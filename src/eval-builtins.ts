@@ -737,6 +737,158 @@ function cacheEvict(ch: CacheHandle): void {
 const _globalCache = makeCacheHandle(10000);
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ══════════════════════════════════════════════════════════════════════════════
+// IO Worker — YIELD Runtime (YIELD-1: SAB 설계 + 인라인 Worker 코드)
+//
+// 아키텍처: YIELD-SEMANTICS.fds 명세 준수
+//   Main thread (synchronous interpreter) ←→ IO Worker (async TCP)
+//   SharedArrayBuffer ring buffer로 Worker→Main 이벤트 전달
+//   fl-yield 호출 시 ring buffer drain → callback dispatch
+//
+// SAB Layout:
+//   ctrlBuf (Int32Array, 4 slots × 4B = 16B):
+//     ctrl[0] = writePos  — Worker가 기록 후 전진 (byte offset)
+//     ctrl[1] = readPos   — Main이 읽은 후 전진 (byte offset)
+//     ctrl[2] = notify    — Worker → Main 신호 (Atomics.notify)
+//     ctrl[3] = reserved
+//   dataBuf (8MB ring buffer):
+//     각 이벤트: [4B length LE][JSON bytes]
+//     wrap sentinel: length = 0xFFFFFFFF → readPos를 0으로 리셋
+// ══════════════════════════════════════════════════════════════════════════════
+
+const IO_CTRL_SLOTS = 4;
+const IO_CTRL_SIZE  = IO_CTRL_SLOTS * 4; // 16 bytes
+const IO_DATA_SIZE  = 8 * 1024 * 1024;  // 8MB
+
+const IO_SLOT_WRITE  = 0; // ctrl[0]: writePos (Worker owns)
+const IO_SLOT_READ   = 1; // ctrl[1]: readPos  (Main owns)
+const IO_SLOT_NOTIFY = 2; // ctrl[2]: notify   (Worker writes, Main waits)
+// ctrl[3] reserved
+
+const _ioWorkerCode = `
+const { workerData, parentPort } = require('worker_threads');
+const net = require('net');
+
+const ctrl = new Int32Array(workerData.ctrlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const DATA_SIZE = ${IO_DATA_SIZE};
+const WP = ${IO_SLOT_WRITE};
+const NOTIFY = ${IO_SLOT_NOTIFY};
+
+// push: JSON 이벤트를 ring buffer에 기록하고 Main을 깨움
+// wrap sentinel(0xFFFFFFFF) 패턴으로 버퍼 끝 처리
+function push(eventStr) {
+  const encoded = Buffer.from(eventStr, 'utf8');
+  const totalLen = 4 + encoded.length;
+  let wp = Atomics.load(ctrl, WP);
+  // 현재 위치에 이벤트가 들어가지 않으면 wrap sentinel 기록 후 0으로 이동
+  if (wp + totalLen > DATA_SIZE - 8) {
+    data.writeUInt32LE(0xFFFFFFFF, wp);
+    wp = 0;
+  }
+  data.writeUInt32LE(encoded.length, wp);
+  encoded.copy(data, wp + 4);
+  Atomics.store(ctrl, WP, wp + totalLen);
+  Atomics.store(ctrl, NOTIFY, 1);
+  Atomics.notify(ctrl, NOTIFY);
+}
+
+// 소켓 레지스트리: id → { sock, handler }
+const sockets = new Map();
+// 서버 레지스트리: port → net.Server
+const servers = new Map();
+
+parentPort.on('message', (msg) => {
+  const { cmd } = msg;
+
+  if (cmd === 'tcp-outbound') {
+    const { id, host, port, handler } = msg;
+    const sock = new net.Socket();
+    sockets.set(id, { sock, handler });
+    sock.connect(port, host);
+    sock.on('connect', () =>
+      push(JSON.stringify({ ev: 'connect', id, handler })));
+    sock.on('data', (chunk) =>
+      push(JSON.stringify({ ev: 'data', id, handler, hex: chunk.toString('hex') })));
+    sock.on('close', () => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'close', id, handler }));
+    });
+    sock.on('error', (e) => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'error', id, handler, msg: e.message }));
+    });
+  }
+
+  if (cmd === 'tcp-write') {
+    const entry = sockets.get(msg.id);
+    if (entry && !entry.sock.destroyed) {
+      entry.sock.write(Buffer.from(msg.hex, 'hex'));
+    }
+  }
+
+  if (cmd === 'tcp-drop') {
+    const entry = sockets.get(msg.id);
+    if (entry) { entry.sock.destroy(); sockets.delete(msg.id); }
+  }
+
+  if (cmd === 'tcp-server-raw') {
+    const { port, handler } = msg;
+    if (servers.has(port)) return;
+    let seq = 0;
+    const server = net.createServer((sock) => {
+      const cid = 'conn_' + port + '_' + (++seq);
+      sockets.set(cid, { sock, handler });
+      push(JSON.stringify({ ev: 'accept', id: cid, handler }));
+      sock.on('data', (chunk) =>
+        push(JSON.stringify({ ev: 'data', id: cid, handler, hex: chunk.toString('hex') })));
+      sock.on('close', () => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'close', id: cid, handler }));
+      });
+      sock.on('error', (e) => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'error', id: cid, handler, msg: e.message }));
+      });
+    });
+    server.listen(port, () =>
+      push(JSON.stringify({ ev: 'listening', id: port, handler })));
+    servers.set(port, server);
+  }
+
+  if (cmd === 'tcp-server-stop') {
+    const server = servers.get(msg.port);
+    if (server) { server.close(); servers.delete(msg.port); }
+  }
+});
+`;
+
+// __ensureIoWorker: IO Worker를 lazy 초기화한다.
+// 동일 Worker 인스턴스를 globalThis에 보관 (프로세스 수명 동안 단일 Worker).
+function __ensureIoWorker(): void {
+  if ((globalThis as any).__ioWorker) return;
+  const { Worker: IoWorker } = require("worker_threads");
+  const ctrlBuf = new SharedArrayBuffer(IO_CTRL_SIZE);
+  const dataBuf = new SharedArrayBuffer(IO_DATA_SIZE);
+  const ctrl = new Int32Array(ctrlBuf);
+  Atomics.store(ctrl, IO_SLOT_WRITE,  0);
+  Atomics.store(ctrl, IO_SLOT_READ,   0);
+  Atomics.store(ctrl, IO_SLOT_NOTIFY, 0);
+  const worker = new IoWorker(_ioWorkerCode, {
+    eval: true,
+    workerData: { ctrlBuf, dataBuf },
+  });
+  worker.on("error", (e: any) => {
+    process.stderr.write(`[IO Worker] error: ${e.message}\n`);
+    (globalThis as any).__ioWorker = null;
+  });
+  (globalThis as any).__ioWorker   = worker;
+  (globalThis as any).__ioCtrlBuf  = ctrlBuf;
+  (globalThis as any).__ioDataBuf  = dataBuf;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // AI-First #3: snake_case ↔ kebab-case 양방향 허용
   // 내부 구현은 kebab-case 기준 — snake_case 입력 시 자동 변환

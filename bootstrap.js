@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -393,8 +392,8 @@ function makeTemplateString(value, line) {
 function makeVariable(name, line) {
   return { kind: "variable", name, line };
 }
-function makeSExpr(op, args3, line) {
-  return { kind: "sexpr", op, args: args3, line };
+function makeSExpr(op, args2, line) {
+  return { kind: "sexpr", op, args: args2, line };
 }
 function makeKeyword(name) {
   return { kind: "keyword", name };
@@ -450,11 +449,11 @@ function makeThrowExpression(argument) {
 function makePageNode(name, title, route, component, metadata, line) {
   return { kind: "page", name, title, route, component, metadata, line };
 }
-function makeRouteNode(name, path19, method, handler, middleware, validation, line) {
-  return { kind: "route", name, path: path19, method, handler, middleware, validation, line };
+function makeRouteNode(name, path15, method, handler, middleware, validation, line) {
+  return { kind: "route", name, path: path15, method, handler, middleware, validation, line };
 }
-function makeComponentNode(name, render, state, computed, watch2, methods, slots, line) {
-  return { kind: "component", name, render, state, computed, watch: watch2, methods, slots, line };
+function makeComponentNode(name, render, state, computed, watch, methods, slots, line) {
+  return { kind: "component", name, render, state, computed, watch, methods, slots, line };
 }
 function makeFormNode(name, fields, validation, submit, handlers, line) {
   return { kind: "form", name, fields, validation, submit, handlers, line };
@@ -1208,12 +1207,12 @@ var init_parser = __esm({
             op = `${op}[${typeArgs.join(", ")}]`;
           }
         }
-        const args3 = [];
+        const args2 = [];
         while (!this.check("RParen" /* RParen */) && !this.isAtEnd()) {
-          args3.push(this.parseValue());
+          args2.push(this.parseValue());
         }
         this.expect("RParen" /* RParen */);
-        return makeSExpr(op, args3, opToken.line);
+        return makeSExpr(op, args2, opToken.line);
       }
       // Parse type annotation: int, string, bool, array<T>, map<K,V>, T?
       parseTypeAnnotation() {
@@ -2410,12 +2409,12 @@ ${parenHint}` : parenHint;
       }
       // Phase 11: Parse PAGE block - [PAGE name :path "/" :render "<h1>...</h1>" :title "..." :component ComponentName]
       parsePage(name, fields, line) {
-        const path19 = this.extractStringField(fields, "path");
+        const path15 = this.extractStringField(fields, "path");
         const title = this.extractStringField(fields, "title");
         const render = this.extractStringField(fields, "render");
         const component = this.extractSymbolField(fields, "component");
         const metadata = this.extractMapField(fields, "metadata");
-        const pageNode = makePageNode(name, title, path19, component, metadata, line);
+        const pageNode = makePageNode(name, title, path15, component, metadata, line);
         if (render) {
           pageNode.fields = pageNode.fields || /* @__PURE__ */ new Map();
           pageNode.fields.set("render", { kind: "literal", type: "string", value: render });
@@ -2424,22 +2423,22 @@ ${parenHint}` : parenHint;
       }
       // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
       parseRoute(name, fields, line) {
-        const path19 = this.extractStringField(fields, "path");
+        const path15 = this.extractStringField(fields, "path");
         const method = this.extractStringField(fields, "method");
         const handler = this.extractSymbolField(fields, "handler");
         const middleware = this.extractSymbolArrayField(fields, "middleware");
         const validation = this.extractSymbolField(fields, "validation");
-        return makeRouteNode(name, path19, method, handler, middleware, validation, line);
+        return makeRouteNode(name, path15, method, handler, middleware, validation, line);
       }
       // Phase 11: Parse COMPONENT block - [COMPONENT name :render renderFn :state stateName :methods [...]]
       parseComponent(name, fields, line) {
         const render = this.extractSymbolField(fields, "render");
         const state = this.extractSymbolField(fields, "state");
         const computed = this.extractSymbolArrayField(fields, "computed");
-        const watch2 = this.extractWatchField(fields, "watch");
+        const watch = this.extractWatchField(fields, "watch");
         const methods = this.extractMethodsField(fields, "methods");
         const slots = this.extractSymbolArrayField(fields, "slots");
-        return makeComponentNode(name, render, state, computed, watch2, methods, slots, line);
+        return makeComponentNode(name, render, state, computed, watch, methods, slots, line);
       }
       // Phase 11: Parse FORM block - [FORM name :fields [...] :validation validationFn :submit submitFn]
       parseForm(name, fields, line) {
@@ -2792,922 +2791,19 @@ var init_errors = __esm({
 // src/_stdlib-signatures.json
 var require_stdlib_signatures = __commonJS({
   "src/_stdlib-signatures.json"(exports2, module2) {
-    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "capture-error", name: "capture_error_args", params: "fn args context?", returns: "{ok, result, error?}" }, { module: "capture-error", name: "error_log", params: "", returns: "[{message, name, stack, timestamp, context?}, ...]" }, { module: "capture-error", name: "error_log_clear", params: "", returns: "count cleared" }, { module: "capture-error", name: "error_log_last", params: "n?", returns: "last n errors (default 10)" }, { module: "capture-error", name: "error_count", params: "", returns: "number of captured errors" }, { module: "capture-error", name: "make_error", params: "message name? code?", returns: "plain object" }, { module: "capture-error", name: "error_message", params: "err", returns: "string" }, { module: "capture-error", name: "error_stack", params: "err", returns: "[string]" }, { module: "capture-error", name: "retry", params: "fn attempts delay_ms?", returns: "{ok, result, attempts_used, error?}" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "frequencies", params: "arr", returns: "{value: count}  (count occurrences of each value)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "csv-parse", params: "text [delimiter]", returns: "[[string]] (quoted fields \uC644\uC804 \uC9C0\uC6D0)" }, { module: "data", name: "csv-parse-map", params: "text [delimiter]", returns: "[{header: val}] (\uD5E4\uB354 \uD3EC\uD568 \uD30C\uC2F1)" }, { module: "data", name: "csv-stringify", params: "rows [delimiter]", returns: "string" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "data", name: "empty?", params: "x", returns: "boolean (\uBC30\uC5F4/\uBB38\uC790\uC5F4/\uAC1D\uCCB4/nil \uBAA8\uB450 \uC9C0\uC6D0)" }, { module: "data", name: "array-empty?", params: "x", returns: "boolean (\uBC30\uC5F4\uB9CC \uD655\uC778)" }, { module: "data", name: "str_replace_in", params: "s old new", returns: "string (replaceAll, \uC778\uC790 \uC21C\uC11C: s \uBA3C\uC800)" }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: '""' }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "file", name: "file_read_or", params: "filePath defaultVal", returns: "string | any (\uD30C\uC77C \uC5C6\uAC70\uB098 \uC624\uB958 \uC2DC \uAE30\uBCF8\uAC12 \uBC18\uD658)" }, { module: "http-macro", name: "http_get_json", params: "url headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_post_json", params: "url body headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_ok?", params: "result", returns: "boolean" }, { module: "http-macro", name: "http_body", params: "result", returns: "parsed body or null" }, { module: "http-macro", name: "http_status", params: "result", returns: "number" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_static", params: "dir [urlPrefix]", returns: 'null  \uC815\uC801 \uD30C\uC77C \uC11C\uBE59 (server-static "public" "/")' }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_csp_nonce", params: "", returns: "string (\uD604\uC7AC \uC694\uCCAD\uC758 CSP nonce \u2014 <script nonce=...> \uB4F1\uC5D0 \uC0AC\uC6A9)" }, { module: "http-server", name: "server_set_cookie", params: "name value opts", returns: "cookie string (HttpOnly+Secure+SameSite \uC790\uB3D9)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_files", params: "req", returns: "array of multipart files" }, { module: "http-server", name: "server_req_fields", params: "req", returns: "map of multipart text fields" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_post_bearer", params: "url body token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_retry_post", params: "url body token retries", returns: '{:status 200 :body "..."}' }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "http", name: "http-post-data", params: "url data", returns: "parsed JSON data | nil  (#12 \uD574\uACB0)" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "optional", name: "require_optional", params: "modName", returns: "true/false (\uC124\uCE58 \uC5EC\uBD80)" }, { module: "optional", name: "optional_call", params: "modName fnPath args", returns: "result or throws" }, { module: "optional", name: "optional_has?", params: "modName", returns: "boolean" }, { module: "optional", name: "optional_version", params: "modName", returns: "string or nil" }, { module: "perf", name: "profile_fn", params: "fn count", returns: "PerfResult" }, { module: "perf", name: "trace_expr", params: "fn label", returns: "TraceResult" }, { module: "perf", name: "perf_stats", params: "", returns: "PerfStats" }, { module: "perf", name: "now_ms", params: "", returns: "number" }, { module: "perf", name: "elapsed_ms", params: "start", returns: "number" }, { module: "perf", name: "bench", params: "fn iterations", returns: "{ms, ops_per_sec}" }, { module: "perf", name: "time_fn", params: "fn args...", returns: "{result, ms}" }, { module: "process", name: "shell_exec_stdout", params: "cmd cwd?", returns: "string | null (stdout\uB9CC \uBC18\uD658, \uC2E4\uD328 \uC2DC null)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "rest-crud", name: "route_info", params: "basePath", returns: "{base, param_name, supported_ops: [...]}" }, { module: "rest-crud", name: "path_param", params: "req paramName", returns: "string or nil" }, { module: "rest-crud", name: "rest_response", params: "status body", returns: "Map" }, { module: "rest-crud", name: "rest_ok", params: "body", returns: "Map (200)" }, { module: "rest-crud", name: "rest_created", params: "body", returns: "Map (201)" }, { module: "rest-crud", name: "rest_not_found", params: "msg", returns: "Map (404)" }, { module: "rest-crud", name: "rest_error", params: "status msg", returns: "Map" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_safe", params: "program args", returns: "string (\uC778\uC790 \uBC30\uC5F4 \uBC29\uC2DD \u2014 \uC0AC\uC6A9\uC790 \uC785\uB825 \uC548\uC804 \uC2E4\uD589, sh -c \uBBF8\uC0AC\uC6A9)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string | null (\uD658\uACBD\uBCC0\uC218 \uC5C6\uC73C\uBA74 null)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "verify", name: "check_parens", params: "code", returns: "VerifyResult" }, { module: "verify", name: "verify_code", params: "code", returns: "{valid, error_count, first_error}" }, { module: "verify", name: "fix_parens", params: "code", returns: "\uC790\uB3D9 \uC218\uC815\uB41C \uCF54\uB4DC (or original if already valid)" }, { module: "verify", name: "count_parens", params: "code", returns: "{open, close, balanced}" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
+    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "binary", name: "buf_u32be", params: "n", returns: "string (base64 of 4-byte big-endian uint32)" }, { module: "binary", name: "buf_u8", params: "n", returns: "string (base64 of 1 byte)" }, { module: "binary", name: "buf_str", params: "s", returns: "string (base64 of UTF-8 encoded string)" }, { module: "binary", name: "buf_concat", params: "list", returns: "string (base64 of concatenated byte buffers)" }, { module: "binary", name: "buf_len", params: "b64", returns: "number (byte count)" }, { module: "binary", name: "buf_read_u32be", params: "b64 offset", returns: "number (big-endian uint32 at byte offset)" }, { module: "binary", name: "buf_read_u8", params: "b64 offset", returns: "number (uint8 at byte offset)" }, { module: "binary", name: "buf_read_str", params: "b64 offset len", returns: "string (UTF-8 string from byte range)" }, { module: "binary", name: "buf_crc32", params: "b64", returns: "number (IEEE 802.3 CRC32 of all bytes)" }, { module: "binary", name: "buf_slice", params: "b64 offset len", returns: "string (sub-buffer as base64)" }, { module: "binary", name: "buf_from_bytes", params: "b64", returns: "string (alias: identity, for clarity in code)" }, { module: "binary", name: "buf_f64le", params: "n", returns: "string (base64 of 8-byte float64 little-endian)" }, { module: "binary", name: "buf_read_f64le", params: "b64 offset", returns: "number (float64 LE at byte offset)" }, { module: "binary", name: "buf_u32le", params: "n", returns: "string (base64 of 4-byte uint32 little-endian)" }, { module: "binary", name: "buf_read_u32le", params: "b64 offset", returns: "number (uint32 LE at byte offset)" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "capture-error", name: "capture_error_args", params: "fn args context?", returns: "{ok, result, error?}" }, { module: "capture-error", name: "error_log", params: "", returns: "[{message, name, stack, timestamp, context?}, ...]" }, { module: "capture-error", name: "error_log_clear", params: "", returns: "count cleared" }, { module: "capture-error", name: "error_log_last", params: "n?", returns: "last n errors (default 10)" }, { module: "capture-error", name: "error_count", params: "", returns: "number of captured errors" }, { module: "capture-error", name: "make_error", params: "message name? code?", returns: "plain object" }, { module: "capture-error", name: "error_message", params: "err", returns: "string" }, { module: "capture-error", name: "error_stack", params: "err", returns: "[string]" }, { module: "capture-error", name: "retry", params: "fn attempts delay_ms?", returns: "{ok, result, attempts_used, error?}" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "frequencies", params: "arr", returns: "{value: count}  (count occurrences of each value)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "csv-parse", params: "text [delimiter]", returns: "[[string]] (quoted fields \uC644\uC804 \uC9C0\uC6D0)" }, { module: "data", name: "csv-parse-map", params: "text [delimiter]", returns: "[{header: val}] (\uD5E4\uB354 \uD3EC\uD568 \uD30C\uC2F1)" }, { module: "data", name: "csv-stringify", params: "rows [delimiter]", returns: "string" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "data", name: "empty?", params: "x", returns: "boolean (\uBC30\uC5F4/\uBB38\uC790\uC5F4/\uAC1D\uCCB4/nil \uBAA8\uB450 \uC9C0\uC6D0)" }, { module: "data", name: "array-empty?", params: "x", returns: "boolean (\uBC30\uC5F4\uB9CC \uD655\uC778)" }, { module: "data", name: "str_replace_in", params: "s old new", returns: "string (replaceAll, \uC778\uC790 \uC21C\uC11C: s \uBA3C\uC800)" }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: '""' }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: 'fd  (modes: "r" "w" "a" "r+")' }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean" }, { module: "fd", name: "fd_tell", params: "fd", returns: "number (current position)" }, { module: "fd", name: "fd_size", params: "fd", returns: "number (file size in bytes)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (UTF-8, advances position)" }, { module: "fd", name: "fd_read_bytes", params: "fd bytes", returns: "string (base64-encoded binary, advances position)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (UTF-8, advances position)" }, { module: "fd", name: "fd_write_bytes", params: "fd base64data", returns: "number (bytes written, binary via base64)" }, { module: "fd", name: "fd_truncate", params: "fd size", returns: "boolean (truncate file at given byte offset)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush fd to disk)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "file", name: "file_read_or", params: "filePath defaultVal", returns: "string | any (\uD30C\uC77C \uC5C6\uAC70\uB098 \uC624\uB958 \uC2DC \uAE30\uBCF8\uAC12 \uBC18\uD658)" }, { module: "http-macro", name: "http_get_json", params: "url headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_post_json", params: "url body headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_ok?", params: "result", returns: "boolean" }, { module: "http-macro", name: "http_body", params: "result", returns: "parsed body or null" }, { module: "http-macro", name: "http_status", params: "result", returns: "number" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_static", params: "dir [urlPrefix]", returns: 'null  \uC815\uC801 \uD30C\uC77C \uC11C\uBE59 (server-static "public" "/")' }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_csp_nonce", params: "", returns: "string (\uD604\uC7AC \uC694\uCCAD\uC758 CSP nonce \u2014 <script nonce=...> \uB4F1\uC5D0 \uC0AC\uC6A9)" }, { module: "http-server", name: "server_set_cookie", params: "name value opts", returns: "cookie string (HttpOnly+Secure+SameSite \uC790\uB3D9)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_files", params: "req", returns: "array of multipart files" }, { module: "http-server", name: "server_req_fields", params: "req", returns: "map of multipart text fields" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_post_bearer", params: "url body token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_retry_post", params: "url body token retries", returns: '{:status 200 :body "..."}' }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "http", name: "http-post-data", params: "url data", returns: "parsed JSON data | nil  (#12 \uD574\uACB0)" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "optional", name: "require_optional", params: "modName", returns: "true/false (\uC124\uCE58 \uC5EC\uBD80)" }, { module: "optional", name: "optional_call", params: "modName fnPath args", returns: "result or throws" }, { module: "optional", name: "optional_has?", params: "modName", returns: "boolean" }, { module: "optional", name: "optional_version", params: "modName", returns: "string or nil" }, { module: "perf", name: "profile_fn", params: "fn count", returns: "PerfResult" }, { module: "perf", name: "trace_expr", params: "fn label", returns: "TraceResult" }, { module: "perf", name: "perf_stats", params: "", returns: "PerfStats" }, { module: "perf", name: "now_ms", params: "", returns: "number" }, { module: "perf", name: "elapsed_ms", params: "start", returns: "number" }, { module: "perf", name: "bench", params: "fn iterations", returns: "{ms, ops_per_sec}" }, { module: "perf", name: "time_fn", params: "fn args...", returns: "{result, ms}" }, { module: "process", name: "shell_exec_stdout", params: "cmd cwd?", returns: "string | null (stdout\uB9CC \uBC18\uD658, \uC2E4\uD328 \uC2DC null)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "rest-crud", name: "route_info", params: "basePath", returns: "{base, param_name, supported_ops: [...]}" }, { module: "rest-crud", name: "path_param", params: "req paramName", returns: "string or nil" }, { module: "rest-crud", name: "rest_response", params: "status body", returns: "Map" }, { module: "rest-crud", name: "rest_ok", params: "body", returns: "Map (200)" }, { module: "rest-crud", name: "rest_created", params: "body", returns: "Map (201)" }, { module: "rest-crud", name: "rest_not_found", params: "msg", returns: "Map (404)" }, { module: "rest-crud", name: "rest_error", params: "status msg", returns: "Map" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_safe", params: "program args", returns: "string (\uC778\uC790 \uBC30\uC5F4 \uBC29\uC2DD \u2014 \uC0AC\uC6A9\uC790 \uC785\uB825 \uC548\uC804 \uC2E4\uD589, sh -c \uBBF8\uC0AC\uC6A9)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string | null (\uD658\uACBD\uBCC0\uC218 \uC5C6\uC73C\uBA74 null)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "verify", name: "check_parens", params: "code", returns: "VerifyResult" }, { module: "verify", name: "verify_code", params: "code", returns: "{valid, error_count, first_error}" }, { module: "verify", name: "fix_parens", params: "code", returns: "\uC790\uB3D9 \uC218\uC815\uB41C \uCF54\uB4DC (or original if already valid)" }, { module: "verify", name: "count_parens", params: "code", returns: "{open, close, balanced}" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
   }
 });
 
-// src/debugger.ts
-var debugger_exports = {};
-__export(debugger_exports, {
-  DebugSession: () => DebugSession,
-  getGlobalDebugSession: () => getGlobalDebugSession,
-  handleBreak: () => handleBreak,
-  setGlobalDebugSession: () => setGlobalDebugSession
+// src/runtime-entry.ts
+var runtime_entry_exports = {};
+__export(runtime_entry_exports, {
+  Interpreter: () => Interpreter,
+  interpret: () => interpret,
+  lex: () => lex,
+  parse: () => parse
 });
-function getGlobalDebugSession() {
-  if (!_globalSession) {
-    _globalSession = new DebugSession();
-  }
-  return _globalSession;
-}
-function setGlobalDebugSession(session) {
-  _globalSession = session;
-}
-function handleBreak(session, loc, env2) {
-  if (!session.enabled) return;
-  session.onBreak(loc, env2);
-}
-var DebugSession, _globalSession;
-var init_debugger = __esm({
-  "src/debugger.ts"() {
-    DebugSession = class _DebugSession {
-      constructor() {
-        /** 중단점 집합 — "file:line" 형태 */
-        this.breakpoints = /* @__PURE__ */ new Set();
-        /** step 모드 — true면 모든 줄에서 break */
-        this.stepMode = false;
-        /** 디버그 모드 활성화 여부 */
-        this.enabled = false;
-        /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
-        this.onBreakCallback = null;
-        /** 소스맵 (선택적) */
-        this.sourceMap = null;
-        /** 브레이크 이벤트 로그 (테스트 검증용) */
-        this.breakLog = [];
-        /** watch 변수 목록 */
-        this.watchList = /* @__PURE__ */ new Set();
-        /** 호출 스택 */
-        this.callStack = [];
-      }
-      static _key(file, line) {
-        return `${file}:${line}`;
-      }
-      /** 중단점 추가 */
-      addBreakpoint(file, line) {
-        this.breakpoints.add(_DebugSession._key(file, line));
-      }
-      /** 중단점 제거 */
-      removeBreakpoint(file, line) {
-        this.breakpoints.delete(_DebugSession._key(file, line));
-      }
-      /** 해당 위치가 중단점인지 확인 */
-      isBreakpoint(file, line) {
-        return this.breakpoints.has(_DebugSession._key(file, line));
-      }
-      /**
-       * 중단점 도달 시 처리:
-       * - 콘솔에 "[BREAK] file:line:col" 출력
-       * - 환경 변수 스냅샷 기록
-       * - watch 변수 값 출력
-       * - 호출 스택 출력
-       * - 콜백 실행
-       */
-      onBreak(loc, env2) {
-        if (!this.enabled) return;
-        const event = { loc, env: { ...env2 } };
-        this.breakLog.push(event);
-        const locStr = `${loc.file}:${loc.line}:${loc.col}`;
-        console.log(`[BREAK] ${locStr}`);
-        if (this.callStack.length > 0) {
-          console.log(`  stack: [${this.callStack.join(" > ")}]`);
-        }
-        if (this.watchList.size > 0) {
-          const watchValues = this.getWatchValues(env2);
-          const hasWatched = Object.keys(watchValues).length > 0;
-          if (hasWatched) {
-            console.log(`  \u{1F441} watch:`);
-            for (const [k, v] of Object.entries(watchValues)) {
-              const display = typeof v === "object" ? JSON.stringify(v) : String(v);
-              console.log(`    ${k} = ${display.slice(0, 80)}`);
-            }
-          }
-        }
-        const entries = Object.entries(env2).slice(0, 10);
-        if (entries.length > 0) {
-          console.log(`  env:`);
-          for (const [k, v] of entries) {
-            const display = typeof v === "object" ? JSON.stringify(v) : String(v);
-            console.log(`    ${k} = ${display.slice(0, 80)}`);
-          }
-        }
-        if (this.onBreakCallback) {
-          this.onBreakCallback(event);
-        }
-      }
-      /** 중단점 모두 제거 */
-      clearBreakpoints() {
-        this.breakpoints.clear();
-      }
-      /** 중단점 개수 */
-      breakpointCount() {
-        return this.breakpoints.size;
-      }
-      /** watch에 변수 추가 */
-      addWatch(varName) {
-        this.watchList.add(varName);
-      }
-      /** watch에서 변수 제거 */
-      removeWatch(varName) {
-        this.watchList.delete(varName);
-      }
-      /** watch 중인 변수들의 현재값 반환 */
-      getWatchValues(env2) {
-        const values = {};
-        for (const varName of this.watchList) {
-          if (varName in env2) {
-            values[varName] = env2[varName];
-          } else {
-            values[varName] = void 0;
-          }
-        }
-        return values;
-      }
-      /** 호출 스택에 함수명 추가 */
-      pushCall(fnName) {
-        this.callStack.push(fnName);
-      }
-      /** 호출 스택에서 제거 */
-      popCall() {
-        if (this.callStack.length > 0) {
-          this.callStack.pop();
-        }
-      }
-      /** 현재 호출 스택 반환 */
-      getStack() {
-        return [...this.callStack];
-      }
-    };
-    _globalSession = null;
-  }
-});
-
-// src/lint-rules.ts
-var lint_rules_exports = {};
-__export(lint_rules_exports, {
-  ALL_RULES: () => ALL_RULES,
-  arityCheck: () => arityCheck,
-  deadCode: () => deadCode,
-  emptyBody: () => emptyBody,
-  getRuleByName: () => getRuleByName,
-  shadowedVars: () => shadowedVars,
-  undefinedVars: () => undefinedVars,
-  unreachableMatch: () => unreachableMatch,
-  unusedBindings: () => unusedBindings
-});
-function getFuncParams(block) {
-  const paramsField = block.fields.get("params");
-  if (!paramsField) return [];
-  const params = Array.isArray(paramsField) ? paramsField : [paramsField];
-  if (params.length === 1 && params[0].kind === "block" && params[0].type === "Array") {
-    const items = params[0].fields?.get("items");
-    if (!Array.isArray(items)) return [];
-    const result = [];
-    for (const item of items) {
-      if (item.kind === "variable") result.push(item.name);
-      else if (item.kind === "block" && item.type === "Array") {
-        const inner = item.fields?.get("items");
-        if (inner && inner[0]?.kind === "variable") result.push(inner[0].name);
-      }
-    }
-    return result;
-  }
-  return params.filter((p) => p.kind === "variable").map((p) => p.name);
-}
-function getFuncBody(block) {
-  const bodyField = block.fields.get("body");
-  if (!bodyField) return [];
-  return Array.isArray(bodyField) ? bodyField : [bodyField];
-}
-function collectLetBindings(nodes) {
-  const bindings = [];
-  walkAST(nodes, (node) => {
-    if (node.kind === "sexpr" && (node.op === "let" || node.op === "let*" || node.op === "letrec") && node.args.length >= 1) {
-      const bindingsNode = node.args[0];
-      if (bindingsNode.kind === "block" && bindingsNode.type === "Array") {
-        const items = bindingsNode.fields.get("items");
-        if (Array.isArray(items)) {
-          for (const item of items) {
-            if (item.kind === "block" && item.type === "Array") {
-              const subItems = item.fields.get("items");
-              if (Array.isArray(subItems) && subItems[0]?.kind === "variable") {
-                bindings.push({ name: subItems[0].name });
-              }
-            } else if (item.kind === "variable") {
-              bindings.push({ name: item.name });
-            }
-          }
-        }
-      }
-    }
-  });
-  return bindings;
-}
-function getRuleByName(name) {
-  return ALL_RULES.find((r) => r.name === name);
-}
-var undefinedVars, unusedBindings, shadowedVars, arityCheck, emptyBody, unreachableMatch, deadCode, ALL_RULES;
-var init_lint_rules = __esm({
-  "src/lint-rules.ts"() {
-    init_linter();
-    undefinedVars = {
-      name: "undefined-vars",
-      check(ast, ctx) {
-        const diagnostics = [];
-        const globalScope = new Set(ctx.variables);
-        for (const fn of ctx.functions) {
-          globalScope.add("$" + fn);
-          globalScope.add(fn);
-        }
-        for (const node of ast) {
-          if (node.kind === "block" && node.type === "FUNC") {
-            const localScope = new Set(globalScope);
-            for (const p of getFuncParams(node)) {
-              localScope.add(p);
-            }
-            const body = getFuncBody(node);
-            for (const b of collectLetBindings(body)) {
-              localScope.add(b.name);
-            }
-            walkAST(body, (n) => {
-              if (n.kind === "sexpr" && n.op === "define" && n.args[0]?.kind === "variable") {
-                localScope.add(n.args[0].name);
-              }
-            });
-            walkAST(body, (n) => {
-              if (n.kind === "variable") {
-                const name = n.name;
-                const stripped = name.startsWith("$") ? name.slice(1) : name;
-                if (!localScope.has(name) && !localScope.has(stripped) && !localScope.has("$" + stripped)) {
-                  diagnostics.push({
-                    rule: "undefined-vars",
-                    severity: "warn",
-                    message: `\uBBF8\uC815\uC758 \uBCC0\uC218 \uCC38\uC870: ${name} (FUNC ${node.name} \uB0B4)`,
-                    line: node.line
-                  });
-                }
-              }
-            });
-          } else if (node.kind === "sexpr") {
-            walkAST([node], (n) => {
-              if (n.kind === "variable") {
-                const name = n.name;
-                const stripped = name.startsWith("$") ? name.slice(1) : name;
-                if (!globalScope.has(name) && !globalScope.has(stripped) && !globalScope.has("$" + stripped) && !ctx.functions.has(stripped)) {
-                  diagnostics.push({
-                    rule: "undefined-vars",
-                    severity: "warn",
-                    message: `\uBBF8\uC815\uC758 \uBCC0\uC218 \uCC38\uC870: ${name}`
-                  });
-                }
-              }
-            });
-          }
-        }
-        return diagnostics;
-      }
-    };
-    unusedBindings = {
-      name: "unused-bindings",
-      check(ast, ctx) {
-        const diagnostics = [];
-        for (const node of ast) {
-          if (node.kind !== "block" || node.type !== "FUNC") continue;
-          const body = getFuncBody(node);
-          const letBindings = [];
-          walkAST(body, (n) => {
-            if (n.kind === "sexpr" && (n.op === "let" || n.op === "let*") && n.args.length >= 1) {
-              const bindNode = n.args[0];
-              if (bindNode.kind === "block" && bindNode.type === "Array") {
-                const items = bindNode.fields.get("items");
-                if (Array.isArray(items)) {
-                  for (const item of items) {
-                    if (item.kind === "block" && item.type === "Array") {
-                      const subItems = item.fields.get("items");
-                      if (Array.isArray(subItems) && subItems[0]?.kind === "variable") {
-                        letBindings.push({ name: subItems[0].name });
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          });
-          const defineBindings = [];
-          walkAST(body, (n) => {
-            if (n.kind === "sexpr" && n.op === "define" && n.args[0]?.kind === "variable") {
-              defineBindings.push({ name: n.args[0].name });
-            }
-          });
-          const usedVars = /* @__PURE__ */ new Set();
-          walkAST(body, (n) => {
-            if (n.kind === "variable") {
-              usedVars.add(n.name);
-              usedVars.add(n.name.replace(/^\$/, ""));
-            }
-          });
-          for (const binding of letBindings) {
-            const bare = binding.name.replace(/^\$/, "");
-            let useCount = 0;
-            walkAST(body, (n) => {
-              if (n.kind === "variable") {
-                const vbare = n.name.replace(/^\$/, "");
-                if (vbare === bare) useCount++;
-              }
-            });
-            if (useCount < 2) {
-              diagnostics.push({
-                rule: "unused-bindings",
-                severity: "warn",
-                message: `\uBBF8\uC0AC\uC6A9 let \uBC14\uC778\uB529: ${binding.name} (FUNC ${node.name} \uB0B4)`
-              });
-            }
-          }
-          for (const binding of defineBindings) {
-            const bare = binding.name.replace(/^\$/, "");
-            let useCount = 0;
-            walkAST(body, (n) => {
-              if (n.kind === "variable") {
-                const vbare = n.name.replace(/^\$/, "");
-                if (vbare === bare) useCount++;
-              }
-            });
-            if (useCount < 2) {
-              diagnostics.push({
-                rule: "unused-bindings",
-                severity: "warn",
-                message: `\uBBF8\uC0AC\uC6A9 define \uBC14\uC778\uB529: ${binding.name} (FUNC ${node.name} \uB0B4)`
-              });
-            }
-          }
-        }
-        return diagnostics;
-      }
-    };
-    shadowedVars = {
-      name: "shadowed-vars",
-      check(ast, ctx) {
-        const diagnostics = [];
-        for (const node of ast) {
-          if (node.kind !== "block" || node.type !== "FUNC") continue;
-          const paramNames = new Set(getFuncParams(node).map((p) => p.replace(/^\$/, "")));
-          const body = getFuncBody(node);
-          walkAST(body, (n) => {
-            if (n.kind === "sexpr" && (n.op === "let" || n.op === "let*") && n.args.length >= 1) {
-              const bindNode = n.args[0];
-              if (bindNode.kind === "block" && bindNode.type === "Array") {
-                const items = bindNode.fields.get("items");
-                if (Array.isArray(items)) {
-                  for (const item of items) {
-                    if (item.kind === "block" && item.type === "Array") {
-                      const subItems = item.fields.get("items");
-                      if (Array.isArray(subItems) && subItems[0]?.kind === "variable") {
-                        const vname = subItems[0].name.replace(/^\$/, "");
-                        if (paramNames.has(vname)) {
-                          diagnostics.push({
-                            rule: "shadowed-vars",
-                            severity: "warn",
-                            message: `\uBCC0\uC218 \uC100\uB3C4\uC789: $${vname}\uB294 \uD30C\uB77C\uBBF8\uD130\uB97C \uB36E\uC5B4\uC501\uB2C8\uB2E4 (FUNC ${node.name})`
-                          });
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          });
-          for (const param of paramNames) {
-            if (ctx.variables.has("$" + param) || ctx.variables.has(param)) {
-              diagnostics.push({
-                rule: "shadowed-vars",
-                severity: "info",
-                message: `\uD30C\uB77C\uBBF8\uD130 $${param}\uC774 \uC804\uC5ED \uBCC0\uC218\uB97C \uC100\uB3C4\uC789\uD569\uB2C8\uB2E4 (FUNC ${node.name})`
-              });
-            }
-          }
-        }
-        return diagnostics;
-      }
-    };
-    arityCheck = {
-      name: "arity-check",
-      check(ast, ctx) {
-        const diagnostics = [];
-        const variadic = /* @__PURE__ */ new Set([
-          "print",
-          "println",
-          "list",
-          "array",
-          "concat",
-          "str",
-          "+",
-          "-",
-          "*",
-          "/",
-          "and",
-          "or",
-          "do",
-          "begin",
-          "cond",
-          "if",
-          "let",
-          "let*",
-          "define",
-          "match",
-          "fn",
-          "map",
-          "filter",
-          "each",
-          "reduce",
-          "range"
-        ]);
-        function checkCallArgs(sexpr) {
-          if (sexpr.kind !== "sexpr") return;
-          const fnName = sexpr.op;
-          if (variadic.has(fnName)) return;
-          const expectedArity = ctx.funcArity.get(fnName);
-          if (expectedArity === void 0) return;
-          const actualArgs = sexpr.args.length;
-          if (actualArgs !== expectedArity) {
-            diagnostics.push({
-              rule: "arity-check",
-              severity: "warn",
-              message: `\uD568\uC218 ${fnName}: ${expectedArity}\uAC1C \uC778\uC790 \uD544\uC694, ${actualArgs}\uAC1C \uC804\uB2EC\uB428`,
-              line: sexpr.line
-            });
-          }
-          for (const arg of sexpr.args) {
-            if (arg.kind === "sexpr") checkCallArgs(arg);
-          }
-        }
-        walkAST(ast, (node) => {
-          if (node.kind === "sexpr") {
-            checkCallArgs(node);
-          }
-        });
-        return diagnostics;
-      }
-    };
-    emptyBody = {
-      name: "empty-body",
-      check(ast, ctx) {
-        const diagnostics = [];
-        for (const node of ast) {
-          if (node.kind !== "block" || node.type !== "FUNC") continue;
-          const bodyField = node.fields.get("body");
-          let isEmpty = false;
-          if (!bodyField) {
-            isEmpty = true;
-          } else if (Array.isArray(bodyField) && bodyField.length === 0) {
-            isEmpty = true;
-          } else if (!Array.isArray(bodyField) && bodyField.kind === "block" && bodyField.type === "Array") {
-            const items = bodyField.fields?.get("items");
-            if (!items || Array.isArray(items) && items.length === 0) {
-              isEmpty = true;
-            }
-          }
-          if (isEmpty) {
-            diagnostics.push({
-              rule: "empty-body",
-              severity: "warn",
-              message: `\uBE48 \uD568\uC218 \uBC14\uB514: FUNC ${node.name}`,
-              line: node.line
-            });
-          }
-        }
-        return diagnostics;
-      }
-    };
-    unreachableMatch = {
-      name: "unreachable-match",
-      check(ast, ctx) {
-        const diagnostics = [];
-        walkAST(ast, (node) => {
-          if (node.kind === "sexpr" && node.op === "cond") {
-            let elseFound = false;
-            for (let i = 0; i < node.args.length; i++) {
-              const clause = node.args[i];
-              if (elseFound) {
-                diagnostics.push({
-                  rule: "unreachable-match",
-                  severity: "warn",
-                  message: `\uB3C4\uB2EC \uBD88\uAC00 cond \uCF00\uC774\uC2A4: else \uC774\uD6C4 \uCF00\uC774\uC2A4 \uBC1C\uACAC (\uC778\uB371\uC2A4 ${i})`,
-                  line: node.line
-                });
-                break;
-              }
-              if (clause.kind === "block" && clause.type === "Array") {
-                const items = clause.fields.get("items");
-                if (Array.isArray(items) && items.length >= 1) {
-                  const condExpr = items[0];
-                  if (condExpr.kind === "literal" && condExpr.value === true || condExpr.kind === "literal" && condExpr.type === "symbol" && condExpr.value === "else" || condExpr.kind === "sexpr" && condExpr.op === "else") {
-                    elseFound = true;
-                  }
-                }
-              } else if (clause.kind === "sexpr" && clause.op === "else") {
-                elseFound = true;
-              }
-            }
-          }
-          if (node.kind === "pattern-match") {
-            let wildcardFound = false;
-            for (let i = 0; i < node.cases.length; i++) {
-              const c = node.cases[i];
-              if (wildcardFound) {
-                diagnostics.push({
-                  rule: "unreachable-match",
-                  severity: "warn",
-                  message: `\uB3C4\uB2EC \uBD88\uAC00 match \uCF00\uC774\uC2A4: wildcard \uC774\uD6C4 \uCF00\uC774\uC2A4 (\uC778\uB371\uC2A4 ${i})`
-                });
-                break;
-              }
-              if (c.pattern.kind === "wildcard-pattern") {
-                wildcardFound = true;
-              }
-            }
-          }
-        });
-        return diagnostics;
-      }
-    };
-    deadCode = {
-      name: "dead-code",
-      check(ast, ctx) {
-        const diagnostics = [];
-        function isPureValue(node) {
-          if (node.kind === "literal") return true;
-          if (node.kind === "variable") return true;
-          if (node.kind === "keyword") return true;
-          if (node.kind === "sexpr") {
-            const pureFns = /* @__PURE__ */ new Set([
-              "+",
-              "-",
-              "*",
-              "/",
-              "%",
-              "<",
-              ">",
-              "<=",
-              ">=",
-              "=",
-              "!=",
-              "and",
-              "or",
-              "not",
-              "str",
-              "num",
-              "bool",
-              "list",
-              "array",
-              "get",
-              "length",
-              "count",
-              "first",
-              "rest",
-              "keys",
-              "values",
-              "concat",
-              "append",
-              "reverse"
-            ]);
-            if (pureFns.has(node.op)) {
-              return node.args.every((a) => isPureValue(a));
-            }
-          }
-          return false;
-        }
-        walkAST(ast, (node) => {
-          if (node.kind === "sexpr" && node.op === "do") {
-            const stmts = node.args;
-            for (let i = 0; i < stmts.length - 1; i++) {
-              if (isPureValue(stmts[i])) {
-                diagnostics.push({
-                  rule: "dead-code",
-                  severity: "warn",
-                  message: `Dead code: do \uBE14\uB85D\uC5D0\uC11C \uACB0\uACFC\uAC00 \uC0AC\uC6A9\uB418\uC9C0 \uC54A\uB294 \uC21C\uC218 \uD45C\uD604\uC2DD (\uC778\uB371\uC2A4 ${i})`,
-                  line: node.line
-                });
-              }
-            }
-          }
-        });
-        return diagnostics;
-      }
-    };
-    ALL_RULES = [
-      undefinedVars,
-      unusedBindings,
-      shadowedVars,
-      arityCheck,
-      emptyBody,
-      unreachableMatch,
-      deadCode
-    ];
-  }
-});
-
-// src/linter.ts
-function walkAST(nodes, cb, parent) {
-  for (const node of nodes) {
-    cb(node, parent);
-    if (node.kind === "block") {
-      for (const [, val] of node.fields) {
-        const children = Array.isArray(val) ? val : [val];
-        walkAST(children, cb, node);
-      }
-    } else if (node.kind === "sexpr") {
-      cb(node, parent);
-      walkAST(node.args, cb, node);
-    } else if (node.kind === "pattern-match") {
-      walkAST([node.value], cb, node);
-      for (const c of node.cases) {
-        walkAST([c.body], cb, node);
-        if (c.guard) walkAST([c.guard], cb, node);
-      }
-      if (node.defaultCase) walkAST([node.defaultCase], cb, node);
-    } else if (node.kind === "try-block") {
-      walkAST([node.body], cb, node);
-      if (node.catchClauses) {
-        for (const clause of node.catchClauses) {
-          walkAST([clause.handler], cb, node);
-        }
-      }
-      if (node.finallyBlock) walkAST([node.finallyBlock], cb, node);
-    } else if (node.kind === "await") {
-      walkAST([node.argument], cb, node);
-    } else if (node.kind === "throw") {
-      walkAST([node.argument], cb, node);
-    } else if (node.kind === "async-function") {
-      walkAST([node.body], cb, node);
-    }
-  }
-}
-function buildLintContext(ast, source) {
-  const functions = /* @__PURE__ */ new Set();
-  const variables = /* @__PURE__ */ new Set();
-  const funcArity = /* @__PURE__ */ new Map();
-  const builtins = [
-    "print",
-    "println",
-    "+",
-    "-",
-    "*",
-    "/",
-    "%",
-    "<",
-    ">",
-    "<=",
-    ">=",
-    "=",
-    "!=",
-    "and",
-    "or",
-    "not",
-    "if",
-    "cond",
-    "let",
-    "define",
-    "do",
-    "begin",
-    "list",
-    "array",
-    "map",
-    "get",
-    "set",
-    "push",
-    "pop",
-    "length",
-    "count",
-    "filter",
-    "reduce",
-    "each",
-    "range",
-    "concat",
-    "str",
-    "num",
-    "bool",
-    "first",
-    "rest",
-    "cons",
-    "nil?",
-    "empty?",
-    "null?",
-    "type-of",
-    "string-length",
-    "substring",
-    "string-split",
-    "string-join",
-    "string-contains",
-    "keys",
-    "values",
-    "entries",
-    "merge",
-    "json-parse",
-    "json-stringify",
-    "throw",
-    "try",
-    "catch",
-    "await",
-    "async",
-    "match",
-    "fn",
-    "let*",
-    "append",
-    "reverse",
-    "sort",
-    "zip",
-    "flat-map",
-    "max",
-    "min",
-    "abs",
-    "floor",
-    "ceil",
-    "round",
-    "sqrt",
-    "pow",
-    "now",
-    "date-format",
-    "sleep",
-    "http-get",
-    "http-post",
-    // Phase 63+ 추가 내장
-    "defstruct",
-    "defprotocol",
-    "impl",
-    "->",
-    "push!",
-    "map-get",
-    "map-set",
-    "defmacro",
-    "when",
-    "unless",
-    "iterate",
-    "take",
-    "filter-lazy",
-    "parallel",
-    "channel",
-    "send!",
-    "receive!",
-    "assoc",
-    "dissoc",
-    "update"
-  ];
-  for (const b of builtins) {
-    functions.add(b);
-  }
-  const knownArities = {
-    "not": 1,
-    "nil?": 1,
-    "empty?": 1,
-    "null?": 1,
-    "type-of": 1,
-    "length": 1,
-    "count": 1,
-    "first": 1,
-    "rest": 1,
-    "reverse": 1,
-    "keys": 1,
-    "values": 1,
-    "json-parse": 1,
-    "json-stringify": 1,
-    "str": 1,
-    "num": 1,
-    "bool": 1,
-    "abs": 1,
-    "floor": 1,
-    "ceil": 1,
-    "round": 1,
-    "sqrt": 1,
-    "print": 1,
-    "println": 1,
-    "+": 2,
-    "-": 2,
-    "*": 2,
-    "/": 2,
-    "%": 2,
-    "<": 2,
-    ">": 2,
-    "<=": 2,
-    ">=": 2,
-    "=": 2,
-    "!=": 2,
-    "and": 2,
-    "or": 2,
-    "get": 2,
-    "push": 2,
-    "cons": 2,
-    "concat": 2,
-    "pow": 2,
-    "merge": 2,
-    "zip": 2,
-    "append": 2,
-    "assoc": 3,
-    "dissoc": 2,
-    "filter": 2,
-    "each": 2,
-    "map": 2,
-    "sort": 2,
-    "flat-map": 2,
-    "reduce": 3,
-    "range": 2,
-    "substring": 3
-  };
-  for (const [fn, arity] of Object.entries(knownArities)) {
-    funcArity.set(fn, arity);
-  }
-  for (const node of ast) {
-    if (node.kind === "block" && node.type === "FUNC") {
-      functions.add(node.name);
-      const paramsField = node.fields.get("params");
-      if (paramsField) {
-        const params = Array.isArray(paramsField) ? paramsField : [paramsField];
-        if (params.length === 1 && params[0].kind === "block" && params[0].type === "Array") {
-          const items = params[0].fields?.get("items");
-          if (Array.isArray(items)) {
-            funcArity.set(node.name, items.length);
-          } else {
-            funcArity.set(node.name, 0);
-          }
-        } else {
-          const varParams = params.filter((p) => p.kind === "variable");
-          funcArity.set(node.name, varParams.length);
-        }
-      } else {
-        funcArity.set(node.name, 0);
-      }
-    }
-  }
-  for (const node of ast) {
-    if (node.kind === "sexpr" && node.op === "define" && node.args.length >= 1) {
-      const nameNode = node.args[0];
-      if (nameNode.kind === "variable") {
-        variables.add(nameNode.name);
-      }
-    }
-  }
-  return { source, functions, variables, funcArity };
-}
-function createDefaultLinter() {
-  const { ALL_RULES: ALL_RULES2 } = (init_lint_rules(), __toCommonJS(lint_rules_exports));
-  const linter = new FLLinter();
-  for (const rule of ALL_RULES2) {
-    linter.addRule(rule);
-  }
-  return linter;
-}
-var FLLinter;
-var init_linter = __esm({
-  "src/linter.ts"() {
-    init_lexer();
-    init_parser();
-    FLLinter = class {
-      constructor() {
-        this.rules = [];
-      }
-      addRule(rule) {
-        this.rules.push(rule);
-        return this;
-      }
-      lint(src) {
-        let tokens;
-        let ast;
-        try {
-          tokens = lex(src);
-          ast = parse(tokens);
-        } catch (e) {
-          return [{
-            rule: "parse-error",
-            severity: "error",
-            message: `Parse error: ${e.message}`
-          }];
-        }
-        const ctx = buildLintContext(ast, src);
-        const diagnostics = [];
-        for (const rule of this.rules) {
-          try {
-            const diags = rule.check(ast, ctx);
-            diagnostics.push(...diags);
-          } catch (e) {
-          }
-        }
-        return diagnostics;
-      }
-      /**
-       * severity 필터링
-       */
-      lintFiltered(src, severity) {
-        return this.lint(src).filter((d) => d.severity === severity);
-      }
-    };
-  }
-});
-
-// src/cli.ts
-var fs20 = __toESM(require("fs"));
-var path18 = __toESM(require("path"));
-var readline = __toESM(require("readline"));
-init_lexer();
-init_parser();
+module.exports = __toCommonJS(runtime_entry_exports);
 
 // src/interpreter.ts
 var fs14 = __toESM(require("fs"));
@@ -4942,11 +4038,11 @@ var FreeLangPromise = class _FreeLangPromise {
    * onFulfilled가 성공했을 때 호출되고, 새로운 Promise 반환
    */
   then(onFulfilled) {
-    return new _FreeLangPromise((resolve9, reject) => {
+    return new _FreeLangPromise((resolve7, reject) => {
       if (this.state === "resolved") {
         try {
           const result = onFulfilled(this.value);
-          resolve9(result);
+          resolve7(result);
         } catch (e) {
           reject(e);
         }
@@ -4956,7 +4052,7 @@ var FreeLangPromise = class _FreeLangPromise {
         this.resolvers.push((value) => {
           try {
             const result = onFulfilled(value);
-            resolve9(result);
+            resolve7(result);
           } catch (e) {
             reject(e);
           }
@@ -4969,21 +4065,21 @@ var FreeLangPromise = class _FreeLangPromise {
    * onRejected가 에러일 때 호출되고, 새로운 Promise 반환
    */
   catch(onRejected) {
-    return new _FreeLangPromise((resolve9, reject) => {
+    return new _FreeLangPromise((resolve7, reject) => {
       if (this.state === "rejected") {
         try {
           const result = onRejected(this.error);
-          resolve9(result);
+          resolve7(result);
         } catch (e) {
           reject(e);
         }
       } else if (this.state === "resolved") {
-        resolve9(this.value);
+        resolve7(this.value);
       } else {
         this.rejecters.push((error) => {
           try {
             const result = onRejected(error);
-            resolve9(result);
+            resolve7(result);
           } catch (e) {
             reject(e);
           }
@@ -4995,7 +4091,7 @@ var FreeLangPromise = class _FreeLangPromise {
    * finally 메서드: 성공/실패 상관없이 항상 실행
    */
   finally(onFinally) {
-    return new _FreeLangPromise((resolve9, reject) => {
+    return new _FreeLangPromise((resolve7, reject) => {
       const executeFinally = () => {
         try {
           onFinally();
@@ -5004,7 +4100,7 @@ var FreeLangPromise = class _FreeLangPromise {
           return;
         }
         if (this.state === "resolved") {
-          resolve9(this.value);
+          resolve7(this.value);
         } else if (this.state === "rejected") {
           reject(this.error);
         }
@@ -5021,9 +4117,9 @@ var FreeLangPromise = class _FreeLangPromise {
    * 모든 Promise가 완료될 때까지 대기
    */
   static all(promises) {
-    return new _FreeLangPromise((resolve9, reject) => {
+    return new _FreeLangPromise((resolve7, reject) => {
       if (promises.length === 0) {
-        resolve9([]);
+        resolve7([]);
         return;
       }
       const results = [];
@@ -5041,13 +4137,13 @@ var FreeLangPromise = class _FreeLangPromise {
             results[i] = value;
             completedCount++;
             if (completedCount === promises.length) {
-              resolve9(results);
+              resolve7(results);
             }
           }).catch((error) => reject(error));
         }
       }
       if (completedCount === promises.length) {
-        resolve9(results);
+        resolve7(results);
       }
     });
   }
@@ -5055,24 +4151,24 @@ var FreeLangPromise = class _FreeLangPromise {
    * 첫 번째로 완료된 Promise 반환
    */
   static race(promises) {
-    return new _FreeLangPromise((resolve9, reject) => {
+    return new _FreeLangPromise((resolve7, reject) => {
       for (const promise of promises) {
         if (promise.state === "resolved") {
-          resolve9(promise.value);
+          resolve7(promise.value);
           return;
         } else if (promise.state === "rejected") {
           reject(promise.error);
           return;
         } else {
-          promise.then((value) => resolve9(value)).catch((error) => reject(error));
+          promise.then((value) => resolve7(value)).catch((error) => reject(error));
         }
       }
     });
   }
 };
 function resolvedPromise(value) {
-  return new FreeLangPromise((resolve9) => {
-    resolve9(value);
+  return new FreeLangPromise((resolve7) => {
+    resolve7(value);
   });
 }
 function rejectedPromise(error) {
@@ -5380,13 +4476,13 @@ var ToolRegistry = class {
     return Array.from(this.tools.values());
   }
   /** 비동기 도구 실행 */
-  async execute(name, args3) {
+  async execute(name, args2) {
     const start = Date.now();
     const tool = this.tools.get(name);
     if (!tool) {
       return {
         tool: name,
-        input: args3,
+        input: args2,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -5395,14 +4491,14 @@ var ToolRegistry = class {
     }
     const timeout = tool.timeout ?? 5e3;
     try {
-      const resultPromise = Promise.resolve(tool.execute(args3));
+      const resultPromise = Promise.resolve(tool.execute(args2));
       const timeoutPromise = new Promise(
         (_, reject) => setTimeout(() => reject(new Error(`Tool timeout: ${name} (${timeout}ms)`)), timeout)
       );
       const output = await Promise.race([resultPromise, timeoutPromise]);
       return {
         tool: name,
-        input: args3,
+        input: args2,
         output,
         durationMs: Date.now() - start,
         success: true
@@ -5410,7 +4506,7 @@ var ToolRegistry = class {
     } catch (e) {
       return {
         tool: name,
-        input: args3,
+        input: args2,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -5419,13 +4515,13 @@ var ToolRegistry = class {
     }
   }
   /** 동기 도구 실행 (비동기 도구는 await 없이 실행) */
-  executeSync(name, args3) {
+  executeSync(name, args2) {
     const start = Date.now();
     const tool = this.tools.get(name);
     if (!tool) {
       return {
         tool: name,
-        input: args3,
+        input: args2,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -5433,10 +4529,10 @@ var ToolRegistry = class {
       };
     }
     try {
-      const output = tool.execute(args3);
+      const output = tool.execute(args2);
       return {
         tool: name,
-        input: args3,
+        input: args2,
         output,
         durationMs: Date.now() - start,
         success: true
@@ -5444,7 +4540,7 @@ var ToolRegistry = class {
     } catch (e) {
       return {
         tool: name,
-        input: args3,
+        input: args2,
         output: null,
         durationMs: Date.now() - start,
         success: false,
@@ -5847,8 +4943,8 @@ var FLStream = class extends import_events.EventEmitter {
   }
   collect() {
     if (this._done) return Promise.resolve(this._collected);
-    return new Promise((resolve9) => {
-      this.once("end", resolve9);
+    return new Promise((resolve7) => {
+      this.once("end", resolve7);
     });
   }
   isDone() {
@@ -5866,12 +4962,12 @@ var FLStream = class extends import_events.EventEmitter {
 };
 function streamText(stream, text, delayMs = 0) {
   const words = text.split(" ");
-  return new Promise((resolve9) => {
+  return new Promise((resolve7) => {
     let i = 0;
     function next() {
       if (i >= words.length) {
         stream.end();
-        resolve9();
+        resolve7();
         return;
       }
       stream.write(i === 0 ? words[i] : " " + words[i]);
@@ -6131,43 +5227,43 @@ function getTrace(id) {
 
 // src/prompt-compiler.ts
 var BLOCK_TEMPLATES = {
-  COT: (args3) => ({
+  COT: (args2) => ({
     name: "chain-of-thought",
     priority: 1,
     content: `Think step by step:
-${(args3.steps ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n")}
+${(args2.steps ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n")}
 Then provide your conclusion.`
   }),
-  TOT: (args3) => ({
+  TOT: (args2) => ({
     name: "tree-of-thought",
     priority: 1,
     content: `Explore multiple approaches:
-${(args3.branches ?? []).map((b) => `- ${b}`).join("\n")}
+${(args2.branches ?? []).map((b) => `- ${b}`).join("\n")}
 Evaluate each and select the best.`
   }),
-  REFLECT: (args3) => ({
+  REFLECT: (args2) => ({
     name: "self-reflection",
     priority: 0.5,
     content: `After responding, reflect on:
-${(args3.criteria ?? ["accuracy", "completeness"]).map((c) => `- ${c}`).join("\n")}
-Score each criterion (0-10) and revise if below ${(args3.threshold ?? 0.7) * 10}.`
+${(args2.criteria ?? ["accuracy", "completeness"]).map((c) => `- ${c}`).join("\n")}
+Score each criterion (0-10) and revise if below ${(args2.threshold ?? 0.7) * 10}.`
   }),
-  AGENT: (args3) => ({
+  AGENT: (args2) => ({
     name: "agent-loop",
     priority: 1,
-    content: `Goal: ${args3.goal ?? "Complete the task"}
-Max steps: ${args3.maxSteps ?? 5}
+    content: `Goal: ${args2.goal ?? "Complete the task"}
+Max steps: ${args2.maxSteps ?? 5}
 For each step: observe \u2192 think \u2192 act \u2192 verify.`
   }),
-  CONTEXT: (args3) => ({
+  CONTEXT: (args2) => ({
     name: "context",
     priority: 1,
-    content: `Context window: ${args3.maxTokens ?? 4096} tokens. Strategy: ${args3.strategy ?? "sliding"}.`
+    content: `Context window: ${args2.maxTokens ?? 4096} tokens. Strategy: ${args2.strategy ?? "sliding"}.`
   }),
-  "SELF-IMPROVE": (args3) => ({
+  "SELF-IMPROVE": (args2) => ({
     name: "self-improvement",
     priority: 0.5,
-    content: `Iterations: ${args3.iterations ?? 3}. After each response, evaluate and improve until satisfied.`
+    content: `Iterations: ${args2.iterations ?? 3}. After each response, evaluate and improve until satisfied.`
   })
 };
 var PromptCompiler = class {
@@ -6175,10 +5271,10 @@ var PromptCompiler = class {
     this.target = target;
   }
   // FL 블록 정보 → 프롬프트 섹션
-  compileBlock(blockType, args3 = {}) {
+  compileBlock(blockType, args2 = {}) {
     const template = BLOCK_TEMPLATES[blockType];
     if (!template) return null;
-    return template(args3);
+    return template(args2);
   }
   // 여러 섹션 → 최종 프롬프트
   compile(sections, userInstruction) {
@@ -6249,8 +5345,8 @@ var FLCodeBuilder = class {
     this.lines.push(`(defn ${name} [${params.map((p) => "$" + p).join(" ")}] ${body})`);
     return this;
   }
-  call(fn, ...args3) {
-    this.lines.push(`(${fn} ${args3.join(" ")})`);
+  call(fn, ...args2) {
+    this.lines.push(`(${fn} ${args2.join(" ")})`);
     return this;
   }
   // AI 블록
@@ -6438,13 +5534,13 @@ function combine(a, b, fn) {
   return reason !== void 0 ? maybe(combinedConfidence, combinedValue, reason) : maybe(combinedConfidence, combinedValue);
 }
 function createMaybeModule(callFunctionValue2, callUserFunction2) {
-  function callFn2(fn, args3) {
-    if (typeof fn === "function") return fn(...args3);
+  function callFn2(fn, args2) {
+    if (typeof fn === "function") return fn(...args2);
     if (fn && fn.kind === "function-value" && callFunctionValue2) {
-      return callFunctionValue2(fn, args3);
+      return callFunctionValue2(fn, args2);
     }
     if (typeof fn === "string" && callUserFunction2) {
-      return callUserFunction2(fn, args3);
+      return callUserFunction2(fn, args2);
     }
     throw new Error(`fn is not a function`);
   }
@@ -10284,14 +9380,14 @@ var CuriosityEngine = class {
    */
   selectNextTopic() {
     if (this.state.frontier.length === 0) return null;
-    const C2 = Math.SQRT2;
+    const C = Math.SQRT2;
     const N = Math.max(1, this.totalVisits);
     let bestTopic = null;
     let bestScore = -Infinity;
     for (const topic of this.state.frontier) {
       const stats = this.ucb1Stats.get(topic) ?? { visits: 0, totalGain: 0 };
       const avgGain = stats.visits > 0 ? stats.totalGain / stats.visits : 0;
-      const exploration = C2 * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
+      const exploration = C * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
       const ucb1Score = avgGain + exploration;
       if (ucb1Score > bestScore) {
         bestScore = ucb1Score;
@@ -10394,13 +9490,13 @@ var CuriosityEngine = class {
    * topics 목록에서 UCB1 점수 기준 내림차순 정렬
    */
   prioritize(topics) {
-    const C2 = Math.SQRT2;
+    const C = Math.SQRT2;
     const N = Math.max(1, this.totalVisits);
     return [...topics].sort((a, b) => {
       const sA = this.ucb1Stats.get(a) ?? { visits: 0, totalGain: 0 };
       const sB = this.ucb1Stats.get(b) ?? { visits: 0, totalGain: 0 };
-      const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
-      const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
+      const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
+      const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
       return scoreB - scoreA;
     });
   }
@@ -11047,14 +10143,14 @@ var WorldModel = class {
     const visited = /* @__PURE__ */ new Set();
     const queue = [{ id: fromId, path: [fromId] }];
     while (queue.length > 0) {
-      const { id, path: path19 } = queue.shift();
+      const { id, path: path15 } = queue.shift();
       if (visited.has(id)) continue;
       visited.add(id);
       const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
       for (const neighbor of neighbors) {
-        if (neighbor === toId) return [...path19, neighbor];
+        if (neighbor === toId) return [...path15, neighbor];
         if (!visited.has(neighbor)) {
-          queue.push({ id: neighbor, path: [...path19, neighbor] });
+          queue.push({ id: neighbor, path: [...path15, neighbor] });
         }
       }
     }
@@ -11635,9 +10731,9 @@ var Predictor = class {
 var globalPredictor = new Predictor();
 
 // src/eval-builtins-ai.ts
-function evalRefactorSelf(op, args3) {
+function evalRefactorSelf(op, args2) {
   if (op === "refactor-analyze") {
-    const code = String(args3[0] ?? "");
+    const code = String(args2[0] ?? "");
     const result = globalRefactorer.refactor(code, true);
     return /* @__PURE__ */ new Map([
       ["suggestions", result.suggestions.map((s) => /* @__PURE__ */ new Map([
@@ -11658,7 +10754,7 @@ function evalRefactorSelf(op, args3) {
     ]);
   }
   if (op === "refactor-suggest") {
-    const code = String(args3[0] ?? "");
+    const code = String(args2[0] ?? "");
     return globalRefactorer.suggest(code).map((s) => /* @__PURE__ */ new Map([
       ["pattern", s.pattern],
       ["location", s.location],
@@ -11669,8 +10765,8 @@ function evalRefactorSelf(op, args3) {
     ]));
   }
   if (op === "refactor-apply") {
-    const code = String(args3[0] ?? "");
-    const rawSuggestions = Array.isArray(args3[1]) ? args3[1] : [];
+    const code = String(args2[0] ?? "");
+    const rawSuggestions = Array.isArray(args2[1]) ? args2[1] : [];
     const suggestions = rawSuggestions.map((s) => {
       if (s instanceof Map) return {
         pattern: s.get("pattern") ?? "extract-duplicate",
@@ -11693,16 +10789,16 @@ function evalRefactorSelf(op, args3) {
     ]);
   }
   if (op === "refactor-complexity") {
-    const code = String(args3[0] ?? "");
+    const code = String(args2[0] ?? "");
     const c = globalRefactorer.analyzeComplexity(code);
     return /* @__PURE__ */ new Map([["lines", c.lines], ["depth", c.depth], ["conditions", c.conditions], ["score", c.score]]);
   }
   if (op === "refactor-quality") {
-    const code = String(args3[0] ?? "");
+    const code = String(args2[0] ?? "");
     return globalRefactorer.qualityScore(code);
   }
   if (op === "refactor-naming") {
-    const code = String(args3[0] ?? "");
+    const code = String(args2[0] ?? "");
     const n = globalRefactorer.analyzeNaming(code);
     return /* @__PURE__ */ new Map([
       ["issues", n.issues.map((i) => /* @__PURE__ */ new Map([
@@ -11714,7 +10810,7 @@ function evalRefactorSelf(op, args3) {
     ]);
   }
   if (op === "refactor-duplicates") {
-    const code = String(args3[0] ?? "");
+    const code = String(args2[0] ?? "");
     return globalRefactorer.findDuplicates(code).map((s) => /* @__PURE__ */ new Map([
       ["pattern", s.pattern],
       ["location", s.location],
@@ -11725,7 +10821,7 @@ function evalRefactorSelf(op, args3) {
     ]));
   }
   if (op === "refactor-score") {
-    const r = args3[0];
+    const r = args2[0];
     if (r instanceof Map) {
       const score = r.get("score");
       if (score instanceof Map) return /* @__PURE__ */ new Map([
@@ -11738,9 +10834,9 @@ function evalRefactorSelf(op, args3) {
   }
   if (op === "causal-add-node") {
     const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kw[key] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      kw[key] = args2[i + 1];
     }
     const node = {
       id: String(kw["id"] ?? ""),
@@ -11753,9 +10849,9 @@ function evalRefactorSelf(op, args3) {
   }
   if (op === "causal-add-edge") {
     const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kw[key] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      kw[key] = args2[i + 1];
     }
     const edge = {
       from: String(kw["from"] ?? ""),
@@ -11769,7 +10865,7 @@ function evalRefactorSelf(op, args3) {
     return /* @__PURE__ */ new Map([["from", edge.from], ["to", edge.to], ["strength", edge.strength], ["confidence", edge.confidence]]);
   }
   if (op === "causal-explain") {
-    const effectId = String(args3[0] ?? "");
+    const effectId = String(args2[0] ?? "");
     const expl = globalCausal.explain(effectId);
     return /* @__PURE__ */ new Map([
       ["effect", expl.effect],
@@ -11789,8 +10885,8 @@ function evalRefactorSelf(op, args3) {
     ]);
   }
   if (op === "causal-chains") {
-    const causeId = String(args3[0] ?? "");
-    const effectId = String(args3[1] ?? "");
+    const causeId = String(args2[0] ?? "");
+    const effectId = String(args2[1] ?? "");
     const chains = globalCausal.findCausalChains(causeId, effectId);
     return chains.map((c) => /* @__PURE__ */ new Map([
       ["path", c.path],
@@ -11800,7 +10896,7 @@ function evalRefactorSelf(op, args3) {
     ]));
   }
   if (op === "causal-causes") {
-    const nodeId = String(args3[0] ?? "");
+    const nodeId = String(args2[0] ?? "");
     const causes = globalCausal.getDirectCauses(nodeId);
     return causes.map((e) => /* @__PURE__ */ new Map([
       ["from", e.from],
@@ -11810,7 +10906,7 @@ function evalRefactorSelf(op, args3) {
     ]));
   }
   if (op === "causal-effects") {
-    const nodeId = String(args3[0] ?? "");
+    const nodeId = String(args2[0] ?? "");
     const effects = globalCausal.getDirectEffects(nodeId);
     return effects.map((e) => /* @__PURE__ */ new Map([
       ["from", e.from],
@@ -11820,11 +10916,11 @@ function evalRefactorSelf(op, args3) {
     ]));
   }
   if (op === "causal-roots") {
-    const nodeId = String(args3[0] ?? "");
+    const nodeId = String(args2[0] ?? "");
     return globalCausal.findRootCauses(nodeId);
   }
   if (op === "causal-simulate") {
-    const arg = args3[0];
+    const arg = args2[0];
     const interventions = {};
     if (arg instanceof Map) {
       for (const [k, v] of arg.entries()) {
@@ -11835,8 +10931,8 @@ function evalRefactorSelf(op, args3) {
     return new Map(Object.entries(result));
   }
   if (op === "causal-why") {
-    const effectId = String(args3[0] ?? "");
-    const causeId = String(args3[1] ?? "");
+    const effectId = String(args2[0] ?? "");
+    const causeId = String(args2[1] ?? "");
     const chain = whyCaused(effectId, causeId);
     if (chain === null) return null;
     return /* @__PURE__ */ new Map([
@@ -11847,17 +10943,17 @@ function evalRefactorSelf(op, args3) {
     ]);
   }
   if (op === "causal-summary") {
-    const nodeId = String(args3[0] ?? "");
+    const nodeId = String(args2[0] ?? "");
     return globalCausal.summarize(nodeId);
   }
   return null;
 }
-function evalAlign(op, args3) {
+function evalAlign(op, args2) {
   if (op === "align-add-goal") {
     const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kw[key] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      kw[key] = args2[i + 1];
     }
     const goal = {
       id: String(kw["id"] ?? `goal_${Date.now()}`),
@@ -11877,9 +10973,9 @@ function evalAlign(op, args3) {
   }
   if (op === "align-add-value") {
     const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kw[key] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      kw[key] = args2[i + 1];
     }
     const value = {
       id: String(kw["id"] ?? `value_${Date.now()}`),
@@ -11896,7 +10992,7 @@ function evalAlign(op, args3) {
     ]);
   }
   if (op === "align-score") {
-    const actionRaw = args3[0];
+    const actionRaw = args2[0];
     const _getF = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _getEO = (obj) => {
       const eo = _getF(obj, "expectedOutcomes");
@@ -11922,7 +11018,7 @@ function evalAlign(op, args3) {
     ]);
   }
   if (op === "align-best") {
-    const actionsList = Array.isArray(args3[0]) ? args3[0] : [];
+    const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
     const _getF2 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _getEO2 = (obj) => {
       const eo = _getF2(obj, "expectedOutcomes");
@@ -11952,7 +11048,7 @@ function evalAlign(op, args3) {
     ]));
   }
   if (op === "align-plan") {
-    const actionsList = Array.isArray(args3[0]) ? args3[0] : [];
+    const actionsList = Array.isArray(args2[0]) ? args2[0] : [];
     const _gFP = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _gEOP = (obj) => {
       const eo = _gFP(obj, "expectedOutcomes");
@@ -11974,7 +11070,7 @@ function evalAlign(op, args3) {
     ]);
   }
   if (op === "align-improve") {
-    const actionRaw3 = args3[0];
+    const actionRaw3 = args2[0];
     const _getF3 = (obj, key) => obj instanceof Map ? obj.get(key) : obj && typeof obj === "object" ? obj[key] : void 0;
     const _getEO3 = (obj) => {
       const eo = _getF3(obj, "expectedOutcomes");
@@ -12001,13 +11097,13 @@ function evalAlign(op, args3) {
   }
   return null;
 }
-function evalPredict_PHASE144(op, args3) {
+function evalPredict_PHASE144(op, args2) {
   if (op === "predict-linear") {
-    const data144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const data144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
     let horizon144 = 1;
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const k = String(args3[i]).replace(/^:/, "");
-      if (k === "horizon") horizon144 = Number(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const k = String(args2[i]).replace(/^:/, "");
+      if (k === "horizon") horizon144 = Number(args2[i + 1]);
     }
     const p144 = globalPredictor.linearRegression(data144, horizon144);
     return /* @__PURE__ */ new Map([
@@ -12020,13 +11116,13 @@ function evalPredict_PHASE144(op, args3) {
     ]);
   }
   if (op === "predict-ma") {
-    const data144ma = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const data144ma = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
     let window144 = 3;
     let horizon144ma = 1;
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const k = String(args3[i]).replace(/^:/, "");
-      if (k === "window") window144 = Number(args3[i + 1]);
-      else if (k === "horizon") horizon144ma = Number(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const k = String(args2[i]).replace(/^:/, "");
+      if (k === "window") window144 = Number(args2[i + 1]);
+      else if (k === "horizon") horizon144ma = Number(args2[i + 1]);
     }
     const pma = globalPredictor.movingAverage(data144ma, window144, horizon144ma);
     return /* @__PURE__ */ new Map([
@@ -12039,13 +11135,13 @@ function evalPredict_PHASE144(op, args3) {
     ]);
   }
   if (op === "predict-exp") {
-    const data144exp = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const data144exp = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
     let alpha144 = 0.3;
     let horizon144exp = 1;
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const k = String(args3[i]).replace(/^:/, "");
-      if (k === "alpha") alpha144 = Number(args3[i + 1]);
-      else if (k === "horizon") horizon144exp = Number(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const k = String(args2[i]).replace(/^:/, "");
+      if (k === "alpha") alpha144 = Number(args2[i + 1]);
+      else if (k === "horizon") horizon144exp = Number(args2[i + 1]);
     }
     const pexp = globalPredictor.exponentialSmoothing(data144exp, alpha144, horizon144exp);
     return /* @__PURE__ */ new Map([
@@ -12058,11 +11154,11 @@ function evalPredict_PHASE144(op, args3) {
     ]);
   }
   if (op === "predict-forecast") {
-    const data144ts = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const data144ts = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
     let steps144 = 3;
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const k = String(args3[i]).replace(/^:/, "");
-      if (k === "steps") steps144 = Number(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const k = String(args2[i]).replace(/^:/, "");
+      if (k === "steps") steps144 = Number(args2[i + 1]);
     }
     const tsResult = globalPredictor.forecastTimeSeries(data144ts, steps144);
     return /* @__PURE__ */ new Map([
@@ -12080,17 +11176,17 @@ function evalPredict_PHASE144(op, args3) {
     ]);
   }
   if (op === "predict-ci") {
-    const samples144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const samples144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
     let conf144 = 0.95;
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const k = String(args3[i]).replace(/^:/, "");
-      if (k === "confidence") conf144 = Number(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const k = String(args2[i]).replace(/^:/, "");
+      if (k === "confidence") conf144 = Number(args2[i + 1]);
     }
     const ci = globalPredictor.confidenceInterval(samples144, conf144);
     return /* @__PURE__ */ new Map([["lower", ci.lower], ["upper", ci.upper]]);
   }
   if (op === "predict-classify") {
-    const rawFeatures = args3[0];
+    const rawFeatures = args2[0];
     const features144 = {};
     if (rawFeatures instanceof Map) {
       rawFeatures.forEach((v, k) => {
@@ -12101,7 +11197,7 @@ function evalPredict_PHASE144(op, args3) {
         features144[k.replace(/^:/, "")] = Number(v);
       });
     }
-    const rawTraining = Array.isArray(args3[1]) ? args3[1] : [];
+    const rawTraining = Array.isArray(args2[1]) ? args2[1] : [];
     const trainingData144 = rawTraining.map((item) => {
       if (item instanceof Map) {
         const rawF = item.get("features") ?? item.get(":features");
@@ -12124,8 +11220,8 @@ function evalPredict_PHASE144(op, args3) {
     ]);
   }
   if (op === "predict-evaluate") {
-    const preds144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
-    const actuals144 = Array.isArray(args3[1]) ? args3[1].map(Number) : [];
+    const preds144 = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
+    const actuals144 = Array.isArray(args2[1]) ? args2[1].map(Number) : [];
     const evalResult = globalPredictor.evaluate(preds144, actuals144);
     return /* @__PURE__ */ new Map([
       ["mae", evalResult.mae],
@@ -12134,23 +11230,23 @@ function evalPredict_PHASE144(op, args3) {
     ]);
   }
   if (op === "predict-trend") {
-    const data144tr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const data144tr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
     return globalPredictor.detectTrend(data144tr);
   }
   return null;
 }
-function evalCuriosity(op, args3, callFn2) {
+function evalCuriosity(op, args2, callFn2) {
   if (op === "curiosity-score") {
-    const topic = String(args3[0] ?? "");
-    const knownFacts = Array.isArray(args3[1]) ? args3[1].map((f) => String(f)) : [];
+    const topic = String(args2[0] ?? "");
+    const knownFacts = Array.isArray(args2[1]) ? args2[1].map((f) => String(f)) : [];
     return globalCuriosity.computeCuriosity(topic, knownFacts);
   }
   if (op === "curiosity-next") {
     return globalCuriosity.selectNextTopic();
   }
   if (op === "curiosity-explore") {
-    const topic = String(args3[0] ?? "");
-    const fn = args3[1];
+    const topic = String(args2[0] ?? "");
+    const fn = args2[1];
     const explorerFunc = (t) => {
       const result = callFn2 ? callFn2(fn, [t]) : typeof fn === "function" ? fn(t) : null;
       if (result instanceof Map) {
@@ -12171,8 +11267,8 @@ function evalCuriosity(op, args3, callFn2) {
     ]);
   }
   if (op === "curiosity-gaps") {
-    const known = Array.isArray(args3[0]) ? args3[0].map((s) => String(s)) : [];
-    const all = Array.isArray(args3[1]) ? args3[1].map((s) => String(s)) : [];
+    const known = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
+    const all = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
     const gaps = globalCuriosity.identifyGaps(known, all);
     return gaps.map((g) => /* @__PURE__ */ new Map([
       ["topic", g.topic],
@@ -12183,12 +11279,12 @@ function evalCuriosity(op, args3, callFn2) {
     ]));
   }
   if (op === "curiosity-questions") {
-    const topic = String(args3[0] ?? "");
-    const context = Array.isArray(args3[1]) ? args3[1].map((s) => String(s)) : [];
+    const topic = String(args2[0] ?? "");
+    const context = Array.isArray(args2[1]) ? args2[1].map((s) => String(s)) : [];
     return globalCuriosity.generateQuestions(topic, context);
   }
   if (op === "curiosity-prioritize") {
-    const topics = Array.isArray(args3[0]) ? args3[0].map((s) => String(s)) : [];
+    const topics = Array.isArray(args2[0]) ? args2[0].map((s) => String(s)) : [];
     return globalCuriosity.prioritize(topics);
   }
   if (op === "curiosity-analyze") {
@@ -12222,9 +11318,9 @@ function evalCuriosity(op, args3, callFn2) {
   }
   if (op === "wisdom-add-exp") {
     const kwargs = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kwargs[key] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      kwargs[key] = args2[i + 1];
     }
     const exp = globalWisdom.addExperience({
       situation: String(kwargs["situation"] ?? ""),
@@ -12248,7 +11344,7 @@ function evalCuriosity(op, args3, callFn2) {
     ]);
   }
   if (op === "wisdom-judge") {
-    const situation = String(args3[0] ?? "");
+    const situation = String(args2[0] ?? "");
     const judgment = globalWisdom.judge(situation);
     return /* @__PURE__ */ new Map([
       ["situation", judgment.situation],
@@ -12299,8 +11395,8 @@ function evalCuriosity(op, args3, callFn2) {
     ]));
   }
   if (op === "wisdom-relevant") {
-    const situation = String(args3[0] ?? "");
-    const limit = typeof args3[1] === "number" ? args3[1] : 5;
+    const situation = String(args2[0] ?? "");
+    const limit = typeof args2[1] === "number" ? args2[1] : 5;
     return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -12314,9 +11410,9 @@ function evalCuriosity(op, args3, callFn2) {
   }
   if (op === "wisdom-lessons") {
     let domain;
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      if (key === "domain") domain = String(args3[i + 1]);
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      if (key === "domain") domain = String(args2[i + 1]);
     }
     return globalWisdom.getLessons(domain);
   }
@@ -12324,7 +11420,7 @@ function evalCuriosity(op, args3, callFn2) {
     return globalWisdom.wisdomScore();
   }
   if (op === "wisdom-domain") {
-    const domain = String(args3[0] ?? "general");
+    const domain = String(args2[0] ?? "general");
     const summary = globalWisdom.summarizeDomain(domain);
     return /* @__PURE__ */ new Map([
       ["topLessons", summary.topLessons],
@@ -12339,7 +11435,7 @@ function evalCuriosity(op, args3, callFn2) {
     ]);
   }
   if (op === "wisdom-valid?") {
-    const expMap = args3[0];
+    const expMap = args2[0];
     if (!(expMap instanceof Map)) return false;
     const exp = {
       id: String(expMap.get("id") ?? ""),
@@ -12355,7 +11451,7 @@ function evalCuriosity(op, args3, callFn2) {
     return globalWisdom.isStillValid(exp);
   }
   if (op === "wisdom-similar") {
-    const situation = String(args3[0] ?? "");
+    const situation = String(args2[0] ?? "");
     return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -12369,12 +11465,12 @@ function evalCuriosity(op, args3, callFn2) {
   }
   return null;
 }
-function evalCounterfactual(op, args3, callFn2) {
+function evalCounterfactual(op, args2, callFn2) {
   if (op === "cf-scenario") {
     const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kw[key] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      kw[key] = args2[i + 1];
     }
     const id = String(kw["id"] ?? `s-${Date.now()}`);
     const name = String(kw["name"] ?? id);
@@ -12397,13 +11493,13 @@ function evalCounterfactual(op, args3, callFn2) {
   if (op === "cf-what-if") {
     let variables = {};
     let change = {};
-    if (args3[0] instanceof Map) {
-      for (const [k, v] of args3[0]) variables[String(k).replace(/^:/, "")] = v;
+    if (args2[0] instanceof Map) {
+      for (const [k, v] of args2[0]) variables[String(k).replace(/^:/, "")] = v;
     }
-    if (args3[1] instanceof Map) {
-      for (const [k, v] of args3[1]) change[String(k).replace(/^:/, "")] = v;
+    if (args2[1] instanceof Map) {
+      for (const [k, v] of args2[1]) change[String(k).replace(/^:/, "")] = v;
     }
-    const fn = args3[2];
+    const fn = args2[2];
     const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
     const cf = globalCounterfactual.whatIf(variables, change, outcomeFunc);
     return /* @__PURE__ */ new Map([
@@ -12416,10 +11512,10 @@ function evalCounterfactual(op, args3, callFn2) {
     ]);
   }
   if (op === "cf-analyze") {
-    const scenarioId = String(args3[0] ?? "");
+    const scenarioId = String(args2[0] ?? "");
     const interventionsList = [];
-    if (Array.isArray(args3[1])) {
-      for (const iv of args3[1]) {
+    if (Array.isArray(args2[1])) {
+      for (const iv of args2[1]) {
         const obj = {};
         if (iv instanceof Map) {
           for (const [k, v] of iv) obj[String(k).replace(/^:/, "")] = v;
@@ -12427,7 +11523,7 @@ function evalCounterfactual(op, args3, callFn2) {
         interventionsList.push(obj);
       }
     }
-    const fn = args3[2];
+    const fn = args2[2];
     const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
     const analysis = globalCounterfactual.analyze(scenarioId, interventionsList, outcomeFunc);
     return /* @__PURE__ */ new Map([
@@ -12453,9 +11549,9 @@ function evalCounterfactual(op, args3, callFn2) {
     ]);
   }
   if (op === "cf-minimal") {
-    const scenarioId = String(args3[0] ?? "");
-    const targetOutcome = args3[1];
-    const fn = args3[2];
+    const scenarioId = String(args2[0] ?? "");
+    const targetOutcome = args2[1];
+    const fn = args2[2];
     const outcomeFunc = (vars) => callFn2(fn, [new Map(Object.entries(vars))]);
     const minimal = globalCounterfactual.findMinimalIntervention(scenarioId, targetOutcome, outcomeFunc);
     if (minimal === null) return null;
@@ -12463,13 +11559,13 @@ function evalCounterfactual(op, args3, callFn2) {
   }
   if (op === "cf-sensitivity") {
     let variables = {};
-    const rawVars = args3[0];
+    const rawVars = args2[0];
     if (rawVars instanceof Map) {
       for (const [k, v] of rawVars) variables[String(k).replace(/^:/, "")] = v;
     } else if (rawVars && typeof rawVars === "object" && !Array.isArray(rawVars)) {
       for (const [k, v] of Object.entries(rawVars)) variables[String(k).replace(/^:/, "")] = v;
     }
-    const fn = args3[1];
+    const fn = args2[1];
     const outcomeFunc = (vars) => {
       try {
         return Number(callFn2(fn, [vars]));
@@ -12481,7 +11577,7 @@ function evalCounterfactual(op, args3, callFn2) {
     return new Map(Object.entries(sens));
   }
   if (op === "cf-key-factors") {
-    const analysis = args3[0];
+    const analysis = args2[0];
     if (analysis instanceof Map) {
       const factors = analysis.get("keyFactors");
       if (Array.isArray(factors)) return factors;
@@ -12489,23 +11585,23 @@ function evalCounterfactual(op, args3, callFn2) {
     return [];
   }
   if (op === "cf-best-alt") {
-    const analysis = args3[0];
+    const analysis = args2[0];
     if (analysis instanceof Map) {
       return analysis.get("mostLikelyAlternative") ?? null;
     }
     return null;
   }
   if (op === "cf-explain") {
-    const cf = args3[0];
+    const cf = args2[0];
     if (cf instanceof Map) {
       return cf.get("explanation") ?? "";
     }
     return "";
   }
   if (op === "explain-decision") {
-    const decision = args3[0];
-    const rawFactors = args3[1];
-    const context = args3[2] !== void 0 ? String(args3[2]) : void 0;
+    const decision = args2[0];
+    const rawFactors = args2[1];
+    const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
     const factors = {};
     if (rawFactors instanceof Map) {
       for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
@@ -12542,9 +11638,9 @@ function evalCounterfactual(op, args3, callFn2) {
       }
       return result;
     };
-    const inputs145 = toRecord145(args3[0]);
-    const outputs145 = toRecord145(args3[1]);
-    const baseline145 = args3[2] !== void 0 ? toRecord145(args3[2]) : void 0;
+    const inputs145 = toRecord145(args2[0]);
+    const outputs145 = toRecord145(args2[1]);
+    const baseline145 = args2[2] !== void 0 ? toRecord145(args2[2]) : void 0;
     const features145 = globalExplainer.featureImportance(inputs145, outputs145, baseline145);
     return features145.map((f) => /* @__PURE__ */ new Map([
       ["feature", f.feature],
@@ -12554,9 +11650,9 @@ function evalCounterfactual(op, args3, callFn2) {
     ]));
   }
   if (op === "explain-local") {
-    const rawInput145 = args3[0];
-    const output145 = args3[1];
-    const modelFn145 = args3[2];
+    const rawInput145 = args2[0];
+    const output145 = args2[1];
+    const modelFn145 = args2[2];
     const input145 = {};
     if (rawInput145 instanceof Map) {
       for (const [k, v] of rawInput145.entries()) input145[String(k).replace(/^:/, "")] = v;
@@ -12588,11 +11684,11 @@ function evalCounterfactual(op, args3, callFn2) {
     ]);
   }
   if (op === "explain-natural") {
-    const rawExpl145 = args3[0];
+    const rawExpl145 = args2[0];
     let audience145 = "technical";
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      if (key === "audience") audience145 = String(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      if (key === "audience") audience145 = String(args2[i + 1]);
     }
     if (!(rawExpl145 instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
     const featuresRaw145 = rawExpl145.get("features") ?? [];
@@ -12624,9 +11720,9 @@ function evalCounterfactual(op, args3, callFn2) {
     return globalExplainer.toNaturalLanguage(explanation145n, audience145);
   }
   if (op === "explain-contrast") {
-    const decision145c = args3[0];
-    const alternative145c = args3[1];
-    const rawFactors145c = args3[2];
+    const decision145c = args2[0];
+    const alternative145c = args2[1];
+    const rawFactors145c = args2[2];
     const factors145c = {};
     if (rawFactors145c instanceof Map) {
       for (const [k, v] of rawFactors145c.entries()) factors145c[String(k).replace(/^:/, "")] = Number(v);
@@ -12636,7 +11732,7 @@ function evalCounterfactual(op, args3, callFn2) {
     return globalExplainer.contrastiveExplain(decision145c, alternative145c, factors145c);
   }
   if (op === "explain-rules") {
-    const rawExamples145 = args3[0];
+    const rawExamples145 = args2[0];
     const examples145 = [];
     const toRecord145r = (v) => {
       const result = {};
@@ -12664,11 +11760,11 @@ function evalCounterfactual(op, args3, callFn2) {
     ]));
   }
   if (op === "explain-top-factors") {
-    const rawExpl145tf = args3[0];
+    const rawExpl145tf = args2[0];
     let n145 = 3;
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      if (key === "n") n145 = Number(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      if (key === "n") n145 = Number(args2[i + 1]);
     }
     let features145tf = [];
     if (rawExpl145tf instanceof Map) features145tf = rawExpl145tf.get("features") ?? [];
@@ -12676,18 +11772,18 @@ function evalCounterfactual(op, args3, callFn2) {
     return features145tf.slice(0, n145);
   }
   if (op === "explain-summary") {
-    const rawExpl145s = args3[0];
+    const rawExpl145s = args2[0];
     if (rawExpl145s instanceof Map) return String(rawExpl145s.get("summary") ?? "");
     return "";
   }
   return null;
 }
-function evalWisdom(op, args3) {
+function evalWisdom(op, args2) {
   if (op === "wisdom-add-exp") {
     const kwargs = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kwargs[key] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      kwargs[key] = args2[i + 1];
     }
     const exp = globalWisdom.addExperience({
       situation: String(kwargs["situation"] ?? ""),
@@ -12711,7 +11807,7 @@ function evalWisdom(op, args3) {
     ]);
   }
   if (op === "wisdom-judge") {
-    const situation = String(args3[0] ?? "");
+    const situation = String(args2[0] ?? "");
     const judgment = globalWisdom.judge(situation);
     return /* @__PURE__ */ new Map([
       ["situation", judgment.situation],
@@ -12762,8 +11858,8 @@ function evalWisdom(op, args3) {
     ]));
   }
   if (op === "wisdom-relevant") {
-    const situation = String(args3[0] ?? "");
-    const limit = typeof args3[1] === "number" ? args3[1] : 5;
+    const situation = String(args2[0] ?? "");
+    const limit = typeof args2[1] === "number" ? args2[1] : 5;
     return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -12777,9 +11873,9 @@ function evalWisdom(op, args3) {
   }
   if (op === "wisdom-lessons") {
     let domain;
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      if (key === "domain") domain = String(args3[i + 1]);
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      if (key === "domain") domain = String(args2[i + 1]);
     }
     return globalWisdom.getLessons(domain);
   }
@@ -12787,7 +11883,7 @@ function evalWisdom(op, args3) {
     return globalWisdom.wisdomScore();
   }
   if (op === "wisdom-domain") {
-    const domain = String(args3[0] ?? "general");
+    const domain = String(args2[0] ?? "general");
     const summary = globalWisdom.summarizeDomain(domain);
     return /* @__PURE__ */ new Map([
       ["topLessons", summary.topLessons],
@@ -12802,7 +11898,7 @@ function evalWisdom(op, args3) {
     ]);
   }
   if (op === "wisdom-valid?") {
-    const expMap = args3[0];
+    const expMap = args2[0];
     if (!(expMap instanceof Map)) return false;
     const exp = {
       id: String(expMap.get("id") ?? ""),
@@ -12818,7 +11914,7 @@ function evalWisdom(op, args3) {
     return globalWisdom.isStillValid(exp);
   }
   if (op === "wisdom-similar") {
-    const situation = String(args3[0] ?? "");
+    const situation = String(args2[0] ?? "");
     return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
       ["id", e.id],
       ["situation", e.situation],
@@ -12832,11 +11928,11 @@ function evalWisdom(op, args3) {
   }
   return null;
 }
-function evalExplain_PHASE145(op, args3, callFnVal) {
+function evalExplain_PHASE145(op, args2, callFnVal) {
   if (op === "explain-decision") {
-    const decision = args3[0];
-    const rawFactors = args3[1];
-    const context = args3[2] !== void 0 ? String(args3[2]) : void 0;
+    const decision = args2[0];
+    const rawFactors = args2[1];
+    const context = args2[2] !== void 0 ? String(args2[2]) : void 0;
     const factors = {};
     if (rawFactors instanceof Map) {
       for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
@@ -12873,7 +11969,7 @@ function evalExplain_PHASE145(op, args3, callFnVal) {
       }
       return result;
     };
-    const features = globalExplainer.featureImportance(toRecord(args3[0]), toRecord(args3[1]), args3[2] !== void 0 ? toRecord(args3[2]) : void 0);
+    const features = globalExplainer.featureImportance(toRecord(args2[0]), toRecord(args2[1]), args2[2] !== void 0 ? toRecord(args2[2]) : void 0);
     return features.map((f) => /* @__PURE__ */ new Map([
       ["feature", f.feature],
       ["importance", f.importance],
@@ -12882,9 +11978,9 @@ function evalExplain_PHASE145(op, args3, callFnVal) {
     ]));
   }
   if (op === "explain-local") {
-    const rawInput = args3[0];
-    const output = args3[1];
-    const modelFn = args3[2];
+    const rawInput = args2[0];
+    const output = args2[1];
+    const modelFn = args2[2];
     const input = {};
     if (rawInput instanceof Map) {
       for (const [k, v] of rawInput.entries()) input[String(k).replace(/^:/, "")] = v;
@@ -12916,11 +12012,11 @@ function evalExplain_PHASE145(op, args3, callFnVal) {
     ]);
   }
   if (op === "explain-natural") {
-    const rawExpl = args3[0];
+    const rawExpl = args2[0];
     let audience = "technical";
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      if (key === "audience") audience = String(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      const key = String(args2[i]).replace(/^:/, "");
+      if (key === "audience") audience = String(args2[i + 1]);
     }
     if (!(rawExpl instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
     const featuresRaw = rawExpl.get("features") ?? [];
@@ -12953,13 +12049,13 @@ function evalExplain_PHASE145(op, args3, callFnVal) {
   }
   if (op === "explain-contrast") {
     const factors = {};
-    const rawF = args3[2];
+    const rawF = args2[2];
     if (rawF instanceof Map) {
       for (const [k, v] of rawF.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
     } else if (rawF && typeof rawF === "object") {
       for (const [k, v] of Object.entries(rawF)) factors[String(k).replace(/^:/, "")] = Number(v);
     }
-    return globalExplainer.contrastiveExplain(args3[0], args3[1], factors);
+    return globalExplainer.contrastiveExplain(args2[0], args2[1], factors);
   }
   if (op === "explain-rules") {
     const examples = [];
@@ -12972,8 +12068,8 @@ function evalExplain_PHASE145(op, args3, callFnVal) {
       }
       return r;
     };
-    if (Array.isArray(args3[0])) {
-      for (const ex of args3[0]) {
+    if (Array.isArray(args2[0])) {
+      for (const ex of args2[0]) {
         if (ex instanceof Map) examples.push({ input: toRec(ex.get("input")), output: ex.get("output") });
         else if (ex && typeof ex === "object") examples.push({ input: toRec(ex.input), output: ex.output });
       }
@@ -12986,27 +12082,27 @@ function evalExplain_PHASE145(op, args3, callFnVal) {
   }
   if (op === "explain-top-factors") {
     let n = 3;
-    for (let i = 1; i < args3.length - 1; i += 2) {
-      if (String(args3[i]).replace(/^:/, "") === "n") n = Number(args3[i + 1]);
+    for (let i = 1; i < args2.length - 1; i += 2) {
+      if (String(args2[i]).replace(/^:/, "") === "n") n = Number(args2[i + 1]);
     }
-    const rawExpl = args3[0];
+    const rawExpl = args2[0];
     let features = [];
     if (rawExpl instanceof Map) features = rawExpl.get("features") ?? [];
     if (!Array.isArray(features)) features = [];
     return features.slice(0, n);
   }
   if (op === "explain-summary") {
-    const rawExpl = args3[0];
+    const rawExpl = args2[0];
     if (rawExpl instanceof Map) return String(rawExpl.get("summary") ?? "");
     return "";
   }
   return null;
 }
-function evalWorldModel141(op, args3) {
+function evalWorldModel141(op, args2) {
   if (op === "world-add-entity") {
     const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      kw[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      kw[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
     }
     const rawP = kw["props"] ?? kw["properties"] ?? {};
     const props = rawP instanceof Map ? Object.fromEntries(rawP.entries()) : typeof rawP === "object" && rawP !== null ? rawP : {};
@@ -13014,45 +12110,45 @@ function evalWorldModel141(op, args3) {
     return /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]);
   }
   if (op === "world-update-entity") {
-    const rawPu = args3[1] ?? {};
+    const rawPu = args2[1] ?? {};
     const propsu = rawPu instanceof Map ? Object.fromEntries(rawPu.entries()) : typeof rawPu === "object" && rawPu !== null ? rawPu : {};
-    const eu = globalWorldModel.updateEntity(String(args3[0] ?? ""), propsu);
+    const eu = globalWorldModel.updateEntity(String(args2[0] ?? ""), propsu);
     if (!eu) return null;
     return /* @__PURE__ */ new Map([["id", eu.id], ["type", eu.type], ["properties", new Map(Object.entries(eu.properties))], ["confidence", eu.confidence], ["lastUpdated", eu.lastUpdated.toISOString()]]);
   }
   if (op === "world-get-entity") {
-    const eg = globalWorldModel.getEntity(String(args3[0] ?? ""));
+    const eg = globalWorldModel.getEntity(String(args2[0] ?? ""));
     if (!eg) return null;
     return /* @__PURE__ */ new Map([["id", eg.id], ["type", eg.type], ["properties", new Map(Object.entries(eg.properties))], ["confidence", eg.confidence], ["lastUpdated", eg.lastUpdated.toISOString()]]);
   }
   if (op === "world-remove-entity") {
-    return globalWorldModel.removeEntity(String(args3[0] ?? ""));
+    return globalWorldModel.removeEntity(String(args2[0] ?? ""));
   }
   if (op === "world-add-relation") {
     const kwr = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      kwr[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      kwr[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
     }
     const rel = globalWorldModel.addRelation({ from: String(kwr["from"] ?? ""), to: String(kwr["to"] ?? ""), type: String(kwr["type"] ?? "related"), strength: typeof kwr["strength"] === "number" ? kwr["strength"] : 1, bidirectional: kwr["bidirectional"] === true });
     return /* @__PURE__ */ new Map([["id", rel.id], ["from", rel.from], ["to", rel.to], ["type", rel.type], ["strength", rel.strength], ["bidirectional", rel.bidirectional]]);
   }
   if (op === "world-get-relations") {
-    return globalWorldModel.getRelations(String(args3[0] ?? "")).map((r) => /* @__PURE__ */ new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
+    return globalWorldModel.getRelations(String(args2[0] ?? "")).map((r) => /* @__PURE__ */ new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
   }
   if (op === "world-find-path") {
-    return globalWorldModel.findPath(String(args3[0] ?? ""), String(args3[1] ?? ""));
+    return globalWorldModel.findPath(String(args2[0] ?? ""), String(args2[1] ?? ""));
   }
   if (op === "world-set-fact") {
-    globalWorldModel.setFact(String(args3[0] ?? ""), args3[1]);
+    globalWorldModel.setFact(String(args2[0] ?? ""), args2[1]);
     return null;
   }
   if (op === "world-get-fact") {
-    return globalWorldModel.getFact(String(args3[0] ?? ""));
+    return globalWorldModel.getFact(String(args2[0] ?? ""));
   }
   if (op === "world-add-rule") {
     const kwrule = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      kwrule[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      kwrule[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
     }
     const rule = globalWorldModel.addRule({ condition: String(kwrule["condition"] ?? ""), consequence: String(kwrule["consequence"] ?? ""), confidence: typeof kwrule["confidence"] === "number" ? kwrule["confidence"] : 0.8 });
     return /* @__PURE__ */ new Map([["id", rule.id], ["condition", rule.condition], ["consequence", rule.consequence], ["confidence", rule.confidence]]);
@@ -13062,8 +12158,8 @@ function evalWorldModel141(op, args3) {
   }
   if (op === "world-query") {
     const kwq = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      kwq[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    for (let i = 0; i < args2.length - 1; i += 2) {
+      kwq[String(args2[i]).replace(/^:/, "")] = args2[i + 1];
     }
     return globalWorldModel.query(kwq["type"] !== void 0 ? String(kwq["type"]) : void 0, kwq["min-confidence"] !== void 0 ? Number(kwq["min-confidence"]) : void 0).map((e) => /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]));
   }
@@ -14113,11 +13209,11 @@ function flExecOpNative(op, vals) {
     // ── Phase L1: 모듈 시스템 + 파일 I/O ──
     case "load": {
       const filePath = String(v0 ?? "");
-      const fs21 = require("fs");
-      const path19 = require("path");
+      const fs15 = require("fs");
+      const path15 = require("path");
       try {
-        const resolvedPath = path19.resolve(process.cwd(), filePath);
-        const src = fs21.readFileSync(resolvedPath, "utf-8");
+        const resolvedPath = path15.resolve(process.cwd(), filePath);
+        const src = fs15.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -14142,9 +13238,9 @@ function flExecOpNative(op, vals) {
     case "file-mkdir":
     case "file_mkdir": {
       const dirPath = String(v0 ?? "");
-      const fs21 = require("fs");
+      const fs15 = require("fs");
       try {
-        fs21.mkdirSync(dirPath, { recursive: true });
+        fs15.mkdirSync(dirPath, { recursive: true });
         return true;
       } catch {
         return false;
@@ -14154,9 +13250,9 @@ function flExecOpNative(op, vals) {
     case "file_append": {
       const filePath = String(v0 ?? "");
       const content = String(v1 ?? "");
-      const fs21 = require("fs");
+      const fs15 = require("fs");
       try {
-        fs21.appendFileSync(filePath, content);
+        fs15.appendFileSync(filePath, content);
         return true;
       } catch {
         return false;
@@ -14167,7 +13263,7 @@ function flExecOpNative(op, vals) {
       const url2 = String(v0 ?? "");
       try {
         const { execSync: execSync2 } = require("child_process");
-        const { writeFileSync: writeFileSync12, unlinkSync: unlinkSync5 } = require("fs");
+        const { writeFileSync: writeFileSync10, unlinkSync: unlinkSync4 } = require("fs");
         const { randomUUID: randomUUID5 } = require("crypto");
         const tmpFile = `/tmp/fl-http-${randomUUID5()}.js`;
         const nodeScript = `process.env.FL_URL=${JSON.stringify(url2)};
@@ -14181,10 +13277,10 @@ const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'
 req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
 req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
 req.end();`;
-        writeFileSync12(tmpFile, nodeScript, "utf-8");
+        writeFileSync10(tmpFile, nodeScript, "utf-8");
         const result = execSync2(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15e3 });
         try {
-          unlinkSync5(tmpFile);
+          unlinkSync4(tmpFile);
         } catch {
         }
         const parsed = JSON.parse(result);
@@ -14404,7 +13500,109 @@ function cacheEvict(ch) {
   }
 }
 var _globalCache = makeCacheHandle(1e4);
-function evalBuiltin(interp2, op, args3, expr2) {
+var IO_CTRL_SLOTS = 4;
+var IO_CTRL_SIZE = IO_CTRL_SLOTS * 4;
+var IO_DATA_SIZE = 8 * 1024 * 1024;
+var IO_SLOT_WRITE = 0;
+var IO_SLOT_NOTIFY = 2;
+var _ioWorkerCode = `
+const { workerData, parentPort } = require('worker_threads');
+const net = require('net');
+
+const ctrl = new Int32Array(workerData.ctrlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const DATA_SIZE = ${IO_DATA_SIZE};
+const WP = ${IO_SLOT_WRITE};
+const NOTIFY = ${IO_SLOT_NOTIFY};
+
+// push: JSON \uC774\uBCA4\uD2B8\uB97C ring buffer\uC5D0 \uAE30\uB85D\uD558\uACE0 Main\uC744 \uAE68\uC6C0
+// wrap sentinel(0xFFFFFFFF) \uD328\uD134\uC73C\uB85C \uBC84\uD37C \uB05D \uCC98\uB9AC
+function push(eventStr) {
+  const encoded = Buffer.from(eventStr, 'utf8');
+  const totalLen = 4 + encoded.length;
+  let wp = Atomics.load(ctrl, WP);
+  // \uD604\uC7AC \uC704\uCE58\uC5D0 \uC774\uBCA4\uD2B8\uAC00 \uB4E4\uC5B4\uAC00\uC9C0 \uC54A\uC73C\uBA74 wrap sentinel \uAE30\uB85D \uD6C4 0\uC73C\uB85C \uC774\uB3D9
+  if (wp + totalLen > DATA_SIZE - 8) {
+    data.writeUInt32LE(0xFFFFFFFF, wp);
+    wp = 0;
+  }
+  data.writeUInt32LE(encoded.length, wp);
+  encoded.copy(data, wp + 4);
+  Atomics.store(ctrl, WP, wp + totalLen);
+  Atomics.store(ctrl, NOTIFY, 1);
+  Atomics.notify(ctrl, NOTIFY);
+}
+
+// \uC18C\uCF13 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: id \u2192 { sock, handler }
+const sockets = new Map();
+// \uC11C\uBC84 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: port \u2192 net.Server
+const servers = new Map();
+
+parentPort.on('message', (msg) => {
+  const { cmd } = msg;
+
+  if (cmd === 'tcp-outbound') {
+    const { id, host, port, handler } = msg;
+    const sock = new net.Socket();
+    sockets.set(id, { sock, handler });
+    sock.connect(port, host);
+    sock.on('connect', () =>
+      push(JSON.stringify({ ev: 'connect', id, handler })));
+    sock.on('data', (chunk) =>
+      push(JSON.stringify({ ev: 'data', id, handler, hex: chunk.toString('hex') })));
+    sock.on('close', () => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'close', id, handler }));
+    });
+    sock.on('error', (e) => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'error', id, handler, msg: e.message }));
+    });
+  }
+
+  if (cmd === 'tcp-write') {
+    const entry = sockets.get(msg.id);
+    if (entry && !entry.sock.destroyed) {
+      entry.sock.write(Buffer.from(msg.hex, 'hex'));
+    }
+  }
+
+  if (cmd === 'tcp-drop') {
+    const entry = sockets.get(msg.id);
+    if (entry) { entry.sock.destroy(); sockets.delete(msg.id); }
+  }
+
+  if (cmd === 'tcp-server-raw') {
+    const { port, handler } = msg;
+    if (servers.has(port)) return;
+    let seq = 0;
+    const server = net.createServer((sock) => {
+      const cid = 'conn_' + port + '_' + (++seq);
+      sockets.set(cid, { sock, handler });
+      push(JSON.stringify({ ev: 'accept', id: cid, handler }));
+      sock.on('data', (chunk) =>
+        push(JSON.stringify({ ev: 'data', id: cid, handler, hex: chunk.toString('hex') })));
+      sock.on('close', () => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'close', id: cid, handler }));
+      });
+      sock.on('error', (e) => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'error', id: cid, handler, msg: e.message }));
+      });
+    });
+    server.listen(port, () =>
+      push(JSON.stringify({ ev: 'listening', id: port, handler })));
+    servers.set(port, server);
+  }
+
+  if (cmd === 'tcp-server-stop') {
+    const server = servers.get(msg.port);
+    if (server) { server.close(); servers.delete(msg.port); }
+  }
+});
+`;
+function evalBuiltin(interp2, op, args2, expr2) {
   const normalizedOp2 = op.replace(/_/g, "-");
   if (normalizedOp2 !== op && op !== "server_start" && !process.env.FL_NO_DEPRECATION_WARN) {
     console.warn(`\u26A0\uFE0F  [FreeLang v11.5.1] ${op}\uC740 deprecated\uC785\uB2C8\uB2E4. ${normalizedOp2}\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.`);
@@ -14434,25 +13632,25 @@ function evalBuiltin(interp2, op, args3, expr2) {
   switch (normalizedOp2) {
     // atom: 변경 가능한 참조 컨테이너
     case "atom": {
-      return { value: args3[0] !== void 0 ? args3[0] : null };
+      return { value: args2[0] !== void 0 ? args2[0] : null };
     }
     case "deref": {
-      const ref = args3[0];
+      const ref = args2[0];
       if (ref && typeof ref === "object" && "value" in ref) return ref.value;
       return ref;
     }
     case "reset!": {
-      const ref = args3[0];
+      const ref = args2[0];
       if (ref && typeof ref === "object" && "value" in ref) {
-        ref.value = args3[1];
-        return args3[1];
+        ref.value = args2[1];
+        return args2[1];
       }
-      return args3[1];
+      return args2[1];
     }
     case "swap!": {
-      const ref = args3[0];
-      const fn = args3[1];
-      const extra = args3.slice(2);
+      const ref = args2[0];
+      const fn = args2[1];
+      const extra = args2.slice(2);
       if (ref && typeof ref === "object" && "value" in ref && fn) {
         const newVal = callFnVal(fn, [ref.value, ...extra]);
         ref.value = newVal;
@@ -14462,19 +13660,19 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     // Phase L1: Module system
     case "load": {
-      const filePath = String(args3[0] ?? "");
-      const nsPrefix = args3[1] != null ? String(args3[1]) : null;
-      const fs21 = require("fs");
-      const path19 = require("path");
+      const filePath = String(args2[0] ?? "");
+      const nsPrefix = args2[1] != null ? String(args2[1]) : null;
+      const fs15 = require("fs");
+      const path15 = require("path");
       try {
-        const resolvedPath = path19.resolve(process.cwd(), filePath);
+        const resolvedPath = path15.resolve(process.cwd(), filePath);
         const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
         if (!MODULE_CACHE_DISABLED && !isWatchMode && !nsPrefix) {
           if (!interp2.__loadCache) interp2.__loadCache = /* @__PURE__ */ new Set();
           if (interp2.__loadCache.has(resolvedPath)) return null;
           interp2.__loadCache.add(resolvedPath);
         }
-        const src = fs21.readFileSync(resolvedPath, "utf-8");
+        const src = fs15.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -14496,7 +13694,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     // ── v12 Hot Reload ─────────────────────────────────────────────────────────
     case "fl-reload": {
-      const frFilePath = String(args3[0] ?? "");
+      const frFilePath = String(args2[0] ?? "");
       const frFs = require("fs");
       const frPath = require("path");
       try {
@@ -14530,9 +13728,9 @@ function evalBuiltin(interp2, op, args3, expr2) {
       }
     }
     case "fl-watch": {
-      const fwPath = String(args3[0] ?? "");
-      const fwCb = args3[1];
-      const fwOpts = args3[2];
+      const fwPath = String(args2[0] ?? "");
+      const fwCb = args2[1];
+      const fwOpts = args2[2];
       const fwDebounce = fwOpts && typeof fwOpts === "object" ? fwOpts[":debounce"] ?? fwOpts["debounce"] ?? 300 : 300;
       const fwFs = require("fs");
       const fwPathMod = require("path");
@@ -14571,25 +13769,25 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     // Phase Step3: require function (module system)
     case "cli-args": {
-      const args4 = process.argv.slice(2);
-      if (args4[0] === "run" || args4[0] === "debug") {
-        return args4.slice(2);
+      const args3 = process.argv.slice(2);
+      if (args3[0] === "run" || args3[0] === "debug") {
+        return args3.slice(2);
       }
-      return args4;
+      return args3;
     }
     case "shell-exec": {
       const { execSync: execSync2 } = require("child_process");
-      const cmd2 = String(args3[0] ?? "");
+      const cmd = String(args2[0] ?? "");
       try {
-        return execSync2(cmd2, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+        return execSync2(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
       } catch (e) {
         return null;
       }
     }
     case "shell-exec-result": {
       const { spawnSync: spawnSync9 } = require("child_process");
-      const cmd2 = String(args3[0] ?? "");
-      const res = spawnSync9("sh", ["-c", cmd2], { encoding: "utf-8" });
+      const cmd = String(args2[0] ?? "");
+      const res = spawnSync9("sh", ["-c", cmd], { encoding: "utf-8" });
       return {
         stdout: res.stdout ?? "",
         stderr: res.stderr ?? "",
@@ -14598,19 +13796,19 @@ function evalBuiltin(interp2, op, args3, expr2) {
       };
     }
     case "require": {
-      const modulePath = String(args3[0] ?? "");
-      const fs21 = require("fs");
-      const path19 = require("path");
+      const modulePath = String(args2[0] ?? "");
+      const fs15 = require("fs");
+      const path15 = require("path");
       try {
         let filePath = modulePath;
         if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
           filePath = filePath + ".fl";
         }
-        const resolvedPath = path19.isAbsolute(filePath) ? filePath : path19.resolve(process.cwd(), filePath);
+        const resolvedPath = path15.isAbsolute(filePath) ? filePath : path15.resolve(process.cwd(), filePath);
         if (MODULE_CACHE.has(resolvedPath)) {
           return MODULE_CACHE.get(resolvedPath);
         }
-        const src = fs21.readFileSync(resolvedPath, "utf-8");
+        const src = fs15.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -14624,10 +13822,10 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     // Phase TCP: TCP Socket Support (synchronous via spawnSync)
     case "net-sendrecv": {
-      const host = String(args3[0] ?? "localhost");
-      const port = Number(args3[1] ?? 27017);
-      const hexData = String(args3[2] ?? "");
-      const timeout = Number(args3[3] ?? 1e4);
+      const host = String(args2[0] ?? "localhost");
+      const port = Number(args2[1] ?? 27017);
+      const hexData = String(args2[2] ?? "");
+      const timeout = Number(args2[3] ?? 1e4);
       const { spawnSync: spawnSync9 } = require("child_process");
       const inlineScript = `
 const net = require('net');
@@ -14691,9 +13889,9 @@ sock.setTimeout(timeout, () => {
       }
     }
     case "net-connect": {
-      const host = String(args3[0] ?? "localhost");
-      const port = Number(args3[1] ?? 27017);
-      const timeout = Number(args3[2] ?? 5e3);
+      const host = String(args2[0] ?? "localhost");
+      const port = Number(args2[1] ?? 27017);
+      const timeout = Number(args2[2] ?? 5e3);
       const { spawnSync: spawnSync9 } = require("child_process");
       const inlineScript = `
 const net = require('net');
@@ -14719,10 +13917,10 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
     // args: host port hexData timeout
     // Returns hex response or null
     case "net-sendrecv-pool": {
-      const host = String(args3[0] ?? "localhost");
-      const port = Number(args3[1] ?? 27017);
-      const hexData = String(args3[2] ?? "");
-      const timeout = Number(args3[3] ?? 1e4);
+      const host = String(args2[0] ?? "localhost");
+      const port = Number(args2[1] ?? 27017);
+      const hexData = String(args2[2] ?? "");
+      const timeout = Number(args2[3] ?? 1e4);
       if (!globalThis.__netPoolWorker) {
         const { Worker: NetWorker } = require("worker_threads");
         const netCtrlBuf = new SharedArrayBuffer(4);
@@ -14836,13 +14034,16 @@ loop().catch(e => {
       if (!resp.ok) return null;
       return resp.data;
     }
-    // rpc-client-call: Worker Thread 기반 바이너리 RPC 클라이언트
-    case "rpc-client-call": case "rpc_client_call": {
-      const _rHost = String(args3[0] ?? "localhost");
-      const _rPort = Number(args3[1] ?? 30390);
-      const _rFnId = Number(args3[2] ?? 0);
-      const _rArgs = typeof args3[3] === "string" ? args3[3] : JSON.stringify(args3[3] ?? null);
-      const _rTimeout = Number(args3[4] ?? 10000);
+    // rpc-client-call: 바이너리 RPC 클라이언트 (Worker Thread + Pending Map)
+    // 헤더 9B: [Type 1B][Req_ID 2B LE][Func_ID 2B LE][Length 4B LE]
+    // args: host port fn_id args_json timeout?
+    case "rpc-client-call":
+    case "rpc_client_call": {
+      const _rHost = String(args2[0] ?? "localhost");
+      const _rPort = Number(args2[1] ?? 30390);
+      const _rFnId = Number(args2[2] ?? 0);
+      const _rArgs = typeof args2[3] === "string" ? args2[3] : JSON.stringify(args2[3] ?? null);
+      const _rTimeout = Number(args2[4] ?? 1e4);
       if (!globalThis.__rpcClientWorker) {
         const { Worker: RpcWorker } = require("worker_threads");
         const rpcCtrlBuf = new SharedArrayBuffer(4);
@@ -14853,17 +14054,28 @@ const { workerData } = require('worker_threads');
 const net = require('net');
 const control = new Int32Array(workerData.controlBuf);
 const data = Buffer.from(workerData.dataBuf);
-const HEADER = 9, T_REQ = 0x01, T_RES = 0x02, MAX_PKT = 10*1024*1024;
-const conns = new Map();
+const HEADER = 9;
+const T_REQ = 0x01, T_RES = 0x02;
+const MAX_PKT = 10 * 1024 * 1024;
+const conns = new Map(); // key \u2192 {socket, buf, pending}
+
 function encodeReq(req_id, fn_id, payload) {
   const pb = Buffer.from(payload, 'utf8');
   const h = Buffer.allocUnsafe(HEADER);
-  h[0] = T_REQ; h.writeUInt16LE(req_id, 1); h.writeUInt16LE(fn_id, 3); h.writeUInt32LE(pb.length, 5);
+  h[0] = T_REQ;
+  h.writeUInt16LE(req_id, 1);
+  h.writeUInt16LE(fn_id, 3);
+  h.writeUInt32LE(pb.length, 5);
   return Buffer.concat([h, pb]);
 }
+
 function getConn(host, port) {
   const key = host + ':' + port;
-  if (conns.has(key)) { const c = conns.get(key); if (!c.socket.destroyed && c.socket.writable) return Promise.resolve(c); conns.delete(key); }
+  if (conns.has(key)) {
+    const c = conns.get(key);
+    if (!c.socket.destroyed && c.socket.writable) return Promise.resolve(c);
+    conns.delete(key);
+  }
   return new Promise((resolve, reject) => {
     const c = { socket: null, buf: Buffer.alloc(0), pending: new Map() };
     c.socket = net.createConnection({ host, port });
@@ -14874,10 +14086,13 @@ function getConn(host, port) {
         const plen = c.buf.readUInt32LE(5);
         if (plen > MAX_PKT) { c.socket.destroy(); conns.delete(key); return; }
         if (c.buf.length < HEADER + plen) break;
-        const type = c.buf[0], rid = c.buf.readUInt16LE(1);
-        const pay = c.buf.slice(HEADER, HEADER + plen).toString('utf8');
+        const type = c.buf[0];
+        const rid  = c.buf.readUInt16LE(1);
+        const pay  = c.buf.slice(HEADER, HEADER + plen).toString('utf8');
         c.buf = c.buf.slice(HEADER + plen);
-        if (type === T_RES && c.pending.has(rid)) { const cb = c.pending.get(rid); c.pending.delete(rid); cb(pay); }
+        if (type === T_RES && c.pending.has(rid)) {
+          const cb = c.pending.get(rid); c.pending.delete(rid); cb(pay);
+        }
       }
     });
     c.socket.on('error', e => { reject(e); conns.delete(key); });
@@ -14885,6 +14100,7 @@ function getConn(host, port) {
     setTimeout(() => reject(new Error('connect timeout')), 5000);
   });
 }
+
 function sendRpc(host, port, fn_id, req_id, argsJson, timeout) {
   return new Promise(async (resolve, reject) => {
     let c; try { c = await getConn(host, port); } catch(e) { return reject(e); }
@@ -14894,6 +14110,7 @@ function sendRpc(host, port, fn_id, req_id, argsJson, timeout) {
     c.socket.write(frame);
   });
 }
+
 async function loop() {
   let seq = 0;
   while (true) {
@@ -14918,8 +14135,13 @@ async function loop() {
 }
 loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); });
 `;
-        const rpcWorker = new RpcWorker(rpcWorkerCode, { eval: true, workerData: { controlBuf: rpcCtrlBuf, dataBuf: rpcDataBuf } });
-        rpcWorker.on("error", () => { globalThis.__rpcClientWorker = null; });
+        const rpcWorker = new RpcWorker(rpcWorkerCode, {
+          eval: true,
+          workerData: { controlBuf: rpcCtrlBuf, dataBuf: rpcDataBuf }
+        });
+        rpcWorker.on("error", () => {
+          globalThis.__rpcClientWorker = null;
+        });
         globalThis.__rpcClientWorker = rpcWorker;
         globalThis.__rpcClientCtrlBuf = rpcCtrlBuf;
         globalThis.__rpcClientDataBuf = rpcDataBuf;
@@ -14927,9 +14149,11 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
       const _rc = new Int32Array(globalThis.__rpcClientCtrlBuf);
       const _rd = Buffer.from(globalThis.__rpcClientDataBuf);
       const _rReqStr = JSON.stringify({ host: _rHost, port: _rPort, fn_id: _rFnId, args: _rArgs, timeout: _rTimeout });
-      _rd.writeInt32LE(_rReqStr.length, 0); _rd.write(_rReqStr, 4, "utf8");
-      Atomics.store(_rc, 0, 1); Atomics.notify(_rc, 0);
-      const _rWait = Atomics.wait(_rc, 0, 1, _rTimeout + 2000);
+      _rd.writeInt32LE(_rReqStr.length, 0);
+      _rd.write(_rReqStr, 4, "utf8");
+      Atomics.store(_rc, 0, 1);
+      Atomics.notify(_rc, 0);
+      const _rWait = Atomics.wait(_rc, 0, 1, _rTimeout + 2e3);
       if (_rWait === "timed-out") return null;
       const _rRespLen = _rd.readInt32LE(0);
       const _rResp = JSON.parse(_rd.toString("utf8", 4, 4 + _rRespLen));
@@ -14949,19 +14173,19 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
     // (capability-enabled? name) → true | false
     case "capability-enabled?": {
       if (!globalThis.__flCapRegistry) globalThis.__flCapRegistry = { tcp: { enabled: true, builtins: [] }, file: { enabled: true, builtins: [] }, http: { enabled: true, builtins: [] }, db: { enabled: true, builtins: [] }, process: { enabled: true, builtins: [] } };
-      const _capName = String(args3[0] ?? "");
+      const _capName = String(args2[0] ?? "");
       return !!globalThis.__flCapRegistry[_capName]?.enabled;
     }
     // (capability-builtins name) → ["builtin1" ...]
     case "capability-builtins": {
       if (!globalThis.__flCapRegistry) return [];
-      const _capName = String(args3[0] ?? "");
+      const _capName = String(args2[0] ?? "");
       return globalThis.__flCapRegistry[_capName]?.builtins ?? [];
     }
     // (capability-disable name) → "ok" | "not-found"
     case "capability-disable": {
       if (!globalThis.__flCapRegistry) return "not-found";
-      const _capName = String(args3[0] ?? "");
+      const _capName = String(args2[0] ?? "");
       const _reg = globalThis.__flCapRegistry;
       if (!_reg[_capName]) return "not-found";
       _reg[_capName].enabled = false;
@@ -14970,7 +14194,7 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
     // (capability-enable name) → "ok" | "not-found"
     case "capability-enable": {
       if (!globalThis.__flCapRegistry) return "not-found";
-      const _capName = String(args3[0] ?? "");
+      const _capName = String(args2[0] ?? "");
       const _reg = globalThis.__flCapRegistry;
       if (!_reg[_capName]) return "not-found";
       _reg[_capName].enabled = true;
@@ -14979,8 +14203,8 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
     // (capability-register name builtins) → "ok"
     case "capability-register": {
       if (!globalThis.__flCapRegistry) globalThis.__flCapRegistry = {};
-      const _capName = String(args3[0] ?? "");
-      const _builtins = Array.isArray(args3[1]) ? args3[1].map(String) : [];
+      const _capName = String(args2[0] ?? "");
+      const _builtins = Array.isArray(args2[1]) ? args2[1].map(String) : [];
       globalThis.__flCapRegistry[_capName] = { enabled: true, builtins: _builtins };
       return "ok";
     }
@@ -15075,23 +14299,23 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
     // (fl-error-severity err) → "fatal" | "recoverable"
     // err: ["io-err" severity source msg]
     case "fl-error-severity": {
-      const e = args3[0];
+      const e = args2[0];
       return Array.isArray(e) && e[0] === "io-err" ? String(e[1]) : null;
     }
     // (fl-error-source err) → "queue-overflow" | "handler" | "write"
     case "fl-error-source": {
-      const e = args3[0];
+      const e = args2[0];
       return Array.isArray(e) && e[0] === "io-err" ? String(e[2]) : null;
     }
     // (fl-error-message err) → message string
     case "fl-error-message": {
-      const e = args3[0];
+      const e = args2[0];
       return Array.isArray(e) && e[0] === "io-err" ? String(e[3]) : null;
     }
     // (fl-error-filter severity) → errors matching severity, clears them from queue
     // severity: "fatal" | "recoverable" | "all"
     case "fl-error-filter": {
-      const sev = String(args3[0] ?? "all");
+      const sev = String(args2[0] ?? "all");
       const eq = globalThis.__flErrorQueue ?? [];
       if (sev === "all") {
         globalThis.__flErrorQueue = [];
@@ -15105,8 +14329,8 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
     // (fl-queue-cap n) → set cap to n, return old cap
     case "fl-queue-cap": {
       const prev = globalThis.__flQueueCap ?? 1e4;
-      if (args3[0] != null) {
-        const n = Number(args3[0]);
+      if (args2[0] != null) {
+        const n = Number(args2[0]);
         if (n > 0) globalThis.__flQueueCap = n;
       }
       return prev;
@@ -15122,8 +14346,8 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
           if (_c.builtins.includes("tcp-server-start") && !_c.enabled) return `[capability-denied ${_n}]`;
         }
       }
-      const port = Number(args3[0] ?? 30390);
-      const handlerName = String(args3[1] ?? "");
+      const port = Number(args2[0] ?? 30390);
+      const handlerName = String(args2[1] ?? "");
       const reg = globalThis.__tcpServers ?? {};
       if (!globalThis.__tcpServers) globalThis.__tcpServers = reg;
       if (reg[port] && !reg[port].stopped) return "already-running";
@@ -15182,7 +14406,7 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
     }
     // (tcp-server-stop port) → "ok" | "not-running"
     case "tcp-server-stop": {
-      const port = Number(args3[0] ?? 30390);
+      const port = Number(args2[0] ?? 30390);
       const reg = globalThis.__tcpServers ?? {};
       const entry = reg[port];
       if (!entry || entry.stopped) return "not-running";
@@ -15201,10 +14425,10 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
     // (tcp-send host port line) → response-string | nil
     // 단순 line 기반 요청-응답 (한 줄 송신 → 한 줄 수신)
     case "tcp-send": {
-      const host = String(args3[0] ?? "localhost");
-      const port = Number(args3[1] ?? 30390);
-      const line = String(args3[2] ?? "");
-      const timeout = Number(args3[3] ?? 3e3);
+      const host = String(args2[0] ?? "localhost");
+      const port = Number(args2[1] ?? 30390);
+      const line = String(args2[2] ?? "");
+      const timeout = Number(args2[3] ?? 3e3);
       const { spawnSync: spawnSync9 } = require("child_process");
       const script = `
 const net = require('net');
@@ -15232,7 +14456,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (tcp-server-running? port) → true | false
     case "tcp-server-running?": {
-      const port = Number(args3[0] ?? 30390);
+      const port = Number(args2[0] ?? 30390);
       const entry = globalThis.__tcpServers?.[port];
       return !!(entry && !entry.stopped);
     }
@@ -15248,8 +14472,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           if (_c.builtins.includes("tcp-server-raw") && !_c.enabled) return `[capability-denied ${_n}]`;
         }
       }
-      const _rrPort = Number(args3[0] ?? 30390);
-      const _rrHandler = String(args3[1] ?? "");
+      const _rrPort = Number(args2[0] ?? 30390);
+      const _rrHandler = String(args2[1] ?? "");
       const _rrReg = globalThis.__tcpServers ?? {};
       if (!globalThis.__tcpServers) globalThis.__tcpServers = _rrReg;
       if (_rrReg[_rrPort] && !_rrReg[_rrPort].stopped) return "already-running";
@@ -15264,7 +14488,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           sock.destroy();
           return;
         }
-        const _rrConnId = `conn_${_rrPort}_${++_rrSeq}`;
+        const _rrConnId = `conn_${++_rrSeq}`;
         _rrEntry.sockets.add(sock);
         globalThis.__flConnSocks[_rrConnId] = sock;
         const _rrEnq = (evArgs) => {
@@ -15296,16 +14520,15 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return "ok";
     }
     // (tcp-outbound host port "handler") → upstream-id (즉시 반환, 연결은 비동기)
-    // 이벤트 큐 경유 (항상 3 인자):
+    // IO Worker Thread 기반. fl-yield로 이벤트 드레인 필요.
     //   handler("connect", upstreamId, "")         — 연결 성공
     //   handler("data",    upstreamId, chunk)       — 응답 수신
     //   handler("close",   upstreamId, "")          — 종료
     //   handler("error",   upstreamId, message)     — 연결 실패
     case "tcp-outbound": {
-      const _obHost = String(args3[0] ?? "localhost");
-      const _obPort = Number(args3[1] ?? 80);
-      const _obHandler = String(args3[2] ?? "");
-      // IO Worker 초기화 (최초 tcp-outbound 호출 시)
+      const _obHost = String(args2[0] ?? "localhost");
+      const _obPort = Number(args2[1] ?? 80);
+      const _obHandler = String(args2[2] ?? "");
       if (!globalThis.__flIoWorker) {
         const { Worker: _IoW } = require("worker_threads");
         const _ioCtrlBuf = new SharedArrayBuffer(12);
@@ -15313,14 +14536,55 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         Atomics.store(new Int32Array(_ioCtrlBuf), 0, 0);
         Atomics.store(new Int32Array(_ioCtrlBuf), 1, 0);
         Atomics.store(new Int32Array(_ioCtrlBuf), 2, 0);
-        const _ioCode = `const{workerData,parentPort}=require('worker_threads');const net=require('net');const ctrl=new Int32Array(workerData.ctrlBuf);const dataBuf=Buffer.from(workerData.dataBuf);const BUFSZ=dataBuf.length;const ups=new Map();function lock(){while(Atomics.compareExchange(ctrl,2,0,1)!==0){}}function unlock(){Atomics.store(ctrl,2,0);}function push(handler,args){const s=JSON.stringify({handler,args});const b=Buffer.from(s,'utf8');lock();let wp=Atomics.load(ctrl,0);if(wp+4+b.length>BUFSZ){wp=0;}dataBuf.writeUInt32LE(b.length,wp);b.copy(dataBuf,wp+4);Atomics.store(ctrl,0,wp+4+b.length);unlock();Atomics.store(ctrl,1,1);Atomics.notify(ctrl,1,1);}parentPort.on('message',msg=>{if(msg.cmd==='connect'){const{id,host,port,handler}=msg;const s=net.createConnection({host,port});ups.set(id,s);s.on('connect',()=>push(handler,['connect',id,'']));s.on('data',c=>push(handler,['data',id,c.toString('binary')]));s.on('close',()=>{ups.delete(id);push(handler,['close',id,'']);});s.on('error',e=>{ups.delete(id);push(handler,['error',id,String(e.message||'connect failed')]);});}else if(msg.cmd==='write'){const s=ups.get(msg.id);if(s&&!s.destroyed)try{s.write(Buffer.from(msg.data,'binary'));}catch(e){}}else if(msg.cmd==='drop'){const s=ups.get(msg.id);if(s){try{s.destroy();}catch(e){}ups.delete(msg.id);}}});`;
+        const _ioCode = `
+const{workerData,parentPort}=require('worker_threads');
+const net=require('net');
+const ctrl=new Int32Array(workerData.ctrlBuf);
+const dataBuf=Buffer.from(workerData.dataBuf);
+const BUFSZ=dataBuf.length;
+const ups=new Map();
+function lock(){while(Atomics.compareExchange(ctrl,2,0,1)!==0){}}
+function unlock(){Atomics.store(ctrl,2,0);}
+function push(handler,args){
+  const s=JSON.stringify({handler,args});
+  const b=Buffer.from(s,'utf8');
+  lock();
+  let wp=Atomics.load(ctrl,0);
+  if(wp+4+b.length>BUFSZ){wp=0;}
+  dataBuf.writeUInt32LE(b.length,wp);
+  b.copy(dataBuf,wp+4);
+  Atomics.store(ctrl,0,wp+4+b.length);
+  unlock();
+  Atomics.store(ctrl,1,1);
+  Atomics.notify(ctrl,1,1);
+}
+parentPort.on('message',msg=>{
+  if(msg.cmd==='connect'){
+    const{id,host,port,handler}=msg;
+    const s=net.createConnection({host,port});
+    ups.set(id,s);
+    s.on('connect',()=>push(handler,['connect',id,'']));
+    s.on('data',c=>push(handler,['data',id,c.toString('binary')]));
+    s.on('close',()=>{ups.delete(id);push(handler,['close',id,'']);});
+    s.on('error',e=>{ups.delete(id);push(handler,['error',id,String(e.message||'connect failed')]);});
+  }else if(msg.cmd==='write'){
+    const s=ups.get(msg.id);
+    if(s&&!s.destroyed)try{s.write(Buffer.from(msg.data,'binary'));}catch(e){}
+  }else if(msg.cmd==='drop'){
+    const s=ups.get(msg.id);
+    if(s){try{s.destroy();}catch(e){}ups.delete(msg.id);}
+  }
+});
+`;
         const _ioWorker = new _IoW(_ioCode, { eval: true, workerData: { ctrlBuf: _ioCtrlBuf, dataBuf: _ioDataBuf } });
         _ioWorker.unref();
-        _ioWorker.on("error", () => { globalThis.__flIoWorker = null; });
+        _ioWorker.on("error", () => {
+          globalThis.__flIoWorker = null;
+        });
         globalThis.__flIoWorker = _ioWorker;
         globalThis.__flIoCtrl = new Int32Array(_ioCtrlBuf);
         globalThis.__flIoDataBuf = _ioDataBuf;
-        globalThis.__flIoUpstreams = new Set();
+        globalThis.__flIoUpstreams = /* @__PURE__ */ new Set();
         globalThis.__flIoUpstreamSeq = 0;
       }
       const _upId = `upstream_${++globalThis.__flIoUpstreamSeq}`;
@@ -15329,10 +14593,10 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return _upId;
     }
     // (tcp-write conn-id data) → "ok" | "error" | "not-found"
-    // IO Worker upstream, 인바운드(__flConnSocks), 구형 아웃바운드(__flUpstreams)
+    // 인바운드(__flConnSocks), IO Worker 아웃바운드(__flIoUpstreams), 구형 아웃바운드(__flUpstreams)
     case "tcp-write": {
-      const _twId = String(args3[0] ?? "");
-      const _twData = String(args3[1] ?? "");
+      const _twId = String(args2[0] ?? "");
+      const _twData = String(args2[1] ?? "");
       if (globalThis.__flIoUpstreams?.has(_twId)) {
         globalThis.__flIoWorker?.postMessage({ cmd: "write", id: _twId, data: _twData });
         return "ok";
@@ -15351,7 +14615,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // (tcp-drop conn-id) → "ok" | "not-found"
     // 인바운드 또는 아웃바운드 연결 강제 종료
     case "tcp-drop": {
-      const _tdId = String(args3[0] ?? "");
+      const _tdId = String(args2[0] ?? "");
       if (globalThis.__flIoUpstreams?.has(_tdId)) {
         globalThis.__flIoUpstreams.delete(_tdId);
         globalThis.__flIoWorker?.postMessage({ cmd: "drop", id: _tdId });
@@ -15359,13 +14623,19 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       const _tdIn = globalThis.__flConnSocks?.[_tdId];
       if (_tdIn) {
-        try { _tdIn.destroy(); } catch {}
+        try {
+          _tdIn.destroy();
+        } catch {
+        }
         delete globalThis.__flConnSocks[_tdId];
         return "ok";
       }
       const _tdOut = globalThis.__flUpstreams?.[_tdId];
       if (_tdOut) {
-        try { _tdOut.destroy(); } catch {}
+        try {
+          _tdOut.destroy();
+        } catch {
+        }
         delete globalThis.__flUpstreams[_tdId];
         return "ok";
       }
@@ -15374,8 +14644,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // (fl-set-interval ms "handler-name") → interval-id
     // Node.js setInterval로 주기적으로 FL 핸들러 호출. 이벤트 루프 비블로킹.
     case "fl-set-interval": {
-      const _siMs = Math.max(1, Number(args3[0] ?? 1e3));
-      const _siHandler = String(args3[1] ?? "");
+      const _siMs = Math.max(1, Number(args2[0] ?? 1e3));
+      const _siHandler = String(args2[1] ?? "");
       if (!globalThis.__flIntervals) globalThis.__flIntervals = {};
       if (!globalThis.__flIntervalSeq) globalThis.__flIntervalSeq = 0;
       const _siId = `interval_${++globalThis.__flIntervalSeq}`;
@@ -15392,22 +14662,31 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (fl-clear-interval interval-id) → "ok" | "not-found"
     case "fl-clear-interval": {
-      const _ciId = String(args3[0] ?? "");
+      const _ciId = String(args2[0] ?? "");
       const _ciHandle = globalThis.__flIntervals?.[_ciId];
       if (!_ciHandle) return "not-found";
       clearInterval(_ciHandle);
       delete globalThis.__flIntervals[_ciId];
       return "ok";
     }
-    // (fl-yield [timeout-ms]) → number
+    // ── IO Worker (fl-yield / tcp-outbound async) ──────────────────────
+    // IO Worker: Worker Thread에서 tcp-outbound I/O를 처리.
+    // 이벤트는 SharedArrayBuffer ring buffer를 통해 메인 스레드로 전달.
+    // SAB ctrl layout (Int32Array × 3):
+    //   ctrl[0]: writePos — Worker가 증가, Main이 드레인 후 0으로 리셋
+    //   ctrl[1]: notify   — Worker가 1로 set, Main이 wait 후 0으로 클리어
+    //   ctrl[2]: mutex    — 0=free, 1=locked (CAS spin-lock)
+    // dataBuf: 8MB — 각 이벤트는 [4B length][JSON bytes]
+    // (fl-yield [timeout-ms]) → number (처리된 이벤트 수)
     // IO Worker 이벤트를 메인 스레드에서 드레인. tcp-outbound 응답 수신에 사용.
     case "fl-yield": {
-      const _fyMs = Math.max(0, Number(args3[0] ?? 1));
+      const _fyMs = Math.max(0, Number(args2[0] ?? 1));
       const _fyCtrl = globalThis.__flIoCtrl;
       if (!_fyCtrl) return 0;
       Atomics.wait(_fyCtrl, 1, 0, _fyMs);
       Atomics.store(_fyCtrl, 1, 0);
-      while (Atomics.compareExchange(_fyCtrl, 2, 0, 1) !== 0) {}
+      while (Atomics.compareExchange(_fyCtrl, 2, 0, 1) !== 0) {
+      }
       const _fyWp = Atomics.load(_fyCtrl, 0);
       const _fyEvents = [];
       if (_fyWp > 0) {
@@ -15416,7 +14695,10 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         while (_fyPos < _fyWp) {
           const _fyLen = _fyBuf.readUInt32LE(_fyPos);
           if (_fyLen === 0 || _fyPos + 4 + _fyLen > _fyWp) break;
-          try { _fyEvents.push(JSON.parse(_fyBuf.toString("utf8", _fyPos + 4, _fyPos + 4 + _fyLen))); } catch {}
+          try {
+            _fyEvents.push(JSON.parse(_fyBuf.toString("utf8", _fyPos + 4, _fyPos + 4 + _fyLen)));
+          } catch {
+          }
           _fyPos += 4 + _fyLen;
         }
         Atomics.store(_fyCtrl, 0, 0);
@@ -15424,98 +14706,100 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       Atomics.store(_fyCtrl, 2, 0);
       let _fyCnt = 0;
       for (const _fyEv of _fyEvents) {
-        try { callFnVal(_fyEv.handler, _fyEv.args); _fyCnt++; }
-        catch (e) {
+        try {
+          callFnVal(_fyEv.handler, _fyEv.args);
+          _fyCnt++;
+        } catch (e) {
           if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
-          globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e?.message ?? e)]);
+          globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e.message ?? e)]);
         }
       }
       return _fyCnt;
     }
     // Arithmetic
     case "+": {
-      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      const bi = args2.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
       if (bi >= 0) {
-        const t = flTypeOf(args3[bi]);
+        const t = flTypeOf(args2[bi]);
         const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
         throw new Error(`[E_TYPE_MISMATCH] +: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
       }
-      return args3.reduce((a, b) => a + b, 0);
+      return args2.reduce((a, b) => a + b, 0);
     }
     case "-": {
-      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      const bi = args2.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
       if (bi >= 0) {
-        const t = flTypeOf(args3[bi]);
+        const t = flTypeOf(args2[bi]);
         const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
         throw new Error(`[E_TYPE_MISMATCH] -: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
       }
-      return args3.length === 1 ? -args3[0] : args3.reduce((a, b) => a - b);
+      return args2.length === 1 ? -args2[0] : args2.reduce((a, b) => a - b);
     }
     case "*": {
-      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      const bi = args2.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
       if (bi >= 0) {
-        const t = flTypeOf(args3[bi]);
+        const t = flTypeOf(args2[bi]);
         const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
         throw new Error(`[E_TYPE_MISMATCH] *: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
       }
-      return args3.reduce((a, b) => a * b, 1);
+      return args2.reduce((a, b) => a * b, 1);
     }
     case "/": {
-      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      const bi = args2.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
       if (bi >= 0) {
-        const t = flTypeOf(args3[bi]);
+        const t = flTypeOf(args2[bi]);
         const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
         throw new Error(`[E_TYPE_MISMATCH] /: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
       }
-      return args3.length === 1 ? 1 / args3[0] : args3.reduce((a, b) => a / b);
+      return args2.length === 1 ? 1 / args2[0] : args2.reduce((a, b) => a / b);
     }
     case "%":
-      return args3[0] % args3[1];
+      return args2[0] % args2[1];
     // Comparison
     case "=":
-      return flDeepEq(args3[0], args3[1]);
+      return flDeepEq(args2[0], args2[1]);
     case "<":
-      return args3[0] < args3[1];
+      return args2[0] < args2[1];
     case ">":
-      return args3[0] > args3[1];
+      return args2[0] > args2[1];
     case "<=":
-      return args3[0] <= args3[1];
+      return args2[0] <= args2[1];
     case ">=":
-      return args3[0] >= args3[1];
+      return args2[0] >= args2[1];
     case "!=":
     case "not=":
-      return args3[0] !== args3[1];
+      return args2[0] !== args2[1];
     // Logical (evaluated versions — unevaluated short-circuit is in eval-special-forms.ts)
     case "and":
-      return args3.every((a) => a);
+      return args2.every((a) => a);
     case "or": {
       const flFalsy3 = (v) => v === null || v === void 0 || v === false;
-      for (const a of args3) {
+      for (const a of args2) {
         if (!flFalsy3(a)) return a;
       }
-      return args3.length > 0 ? args3[args3.length - 1] : null;
+      return args2.length > 0 ? args2[args2.length - 1] : null;
     }
     case "not":
-      return !args3[0];
+      return !args2[0];
     // Output
     case "print":
-      process.stdout.write(args3.map((a) => toDisplay2(a)).join(" "));
+      process.stdout.write(args2.map((a) => toDisplay2(a)).join(" "));
       return null;
     case "println":
     case "echo":
-      process.stdout.write(args3.map((a) => toDisplay2(a)).join(" ") + "\n");
+      process.stdout.write(args2.map((a) => toDisplay2(a)).join(" ") + "\n");
       return null;
     case "tap":
     case "dbg": {
-      const label = args3.length > 1 ? String(args3[0]) + " " : "";
-      const val = args3.length > 1 ? args3[1] : args3[0];
+      const label = args2.length > 1 ? String(args2[0]) + " " : "";
+      const val = args2.length > 1 ? args2[1] : args2[0];
       process.stderr.write("[tap] " + label + toDisplay2(val) + "\n");
       return val;
     }
     case "debug": {
-      const hasLabel = args3.length > 1;
-      const debugLabel = hasLabel ? String(args3[0]) : "";
-      const debugVal = hasLabel ? args3[1] : args3[0];
+      const hasLabel = args2.length > 1;
+      const debugLabel = hasLabel ? String(args2[0]) : "";
+      const debugVal = hasLabel ? args2[1] : args2[0];
       const debugPrefix = debugLabel ? `[DEBUG ${debugLabel}]` : "[DEBUG]";
       process.stderr.write(`${debugPrefix} ${toDisplay2(debugVal)}
 `);
@@ -15530,11 +14814,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return debugVal;
     }
     case "runtime-events": {
-      if (args3.length === 0) return getEvents();
+      if (args2.length === 0) return getEvents();
       const reOpts = {};
-      for (let i = 0; i + 1 < args3.length; i += 2) {
-        const k = String(args3[i]).replace(/^:/, "");
-        reOpts[k] = args3[i + 1];
+      for (let i = 0; i + 1 < args2.length; i += 2) {
+        const k = String(args2[i]).replace(/^:/, "");
+        reOpts[k] = args2[i + 1];
       }
       let reEvs = getEvents();
       if (reOpts.type !== void 0) {
@@ -15633,13 +14917,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return issues;
     }
     case "save-runtime-events": {
-      const savePath = String(args3[0]);
+      const savePath = String(args2[0]);
       const saveFs = require("fs");
       saveFs.writeFileSync(savePath, JSON.stringify(getEvents(), null, 2), "utf-8");
       return savePath;
     }
     case "load-runtime-events": {
-      const loadPath = String(args3[0]);
+      const loadPath = String(args2[0]);
       const loadFs = require("fs");
       const loaded2 = JSON.parse(loadFs.readFileSync(loadPath, "utf-8"));
       clearEvents();
@@ -15647,8 +14931,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return loaded2.length;
     }
     case "runtime-diff": {
-      const rdA = Array.isArray(args3[0]) ? args3[0] : [];
-      const rdB = Array.isArray(args3[1]) ? args3[1] : [];
+      const rdA = Array.isArray(args2[0]) ? args2[0] : [];
+      const rdB = Array.isArray(args2[1]) ? args2[1] : [];
       const rdSum = (evs) => {
         const tms = evs.filter((e) => e.type === "trace").map((e) => e.elapsedMs ?? 0);
         return {
@@ -15706,7 +14990,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // ── Phase 10: Persistent Runtime Memory ───────────────────────────────
     case "runtime-store-save": {
-      const rstPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const rstPath = args2[0] != null ? String(args2[0]) : storeGetDefaultPath();
       const rstEvs = getEvents();
       const rstSummaryEvs = rstEvs.filter((e) => e.type === "trace");
       const rstMs = rstSummaryEvs.map((e) => e.elapsedMs ?? 0);
@@ -15744,30 +15028,30 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return rstPath;
     }
     case "runtime-store-load": {
-      const rslPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const rslPath = args2[0] != null ? String(args2[0]) : storeGetDefaultPath();
       return storeLoadRuns(rslPath);
     }
     case "runtime-store-clear": {
-      const rscPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const rscPath = args2[0] != null ? String(args2[0]) : storeGetDefaultPath();
       storeClear(rscPath);
       return true;
     }
     case "runtime-replay-history": {
-      const rrhPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const rrhPath = args2[0] != null ? String(args2[0]) : storeGetDefaultPath();
       return replayHistory(rrhPath);
     }
     case "runtime-history": {
-      const rhisPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const rhisPath = args2[0] != null ? String(args2[0]) : storeGetDefaultPath();
       return computeHistory(rhisPath);
     }
     case "runtime-reputation": {
-      const rrepName = String(args3[0] ?? "").replace(/^:/, "");
-      const rrepPath = args3[1] != null ? String(args3[1]) : storeGetDefaultPath();
+      const rrepName = String(args2[0] ?? "").replace(/^:/, "");
+      const rrepPath = args2[1] != null ? String(args2[1]) : storeGetDefaultPath();
       if (!rrepName) return computeAllReputations(rrepPath);
       return computeReputation(rrepName, rrepPath);
     }
     case "runtime-intelligence": {
-      const riPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const riPath = args2[0] != null ? String(args2[0]) : storeGetDefaultPath();
       return computeIntelligence(riPath);
     }
     // ──────────────────────────────────────────────────────────────────────
@@ -15775,7 +15059,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return getRuntimeMode();
     }
     case "set-runtime-mode": {
-      const modeArg = String(args3[0]).replace(/^:/, "");
+      const modeArg = String(args2[0]).replace(/^:/, "");
       const validModes = ["normal", "degraded", "protected", "panic"];
       if (!validModes.includes(modeArg)) {
         throw new Error(`set-runtime-mode: invalid mode "${modeArg}". Use :normal/:degraded/:protected/:panic`);
@@ -15842,7 +15126,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "abort-current-runtime":
     case "abort-runtime-context": {
-      const ctxId = args3[0] != null ? String(args3[0]) : getCurrentContextId();
+      const ctxId = args2[0] != null ? String(args2[0]) : getCurrentContextId();
       if (ctxId) {
         abortContext(ctxId);
         recordEvent({
@@ -15931,7 +15215,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       };
     }
     case "set-runtime-filter": {
-      const sfSev = String(args3[0]).replace(/^:/, "");
+      const sfSev = String(args2[0]).replace(/^:/, "");
       if (!["debug", "info", "warn", "error", "fatal"].includes(sfSev)) {
         throw new Error(`set-runtime-filter: invalid severity "${sfSev}". Use :debug/:info/:warn/:error/:fatal`);
       }
@@ -15942,8 +15226,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       clearRuntimeFilter();
       return null;
     case "runtime-replay-check": {
-      const rrEvFile = String(args3[0]);
-      const rrSrcFile = String(args3[1]);
+      const rrEvFile = String(args2[0]);
+      const rrSrcFile = String(args2[1]);
       const rrFs = require("fs");
       const refEvs = JSON.parse(rrFs.readFileSync(rrEvFile, "utf-8"));
       const rrSrc = rrFs.readFileSync(rrSrcFile, "utf-8");
@@ -15984,8 +15268,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       };
     }
     case "assert": {
-      const assertCond = args3[0];
-      const assertMsg = args3.length > 1 ? String(args3[1]) : void 0;
+      const assertCond = args2[0];
+      const assertMsg = args2.length > 1 ? String(args2[1]) : void 0;
       if (!assertCond) {
         let assertExpr = "?";
         try {
@@ -16019,10 +15303,10 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return true;
     }
     case "print-err":
-      process.stderr.write(args3.map((a) => toDisplay2(a)).join(" ") + "\n");
+      process.stderr.write(args2.map((a) => toDisplay2(a)).join(" ") + "\n");
       return null;
     case "str":
-      return args3.map((a) => {
+      return args2.map((a) => {
         if (a === null || a === void 0) return "null";
         if (typeof a === "string" || typeof a === "number" || typeof a === "boolean") return String(a);
         const isPlainObj = typeof a === "object" && !Array.isArray(a) && !(a instanceof Map) && a?.kind !== "function-value" && a?.kind !== "closure";
@@ -16036,27 +15320,27 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return toDisplay2(a);
       }).join("");
     case "repr":
-      return JSON.stringify(args3[0], null, 2);
+      return JSON.stringify(args2[0], null, 2);
     case "inspect": {
-      const inspected = toDisplay2(args3[0]);
+      const inspected = toDisplay2(args2[0]);
       console.log(inspected);
-      return args3[0];
+      return args2[0];
     }
     // String basic
     case "concat":
-      if (!Array.isArray(args3[0])) return args3.join("");
-      if (!Array.isArray(args3[1])) return args3[0] || [];
-      return args3[0].concat(args3[1]);
+      if (!Array.isArray(args2[0])) return args2.join("");
+      if (!Array.isArray(args2[1])) return args2[0] || [];
+      return args2[0].concat(args2[1]);
     case "upper":
-      return args3[0]?.toString().toUpperCase();
+      return args2[0]?.toString().toUpperCase();
     case "lower":
-      return args3[0]?.toString().toLowerCase();
+      return args2[0]?.toString().toLowerCase();
     case "length":
     case "count":
-      return Array.isArray(args3[0]) ? args3[0].length : typeof args3[0] === "string" ? args3[0].length : args3[0] !== null && typeof args3[0] === "object" ? Object.keys(args3[0]).length : 0;
+      return Array.isArray(args2[0]) ? args2[0].length : typeof args2[0] === "string" ? args2[0].length : args2[0] !== null && typeof args2[0] === "object" ? Object.keys(args2[0]).length : 0;
     // Phase MongoDB: to-hex (number → 2-digit hex string)
     case "to-hex": {
-      const n = Math.floor(Number(args3[0])) & 255;
+      const n = Math.floor(Number(args2[0])) & 255;
       return n.toString(16).padStart(2, "0");
     }
     // Phase MongoDB: bson-encode-native (FreeLang map → BSON hex)
@@ -16114,13 +15398,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const size2 = 4 + elements.length / 2 + 1;
         return int32ToHex(size2) + elements + "00";
       };
-      const doc = args3[0];
+      const doc = args2[0];
       if (!doc || typeof doc !== "object") return "0c000000107069696e6700010000000000";
       return encodeDoc(doc);
     }
     // Phase MongoDB: bson-decode-native (BSON hex → FreeLang map/array)
     case "bson-decode-native": {
-      const hex = String(args3[0] || "");
+      const hex = String(args2[0] || "");
       if (hex.length < 8) return {};
       const buf = Buffer.from(hex, "hex");
       const decodeDoc = (buf2, startOffset) => {
@@ -16180,9 +15464,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // P3 (2026-04-25): 작은 함수형 stdlib — AI가 자연스럽게 짜는 패턴
     case "identity":
-      return args3[0];
+      return args2[0];
     case "comp": {
-      const fns = args3.filter((a) => a != null);
+      const fns = args2.filter((a) => a != null);
       return (...callArgs) => {
         if (fns.length === 0) return callArgs[0];
         let result = callFnVal(fns[fns.length - 1], callArgs);
@@ -16191,15 +15475,15 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       };
     }
     case "juxt": {
-      const fns = args3.filter((a) => a != null);
+      const fns = args2.filter((a) => a != null);
       return (...callArgs) => fns.map((fn) => callFnVal(fn, callArgs));
     }
     case "constantly": {
-      const v = args3[0];
+      const v = args2[0];
       return (..._callArgs) => v;
     }
     case "complement": {
-      const pred = args3[0];
+      const pred = args2[0];
       const callOne = (fn, callArgs) => {
         if (typeof fn === "function") return fn(...callArgs);
         if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
@@ -16209,24 +15493,24 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // Array/Collection
     case "list":
-      return args3;
+      return args2;
     case "first":
-      return Array.isArray(args3[0]) ? args3[0][0] !== void 0 ? args3[0][0] : null : null;
+      return Array.isArray(args2[0]) ? args2[0][0] !== void 0 ? args2[0][0] : null : null;
     case "second":
-      return Array.isArray(args3[0]) ? args3[0][1] !== void 0 ? args3[0][1] : null : null;
+      return Array.isArray(args2[0]) ? args2[0][1] !== void 0 ? args2[0][1] : null : null;
     case "nth":
-      return Array.isArray(args3[0]) ? args3[0][Number(args3[1])] !== void 0 ? args3[0][Number(args3[1])] : null : null;
+      return Array.isArray(args2[0]) ? args2[0][Number(args2[1])] !== void 0 ? args2[0][Number(args2[1])] : null : null;
     case "rest":
-      return Array.isArray(args3[0]) ? args3[0].slice(1) : [];
+      return Array.isArray(args2[0]) ? args2[0].slice(1) : [];
     // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
     case "keys": {
-      const kObj = args3[0];
+      const kObj = args2[0];
       if (kObj instanceof Map) return Array.from(kObj.keys());
       return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
     }
     case "length-or-zero":
     case "length_or_zero": {
-      const v = args3[0];
+      const v = args2[0];
       if (v === null || v === void 0) return 0;
       if (typeof v === "string") return v.length;
       if (Array.isArray(v)) return v.length;
@@ -16236,47 +15520,47 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "vals":
     case "values": {
-      const vObj = args3[0];
+      const vObj = args2[0];
       if (vObj instanceof Map) return Array.from(vObj.values());
       return vObj && typeof vObj === "object" && !Array.isArray(vObj) ? Object.values(vObj) : [];
     }
     case "upper-case":
-      return typeof args3[0] === "string" ? args3[0].toUpperCase() : args3[0];
+      return typeof args2[0] === "string" ? args2[0].toUpperCase() : args2[0];
     case "lower-case":
     case "lowercase":
     case "lower":
-      return typeof args3[0] === "string" ? args3[0].toLowerCase() : args3[0];
+      return typeof args2[0] === "string" ? args2[0].toLowerCase() : args2[0];
     case "trim":
-      return typeof args3[0] === "string" ? args3[0].trim() : "";
+      return typeof args2[0] === "string" ? args2[0].trim() : "";
     case "starts-with?":
     case "str-starts-with?":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
+      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
     case "ends-with?":
     case "str-ends-with?":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
+      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].endsWith(args2[1]) : false;
     case "char-at":
     case "str-char-at":
-      return typeof args3[0] === "string" ? args3[0][Number(args3[1])] ?? "" : "";
+      return typeof args2[0] === "string" ? args2[0][Number(args2[1])] ?? "" : "";
     case "math-pow":
-      return Math.pow(Number(args3[0]), Number(args3[1]));
+      return Math.pow(Number(args2[0]), Number(args2[1]));
     case "append":
-      if (Array.isArray(args3[0]) && args3.length === 2 && Array.isArray(args3[1])) {
-        return [...args3[0], ...args3[1]];
+      if (Array.isArray(args2[0]) && args2.length === 2 && Array.isArray(args2[1])) {
+        return [...args2[0], ...args2[1]];
       }
-      return [...args3[0] || [], ...args3.slice(1)];
+      return [...args2[0] || [], ...args2.slice(1)];
     case "reverse":
-      if (Array.isArray(args3[0])) return [...args3[0]].reverse();
+      if (Array.isArray(args2[0])) return [...args2[0]].reverse();
       return [];
     case "map": {
-      if (Array.isArray(args3[0]) && args3[0].length > 0) {
-        const second = args3[1];
+      if (Array.isArray(args2[0]) && args2[0].length > 0) {
+        const second = args2[1];
         if (second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure")) {
           throw new Error(`map \uC778\uC790 \uC21C\uC11C \uC624\uB958: (map fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (map arr fn)`);
         }
       }
-      const mapFn = args3[0];
-      if (args3[1] === null || args3[1] === void 0) return [];
-      const mapArr = Array.isArray(args3[1]) ? args3[1] : [];
+      const mapFn = args2[0];
+      if (args2[1] === null || args2[1] === void 0) return [];
+      const mapArr = Array.isArray(args2[1]) ? args2[1] : [];
       return mapArr.map((item) => callFnVal(mapFn, [item]));
     }
     // Phase 7: Async functions
@@ -16284,13 +15568,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (expr2.args.length < 2) throw new Error(`set-timeout requires callback and delay`);
       const callback = ev(expr2.args[0]);
       const delay = ev(expr2.args[1]);
-      return new FreeLangPromise((resolve9, reject) => {
+      return new FreeLangPromise((resolve7, reject) => {
         setTimeout(() => {
           try {
             if (typeof callback === "function") {
-              resolve9(callback());
+              resolve7(callback());
             } else if (callback.kind === "function-value") {
-              resolve9(callFnVal(callback, []));
+              resolve7(callFnVal(callback, []));
             } else {
               reject(new Error("set-timeout callback must be a function"));
             }
@@ -16304,9 +15588,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (expr2.args.length < 1) throw new Error(`promise requires executor function`);
       const executor = ev(expr2.args[0]);
       if (executor.kind === "function-value") {
-        return new FreeLangPromise((resolve9, reject) => {
+        return new FreeLangPromise((resolve7, reject) => {
           try {
-            const resolveWrapper = { kind: "builtin-function", fn: (a) => resolve9(a[0]) };
+            const resolveWrapper = { kind: "builtin-function", fn: (a) => resolve7(a[0]) };
             const rejectWrapper = {
               kind: "builtin-function",
               fn: (a) => reject(a[0] instanceof Error ? a[0] : new Error(String(a[0])))
@@ -16343,23 +15627,23 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       };
     }
     case "reduce": {
-      if (Array.isArray(args3[0]) && args3[0].length > 0) {
-        const third = args3[2];
+      if (Array.isArray(args2[0]) && args2[0].length > 0) {
+        const third = args2[2];
         if (third && (typeof third === "function" || third?.kind === "function-value" || third?.kind === "closure")) {
           throw new Error(`reduce \uC778\uC790 \uC21C\uC11C \uC624\uB958: (reduce fn init arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (reduce arr init fn)`);
         }
       }
-      const reduceFn = args3[0];
+      const reduceFn = args2[0];
       let accumulator;
       let arr;
-      if (args3.length <= 2 || args3[2] === void 0) {
-        const coll = Array.isArray(args3[1]) ? args3[1] : [];
+      if (args2.length <= 2 || args2[2] === void 0) {
+        const coll = Array.isArray(args2[1]) ? args2[1] : [];
         if (coll.length === 0) return null;
         accumulator = coll[0];
         arr = coll.slice(1);
       } else {
-        accumulator = args3[1];
-        arr = args3[2] ?? [];
+        accumulator = args2[1];
+        arr = args2[2] ?? [];
       }
       if (isLazySeq(arr)) {
         const REDUCE_LAZY_LIMIT = 1e5;
@@ -16383,38 +15667,38 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // HTTP responses
     case "json-response":
-      if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) return args3[0];
-      if (Array.isArray(args3[0])) {
+      if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) return args2[0];
+      if (Array.isArray(args2[0])) {
         const obj = {};
-        for (let i = 0; i < args3[0].length; i += 2) {
-          let key = args3[0][i];
-          const value = args3[0][i + 1];
+        for (let i = 0; i < args2[0].length; i += 2) {
+          let key = args2[0][i];
+          const value = args2[0][i + 1];
           if (typeof key === "string" && key.startsWith(":")) key = key.substring(1);
           if (typeof key === "string") obj[key] = value;
         }
         return obj;
       }
-      return args3[0];
+      return args2[0];
     case "html-response":
-      return { html: args3[0] };
+      return { html: args2[0] };
     // XSS 방어
     case "html-escape": {
-      const s = String(args3[0] ?? "");
+      const s = String(args2[0] ?? "");
       return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
     }
     case "js-escape": {
-      const s = String(args3[0] ?? "");
+      const s = String(args2[0] ?? "");
       return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x00/g, "\\0");
     }
     case "h": {
       const VOID_TAGS = /* @__PURE__ */ new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
       const escAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
       const escText = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const tag = String(args3[0] ?? "div").toLowerCase();
+      const tag = String(args2[0] ?? "div").toLowerCase();
       let attrs = {};
       let childStart = 1;
-      if (args3[1] !== null && args3[1] !== void 0 && typeof args3[1] === "object" && !Array.isArray(args3[1])) {
-        attrs = args3[1];
+      if (args2[1] !== null && args2[1] !== void 0 && typeof args2[1] === "object" && !Array.isArray(args2[1])) {
+        attrs = args2[1];
         childStart = 2;
       }
       const attrStr = Object.entries(attrs).filter(([, v]) => v !== null && v !== void 0 && v !== false).map(([k, v]) => {
@@ -16422,7 +15706,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return ` ${k}="${escAttr(String(v))}"`;
       }).join("");
       if (VOID_TAGS.has(tag)) return `<${tag}${attrStr}>`;
-      const children = args3.slice(childStart).flat().filter((c) => c !== null && c !== void 0 && c !== false).map((c) => {
+      const children = args2.slice(childStart).flat().filter((c) => c !== null && c !== void 0 && c !== false).map((c) => {
         if (typeof c === "string") return c;
         if (typeof c === "number" || typeof c === "boolean") return escText(String(c));
         return String(c ?? "");
@@ -16430,19 +15714,19 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return `<${tag}${attrStr}>${children}</${tag}>`;
     }
     case "cx": {
-      return args3.flat().filter((c) => c !== null && c !== void 0 && c !== false && c !== "").map((c) => String(c).trim()).filter((c) => c.length > 0).join(" ");
+      return args2.flat().filter((c) => c !== null && c !== void 0 && c !== false && c !== "").map((c) => String(c).trim()).filter((c) => c.length > 0).join(" ");
     }
     case "for-html": {
-      if (!Array.isArray(args3[0])) return "";
-      return args3[0].map((item) => {
-        const result = callFnVal(args3[1], [item]);
+      if (!Array.isArray(args2[0])) return "";
+      return args2[0].map((item) => {
+        const result = callFnVal(args2[1], [item]);
         return result !== null && result !== void 0 ? String(result) : "";
       }).join("");
     }
     case "for-html-indexed": {
-      if (!Array.isArray(args3[0])) return "";
-      return args3[0].map((item, i) => {
-        const result = callFnVal(args3[1], [item, i]);
+      if (!Array.isArray(args2[0])) return "";
+      return args2[0].map((item, i) => {
+        const result = callFnVal(args2[1], [item, i]);
         return result !== null && result !== void 0 ? String(result) : "";
       }).join("");
     }
@@ -16453,29 +15737,29 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return Date.now() - interp2.context.startTime;
     // String/Character Operations
     case "char-at":
-      return typeof args3[0] === "string" && typeof args3[1] === "number" ? args3[0][Math.floor(args3[1])] || "" : "";
+      return typeof args2[0] === "string" && typeof args2[1] === "number" ? args2[0][Math.floor(args2[1])] || "" : "";
     case "char-code":
-      if (typeof args3[0] === "string" && args3[0].length > 0) return args3[0].charCodeAt(0);
+      if (typeof args2[0] === "string" && args2[0].length > 0) return args2[0].charCodeAt(0);
       throw new Error(`char-code expects non-empty string`);
     case "char-from-code":
-      return String.fromCharCode(Math.floor(Number(args3[0]) & 0xFF));
+      return String.fromCharCode(Math.floor(Number(args2[0]) & 255));
     case "substring":
-      return typeof args3[0] === "string" ? args3[0].substring(Math.floor(args3[1] || 0), Math.floor(args3[2] || args3[0].length)) : "";
+      return typeof args2[0] === "string" ? args2[0].substring(Math.floor(args2[1] || 0), Math.floor(args2[2] || args2[0].length)) : "";
     case "is-whitespace?":
-      return /^\s$/.test(String(args3[0]));
+      return /^\s$/.test(String(args2[0]));
     case "is-digit?":
-      return /^\d$/.test(String(args3[0]));
+      return /^\d$/.test(String(args2[0]));
     case "is-symbol?":
-      return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args3[0]));
+      return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args2[0]));
     case "split":
-      return typeof args3[0] === "string" ? args3[0].split(String(args3[1] ?? "")) : [];
+      return typeof args2[0] === "string" ? args2[0].split(String(args2[1] ?? "")) : [];
     case "error":
-      throw new Error(String(args3[0]));
+      throw new Error(String(args2[0]));
     case "nil?":
     case "null?":
-      return args3[0] === null || args3[0] === void 0;
+      return args2[0] === null || args2[0] === void 0;
     case "empty?": {
-      const v = args3[0];
+      const v = args2[0];
       if (v === null || v === void 0) return true;
       if (typeof v === "string") return v.length === 0;
       if (Array.isArray(v)) return v.length === 0;
@@ -16483,7 +15767,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return false;
     }
     case "not-empty?": {
-      const v = args3[0];
+      const v = args2[0];
       if (v === null || v === void 0) return false;
       if (typeof v === "string") return v.length > 0;
       if (Array.isArray(v)) return v.length > 0;
@@ -16491,104 +15775,104 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return true;
     }
     case "has-key?": {
-      const obj = args3[0], key = args3[1];
+      const obj = args2[0], key = args2[1];
       if (obj === null || obj === void 0 || typeof obj !== "object" || Array.isArray(obj)) return false;
       const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
       return Object.prototype.hasOwnProperty.call(obj, k);
     }
     case "nil-or-empty?":
-      return args3[0] === null || args3[0] === void 0 || args3[0] && args3[0].length === 0;
+      return args2[0] === null || args2[0] === void 0 || args2[0] && args2[0].length === 0;
     case "zero?":
-      return args3[0] === 0;
+      return args2[0] === 0;
     case "pos?":
-      return typeof args3[0] === "number" && args3[0] > 0;
+      return typeof args2[0] === "number" && args2[0] > 0;
     case "neg?":
-      return typeof args3[0] === "number" && args3[0] < 0;
+      return typeof args2[0] === "number" && args2[0] < 0;
     case "even?":
-      return typeof args3[0] === "number" && args3[0] % 2 === 0;
+      return typeof args2[0] === "number" && args2[0] % 2 === 0;
     case "odd?":
-      return typeof args3[0] === "number" && args3[0] % 2 !== 0;
+      return typeof args2[0] === "number" && args2[0] % 2 !== 0;
     case "some?":
     case "not-nil?":
-      return args3[0] !== null && args3[0] !== void 0;
+      return args2[0] !== null && args2[0] !== void 0;
     case "positive?":
-      return typeof args3[0] === "number" && args3[0] > 0;
+      return typeof args2[0] === "number" && args2[0] > 0;
     case "negative?":
-      return typeof args3[0] === "number" && args3[0] < 0;
+      return typeof args2[0] === "number" && args2[0] < 0;
     case "int?":
-      return typeof args3[0] === "number" && Number.isInteger(args3[0]);
+      return typeof args2[0] === "number" && Number.isInteger(args2[0]);
     case "float?":
-      return typeof args3[0] === "number" && !Number.isInteger(args3[0]);
+      return typeof args2[0] === "number" && !Number.isInteger(args2[0]);
     case "nan?":
-      return typeof args3[0] === "number" && isNaN(args3[0]);
+      return typeof args2[0] === "number" && isNaN(args2[0]);
     case "dir-exists?": {
       try {
-        return require("fs").statSync(String(args3[0])).isDirectory();
+        return require("fs").statSync(String(args2[0])).isDirectory();
       } catch {
         return false;
       }
     }
     case "string?":
-      return typeof args3[0] === "string";
+      return typeof args2[0] === "string";
     case "number?":
-      return typeof args3[0] === "number";
+      return typeof args2[0] === "number";
     case "boolean?":
     case "bool?":
-      return typeof args3[0] === "boolean";
+      return typeof args2[0] === "boolean";
     case "list?":
     case "array?":
-      return Array.isArray(args3[0]);
+      return Array.isArray(args2[0]);
     case "function?":
     case "fn?": {
-      const fv = args3[0];
+      const fv = args2[0];
       return typeof fv === "function" || fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value" || fv.kind === "builtin-fn");
     }
     case "map?":
-      return args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]);
+      return args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]);
     case "vector?":
     case "array?":
     case "list?":
-      return Array.isArray(args3[0]);
+      return Array.isArray(args2[0]);
     case "integer?":
-      return typeof args3[0] === "number" && Number.isInteger(args3[0]);
+      return typeof args2[0] === "number" && Number.isInteger(args2[0]);
     case "float?":
-      return typeof args3[0] === "number" && !Number.isInteger(args3[0]);
+      return typeof args2[0] === "number" && !Number.isInteger(args2[0]);
     case "num-to-str":
-      return String(args3[0]);
+      return String(args2[0]);
     case "str-to-num": {
-      const _n = parseFloat(String(args3[0]));
+      const _n = parseFloat(String(args2[0]));
       return isNaN(_n) ? null : _n;
     }
     case "map-set":
-      if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
-        const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
-        return { ...args3[0], [k]: args3[2] };
+      if (typeof args2[0] === "object" && args2[0] !== null && !Array.isArray(args2[0])) {
+        const k = typeof args2[1] === "string" && args2[1].startsWith(":") ? args2[1].slice(1) : String(args2[1]);
+        return { ...args2[0], [k]: args2[2] };
       }
-      return args3[0];
+      return args2[0];
     case "slice":
-      if (Array.isArray(args3[0])) return args3[0].slice(args3[1], args3[2]);
-      if (typeof args3[0] === "string") return args3[0].slice(args3[1], args3[2]);
+      if (Array.isArray(args2[0])) return args2[0].slice(args2[1], args2[2]);
+      if (typeof args2[0] === "string") return args2[0].slice(args2[1], args2[2]);
       return [];
     case "str-split": {
-      if (typeof args3[0] !== "string" || typeof args3[1] !== "string") return [];
-      const parts = args3[0].split(args3[1]);
-      if (args3[2] !== void 0) {
-        const lim = Number(args3[2]);
+      if (typeof args2[0] !== "string" || typeof args2[1] !== "string") return [];
+      const parts = args2[0].split(args2[1]);
+      if (args2[2] !== void 0) {
+        const lim = Number(args2[2]);
         if (lim > 0 && parts.length > lim) {
-          return [...parts.slice(0, lim - 1), parts.slice(lim - 1).join(args3[1])];
+          return [...parts.slice(0, lim - 1), parts.slice(lim - 1).join(args2[1])];
         }
       }
       return parts;
     }
     case "join":
     case "str-join":
-      if (Array.isArray(args3[0])) return args3[0].join(args3[1] !== void 0 ? String(args3[1]) : "");
-      if (typeof args3[0] === "string" && Array.isArray(args3[1])) return args3[1].join(args3[0]);
-      return Array.isArray(args3[0]) ? args3[0].join("") : "";
+      if (Array.isArray(args2[0])) return args2[0].join(args2[1] !== void 0 ? String(args2[1]) : "");
+      if (typeof args2[0] === "string" && Array.isArray(args2[1])) return args2[1].join(args2[0]);
+      return Array.isArray(args2[0]) ? args2[0].join("") : "";
     case "str-format":
     case "format": {
-      const fmt = String(args3[0] ?? "");
-      const fmtArgs = args3.length === 2 && Array.isArray(args3[1]) ? args3[1] : args3.slice(1);
+      const fmt = String(args2[0] ?? "");
+      const fmtArgs = args2.length === 2 && Array.isArray(args2[1]) ? args2[1] : args2.slice(1);
       let i = 0;
       return fmt.replace(/%([+\-0 ]*)(\d*)\.?(\d*)([sdifoexX%])/g, (_m, flags, width, prec, t) => {
         if (t === "%") return "%";
@@ -16639,114 +15923,114 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       });
     }
     case "str-blank?":
-      return args3[0] === null || args3[0] === void 0 || typeof args3[0] === "string" && args3[0].trim() === "";
+      return args2[0] === null || args2[0] === void 0 || typeof args2[0] === "string" && args2[0].trim() === "";
     case "trim":
     case "string_trim":
     case "str_trim":
-      return typeof args3[0] === "string" ? args3[0].trim() : "";
+      return typeof args2[0] === "string" ? args2[0].trim() : "";
     case "uppercase":
-      return typeof args3[0] === "string" ? args3[0].toUpperCase() : "";
+      return typeof args2[0] === "string" ? args2[0].toUpperCase() : "";
     case "lowercase":
-      return typeof args3[0] === "string" ? args3[0].toLowerCase() : "";
+      return typeof args2[0] === "string" ? args2[0].toLowerCase() : "";
     case "contains?":
-      if (typeof args3[0] === "string" && typeof args3[1] === "string") return args3[0].includes(args3[1]);
-      if (Array.isArray(args3[0])) return args3[0].includes(args3[1]);
-      if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
-        let ck = args3[1];
+      if (typeof args2[0] === "string" && typeof args2[1] === "string") return args2[0].includes(args2[1]);
+      if (Array.isArray(args2[0])) return args2[0].includes(args2[1]);
+      if (args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0])) {
+        let ck = args2[1];
         if (ck !== null && typeof ck === "object" && ck.kind === "keyword") ck = ck.name;
         const ckNorm = typeof ck === "string" && ck.startsWith(":") ? ck.slice(1) : String(ck);
-        return Object.prototype.hasOwnProperty.call(args3[0], ckNorm) || Object.prototype.hasOwnProperty.call(args3[0], ":" + ckNorm);
+        return Object.prototype.hasOwnProperty.call(args2[0], ckNorm) || Object.prototype.hasOwnProperty.call(args2[0], ":" + ckNorm);
       }
       return false;
     case "starts-with?":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
+      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
     case "index-of":
-      if (Array.isArray(args3[0])) return args3[0].indexOf(args3[1]);
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].indexOf(args3[1]) : -1;
+      if (Array.isArray(args2[0])) return args2[0].indexOf(args2[1]);
+      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].indexOf(args2[1]) : -1;
     case "replace":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" && typeof args3[2] === "string" ? args3[0].split(args3[1]).join(args3[2]) : "";
+      return typeof args2[0] === "string" && typeof args2[1] === "string" && typeof args2[2] === "string" ? args2[0].split(args2[1]).join(args2[2]) : "";
     case "repeat": {
-      if (typeof args3[0] === "number") return Array(args3[0]).fill(args3[1] !== void 0 ? args3[1] : null);
-      if (typeof args3[0] === "string" && typeof args3[1] === "number") return args3[0].repeat(args3[1]);
+      if (typeof args2[0] === "number") return Array(args2[0]).fill(args2[1] !== void 0 ? args2[1] : null);
+      if (typeof args2[0] === "string" && typeof args2[1] === "number") return args2[0].repeat(args2[1]);
       return [];
     }
     // Array Operations
     case "filter": {
-      if (Array.isArray(args3[0]) && args3[0].length > 0) {
-        const second = args3[1];
+      if (Array.isArray(args2[0]) && args2[0].length > 0) {
+        const second = args2[1];
         if (second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure")) {
           throw new Error(`filter \uC778\uC790 \uC21C\uC11C \uC624\uB958: (filter fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (filter arr fn)`);
         }
       }
-      const filterFn = args3[0];
-      const coll = args3[1];
+      const filterFn = args2[0];
+      const coll = args2[1];
       if (coll === null || coll === void 0) return [];
       if (!Array.isArray(coll)) return [];
       if (filterFn === null || filterFn === void 0) return coll;
       return coll.filter((item) => callFnVal(filterFn, [item]));
     }
     case "find": {
-      if (!Array.isArray(args3[0])) return -1;
-      const findTarget = args3[1];
-      if (typeof findTarget === "function") return args3[0].find(findTarget) ?? null;
+      if (!Array.isArray(args2[0])) return -1;
+      const findTarget = args2[1];
+      if (typeof findTarget === "function") return args2[0].find(findTarget) ?? null;
       if (findTarget && (findTarget.kind === "function-value" || findTarget.kind === "closure")) {
-        return args3[0].find((item) => callFnVal(findTarget, [item])) ?? null;
+        return args2[0].find((item) => callFnVal(findTarget, [item])) ?? null;
       }
-      return args3[0].indexOf(findTarget);
+      return args2[0].indexOf(findTarget);
     }
     case "last":
-      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
+      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
     case "butlast":
-      return Array.isArray(args3[0]) && args3[0].length > 1 ? args3[0].slice(0, -1) : [];
+      return Array.isArray(args2[0]) && args2[0].length > 1 ? args2[0].slice(0, -1) : [];
     // Phase C: nil-safe wrapper들
     case "first-or":
     case "first_or":
-      return Array.isArray(args3[0]) && args3[0].length > 0 && args3[0][0] !== void 0 ? args3[0][0] : args3[1] !== void 0 ? args3[1] : null;
+      return Array.isArray(args2[0]) && args2[0].length > 0 && args2[0][0] !== void 0 ? args2[0][0] : args2[1] !== void 0 ? args2[1] : null;
     case "last-or":
     case "last_or":
-      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : args3[1] !== void 0 ? args3[1] : null;
+      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : args2[1] !== void 0 ? args2[1] : null;
     // ── apply: (apply fn args-array) ─────────────────────────────────
     case "apply": {
-      const apFn = args3[0], apArr = Array.isArray(args3[args3.length - 1]) ? args3[args3.length - 1] : [];
-      const extraArgs = args3.slice(1, args3.length - 1);
+      const apFn = args2[0], apArr = Array.isArray(args2[args2.length - 1]) ? args2[args2.length - 1] : [];
+      const extraArgs = args2.slice(1, args2.length - 1);
       const allArgs = [...extraArgs, ...apArr];
       if (typeof apFn === "string") return evalBuiltin(interp2, apFn, allArgs, expr2);
       return callFnVal(apFn, allArgs);
     }
     // ── sum / product / average ───────────────────────────────────────
     case "sum": {
-      const arr = Array.isArray(args3[0]) ? args3[0] : args3;
+      const arr = Array.isArray(args2[0]) ? args2[0] : args2;
       return arr.reduce((a, b) => a + Number(b), 0);
     }
     case "product": {
-      const arr = Array.isArray(args3[0]) ? args3[0] : args3;
+      const arr = Array.isArray(args2[0]) ? args2[0] : args2;
       return arr.reduce((a, b) => a * Number(b), 1);
     }
     case "average": {
-      const arr = Array.isArray(args3[0]) ? args3[0] : args3;
+      const arr = Array.isArray(args2[0]) ? args2[0] : args2;
       if (arr.length === 0) return null;
       return arr.reduce((a, b) => a + Number(b), 0) / arr.length;
     }
     // ── update: (update map key fn) ──────────────────────────────────
     case "update": {
-      const uMap = args3[0], uKey0 = args3[1], uFn = args3[2];
+      const uMap = args2[0], uKey0 = args2[1], uFn = args2[2];
       let uKey = uKey0;
       if (uKey && typeof uKey === "object" && uKey.kind === "keyword") uKey = uKey.name;
       else if (typeof uKey === "string" && uKey.startsWith(":")) uKey = uKey.slice(1);
       const cur = uMap && typeof uMap === "object" ? uMap[uKey] ?? null : null;
-      const next = callFnVal(uFn, [cur, ...args3.slice(3)]);
+      const next = callFnVal(uFn, [cur, ...args2.slice(3)]);
       return { ...uMap, [uKey]: next };
     }
     // ── partition: (partition n arr) ─────────────────────────────────
     case "partition": {
-      const n = Number(args3[0]), parr = Array.isArray(args3[1]) ? args3[1] : [];
+      const n = Number(args2[0]), parr = Array.isArray(args2[1]) ? args2[1] : [];
       const out = [];
       for (let i = 0; i < parr.length; i += n) out.push(parr.slice(i, i + n));
       return out;
     }
     // ── interpose: (interpose sep arr) ───────────────────────────────
     case "interpose": {
-      const sep2 = args3[0], iarr = Array.isArray(args3[1]) ? args3[1] : [];
+      const sep2 = args2[0], iarr = Array.isArray(args2[1]) ? args2[1] : [];
       if (iarr.length === 0) return [];
       const result = [iarr[0]];
       for (let i = 1; i < iarr.length; i++) {
@@ -16757,12 +16041,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // ── keep: (keep fn arr) → non-nil results ────────────────────────
     case "keep": {
-      const kfn = args3[0], karr = Array.isArray(args3[1]) ? args3[1] : [];
+      const kfn = args2[0], karr = Array.isArray(args2[1]) ? args2[1] : [];
       return karr.map((x) => callFnVal(kfn, [x])).filter((v) => v !== null && v !== void 0);
     }
     // ── mapcat: (mapcat fn arr) → map + flatten 1 level ──────────────
     case "mapcat": {
-      const mcfn = args3[0], mcarr = Array.isArray(args3[1]) ? args3[1] : [];
+      const mcfn = args2[0], mcarr = Array.isArray(args2[1]) ? args2[1] : [];
       return mcarr.flatMap((x) => {
         const r = callFnVal(mcfn, [x]);
         return Array.isArray(r) ? r : [r];
@@ -16770,24 +16054,24 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // ── count-if: (count-if fn arr) ──────────────────────────────────
     case "count-if": {
-      const cifn = args3[0], ciarr = Array.isArray(args3[1]) ? args3[1] : [];
+      const cifn = args2[0], ciarr = Array.isArray(args2[1]) ? args2[1] : [];
       return ciarr.filter((x) => callFnVal(cifn, [x])).length;
     }
     case "find-first": {
-      const fffn = args3[0], ffarr = Array.isArray(args3[1]) ? args3[1] : [];
+      const fffn = args2[0], ffarr = Array.isArray(args2[1]) ? args2[1] : [];
       const found = ffarr.find((x) => callFnVal(fffn, [x]));
       return found !== void 0 ? found : null;
     }
     // ── max-by / min-by: (max-by fn arr) ─────────────────────────────
     case "max-by": {
-      const mbfn = args3[0], mbarr = Array.isArray(args3[1]) ? args3[1] : [];
+      const mbfn = args2[0], mbarr = Array.isArray(args2[1]) ? args2[1] : [];
       if (mbarr.length === 0) return null;
       const mbIsField = typeof mbfn === "string" && mbarr[0] !== null && typeof mbarr[0] === "object";
       const mbKey = mbIsField ? (x) => x !== null && typeof x === "object" ? x[mbfn] : null : (x) => callFnVal(mbfn, [x]);
       return mbarr.reduce((best, x) => mbKey(x) > mbKey(best) ? x : best);
     }
     case "min-by": {
-      const mnbfn = args3[0], mnbarr = Array.isArray(args3[1]) ? args3[1] : [];
+      const mnbfn = args2[0], mnbarr = Array.isArray(args2[1]) ? args2[1] : [];
       if (mnbarr.length === 0) return null;
       const mnbIsField = typeof mnbfn === "string" && mnbarr[0] !== null && typeof mnbarr[0] === "object";
       const mnbKey = mnbIsField ? (x) => x !== null && typeof x === "object" ? x[mnbfn] : null : (x) => callFnVal(mnbfn, [x]);
@@ -16795,18 +16079,18 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // ── max-of / min-of: (max-of arr) ────────────────────────────────
     case "max-of": {
-      const moarr = Array.isArray(args3[0]) ? args3[0] : args3;
+      const moarr = Array.isArray(args2[0]) ? args2[0] : args2;
       return moarr.length === 0 ? null : Math.max(...moarr.map(Number));
     }
     case "min-of": {
-      const minarr = Array.isArray(args3[0]) ? args3[0] : args3;
+      const minarr = Array.isArray(args2[0]) ? args2[0] : args2;
       return minarr.length === 0 ? null : Math.min(...minarr.map(Number));
     }
     case "get-in": {
-      if (!Array.isArray(args3[1])) throw new Error(`get-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
-      const giDefault = args3[2] !== void 0 ? args3[2] : null;
-      let cur = args3[0];
-      for (const k of args3[1]) {
+      if (!Array.isArray(args2[1])) throw new Error(`get-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const giDefault = args2[2] !== void 0 ? args2[2] : null;
+      let cur = args2[0];
+      for (const k of args2[1]) {
         if (cur === null || cur === void 0) return giDefault;
         const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : k;
         if (Array.isArray(cur)) cur = cur[key] !== void 0 ? cur[key] : void 0;
@@ -16816,64 +16100,64 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return cur !== void 0 ? cur : giDefault;
     }
     case "get-or": {
-      const def = args3[2] !== void 0 ? args3[2] : null;
-      let k = args3[1];
+      const def = args2[2] !== void 0 ? args2[2] : null;
+      let k = args2[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
-      if (args3[0] === null || args3[0] === void 0) return def;
-      if (Array.isArray(args3[0])) {
+      if (args2[0] === null || args2[0] === void 0) return def;
+      if (Array.isArray(args2[0])) {
         const idx = typeof k === "number" ? k : Number(k);
-        return Number.isFinite(idx) && args3[0][idx] !== void 0 ? args3[0][idx] : def;
+        return Number.isFinite(idx) && args2[0][idx] !== void 0 ? args2[0][idx] : def;
       }
-      if (args3[0] instanceof Map) {
-        const r = args3[0].get(String(k).replace(/^:/, ""));
+      if (args2[0] instanceof Map) {
+        const r = args2[0].get(String(k).replace(/^:/, ""));
         return r === void 0 ? def : r;
       }
-      if (typeof args3[0] === "object") {
+      if (typeof args2[0] === "object") {
         const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
-        if (args3[0][normalized] !== void 0) return args3[0][normalized];
-        if (typeof k === "string" && args3[0][k] !== void 0) return args3[0][k];
+        if (args2[0][normalized] !== void 0) return args2[0][normalized];
+        if (typeof k === "string" && args2[0][k] !== void 0) return args2[0][k];
         return def;
       }
       return def;
     }
     case "get": {
-      if ((args3[0] === null || args3[0] === void 0) && process.env.FL_STRICT === "1") {
+      if ((args2[0] === null || args2[0] === void 0) && process.env.FL_STRICT === "1") {
         throw new FLRuntimeError(
           ErrorCodes.TYPE_NIL,
-          `(get nil ${typeof args3[1] === "string" ? '"' + args3[1] + '"' : String(args3[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
+          `(get nil ${typeof args2[1] === "string" ? '"' + args2[1] + '"' : String(args2[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
           { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
         );
       }
-      if (args3[0] !== null && args3[0] !== void 0 && typeof args3[0] !== "object" && typeof args3[0] !== "string" && !Array.isArray(args3[0])) {
-        const hint = `[E_TYPE_MISMATCH] get: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map, array, string\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args3[0]})
+      if (args2[0] !== null && args2[0] !== void 0 && typeof args2[0] !== "object" && typeof args2[0] !== "string" && !Array.isArray(args2[0])) {
+        const hint = `[E_TYPE_MISMATCH] get: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map, array, string\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args2[0]})
   \uC62C\uBC14\uB978 \uD615\uC2DD: (get map key) \uB610\uB294 (get arr index)
   \uC608: (get {:name "kim"} "name") \u2192 "kim"`;
         if (process.env.FL_V12 === "1") throw new Error(hint);
         console.warn(`\u26A0\uFE0F  [FreeLang] ${hint}`);
       }
-      let k = args3[1];
+      let k = args2[1];
       if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
-      const _getDef = args3.length >= 3 ? args3[2] : null;
-      if (Array.isArray(args3[0])) return typeof k === "number" ? args3[0][k] ?? _getDef : _getDef;
-      if (typeof args3[0] === "string") return typeof k === "number" ? args3[0][k] ?? _getDef : _getDef;
-      if (args3[0] instanceof Map) return args3[0].has(String(k).replace(/^:/, "")) ? args3[0].get(String(k).replace(/^:/, "")) : _getDef;
-      if (args3[0] !== null && typeof args3[0] === "object") {
+      const _getDef = args2.length >= 3 ? args2[2] : null;
+      if (Array.isArray(args2[0])) return typeof k === "number" ? args2[0][k] ?? _getDef : _getDef;
+      if (typeof args2[0] === "string") return typeof k === "number" ? args2[0][k] ?? _getDef : _getDef;
+      if (args2[0] instanceof Map) return args2[0].has(String(k).replace(/^:/, "")) ? args2[0].get(String(k).replace(/^:/, "")) : _getDef;
+      if (args2[0] !== null && typeof args2[0] === "object") {
         const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
-        if (args3[0][normalized] !== void 0) return args3[0][normalized];
-        if (typeof k === "string" && args3[0][k] !== void 0) return args3[0][k];
+        if (args2[0][normalized] !== void 0) return args2[0][normalized];
+        if (typeof k === "string" && args2[0][k] !== void 0) return args2[0][k];
         return _getDef;
       }
       return _getDef;
     }
     case "block-items":
-      if (args3[0] && typeof args3[0] === "object" && args3[0].kind === "block" && args3[0].type === "Array") {
-        return args3[0].fields instanceof Map ? args3[0].fields.get("items") ?? [] : [];
+      if (args2[0] && typeof args2[0] === "object" && args2[0].kind === "block" && args2[0].type === "Array") {
+        return args2[0].fields instanceof Map ? args2[0].fields.get("items") ?? [] : [];
       }
-      if (Array.isArray(args3[0])) return args3[0];
+      if (Array.isArray(args2[0])) return args2[0];
       return [];
     case "fl-env-get": {
-      let flenv = args3[0];
-      const fname = String(args3[1]);
+      let flenv = args2[0];
+      const fname = String(args2[1]);
       while (flenv !== null && flenv !== void 0) {
         const vars = flenv.vars;
         if (Array.isArray(vars)) {
@@ -16887,13 +16171,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return null;
     }
     case "fl-special-op?": {
-      const sop = String(args3[0]);
+      const sop = String(args2[0]);
       const specials = ["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"];
       return specials.includes(sop) ? sop : null;
     }
     case "fl-exec-op": {
-      const op2 = String(args3[0]);
-      const vals = Array.isArray(args3[1]) ? args3[1] : [];
+      const op2 = String(args2[0]);
+      const vals = Array.isArray(args2[1]) ? args2[1] : [];
       const v0 = vals[0], v1 = vals[1], v2 = vals[2];
       switch (normalizedOp2) {
         case "+":
@@ -16997,28 +16281,28 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // fl-interp: FL AST 노드를 native TS로 직접 평가 (스택오버플로우 방지)
     // fl-fix-env: 로드된 FL env의 모든 closure-env를 final env로 업데이트 (재귀 지원)
     case "fl-interp":
-      return flInterpNative(args3[0], args3[1]);
+      return flInterpNative(args2[0], args2[1]);
     case "lex":
       try {
-        return lex(String(args3[0] ?? ""));
+        return lex(String(args2[0] ?? ""));
       } catch {
         return [];
       }
     case "parse":
       try {
-        return parse(Array.isArray(args3[0]) ? args3[0] : []);
+        return parse(Array.isArray(args2[0]) ? args2[0] : []);
       } catch {
         return [];
       }
     case "fl-parse": {
       try {
-        return parse(lex(String(args3[0] ?? "")));
+        return parse(lex(String(args2[0] ?? "")));
       } catch {
         return [];
       }
     }
     case "fl-fix-env": {
-      const finalEnv = args3[0];
+      const finalEnv = args2[0];
       if (!finalEnv || !Array.isArray(finalEnv.vars)) return finalEnv;
       for (const pair of finalEnv.vars) {
         if (Array.isArray(pair) && pair[1] && typeof pair[1] === "object" && pair[1].kind === "closure") {
@@ -17029,23 +16313,23 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "hash-map": {
       const hm = {};
-      for (let i = 0; i + 1 < args3.length; i += 2) {
-        const k = typeof args3[i] === "string" && args3[i].startsWith(":") ? args3[i].slice(1) : String(args3[i]);
-        hm[k] = args3[i + 1];
+      for (let i = 0; i + 1 < args2.length; i += 2) {
+        const k = typeof args2[i] === "string" && args2[i].startsWith(":") ? args2[i].slice(1) : String(args2[i]);
+        hm[k] = args2[i + 1];
       }
       return hm;
     }
     case "assoc": {
-      if (args3[0] !== null && (typeof args3[0] !== "object" || Array.isArray(args3[0]))) {
-        throw new Error(`[E_TYPE_MISMATCH] assoc: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args3[0]})
+      if (args2[0] !== null && (typeof args2[0] !== "object" || Array.isArray(args2[0]))) {
+        throw new Error(`[E_TYPE_MISMATCH] assoc: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args2[0]})
   \uC62C\uBC14\uB978 \uD615\uC2DD: (assoc map key val)
   \uC608: (assoc {:a 1} "b" 2) \u2192 {:a 1 :b 2}`);
       }
-      let base = args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]) ? { ...args3[0] } : {};
-      for (let i = 1; i + 1 < args3.length; i += 2) {
-        const rawK = args3[i];
+      let base = args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0]) ? { ...args2[0] } : {};
+      for (let i = 1; i + 1 < args2.length; i += 2) {
+        const rawK = args2[i];
         const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
-        base[k] = args3[i + 1];
+        base[k] = args2[i + 1];
       }
       return base;
     }
@@ -17056,10 +16340,10 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         base[k] = keys.length === 1 ? val : aiSet(base[k], keys.slice(1), val);
         return base;
       };
-      if (!Array.isArray(args3[1]) || args3[1].length === 0) throw new Error(`assoc-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
-      const aiKeys = args3[1];
-      const aiVal = args3[2];
-      return aiSet(args3[0], aiKeys, aiVal);
+      if (!Array.isArray(args2[1]) || args2[1].length === 0) throw new Error(`assoc-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const aiKeys = args2[1];
+      const aiVal = args2[2];
+      return aiSet(args2[0], aiKeys, aiVal);
     }
     case "update-in": {
       let uiUpdate = function(obj, keys) {
@@ -17074,53 +16358,53 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         }
         return base;
       };
-      if (!Array.isArray(args3[1]) || args3[1].length === 0) throw new Error(`update-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
-      const uiKeys = args3[1];
-      const uiFn = args3[2];
-      const uiExtraArgs = args3.slice(3);
-      return uiUpdate(args3[0], uiKeys);
+      if (!Array.isArray(args2[1]) || args2[1].length === 0) throw new Error(`update-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const uiKeys = args2[1];
+      const uiFn = args2[2];
+      const uiExtraArgs = args2.slice(3);
+      return uiUpdate(args2[0], uiKeys);
     }
     case "dissoc": {
-      if (args3[0] !== null && args3[0] !== void 0 && (typeof args3[0] !== "object" || Array.isArray(args3[0]))) {
-        throw new Error(`[E_TYPE_MISMATCH] dissoc: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args3[0]})
+      if (args2[0] !== null && args2[0] !== void 0 && (typeof args2[0] !== "object" || Array.isArray(args2[0]))) {
+        throw new Error(`[E_TYPE_MISMATCH] dissoc: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args2[0]})
   \uC62C\uBC14\uB978 \uD615\uC2DD: (dissoc map key)
   \uC608: (dissoc {:a 1 :b 2} "a") \u2192 {:b 2}`);
       }
-      if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
-        let result = { ...args3[0] };
-        for (let ki = 1; ki < args3.length; ki++) {
-          const rawK = args3[ki];
+      if (args2[0] !== null && typeof args2[0] === "object" && !Array.isArray(args2[0])) {
+        let result = { ...args2[0] };
+        for (let ki = 1; ki < args2.length; ki++) {
+          const rawK = args2[ki];
           const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
           delete result[k];
         }
         return result;
       }
-      return args3[0] ?? {};
+      return args2[0] ?? {};
     }
     case "obj-keys":
     case "obj_keys": {
-      if (!args3[0] || typeof args3[0] !== "object" || Array.isArray(args3[0])) return [];
-      return Object.keys(args3[0]);
+      if (!args2[0] || typeof args2[0] !== "object" || Array.isArray(args2[0])) return [];
+      return Object.keys(args2[0]);
     }
     case "obj-values":
     case "obj_values": {
-      if (!args3[0] || typeof args3[0] !== "object" || Array.isArray(args3[0])) return [];
-      return Object.values(args3[0]);
+      if (!args2[0] || typeof args2[0] !== "object" || Array.isArray(args2[0])) return [];
+      return Object.values(args2[0]);
     }
     case "obj-entries":
     case "obj_entries": {
-      if (!args3[0] || typeof args3[0] !== "object" || Array.isArray(args3[0])) return [];
-      return Object.entries(args3[0]);
+      if (!args2[0] || typeof args2[0] !== "object" || Array.isArray(args2[0])) return [];
+      return Object.entries(args2[0]);
     }
     case "obj-merge":
     case "obj_merge":
     case "merge": {
-      if (args3.length === 0) return {};
-      return Object.assign({}, ...args3.filter((a) => a && typeof a === "object" && !Array.isArray(a)));
+      if (args2.length === 0) return {};
+      return Object.assign({}, ...args2.filter((a) => a && typeof a === "object" && !Array.isArray(a)));
     }
     case "merge-with": {
-      const fn = args3[0];
-      const maps = args3.slice(1).filter((a) => a && typeof a === "object" && !Array.isArray(a));
+      const fn = args2[0];
+      const maps = args2.slice(1).filter((a) => a && typeof a === "object" && !Array.isArray(a));
       if (maps.length === 0) return {};
       const result = { ...maps[0] };
       for (let mi = 1; mi < maps.length; mi++) {
@@ -17131,8 +16415,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return result;
     }
     case "into": {
-      const target = args3[0];
-      const coll = args3[1];
+      const target = args2[0];
+      const coll = args2[1];
       if (Array.isArray(target)) {
         return Array.isArray(coll) ? [...target, ...coll] : target;
       }
@@ -17152,9 +16436,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "obj-pick":
     case "obj_pick":
     case "pick": {
-      if (!args3[0] || !Array.isArray(args3[1])) return {};
-      const m = args3[0];
-      return args3[1].reduce((acc, k) => {
+      if (!args2[0] || !Array.isArray(args2[1])) return {};
+      const m = args2[0];
+      return args2[1].reduce((acc, k) => {
         const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
         if (key in m) acc[key] = m[key];
         return acc;
@@ -17163,28 +16447,28 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "obj-omit":
     case "obj_omit":
     case "omit": {
-      if (!args3[0]) return {};
-      if (!Array.isArray(args3[1])) return { ...args3[0] };
-      const result = { ...args3[0] };
-      for (const k of args3[1]) {
+      if (!args2[0]) return {};
+      if (!Array.isArray(args2[1])) return { ...args2[0] };
+      const result = { ...args2[0] };
+      for (const k of args2[1]) {
         const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
         delete result[key];
       }
       return result;
     }
     case "select-keys": {
-      if (!args3[0] || !Array.isArray(args3[1])) return {};
+      if (!args2[0] || !Array.isArray(args2[1])) return {};
       const result = {};
-      for (const k of args3[1]) {
+      for (const k of args2[1]) {
         const key = k && typeof k === "object" && k.kind === "keyword" ? k.name : typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
-        if (args3[0][key] !== void 0) result[key] = args3[0][key];
+        if (args2[0][key] !== void 0) result[key] = args2[0][key];
       }
       return result;
     }
     case "rename-keys": {
-      if (!args3[0] || !args3[1]) return { ...args3[0] };
-      const result = { ...args3[0] };
-      for (const [oldK, newK] of Object.entries(args3[1])) {
+      if (!args2[0] || !args2[1]) return { ...args2[0] };
+      const result = { ...args2[0] };
+      for (const [oldK, newK] of Object.entries(args2[1])) {
         const ok2 = typeof oldK === "string" && oldK.startsWith(":") ? oldK.slice(1) : oldK;
         const nk = newK && typeof newK === "object" && newK.kind === "keyword" ? newK.name : typeof newK === "string" && newK.startsWith(":") ? newK.slice(1) : String(newK);
         if (result[ok2] !== void 0) {
@@ -17196,89 +16480,89 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "str-index-of":
     case "str-index_of": {
-      if (typeof args3[0] !== "string") return -1;
-      return args3[0].indexOf(String(args3[1] ?? ""), args3[2] !== void 0 ? Number(args3[2]) : 0);
+      if (typeof args2[0] !== "string") return -1;
+      return args2[0].indexOf(String(args2[1] ?? ""), args2[2] !== void 0 ? Number(args2[2]) : 0);
     }
     case "str-replace-all":
     case "str-replace":
-      return typeof args3[0] === "string" ? args3[0].split(String(args3[1] ?? "")).join(String(args3[2] ?? "")) : "";
+      return typeof args2[0] === "string" ? args2[0].split(String(args2[1] ?? "")).join(String(args2[2] ?? "")) : "";
     // 정식 str-* 이름 (alias)
     case "str-to-upper":
     case "str-upper":
-      return typeof args3[0] === "string" ? args3[0].toUpperCase() : args3[0] ?? "";
+      return typeof args2[0] === "string" ? args2[0].toUpperCase() : args2[0] ?? "";
     case "str-to-lower":
     case "str-lower":
-      return typeof args3[0] === "string" ? args3[0].toLowerCase() : args3[0] ?? "";
+      return typeof args2[0] === "string" ? args2[0].toLowerCase() : args2[0] ?? "";
     case "str-trim":
-      return typeof args3[0] === "string" ? args3[0].trim() : args3[0] === null || args3[0] === void 0 ? null : "";
+      return typeof args2[0] === "string" ? args2[0].trim() : args2[0] === null || args2[0] === void 0 ? null : "";
     case "str-trim-left":
-      return typeof args3[0] === "string" ? args3[0].trimStart() : args3[0] ?? "";
+      return typeof args2[0] === "string" ? args2[0].trimStart() : args2[0] ?? "";
     case "str-trim-right":
-      return typeof args3[0] === "string" ? args3[0].trimEnd() : args3[0] ?? "";
+      return typeof args2[0] === "string" ? args2[0].trimEnd() : args2[0] ?? "";
     case "str-starts-with":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
+      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].startsWith(args2[1]) : false;
     case "str-ends-with":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
+      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].endsWith(args2[1]) : false;
     case "str-includes":
     case "str-contains":
-      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].includes(args3[1]) : false;
+      return typeof args2[0] === "string" && typeof args2[1] === "string" ? args2[0].includes(args2[1]) : false;
     // 신규 문자열 함수
     case "str-repeat":
-      return typeof args3[0] === "string" ? args3[0].repeat(Math.max(0, Number(args3[1] ?? 0))) : "";
+      return typeof args2[0] === "string" ? args2[0].repeat(Math.max(0, Number(args2[1] ?? 0))) : "";
     case "str-pad-left": {
-      if (typeof args3[0] !== "string") return String(args3[0] ?? "");
-      const padLen = Number(args3[1] ?? 0);
-      const padCh = typeof args3[2] === "string" ? args3[2] : " ";
-      return args3[0].padStart(padLen, padCh);
+      if (typeof args2[0] !== "string") return String(args2[0] ?? "");
+      const padLen = Number(args2[1] ?? 0);
+      const padCh = typeof args2[2] === "string" ? args2[2] : " ";
+      return args2[0].padStart(padLen, padCh);
     }
     case "str-pad-right": {
-      if (typeof args3[0] !== "string") return String(args3[0] ?? "");
-      const padLen = Number(args3[1] ?? 0);
-      const padCh = typeof args3[2] === "string" ? args3[2] : " ";
-      return args3[0].padEnd(padLen, padCh);
+      if (typeof args2[0] !== "string") return String(args2[0] ?? "");
+      const padLen = Number(args2[1] ?? 0);
+      const padCh = typeof args2[2] === "string" ? args2[2] : " ";
+      return args2[0].padEnd(padLen, padCh);
     }
     case "str-lines":
-      return typeof args3[0] === "string" ? args3[0].split("\n") : [];
+      return typeof args2[0] === "string" ? args2[0].split("\n") : [];
     case "str-reverse":
-      return typeof args3[0] === "string" ? args3[0].split("").reverse().join("") : "";
+      return typeof args2[0] === "string" ? args2[0].split("").reverse().join("") : "";
     // 맵 변환 유틸리티
     case "map-vals": {
-      const fn = args3[0];
-      const m = args3[1];
+      const fn = args2[0];
+      const m = args2[1];
       if (!m || typeof m !== "object" || Array.isArray(m)) return {};
       const out = {};
       for (const [k, v] of Object.entries(m)) out[k] = callFnVal(fn, [v]);
       return out;
     }
     case "map-keys": {
-      const fn = args3[0];
-      const m = args3[1];
+      const fn = args2[0];
+      const m = args2[1];
       if (!m || typeof m !== "object" || Array.isArray(m)) return {};
       const out = {};
       for (const [k, v] of Object.entries(m)) out[String(callFnVal(fn, [k]))] = v;
       return out;
     }
     case "filter-vals": {
-      const fn = args3[0];
-      const m = args3[1];
+      const fn = args2[0];
+      const m = args2[1];
       if (!m || typeof m !== "object" || Array.isArray(m)) return {};
       const out = {};
       for (const [k, v] of Object.entries(m)) if (callFnVal(fn, [v])) out[k] = v;
       return out;
     }
     case "flatten": {
-      if (!Array.isArray(args3[0])) return [];
+      if (!Array.isArray(args2[0])) return [];
       const flattenDeep = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flattenDeep(val) : val), []);
-      return flattenDeep(args3[0]);
+      return flattenDeep(args2[0]);
     }
     case "flatten-1":
     case "flat-1": {
-      if (!Array.isArray(args3[0])) return [];
-      return args3[0].reduce((acc, val) => acc.concat(Array.isArray(val) ? val : [val]), []);
+      if (!Array.isArray(args2[0])) return [];
+      return args2[0].reduce((acc, val) => acc.concat(Array.isArray(val) ? val : [val]), []);
     }
     case "conj": {
-      const coll = args3[0];
-      const vals = args3.slice(1);
+      const coll = args2[0];
+      const vals = args2.slice(1);
       if (Array.isArray(coll)) return [...coll, ...vals];
       if (coll !== null && typeof coll === "object" && !Array.isArray(coll)) {
         let result = { ...coll };
@@ -17291,8 +16575,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return vals;
     }
     case "partition-by": {
-      const fn = args3[0];
-      const coll = args3[1];
+      const fn = args2[0];
+      const coll = args2[1];
       if (!Array.isArray(coll) || coll.length === 0) return [];
       const result = [];
       let group = [coll[0]];
@@ -17312,39 +16596,39 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "every?":
     case "every": {
-      if (args3[1] === null || args3[1] === void 0) return true;
-      if (!Array.isArray(args3[1])) throw new Error(`every?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
-      return args3[1].every((item) => callFnVal(args3[0], [item]));
+      if (args2[1] === null || args2[1] === void 0) return true;
+      if (!Array.isArray(args2[1])) throw new Error(`every?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      return args2[1].every((item) => callFnVal(args2[0], [item]));
     }
     case "any?":
     case "any": {
-      if (args3[1] === null || args3[1] === void 0) return null;
-      if (!Array.isArray(args3[1])) throw new Error(`any?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
-      const found = args3[1].find((item) => callFnVal(args3[0], [item]));
+      if (args2[1] === null || args2[1] === void 0) return null;
+      if (!Array.isArray(args2[1])) throw new Error(`any?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const found = args2[1].find((item) => callFnVal(args2[0], [item]));
       return found !== void 0 ? found : null;
     }
     case "none?": {
-      if (!Array.isArray(args3[1])) return true;
-      return args3[1].every((item) => !callFnVal(args3[0], [item]));
+      if (!Array.isArray(args2[1])) return true;
+      return args2[1].every((item) => !callFnVal(args2[0], [item]));
     }
     case "none":
-      if (args3.length === 0) return { tag: "None", value: null, kind: "Option" };
-      if (Array.isArray(args3[1])) return args3[1].every((item) => !callFnVal(args3[0], [item]));
+      if (args2.length === 0) return { tag: "None", value: null, kind: "Option" };
+      if (Array.isArray(args2[1])) return args2[1].every((item) => !callFnVal(args2[0], [item]));
       return { tag: "None", value: null, kind: "Option" };
     case "unique":
     case "distinct":
-      return Array.isArray(args3[0]) ? [...new Set(args3[0])] : [];
+      return Array.isArray(args2[0]) ? [...new Set(args2[0])] : [];
     case "sort":
-      if (!Array.isArray(args3[0])) return [];
-      return [...args3[0]].sort((a, b) => {
+      if (!Array.isArray(args2[0])) return [];
+      return [...args2[0]].sort((a, b) => {
         if (typeof a === "number" && typeof b === "number") return a - b;
         return String(a).localeCompare(String(b));
       });
     case "sort-by":
     case "sort_by": {
-      if (Array.isArray(args3[0]) && args3[0].length > 0) {
-        const second = args3[1];
-        const firstElemIsFunc = typeof args3[0][0] === "function" || args3[0][0]?.kind === "function-value" || args3[0][0]?.kind === "closure";
+      if (Array.isArray(args2[0]) && args2[0].length > 0) {
+        const second = args2[1];
+        const firstElemIsFunc = typeof args2[0][0] === "function" || args2[0][0]?.kind === "function-value" || args2[0][0]?.kind === "closure";
         const secondIsFunc = second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure");
         if (secondIsFunc && !firstElemIsFunc) {
           throw new Error(
@@ -17352,9 +16636,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           );
         }
       }
-      if (!Array.isArray(args3[1])) return [];
-      const keyFn = args3[0];
-      const sbArr = args3[1];
+      if (!Array.isArray(args2[1])) return [];
+      const keyFn = args2[0];
+      const sbArr = args2[1];
       const sbIsField = typeof keyFn === "string" && sbArr.length > 0 && sbArr[0] !== null && typeof sbArr[0] === "object";
       const sbExtract = sbIsField ? (x) => x !== null && typeof x === "object" ? x[keyFn] : null : (x) => callFnVal(keyFn, [x]);
       return [...sbArr].sort((a, b) => {
@@ -17365,15 +16649,15 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       });
     }
     case "zip": {
-      const a = Array.isArray(args3[0]) ? args3[0] : [];
-      const b = Array.isArray(args3[1]) ? args3[1] : [];
+      const a = Array.isArray(args2[0]) ? args2[0] : [];
+      const b = Array.isArray(args2[1]) ? args2[1] : [];
       const len = Math.min(a.length, b.length);
       return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
     }
     case "zip-with": {
-      const fn = args3[0];
-      const a = Array.isArray(args3[1]) ? args3[1] : [];
-      const b = Array.isArray(args3[2]) ? args3[2] : [];
+      const fn = args2[0];
+      const a = Array.isArray(args2[1]) ? args2[1] : [];
+      const b = Array.isArray(args2[2]) ? args2[2] : [];
       const len = Math.min(a.length, b.length);
       const callFn22 = interp2?.callFunctionValue?.bind(interp2);
       if (!callFn22) return [];
@@ -17381,15 +16665,15 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // ── cache-* (LRU + TTL) ──────────────────────────────────────────────────
     case "cache-create": {
-      const maxSize = typeof args3[0] === "number" ? Math.max(1, args3[0]) : 100;
+      const maxSize = typeof args2[0] === "number" ? Math.max(1, args2[0]) : 100;
       return makeCacheHandle(maxSize);
     }
     case "cache-set": {
-      const isHandle = args3[0] && args3[0].kind === "cache";
-      const ch = isHandle ? args3[0] : _globalCache;
-      const key = String(isHandle ? args3[1] : args3[0]);
-      const val = isHandle ? args3[2] : args3[1];
-      const rawTtl = isHandle ? args3[3] : args3[2];
+      const isHandle = args2[0] && args2[0].kind === "cache";
+      const ch = isHandle ? args2[0] : _globalCache;
+      const key = String(isHandle ? args2[1] : args2[0]);
+      const val = isHandle ? args2[2] : args2[1];
+      const rawTtl = isHandle ? args2[3] : args2[2];
       const ttlMs = typeof rawTtl === "number" ? isHandle ? rawTtl : rawTtl * 1e3 : null;
       if (ch.map.has(key)) ch.map.delete(key);
       else cacheEvict(ch);
@@ -17397,9 +16681,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return true;
     }
     case "cache-get": {
-      const isHandle = args3[0] && args3[0].kind === "cache";
-      const ch = isHandle ? args3[0] : _globalCache;
-      const key = String(isHandle ? args3[1] : args3[0]);
+      const isHandle = args2[0] && args2[0].kind === "cache";
+      const ch = isHandle ? args2[0] : _globalCache;
+      const key = String(isHandle ? args2[1] : args2[0]);
       const entry = ch.map.get(key);
       if (!entry) {
         ch.misses++;
@@ -17416,9 +16700,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return entry.value;
     }
     case "cache-has": {
-      const isHandle = args3[0] && args3[0].kind === "cache";
-      const ch = isHandle ? args3[0] : _globalCache;
-      const key = String(isHandle ? args3[1] : args3[0]);
+      const isHandle = args2[0] && args2[0].kind === "cache";
+      const ch = isHandle ? args2[0] : _globalCache;
+      const key = String(isHandle ? args2[1] : args2[0]);
       const entry = ch.map.get(key);
       if (!entry) return false;
       if (entry.expires !== null && Date.now() > entry.expires) {
@@ -17428,22 +16712,22 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return true;
     }
     case "cache-del": {
-      const isHandle = args3[0] && args3[0].kind === "cache";
-      const ch = isHandle ? args3[0] : _globalCache;
-      const key = String(isHandle ? args3[1] : args3[0]);
+      const isHandle = args2[0] && args2[0].kind === "cache";
+      const ch = isHandle ? args2[0] : _globalCache;
+      const key = String(isHandle ? args2[1] : args2[0]);
       return ch.map.delete(key);
     }
     case "cache-clear": {
-      const isHandle = args3[0] && args3[0].kind === "cache";
-      const ch = isHandle ? args3[0] : _globalCache;
+      const isHandle = args2[0] && args2[0].kind === "cache";
+      const ch = isHandle ? args2[0] : _globalCache;
       ch.map.clear();
       ch.hits = 0;
       ch.misses = 0;
       return true;
     }
     case "cache-stats": {
-      const isHandle = args3[0] && args3[0].kind === "cache";
-      const ch = isHandle ? args3[0] : _globalCache;
+      const isHandle = args2[0] && args2[0].kind === "cache";
+      const ch = isHandle ? args2[0] : _globalCache;
       const total = ch.hits + ch.misses;
       return { size: ch.map.size, hits: ch.hits, misses: ch.misses, "hit-rate": total > 0 ? ch.hits / total : 0 };
     }
@@ -17454,26 +16738,26 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return randomUUID5();
     }
     case "sleep": {
-      const ms = Math.max(0, Number(args3[0] ?? 0));
+      const ms = Math.max(0, Number(args2[0] ?? 0));
       const buf = new SharedArrayBuffer(4);
       Atomics.wait(new Int32Array(buf), 0, 0, ms);
       return null;
     }
     case "push":
-      if (!Array.isArray(args3[0])) return [args3[1]];
-      return [...args3[0], args3[1]];
+      if (!Array.isArray(args2[0])) return [args2[1]];
+      return [...args2[0], args2[1]];
     case "pop":
-      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
+      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][args2[0].length - 1] : null;
     case "shift":
-      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : null;
+      return Array.isArray(args2[0]) && args2[0].length > 0 ? args2[0][0] : null;
     case "unshift":
-      if (!Array.isArray(args3[0])) return [args3[1]];
-      return [args3[1], ...args3[0]];
+      if (!Array.isArray(args2[0])) return [args2[1]];
+      return [args2[1], ...args2[0]];
     // Type/Utility
     case "typeof":
-      return typeof args3[0];
+      return typeof args2[0];
     case "type-of": {
-      const v = args3[0];
+      const v = args2[0];
       if (v === null || v === void 0) return "nil";
       if (Array.isArray(v)) return "array";
       if (typeof v === "function" || v?.kind === "function-value" || v?.kind === "closure" || v?.kind === "builtin-fn") return "function";
@@ -17483,7 +16767,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // ── 벡터 유사도 (pgvector 대체) ──────────────────────────────
     case "vec-dot":
     case "dot-product": {
-      const a = args3[0], b = args3[1];
+      const a = args2[0], b = args2[1];
       if (!Array.isArray(a) || !Array.isArray(b)) return 0;
       let sum = 0;
       for (let i = 0; i < Math.min(a.length, b.length); i++) sum += (a[i] ?? 0) * (b[i] ?? 0);
@@ -17491,13 +16775,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "vec-norm":
     case "vec-magnitude": {
-      const v = args3[0];
+      const v = args2[0];
       if (!Array.isArray(v)) return 0;
       return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
     }
     case "cosine-sim":
     case "cosine_sim": {
-      const a = args3[0], b = args3[1];
+      const a = args2[0], b = args2[1];
       if (!Array.isArray(a) || !Array.isArray(b)) return 0;
       let dot = 0, na = 0, nb = 0;
       for (let i = 0; i < Math.min(a.length, b.length); i++) {
@@ -17510,7 +16794,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "euclidean-dist":
     case "vec-dist": {
-      const a = args3[0], b = args3[1];
+      const a = args2[0], b = args2[1];
       if (!Array.isArray(a) || !Array.isArray(b)) return 0;
       let sum = 0;
       for (let i = 0; i < Math.min(a.length, b.length); i++) {
@@ -17520,25 +16804,25 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return Math.sqrt(sum);
     }
     case "vec-add": {
-      const a = args3[0], b = args3[1];
+      const a = args2[0], b = args2[1];
       if (!Array.isArray(a) || !Array.isArray(b)) return [];
       return Array.from({ length: Math.min(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
     }
     case "vec-scale": {
-      const v = args3[0], s = Number(args3[1] ?? 1);
+      const v = args2[0], s = Number(args2[1] ?? 1);
       if (!Array.isArray(v)) return [];
       return v.map((x) => x * s);
     }
     case "vec-normalize": {
-      const v = args3[0];
+      const v = args2[0];
       if (!Array.isArray(v)) return [];
       const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
       return norm === 0 ? v : v.map((x) => x / norm);
     }
     case "vec-top-k": {
-      const query = args3[0];
-      const vectors = args3[1];
-      const k = Number(args3[2] ?? 5);
+      const query = args2[0];
+      const vectors = args2[1];
+      const k = Number(args2[2] ?? 5);
       if (!Array.isArray(query) || !Array.isArray(vectors)) return [];
       const scored = vectors.map((item, idx) => {
         const vec = Array.isArray(item) ? item : item?.vector ?? item?.embedding ?? [];
@@ -17554,8 +16838,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return scored.sort((a, b) => b.score - a.score).slice(0, k);
     }
     case "assert-type": {
-      const val = args3[0];
-      const typeStr = String(args3[1]);
+      const val = args2[0];
+      const typeStr = String(args2[1]);
       let actualType = typeof val;
       if (Array.isArray(val)) actualType = "array";
       else if (val === null) actualType = "null";
@@ -17566,32 +16850,32 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return val;
     }
     case "num":
-      return Number(args3[0]);
+      return Number(args2[0]);
     case "bool":
-      return Boolean(args3[0]);
+      return Boolean(args2[0]);
     // Math Functions
     case "math-abs":
     case "math_abs":
     case "abs":
-      return Math.abs(args3[0]);
+      return Math.abs(args2[0]);
     case "min":
-      return Math.min(...args3.filter((v) => typeof v === "number"));
+      return Math.min(...args2.filter((v) => typeof v === "number"));
     case "max":
-      return Math.max(...args3.filter((v) => typeof v === "number"));
+      return Math.max(...args2.filter((v) => typeof v === "number"));
     case "floor":
-      return Math.floor(args3[0]);
+      return Math.floor(args2[0]);
     case "ceil":
-      return Math.ceil(args3[0]);
+      return Math.ceil(args2[0]);
     case "round":
-      return Math.round(args3[0]);
+      return Math.round(args2[0]);
     case "quot":
-      return Math.trunc(Number(args3[0]) / Number(args3[1]));
+      return Math.trunc(Number(args2[0]) / Number(args2[1]));
     case "rem":
-      return Number(args3[0]) - Math.trunc(Number(args3[0]) / Number(args3[1])) * Number(args3[1]);
+      return Number(args2[0]) - Math.trunc(Number(args2[0]) / Number(args2[1])) * Number(args2[1]);
     case "int":
-      return Math.trunc(Number(args3[0]));
+      return Math.trunc(Number(args2[0]));
     case "sorted?": {
-      const arr = args3[0];
+      const arr = args2[0];
       if (!Array.isArray(arr) || arr.length <= 1) return true;
       for (let i = 1; i < arr.length; i++) {
         if (arr[i] < arr[i - 1]) return false;
@@ -17601,76 +16885,76 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "math-sqrt":
     case "math_sqrt":
     case "sqrt":
-      return Math.sqrt(args3[0]);
+      return Math.sqrt(args2[0]);
     case "pow":
-      return Math.pow(args3[0], args3[1]);
+      return Math.pow(args2[0], args2[1]);
     case "log":
-      return Math.log(args3[0]);
+      return Math.log(args2[0]);
     case "exp":
-      return Math.exp(args3[0]);
+      return Math.exp(args2[0]);
     case "sin":
-      return Math.sin(args3[0]);
+      return Math.sin(args2[0]);
     case "cos":
-      return Math.cos(args3[0]);
+      return Math.cos(args2[0]);
     case "tan":
-      return Math.tan(args3[0]);
+      return Math.tan(args2[0]);
     case "random":
     case "rand":
       return Math.random();
     case "rand-int": {
-      if (args3.length >= 2) return Math.floor(Math.random() * (Number(args3[1]) - Number(args3[0]))) + Number(args3[0]);
-      return Math.floor(Math.random() * Number(args3[0]));
+      if (args2.length >= 2) return Math.floor(Math.random() * (Number(args2[1]) - Number(args2[0]))) + Number(args2[0]);
+      return Math.floor(Math.random() * Number(args2[0]));
     }
     case "clamp":
-      return Math.max(args3[1], Math.min(args3[2], args3[0]));
+      return Math.max(args2[1], Math.min(args2[2], args2[0]));
     // Monad Operations — Phase 96: Result 타입으로 업그레이드 (_tag 기반)
     case "ok":
-      return ok(args3[0]);
+      return ok(args2[0]);
     case "err": {
-      if (args3.length >= 2) {
-        const code96 = String(args3[0] ?? "ERR");
-        const message96 = String(args3[1] ?? "");
-        const category96 = args3[2];
+      if (args2.length >= 2) {
+        const code96 = String(args2[0] ?? "ERR");
+        const message96 = String(args2[1] ?? "");
+        const category96 = args2[2];
         return err(code96, message96, category96 ? { category: category96 } : void 0);
       }
-      return err("ERR", String(args3[0] ?? ""));
+      return err("ERR", String(args2[0] ?? ""));
     }
     case "some":
-      if (typeof args3[0] === "function" || args3[0] && (args3[0].kind === "function-value" || args3[0].kind === "closure")) {
-        const someFn = args3[0], someArr = Array.isArray(args3[1]) ? args3[1] : [];
+      if (typeof args2[0] === "function" || args2[0] && (args2[0].kind === "function-value" || args2[0].kind === "closure")) {
+        const someFn = args2[0], someArr = Array.isArray(args2[1]) ? args2[1] : [];
         if (typeof someFn === "function") return someArr.some(someFn);
         return someArr.some((item) => callFnVal(someFn, [item]));
       }
-      return { tag: "Some", value: args3[0], kind: "Option" };
+      return { tag: "Some", value: args2[0], kind: "Option" };
     case "every?": {
-      const evFn = args3[0], evArr = Array.isArray(args3[1]) ? args3[1] : [];
+      const evFn = args2[0], evArr = Array.isArray(args2[1]) ? args2[1] : [];
       if (typeof evFn === "function") return evArr.every(evFn);
       return evArr.every((item) => callFnVal(evFn, [item]));
     }
     case "any?": {
-      const anyFn = args3[0], anyArr = Array.isArray(args3[1]) ? args3[1] : [];
+      const anyFn = args2[0], anyArr = Array.isArray(args2[1]) ? args2[1] : [];
       if (typeof anyFn === "function") return anyArr.some(anyFn);
       return anyArr.some((item) => callFnVal(anyFn, [item]));
     }
     case "none":
       return { tag: "None", value: null, kind: "Option" };
     case "pure":
-      return { tag: "Pure", value: args3[0], kind: "Monad" };
+      return { tag: "Pure", value: args2[0], kind: "Monad" };
     case "left":
-      return { tag: "Left", value: args3[0], kind: "Either" };
+      return { tag: "Left", value: args2[0], kind: "Either" };
     case "right":
-      return { tag: "Right", value: args3[0], kind: "Either" };
+      return { tag: "Right", value: args2[0], kind: "Either" };
     case "failure": {
-      const errors = Array.isArray(args3[0]) ? args3[0] : [args3[0]];
+      const errors = Array.isArray(args2[0]) ? args2[0] : [args2[0]];
       return { tag: "Failure", value: errors, kind: "Validation" };
     }
     case "success":
-      return { tag: "Success", value: args3[0], kind: "Validation" };
+      return { tag: "Success", value: args2[0], kind: "Validation" };
     case "tell":
-      return { kind: "Writer", value: null, log: String(args3[0]) };
+      return { kind: "Writer", value: null, log: String(args2[0]) };
     case "return-writer":
     case "pure-writer":
-      return { kind: "Writer", value: args3[0], log: "" };
+      return { kind: "Writer", value: args2[0], log: "" };
     case "bind": {
       if (expr2.args.length < 2) throw new Error(`bind requires monad and transform function`);
       const monad = ev(expr2.args[0]);
@@ -17713,24 +16997,24 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // ── Phase 69: Lazy Sequences ──────────────────────────────────────────
     // (lazy-seq head-thunk tail-thunk) — 직접 생성 (드물게 사용)
     case "lazy-seq": {
-      const hVal = args3[0];
-      const tVal = args3.length > 1 ? args3[1] : null;
+      const hVal = args2[0];
+      const tVal = args2.length > 1 ? args2[1] : null;
       return lazySeq(() => hVal, () => isLazySeq(tVal) ? tVal : null);
     }
     // (iterate f init) — 무한 시퀀스: init, f(init), f(f(init)), ...
     case "iterate": {
-      const fn = args3[0];
-      const initVal = args3[1];
+      const fn = args2[0];
+      const initVal = args2[1];
       const applyFn = (v) => callFn2(fn, [v]);
       const makeIter = (cur) => lazySeq(() => cur, () => makeIter(applyFn(cur)));
       return makeIter(initVal);
     }
     // (range n) → lazy [0..n-1], (range start end) → lazy [start..end-1]
     case "range": {
-      if (args3.length === 0) return rangeSeq(0);
-      const start = args3.length === 1 ? 0 : Number(args3[0]);
-      const end = args3.length === 1 ? Number(args3[0]) : Number(args3[1]);
-      const step = args3.length >= 3 ? Number(args3[2]) : 1;
+      if (args2.length === 0) return rangeSeq(0);
+      const start = args2.length === 1 ? 0 : Number(args2[0]);
+      const end = args2.length === 1 ? Number(args2[0]) : Number(args2[1]);
+      const step = args2.length >= 3 ? Number(args2[2]) : 1;
       const out = [];
       if (step > 0) for (let i = start; i < end; i += step) out.push(i);
       else if (step < 0) for (let i = start; i > end; i += step) out.push(i);
@@ -17738,27 +17022,27 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (take n seq) — lazy or array에서 n개 꺼냄
     case "take": {
-      if (Array.isArray(args3[0]) && typeof args3[1] === "number") {
+      if (Array.isArray(args2[0]) && typeof args2[1] === "number") {
         throw new Error(`take \uC778\uC790 \uC21C\uC11C \uC624\uB958: (take n coll) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (take coll n)`);
       }
-      const n = args3[0];
-      const seq = args3[1];
+      const n = args2[0];
+      const seq = args2[1];
       return take(n, isLazySeq(seq) ? seq : Array.isArray(seq) ? seq : null);
     }
     // (drop n seq) — lazy seq에서 n개 버리고 나머지 반환
     case "drop": {
-      if (Array.isArray(args3[0]) && typeof args3[1] === "number") {
+      if (Array.isArray(args2[0]) && typeof args2[1] === "number") {
         throw new Error(`drop \uC778\uC790 \uC21C\uC11C \uC624\uB958: (drop n coll) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (drop coll n)`);
       }
-      const n = args3[0];
-      const seq = args3[1];
+      const n = args2[0];
+      const seq = args2[1];
       if (Array.isArray(seq)) return seq.slice(n);
       return drop(n, isLazySeq(seq) ? seq : null);
     }
     // (filter-lazy pred seq) — 레이지 필터
     case "filter-lazy": {
-      const pred = args3[0];
-      const seq = args3[1];
+      const pred = args2[0];
+      const seq = args2[1];
       const applyPred = (v) => Boolean(callFn2(pred, [v]));
       const doFilter = (s) => {
         if (!s) return null;
@@ -17773,8 +17057,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (map-lazy f seq) — 레이지 맵 (단항)
     case "map-lazy": {
-      const f2 = args3[0];
-      const seq2 = args3[1];
+      const f2 = args2[0];
+      const seq2 = args2[1];
       const doMap = (s) => {
         if (!s) return null;
         const h = lazyHead(s);
@@ -17784,8 +17068,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (take-while pred seq) — pred가 true인 동안만 꺼냄 (배열 반환)
     case "take-while": {
-      const pred = args3[0];
-      const seq = args3[1];
+      const pred = args2[0];
+      const seq = args2[1];
       if (Array.isArray(seq)) {
         const result = [];
         for (const v of seq) {
@@ -17808,23 +17092,23 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return doTakeWhile(isLazySeq(seq) ? seq : null);
     }
     case "drop-while": {
-      const pred = args3[0];
-      const seq = args3[1];
+      const pred = args2[0];
+      const seq = args2[1];
       if (!Array.isArray(seq)) return [];
       let i = 0;
       while (i < seq.length && callFnVal(pred, [seq[i]])) i++;
       return seq.slice(i);
     }
     case "map-indexed": {
-      const fn = args3[0];
-      const seq = args3[1];
+      const fn = args2[0];
+      const seq = args2[1];
       if (!Array.isArray(seq)) return [];
       return seq.map((v, i) => callFnVal(fn, [i, v]));
     }
     case "reduce-kv": {
-      const fn = args3[0];
-      const init = args3[1];
-      const m = args3[2];
+      const fn = args2[0];
+      const init = args2[1];
+      const m = args2[2];
       if (m === null || m === void 0 || typeof m !== "object" || Array.isArray(m)) return init;
       let acc = init;
       for (const [k, v] of Object.entries(m)) {
@@ -17834,31 +17118,31 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (lazy-head seq) / (lazy-tail seq) — 직접 접근
     case "lazy-head": {
-      return isLazySeq(args3[0]) ? lazyHead(args3[0]) : null;
+      return isLazySeq(args2[0]) ? lazyHead(args2[0]) : null;
     }
     case "lazy-tail": {
-      return isLazySeq(args3[0]) ? lazyTail(args3[0]) : null;
+      return isLazySeq(args2[0]) ? lazyTail(args2[0]) : null;
     }
     // (lazy? v) — 레이지 시퀀스 여부 확인
     case "lazy?": {
-      return isLazySeq(args3[0]);
+      return isLazySeq(args2[0]);
     }
     // ── Phase 95: Context Window 관리 함수 ─────────────────────────────
     // (ctx-new max-tokens?) → ContextManager
     case "ctx-new": {
-      const maxTokens = typeof args3[0] === "number" ? args3[0] : 4096;
+      const maxTokens = typeof args2[0] === "number" ? args2[0] : 4096;
       return new ContextManager(maxTokens);
     }
     // (ctx-add ctx content :priority p :tags [...] :tokens n) → id
     case "ctx-add": {
-      const ctx = args3[0];
-      const content = args3[1];
+      const ctx = args2[0];
+      const content = args2[1];
       const opts = {};
       for (let i = 2; i < expr2.args.length - 1; i++) {
         const raw = expr2.args[i];
         if (raw.kind === "keyword") {
           const kw = raw.name;
-          const val = args3[i];
+          const val = args2[i];
           if (kw === "priority") opts.priority = Number(val);
           else if (kw === "tags") opts.tags = Array.isArray(val) ? val : [String(val)];
           else if (kw === "tokens") opts.tokens = Number(val);
@@ -17868,64 +17152,64 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (ctx-get ctx id) → ContextEntry | undefined
     case "ctx-get": {
-      const ctx = args3[0];
-      return ctx.get(String(args3[1])) ?? null;
+      const ctx = args2[0];
+      return ctx.get(String(args2[1])) ?? null;
     }
     // (ctx-remove ctx id) → void
     case "ctx-remove": {
-      const ctx = args3[0];
-      ctx.remove(String(args3[1]));
+      const ctx = args2[0];
+      ctx.remove(String(args2[1]));
       return null;
     }
     // (ctx-trim ctx) → removed entries
     case "ctx-trim": {
-      const ctx = args3[0];
+      const ctx = args2[0];
       return ctx.trim();
     }
     // (ctx-stats ctx) → {used, max, percent, count}
     case "ctx-stats": {
-      const ctx = args3[0];
+      const ctx = args2[0];
       return ctx.stats();
     }
     // (ctx-has-room? ctx tokens) → bool
     case "ctx-has-room?": {
-      const ctx = args3[0];
-      return ctx.hasRoom(Number(args3[1]));
+      const ctx = args2[0];
+      return ctx.hasRoom(Number(args2[1]));
     }
     // (ctx-all ctx) / (ctx-all ctx tag) → entries
     case "ctx-all": {
-      const ctx = args3[0];
-      const tag = args3.length > 1 ? String(args3[1]) : void 0;
+      const ctx = args2[0];
+      const tag = args2.length > 1 ? String(args2[1]) : void 0;
       return ctx.getAll(tag);
     }
     // ── Phase 96: Result 타입 추가 함수 ─────────────────────────────────────
     // (ok? result) → bool
     case "ok?":
-      return isOk(args3[0]);
+      return isOk(args2[0]);
     // (err? result) → bool
     case "err?":
-      return isErr(args3[0]);
+      return isErr(args2[0]);
     // (unwrap result) → value or throw
     case "unwrap":
-      return unwrap(args3[0]);
+      return unwrap(args2[0]);
     // (unwrap-or result default) → value
     case "unwrap-or":
-      return unwrapOr(args3[0], args3[1]);
+      return unwrapOr(args2[0], args2[1]);
     // (map-ok result fn) → Result
     case "map-ok": {
-      const r = args3[0];
-      const fn = args3[1];
+      const r = args2[0];
+      const fn = args2[1];
       return mapOk(r, (v) => callFn2(fn, [v]));
     }
     // (map-err result fn) → Result
     case "map-err": {
-      const r = args3[0];
-      const fn = args3[1];
+      const r = args2[0];
+      const fn = args2[1];
       return mapErr(r, (e) => callFn2(fn, [e]));
     }
     // (flat-map result fn) → Result
     case "flat-map": {
-      const fmFn = args3[0], fmArr = args3[1];
+      const fmFn = args2[0], fmArr = args2[1];
       if (Array.isArray(fmArr)) {
         const results = [];
         for (const item of fmArr) {
@@ -17939,19 +17223,19 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (recover result fn) → value (Ok값 또는 fn(err) 반환)
     case "recover": {
-      const r = args3[0];
-      const fn = args3[1];
+      const r = args2[0];
+      const fn = args2[1];
       return recover(r, (e) => callFn2(fn, [e]));
     }
     // (result-explain err) → 한국어 설명 문자열
     case "result-explain": {
-      const e = args3[0];
+      const e = args2[0];
       if (!isErr(e)) return "(Ok \uAC12 \u2014 \uC5D0\uB7EC \uC5C6\uC74C)";
       return defaultErrorSystem.explain(e);
     }
     // (result-classify err-obj) → Err 구조체
     case "result-classify": {
-      const raw = args3[0];
+      const raw = args2[0];
       if (raw instanceof Error) return defaultErrorSystem.classify(raw);
       if (typeof raw === "string") return defaultErrorSystem.classify(new Error(raw));
       return raw;
@@ -17959,46 +17243,46 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // Phase 101: Memory System
     // (mem-remember "key" value) — 장기 저장
     case "mem-remember": {
-      const key = String(args3[0]);
-      const value = args3[1];
+      const key = String(args2[0]);
+      const value = args2[1];
       globalMemory.remember(key, value, { scope: "long-term", ttl: "forever" });
       return null;
     }
     // (mem-remember-short "key" value ttl-ms) — 단기 저장
     case "mem-remember-short": {
-      const key = String(args3[0]);
-      const value = args3[1];
-      const ttl = typeof args3[2] === "number" ? args3[2] : 6e4;
+      const key = String(args2[0]);
+      const value = args2[1];
+      const ttl = typeof args2[2] === "number" ? args2[2] : 6e4;
       globalMemory.remember(key, value, { scope: "short-term", ttl });
       return null;
     }
     // (mem-recall "key") / (mem-recall "key" fallback) — 조회
     case "mem-recall": {
-      const key = String(args3[0]);
-      const fallback = args3.length > 1 ? args3[1] : null;
+      const key = String(args2[0]);
+      const fallback = args2.length > 1 ? args2[1] : null;
       return globalMemory.recall(key, fallback);
     }
     // (mem-forget "key") — 삭제
     case "mem-forget": {
-      const key = String(args3[0]);
+      const key = String(args2[0]);
       return globalMemory.forget(key);
     }
     // (mem-episode "id" "what") / (mem-episode "id" "what" context outcome)
     case "mem-episode": {
-      const id = String(args3[0]);
-      const what = String(args3[1]);
-      const context = args3[2] ?? {};
-      const outcome = args3[3];
+      const id = String(args2[0]);
+      const what = String(args2[1]);
+      const context = args2[2] ?? {};
+      const outcome = args2[3];
       return globalMemory.recordEpisode(id, what, context, outcome);
     }
     // (mem-search-episodes "query") — 에피소드 검색
     case "mem-search-episodes": {
-      const query = String(args3[0]);
+      const query = String(args2[0]);
       return globalMemory.searchEpisodes(query);
     }
     // (mem-working-set value) — 작업 메모리 저장
     case "mem-working-set": {
-      globalMemory.setWorking(args3[0]);
+      globalMemory.setWorking(args2[0]);
       return null;
     }
     // (mem-working-get) — 작업 메모리 조회
@@ -18012,7 +17296,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (mem-keys) / (mem-keys "scope") — 모든 키 목록
     case "mem-keys": {
-      const scope = args3.length > 0 ? String(args3[0]) : void 0;
+      const scope = args2.length > 0 ? String(args2[0]) : void 0;
       return globalMemory.keys(scope);
     }
     // (mem-stats) — 통계
@@ -18025,13 +17309,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (mem-search-tag "tag") — 태그 검색
     case "mem-search-tag": {
-      const tag = String(args3[0]);
+      const tag = String(args2[0]);
       return globalMemory.searchByTag(tag);
     }
     // Phase 97: (use-tool "toolname" {key val ...}) — 도구 사용
     case "use-tool": {
-      const toolName = String(args3[0]);
-      const toolArgs = args3[1] && typeof args3[1] === "object" && !Array.isArray(args3[1]) ? args3[1] : {};
+      const toolName = String(args2[0]);
+      const toolArgs = args2[1] && typeof args2[1] === "object" && !Array.isArray(args2[1]) ? args2[1] : {};
       const result = globalToolRegistry.executeSync(toolName, toolArgs);
       if (!result.success) throw new Error(result.error || `Tool failed: ${toolName}`);
       return result.output;
@@ -18043,23 +17327,23 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // Phase 102: RAG 내장 함수
     // (rag-add "id" "content") — 문서 추가
     case "rag-add": {
-      const id = String(args3[0]);
-      const content = String(args3[1]);
-      const metadata = args3[2] && typeof args3[2] === "object" ? args3[2] : void 0;
+      const id = String(args2[0]);
+      const content = String(args2[1]);
+      const metadata = args2[2] && typeof args2[2] === "object" ? args2[2] : void 0;
       globalRAG.add({ id, content, metadata });
       return true;
     }
     // (rag-retrieve "query" topK) — 검색 → 리스트
     case "rag-retrieve": {
-      const query = String(args3[0]);
-      const topK = typeof args3[1] === "number" ? args3[1] : 3;
+      const query = String(args2[0]);
+      const topK = typeof args2[1] === "number" ? args2[1] : 3;
       const results = globalRAG.retrieve(query, topK);
       return results.map((d) => ({ id: d.id, content: d.content, score: d.score ?? 0 }));
     }
     // (rag-query "query") — 검색 + 기본 augment → 문자열
     case "rag-query": {
-      const query = String(args3[0]);
-      const topK = typeof args3[1] === "number" ? args3[1] : 3;
+      const query = String(args2[0]);
+      const topK = typeof args2[1] === "number" ? args2[1] : 3;
       const result = globalRAG.query(query, { topK });
       return result.augmented;
     }
@@ -18069,14 +17353,14 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (rag-remove "id") — 문서 삭제
     case "rag-remove": {
-      const id = String(args3[0]);
+      const id = String(args2[0]);
       return globalRAG.remove(id);
     }
     // Phase 103: 멀티 에이전트 통신
     // (agent-spawn "id" handler-fn) → AgentHandle
     case "agent-spawn": {
-      const agentId = String(args3[0]);
-      const handlerFn = args3[1];
+      const agentId = String(args2[0]);
+      const handlerFn = args2[1];
       const handler = (msg, bus) => {
         return callFn2(handlerFn, [msg, bus]);
       };
@@ -18084,25 +17368,25 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (agent-send "from" "to" content) → AgentMessage
     case "agent-send": {
-      const from = String(args3[0]);
-      const to = String(args3[1]);
-      const content = args3[2];
+      const from = String(args2[0]);
+      const to = String(args2[1]);
+      const content = args2[2];
       return globalBus.send(from, to, content);
     }
     // (agent-broadcast "from" content) → AgentMessage[]
     case "agent-broadcast": {
-      const from = String(args3[0]);
-      const content = args3[1];
+      const from = String(args2[0]);
+      const content = args2[1];
       return globalBus.broadcast(from, content);
     }
     // (agent-recv "id") → AgentMessage | null
     case "agent-recv": {
-      const agentId = String(args3[0]);
+      const agentId = String(args2[0]);
       return globalBus.recv(agentId);
     }
     // (agent-process "id") → any[]
     case "agent-process": {
-      const agentId = String(args3[0]);
+      const agentId = String(args2[0]);
       return globalBus.process(agentId);
     }
     // (agent-list) → string[]
@@ -18115,13 +17399,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (agent-inbox-size "id") → number
     case "agent-inbox-size": {
-      const agentId = String(args3[0]);
+      const agentId = String(args2[0]);
       return globalBus.inboxSize(agentId);
     }
     // Phase 104: TRY-REASON
     // (try-reason [[strategy fn] ...]) → 첫 성공 값
     case "try-reason": {
-      const attemptsList = args3[0];
+      const attemptsList = args2[0];
       if (!Array.isArray(attemptsList)) {
         throw new Error("try-reason: attempts must be a list");
       }
@@ -18141,21 +17425,21 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // Phase 106: Quality Loop 내장 함수
     // (quality-check output threshold?) → score (0.0~1.0)
     case "quality-check": {
-      const output = args3[0];
-      const threshold = args3.length > 1 ? Number(args3[1]) : 0.7;
+      const output = args2[0];
+      const threshold = args2.length > 1 ? Number(args2[1]) : 0.7;
       const result = evaluateQuality(output, defaultCriteria, threshold);
       return result.score;
     }
     // (quality-passed? output threshold?) → boolean
     case "quality-passed?": {
-      const output = args3[0];
-      const threshold = args3.length > 1 ? Number(args3[1]) : 0.7;
+      const output = args2[0];
+      const threshold = args2.length > 1 ? Number(args2[1]) : 0.7;
       const result = evaluateQuality(output, defaultCriteria, threshold);
       return result.passed;
     }
     // (quality-feedback output) → string[]
     case "quality-feedback": {
-      const output = args3[0];
+      const output = args2[0];
       const result = evaluateQuality(output, defaultCriteria, 0.7);
       return result.feedback;
     }
@@ -18167,8 +17451,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (stream-write "id" "chunk") — 청크 쓰기
     case "stream-write": {
-      const streamId = String(args3[0]);
-      const content = String(args3[1] ?? "");
+      const streamId = String(args2[0]);
+      const content = String(args2[1] ?? "");
       const s105a = getStream(streamId);
       if (!s105a) throw new Error(`stream-write: stream not found: ${streamId}`);
       s105a.write(content);
@@ -18176,7 +17460,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (stream-end "id") — 스트림 종료
     case "stream-end": {
-      const streamId = String(args3[0]);
+      const streamId = String(args2[0]);
       const s105b = getStream(streamId);
       if (!s105b) throw new Error(`stream-end: stream not found: ${streamId}`);
       s105b.end();
@@ -18184,49 +17468,49 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (stream-collect "id") → 수집된 문자열 (Promise or string)
     case "stream-collect": {
-      const streamId = String(args3[0]);
+      const streamId = String(args2[0]);
       const s105c = getStream(streamId);
       if (!s105c) throw new Error(`stream-collect: stream not found: ${streamId}`);
       return s105c.collect();
     }
     // (stream-done? "id") → boolean
     case "stream-done?": {
-      const streamId = String(args3[0]);
+      const streamId = String(args2[0]);
       const s105d = getStream(streamId);
       if (!s105d) return true;
       return s105d.isDone();
     }
     // (stream-chunks "id") → StreamChunk[]
     case "stream-chunks": {
-      const streamId = String(args3[0]);
+      const streamId = String(args2[0]);
       const s105e = getStream(streamId);
       if (!s105e) throw new Error(`stream-chunks: stream not found: ${streamId}`);
       return s105e.getChunks();
     }
     // (stream-chunk-count "id") → number
     case "stream-chunk-count": {
-      const streamId = String(args3[0]);
+      const streamId = String(args2[0]);
       const s105f = getStream(streamId);
       if (!s105f) throw new Error(`stream-chunk-count: stream not found: ${streamId}`);
       return s105f.chunkCount();
     }
     // (stream-text "id" "text") — 텍스트를 단어 단위로 자동 스트리밍
     case "stream-text": {
-      const streamId = String(args3[0]);
-      const text = String(args3[1] ?? "");
+      const streamId = String(args2[0]);
+      const text = String(args2[1] ?? "");
       const s105g = getStream(streamId);
       if (!s105g) throw new Error(`stream-text: stream not found: ${streamId}`);
       return streamText(s105g, text, 0);
     }
     // (stream-delete "id") → boolean
     case "stream-delete": {
-      const streamId = String(args3[0]);
+      const streamId = String(args2[0]);
       return deleteStream(streamId);
     }
     // (try-with-fallback fn fallback) → fn() 실패 시 fallback
     case "try-with-fallback": {
-      const fn = args3[0];
-      const fallback = args3[1];
+      const fn = args2[0];
+      const fallback = args2[1];
       const wrappedFn = () => {
         if (typeof fn === "function") return fn();
         if (fn && fn.kind === "function-value") return callFn2(fn, []);
@@ -18237,12 +17521,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // Phase 107: FL 자기 교육 시스템 내장 함수
     // (fl-learn "concept") → 레슨 마크다운 문자열
     case "fl-learn": {
-      const concept = String(args3[0] ?? "");
+      const concept = String(args2[0] ?? "");
       return globalTutor.lessonMarkdown(concept);
     }
     // (fl-examples "tag") → 태그별 예제 리스트 (JSON 문자열)
     case "fl-examples": {
-      const tag = String(args3[0] ?? "");
+      const tag = String(args2[0] ?? "");
       const examples = globalTutor.findByTag(tag);
       return examples.map((e) => `${e.concept}: ${e.description}`).join("\n");
     }
@@ -18257,17 +17541,17 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // Phase 108: AI 추론 시각화 디버거 내장 함수
     // (trace-create "label") → trace-id 문자열
     case "trace-create": {
-      const label = String(args3[0] ?? "trace");
+      const label = String(args2[0] ?? "trace");
       const { id } = createTrace(label);
       return id;
     }
     // (trace-add id "type" "label") → null
     // (trace-add id "type" "label" value) → null
     case "trace-add": {
-      const traceId2 = String(args3[0] ?? "");
-      const nodeType = String(args3[1] ?? "thought");
-      const nodeLabel = String(args3[2] ?? "");
-      const nodeValue = args3.length >= 4 ? args3[3] : void 0;
+      const traceId2 = String(args2[0] ?? "");
+      const nodeType = String(args2[1] ?? "thought");
+      const nodeLabel = String(args2[2] ?? "");
+      const nodeValue = args2.length >= 4 ? args2[3] : void 0;
       const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.add(nodeType, nodeLabel, nodeValue);
@@ -18275,10 +17559,10 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (trace-enter id "type" "label") → null
     case "trace-enter": {
-      const traceId2 = String(args3[0] ?? "");
-      const nodeType = String(args3[1] ?? "thought");
-      const nodeLabel = String(args3[2] ?? "");
-      const nodeValue = args3.length >= 4 ? args3[3] : void 0;
+      const traceId2 = String(args2[0] ?? "");
+      const nodeType = String(args2[1] ?? "thought");
+      const nodeLabel = String(args2[2] ?? "");
+      const nodeValue = args2.length >= 4 ? args2[3] : void 0;
       const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.enter(nodeType, nodeLabel, nodeValue);
@@ -18287,8 +17571,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // (trace-exit id) → null
     // (trace-exit id result) → null
     case "trace-exit": {
-      const traceId2 = String(args3[0] ?? "");
-      const result = args3.length >= 2 ? args3[1] : void 0;
+      const traceId2 = String(args2[0] ?? "");
+      const result = args2.length >= 2 ? args2[1] : void 0;
       const trace = getTrace(traceId2);
       if (!trace) return null;
       trace.exit(result);
@@ -18296,21 +17580,21 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (trace-markdown id) → 마크다운 문자열
     case "trace-markdown": {
-      const traceId2 = String(args3[0] ?? "");
+      const traceId2 = String(args2[0] ?? "");
       const trace = getTrace(traceId2);
       if (!trace) return "";
       return trace.toMarkdown();
     }
     // (trace-tree id) → 텍스트 트리 문자열
     case "trace-tree": {
-      const traceId2 = String(args3[0] ?? "");
+      const traceId2 = String(args2[0] ?? "");
       const trace = getTrace(traceId2);
       if (!trace) return "";
       return trace.toTree();
     }
     // (trace-node-count id) → 노드 수 (숫자)
     case "trace-node-count": {
-      const traceId2 = String(args3[0] ?? "");
+      const traceId2 = String(args2[0] ?? "");
       const trace = getTrace(traceId2);
       if (!trace) return 0;
       return trace.nodeCount();
@@ -18318,8 +17602,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // Phase 109: FL → 최적 프롬프트 컴파일러 내장 함수
     // (prompt-compile "blockType" "instruction") → 프롬프트 문자열
     case "prompt-compile": {
-      const blockType = String(args3[0] ?? "COT");
-      const instruction = String(args3[1] ?? "");
+      const blockType = String(args2[0] ?? "COT");
+      const instruction = String(args2[1] ?? "");
       const section = globalCompiler.compileBlock(blockType, {});
       const sections = section ? [section] : [{ name: "default", content: "", priority: 0.5 }];
       const result = globalCompiler.compile(sections, instruction);
@@ -18327,19 +17611,19 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (prompt-tokens "text") → 추정 토큰 수 (숫자)
     case "prompt-tokens": {
-      const text = String(args3[0] ?? "");
+      const text = String(args2[0] ?? "");
       return Math.ceil(text.length / 4);
     }
     // (prompt-target "claude"|"gpt"|"generic") → 타겟 설정 후 현재 타겟 반환
     case "prompt-target": {
-      const target = String(args3[0] ?? "claude");
+      const target = String(args2[0] ?? "claude");
       globalCompiler.setTarget(target);
       return target;
     }
     // (prompt-from-code "fl-code" "instruction") → FL 코드에서 자동 컴파일된 프롬프트
     case "prompt-from-code": {
-      const flCode = String(args3[0] ?? "");
-      const instruction = String(args3[1] ?? "");
+      const flCode = String(args2[0] ?? "");
+      const instruction = String(args2[1] ?? "");
       const result = globalCompiler.compileFromCode(flCode, instruction);
       return result.prompt;
     }
@@ -18354,71 +17638,71 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     // (sdk-supports "feature") → boolean
     case "sdk-supports": {
-      const feature = String(args3[0] ?? "");
+      const feature = String(args2[0] ?? "");
       return sdk.supports(feature);
     }
     // (sdk-snippet "concept") → 코드 문자열
     case "sdk-snippet": {
-      const concept = String(args3[0] ?? "");
+      const concept = String(args2[0] ?? "");
       return sdk.snippet(concept);
     }
     // (sdk-validate "code") → boolean
     case "sdk-validate": {
-      const code = String(args3[0] ?? "");
+      const code = String(args2[0] ?? "");
       const result = sdk.validate(code);
       return result.valid;
     }
     // ── Phase 112: maybe-chain 확률 자동 전파 ────────────────────────────
     // (maybe-map $m fn) → maybe(same-confidence, fn(value))
     case "maybe-map": {
-      const [m, fn] = args3;
+      const [m, fn] = args2;
       return maybeMap(m, (v) => callFnVal(fn, [v]));
     }
     // (maybe-bind $m fn) → fn(value) 결과 maybe와 확률 곱
     case "maybe-bind": {
-      const [m, fn] = args3;
+      const [m, fn] = args2;
       return maybeBind(m, (v) => callFnVal(fn, [v]));
     }
     // (maybe-chain maybe-list fn) → 확률 곱 + 값 합성
     case "maybe-chain": {
-      const [maybes, fn] = args3;
+      const [maybes, fn] = args2;
       const list = Array.isArray(maybes) ? maybes : [maybes];
       return maybeChain(list, (...vals) => callFnVal(fn, vals));
     }
     // (maybe-filter $m pred) → 조건 불만족 시 none
     case "maybe-filter": {
-      const [m, pred] = args3;
+      const [m, pred] = args2;
       return maybeFilter(m, (v) => callFnVal(pred, [v]));
     }
     // (maybe-combine $a $b fn) → 두 maybe 결합 (확률 곱)
     case "maybe-combine": {
-      const [a, b, fn] = args3;
+      const [a, b, fn] = args2;
       return maybeCombine(a, b, (x, y) => callFnVal(fn, [x, y]));
     }
     // (maybe-select maybe-list) → 최고 신뢰도 선택
     case "maybe-select": {
-      const list = Array.isArray(args3[0]) ? args3[0] : args3;
+      const list = Array.isArray(args2[0]) ? args2[0] : args2;
       return maybeSelect(list);
     }
     // Function call (default)
     default: {
       if (interp2.context.functions.has(op)) {
-        return callUser(op, args3);
+        return callUser(op, args2);
       }
       const bracketMatch = op.match(/^([\w\-]+)\[([^\]]+)\]$/);
       if (bracketMatch && interp2.context.functions.has(bracketMatch[1])) {
-        return callUser(op, args3);
+        return callUser(op, args2);
       }
       if (interp2.context.variables.has(op)) {
         const fn = interp2.context.variables.get(op);
         if (fn.kind === "builtin-function") {
-          return fn.fn(args3.map((arg) => ev(arg)));
+          return fn.fn(args2.map((arg) => ev(arg)));
         } else if (typeof fn === "function" || fn.kind === "function-value") {
-          return callFn2(fn, args3);
+          return callFn2(fn, args2);
         }
       }
       if (op === "hypothesis") {
-        const [claim, testFn, evalFn] = args3;
+        const [claim, testFn, evalFn] = args2;
         const config = {
           claim: String(claim),
           test: (attempt) => {
@@ -18436,7 +17720,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.verdict;
       }
       if (op === "hypothesis-confidence") {
-        const [claim, testFn, evalFn] = args3;
+        const [claim, testFn, evalFn] = args2;
         const config = {
           claim: String(claim),
           test: (attempt) => {
@@ -18454,7 +17738,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.confidence;
       }
       if (op === "hypothesis-compete") {
-        const hypoList = args3[0];
+        const hypoList = args2[0];
         if (!Array.isArray(hypoList) || hypoList.length === 0) return null;
         const configs = hypoList.map((h) => {
           const [claim, testFn, evalFn] = Array.isArray(h) ? h : [h, () => null, () => 0];
@@ -18476,7 +17760,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return winner.claim;
       }
       if (op === "debate") {
-        const [proposition, proFn, conFn] = args3;
+        const [proposition, proFn, conFn] = args2;
         const result = globalDebater.debate({
           proposition: String(proposition),
           pro: (round, conArgs) => {
@@ -18493,7 +17777,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.winner;
       }
       if (op === "debate-score") {
-        const [proposition, proFn, conFn] = args3;
+        const [proposition, proFn, conFn] = args2;
         const result = globalDebater.debate({
           proposition: String(proposition),
           pro: (round, conArgs) => {
@@ -18510,7 +17794,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return { pro: result.proScore, con: result.conScore };
       }
       if (op === "debate-conclusion") {
-        const [proposition, proFn, conFn] = args3;
+        const [proposition, proFn, conFn] = args2;
         const result = globalDebater.debate({
           proposition: String(proposition),
           pro: (round, conArgs) => {
@@ -18527,16 +17811,16 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.conclusion;
       }
       if (op === "cp-save") {
-        const [name, state] = args3;
+        const [name, state] = args2;
         globalCheckpoint.save(String(name), state);
         return null;
       }
       if (op === "cp-restore") {
-        const [name] = args3;
+        const [name] = args2;
         return globalCheckpoint.restore(String(name));
       }
       if (op === "cp-branch") {
-        const [name, state, fn] = args3;
+        const [name, state, fn] = args2;
         const result = globalCheckpoint.branch(String(name), state, (s) => {
           if (typeof fn === "function") return fn(s);
           if (typeof fn === "string") return callUser(fn, [s]);
@@ -18550,23 +17834,23 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.restored;
       }
       if (op === "cp-drop") {
-        const [name] = args3;
+        const [name] = args2;
         return globalCheckpoint.drop(String(name));
       }
       if (op === "cp-list") {
         return globalCheckpoint.list();
       }
       if (op === "cp-versions") {
-        const [name] = args3;
+        const [name] = args2;
         return globalCheckpoint.versions(String(name));
       }
       if (op === "meta-reason") {
-        const problem = String(args3[0] ?? "");
+        const problem = String(args2[0] ?? "");
         const result = globalMetaReasoner.analyze(problem);
         return result.selected;
       }
       if (op === "meta-reason-scores") {
-        const problem = String(args3[0] ?? "");
+        const problem = String(args2[0] ?? "");
         const result = globalMetaReasoner.analyze(problem);
         const scoreMap = {};
         for (const s of result.scores) {
@@ -18575,32 +17859,32 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return scoreMap;
       }
       if (op === "meta-reason-rationale") {
-        const problem = String(args3[0] ?? "");
+        const problem = String(args2[0] ?? "");
         const result = globalMetaReasoner.analyze(problem);
         return result.rationale;
       }
       if (op === "belief-set") {
-        const [claim, confidence] = args3;
+        const [claim, confidence] = args2;
         globalBeliefs.set(String(claim), Number(confidence));
         return null;
       }
       if (op === "belief-get") {
-        const [claim] = args3;
+        const [claim] = args2;
         return globalBeliefs.get(String(claim));
       }
       if (op === "belief-update") {
-        const [claim, evidence] = args3;
+        const [claim, evidence] = args2;
         return globalBeliefs.update(String(claim), Number(evidence));
       }
       if (op === "belief-negate") {
-        const [claim] = args3;
+        const [claim] = args2;
         return globalBeliefs.negate(String(claim));
       }
       if (op === "belief-list") {
         return globalBeliefs.list();
       }
       if (op === "belief-certain") {
-        const threshold = args3.length > 0 ? Number(args3[0]) : 0.8;
+        const threshold = args2.length > 0 ? Number(args2[0]) : 0.8;
         return globalBeliefs.certain(threshold);
       }
       if (op === "belief-strongest") {
@@ -18608,35 +17892,35 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return b ? b.claim : null;
       }
       if (op === "belief-forget") {
-        const [claim] = args3;
+        const [claim] = args2;
         return globalBeliefs.forget(String(claim));
       }
       if (op === "belief-size") {
         return globalBeliefs.size();
       }
       if (op === "analogy-store") {
-        const [desc, solution, tagsRaw] = args3;
+        const [desc, solution, tagsRaw] = args2;
         const tags = Array.isArray(tagsRaw) ? tagsRaw.map(String) : [];
         const p = globalAnalogy.store(String(desc), solution, tags);
         return p.id;
       }
       if (op === "analogy-find") {
-        const [problem, topK] = args3;
+        const [problem, topK] = args2;
         const results = globalAnalogy.find(String(problem), topK != null ? Number(topK) : 3);
         return results.map((p) => p.description);
       }
       if (op === "analogy-best") {
-        const [problem] = args3;
+        const [problem] = args2;
         const p = globalAnalogy.best(String(problem));
         return p ? p.solution : null;
       }
       if (op === "analogy-by-tag") {
-        const [tag] = args3;
+        const [tag] = args2;
         const results = globalAnalogy.byTag(String(tag));
         return results.map((p) => p.description);
       }
       if (op === "analogy-popular") {
-        const [n] = args3;
+        const [n] = args2;
         const results = globalAnalogy.popular(n != null ? Number(n) : 3);
         return results.map((p) => p.description);
       }
@@ -18647,27 +17931,27 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalAnalogy.all().map((p) => p.description);
       }
       if (op === "critique") {
-        const [output] = args3;
+        const [output] = args2;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.approved;
       }
       if (op === "critique-points") {
-        const [output] = args3;
+        const [output] = args2;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.points.map((p) => p.description);
       }
       if (op === "critique-risk") {
-        const [output] = args3;
+        const [output] = args2;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.overallRisk;
       }
       if (op === "critique-summary") {
-        const [output] = args3;
+        const [output] = args2;
         const result = globalCritique.run(output, { finders: defaultFinders });
         return result.summary;
       }
       if (op === "compose-reason") {
-        const [stepsList, input] = args3;
+        const [stepsList, input] = args2;
         if (!Array.isArray(stepsList)) return input;
         const steps = stepsList.map((s) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
@@ -18683,7 +17967,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.output;
       }
       if (op === "compose-history") {
-        const [stepsList, input] = args3;
+        const [stepsList, input] = args2;
         if (!Array.isArray(stepsList)) return [];
         const steps = stepsList.map((s) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
@@ -18699,7 +17983,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.history.map((h) => h.name);
       }
       if (op === "compose-steps") {
-        const [stepsList, input] = args3;
+        const [stepsList, input] = args2;
         if (!Array.isArray(stepsList)) return 0;
         const steps = stepsList.map((s) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
@@ -18715,7 +17999,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.steps;
       }
       if (op === "cognition-solve") {
-        const [problem, solverFn] = args3;
+        const [problem, solverFn] = args2;
         const result = globalCognition.solve(String(problem), (strategy, prob) => {
           if (typeof solverFn === "function") return solverFn(strategy, prob);
           if (solverFn?.kind === "function-value") return callFn2(solverFn, [strategy, prob]);
@@ -18737,17 +18021,17 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "cognition-meta") {
-        const [problem] = args3;
+        const [problem] = args2;
         const result = globalCognition.meta.analyze(String(problem));
         return result.selected;
       }
       if (op === "cognition-believe") {
-        const [claim, confidence] = args3;
+        const [claim, confidence] = args2;
         globalCognition.beliefs.set(String(claim), Number(confidence));
         return null;
       }
       if (op === "cognition-recall") {
-        const [pattern] = args3;
+        const [pattern] = args2;
         const p = globalCognition.analogies.best(String(pattern));
         return p ? p.solution : null;
       }
@@ -18762,23 +18046,23 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           });
         };
         if (op === "consensus-majority") {
-          const votes = parseVotes(args3[0]);
+          const votes = parseVotes(args2[0]);
           const result = globalConsensus.majority(votes);
           return result.answer;
         }
         if (op === "consensus-weighted") {
-          const votes = parseVotes(args3[0]);
+          const votes = parseVotes(args2[0]);
           const result = globalConsensus.weighted(votes);
           return result.answer;
         }
         if (op === "consensus-threshold") {
-          const votes = parseVotes(args3[0]);
-          const threshold = args3[1] !== void 0 ? Number(args3[1]) : 0.7;
+          const votes = parseVotes(args2[0]);
+          const threshold = args2[1] !== void 0 ? Number(args2[1]) : 0.7;
           const result = globalConsensus.threshold(votes, threshold);
           return result ? result.answer : null;
         }
         if (op === "consensus-agreement") {
-          const votes = parseVotes(args3[0]);
+          const votes = parseVotes(args2[0]);
           return globalConsensus.agreement(votes);
         }
       }
@@ -18799,32 +18083,32 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           return [];
         };
         if (op === "vote-plurality") {
-          const ballots = parseBallots(args3[0]);
-          const candidates = parseCandidates(args3[1]);
+          const ballots = parseBallots(args2[0]);
+          const candidates = parseCandidates(args2[1]);
           const result = globalVoting.plurality(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-approval") {
-          const ballots = parseBallots(args3[0]);
-          const candidates = parseCandidates(args3[1]);
+          const ballots = parseBallots(args2[0]);
+          const candidates = parseCandidates(args2[1]);
           const result = globalVoting.approval(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-score") {
-          const ballots = parseBallots(args3[0]);
-          const candidates = parseCandidates(args3[1]);
+          const ballots = parseBallots(args2[0]);
+          const candidates = parseCandidates(args2[1]);
           const result = globalVoting.score(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-tally") {
-          const ballots = parseBallots(args3[0]);
-          const candidates = parseCandidates(args3[1]);
+          const ballots = parseBallots(args2[0]);
+          const candidates = parseCandidates(args2[1]);
           const t = globalVoting.tally(ballots, candidates);
           return new Map(Object.entries(t));
         }
       }
       if (op === "negotiate") {
-        const [raw] = args3;
+        const [raw] = args2;
         if (!Array.isArray(raw)) return false;
         const positions = raw.map((p) => {
           if (Array.isArray(p)) {
@@ -18836,7 +18120,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.agreed;
       }
       if (op === "negotiate-value") {
-        const [raw] = args3;
+        const [raw] = args2;
         if (!Array.isArray(raw)) return null;
         const positions = raw.map((p) => {
           if (Array.isArray(p)) {
@@ -18848,7 +18132,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.agreed ? result.value ?? null : null;
       }
       if (op === "negotiate-rounds") {
-        const [raw] = args3;
+        const [raw] = args2;
         if (!Array.isArray(raw)) return 0;
         const positions = raw.map((p) => {
           if (Array.isArray(p)) {
@@ -18860,7 +18144,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.rounds.length;
       }
       if (op === "swarm-optimize") {
-        const [fnArg, nArg, iterArg] = args3;
+        const [fnArg, nArg, iterArg] = args2;
         const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
         const result = globalSwarm.optimize({
           objective,
@@ -18870,7 +18154,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.bestPosition;
       }
       if (op === "swarm-best-score") {
-        const [fnArg, nArg, iterArg] = args3;
+        const [fnArg, nArg, iterArg] = args2;
         const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
         const result = globalSwarm.optimize({
           objective,
@@ -18880,13 +18164,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.bestScore;
       }
       if (op === "swarm-converged?") {
-        const [fnArg] = args3;
+        const [fnArg] = args2;
         const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
         const result = globalSwarm.optimize({ objective });
         return result.converged;
       }
       if (op === "compete-register") {
-        const [id, solveFn] = args3;
+        const [id, solveFn] = args2;
         const competitor = {
           id: String(id),
           solve: (problem) => callFn2(solveFn, [problem])
@@ -18895,19 +18179,19 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return null;
       }
       if (op === "compete") {
-        const [problem, evalFn] = args3;
+        const [problem, evalFn] = args2;
         const evaluate = (output) => Number(callFn2(evalFn, [output]));
         const result = globalCompetition.run(problem, evaluate);
         return result.winner?.agentId ?? null;
       }
       if (op === "compete-score") {
-        const [problem, evalFn] = args3;
+        const [problem, evalFn] = args2;
         const evaluate = (output) => Number(callFn2(evalFn, [output]));
         const result = globalCompetition.run(problem, evaluate);
         return result.winner?.score ?? null;
       }
       if (op === "compete-all") {
-        const [problem, evalFn] = args3;
+        const [problem, evalFn] = args2;
         const evaluate = (output) => Number(callFn2(evalFn, [output]));
         const result = globalCompetition.run(problem, evaluate);
         return result.allResults.map((r) => [r.agentId, r.score, r.rank]);
@@ -18916,7 +18200,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalCompetition.list();
       }
       if (op === "peer-review-add") {
-        const [idArg, fnArg] = args3;
+        const [idArg, fnArg] = args2;
         const reviewerId = String(idArg);
         const reviewer = {
           id: reviewerId,
@@ -18938,17 +18222,17 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return null;
       }
       if (op === "peer-review") {
-        const [targetId, output] = args3;
+        const [targetId, output] = args2;
         const result = globalPeerReview.review(String(targetId), output);
         return result.approved;
       }
       if (op === "peer-review-score") {
-        const [targetId, output] = args3;
+        const [targetId, output] = args2;
         const result = globalPeerReview.review(String(targetId), output);
         return result.averageScore;
       }
       if (op === "peer-review-comments") {
-        const [targetId, output] = args3;
+        const [targetId, output] = args2;
         const result = globalPeerReview.review(String(targetId), output);
         return result.comments;
       }
@@ -18956,7 +18240,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalPeerReview.list();
       }
       if (op === "chain-agents") {
-        const [rawAgents, input] = args3;
+        const [rawAgents, input] = args2;
         if (!Array.isArray(rawAgents)) return input;
         const agents = rawAgents.map((a) => {
           if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
@@ -18975,7 +18259,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.finalOutput;
       }
       if (op === "chain-links") {
-        const [rawAgents, input] = args3;
+        const [rawAgents, input] = args2;
         if (!Array.isArray(rawAgents)) return [];
         const agents = rawAgents.map((a) => {
           if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
@@ -18994,7 +18278,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.links.filter((l) => !l.skipped).map((l) => l.agentId);
       }
       if (op === "chain-steps") {
-        const [rawAgents, input] = args3;
+        const [rawAgents, input] = args2;
         if (!Array.isArray(rawAgents)) return 0;
         const agents = rawAgents.map((a) => {
           if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
@@ -19013,7 +18297,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return result.stepsCompleted;
       }
       if (op === "orchestrate-run") {
-        const [rawTasks] = args3;
+        const [rawTasks] = args2;
         if (!Array.isArray(rawTasks)) return {};
         const tasks = rawTasks.map((t) => {
           if (Array.isArray(t)) {
@@ -19024,7 +18308,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalOrchestrator.run(tasks).outputs;
       }
       if (op === "orchestrate-order") {
-        const [rawTasks] = args3;
+        const [rawTasks] = args2;
         if (!Array.isArray(rawTasks)) return [];
         const tasks = rawTasks.map((t) => {
           if (Array.isArray(t)) {
@@ -19035,7 +18319,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalOrchestrator.getOrder(tasks);
       }
       if (op === "hub-route") {
-        const [taskType, problem] = args3;
+        const [taskType, problem] = args2;
         const result = globalHub.route(String(taskType), problem, []);
         return result.result;
       }
@@ -19049,7 +18333,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalHub.taskTypes();
       }
       if (op === "delegate-register") {
-        const [id, caps, fn] = args3;
+        const [id, caps, fn] = args2;
         const capabilities = Array.isArray(caps) ? caps.map(String) : [];
         const agent = {
           id: String(id),
@@ -19064,7 +18348,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return String(id);
       }
       if (op === "delegate") {
-        const [desc, input, capability] = args3;
+        const [desc, input, capability] = args2;
         const task = {
           id: `task-${Date.now()}`,
           description: String(desc),
@@ -19081,7 +18365,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "delegate-all") {
-        const [taskList] = args3;
+        const [taskList] = args2;
         const tasks = Array.isArray(taskList) ? taskList.map((t, i) => ({
           id: t instanceof Map ? String(t.get("id") ?? `task-${i}`) : `task-${i}`,
           description: t instanceof Map ? String(t.get("description") ?? "") : String(t),
@@ -19106,7 +18390,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalDelegation.list();
       }
       if (op === "crossover-single") {
-        const [a, b] = args3;
+        const [a, b] = args2;
         const arrA = Array.isArray(a) ? a : [a];
         const arrB = Array.isArray(b) ? b : [b];
         const result = globalCrossover.singlePoint(arrA, arrB);
@@ -19120,7 +18404,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "crossover-two") {
-        const [a, b] = args3;
+        const [a, b] = args2;
         const arrA = Array.isArray(a) ? a : [a];
         const arrB = Array.isArray(b) ? b : [b];
         const result = globalCrossover.twoPoint(arrA, arrB);
@@ -19134,7 +18418,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "crossover-uniform") {
-        const [a, b] = args3;
+        const [a, b] = args2;
         const arrA = Array.isArray(a) ? a : [a];
         const arrB = Array.isArray(b) ? b : [b];
         const result = globalCrossover.uniform(arrA, arrB);
@@ -19148,7 +18432,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       if (op === "crossover-arithmetic") {
         let alpha;
-        let cleanArgs = [...args3];
+        let cleanArgs = [...args2];
         const alphaIdx = cleanArgs.findIndex((v) => v === "alpha" || v === ":alpha");
         if (alphaIdx !== -1) {
           alpha = Number(cleanArgs[alphaIdx + 1]);
@@ -19167,7 +18451,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "crossover-strings") {
-        const [a, b] = args3;
+        const [a, b] = args2;
         const result = globalCrossover.crossoverStrings(String(a), String(b));
         return /* @__PURE__ */ new Map([
           ["parent1", result.parent1],
@@ -19179,7 +18463,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "crossover-objects") {
-        const [a, b] = args3;
+        const [a, b] = args2;
         const objA = a instanceof Map ? Object.fromEntries(a.entries()) : typeof a === "object" && a !== null ? a : {};
         const objB = b instanceof Map ? Object.fromEntries(b.entries()) : typeof b === "object" && b !== null ? b : {};
         const result = globalCrossover.crossoverObjects(objA, objB);
@@ -19193,7 +18477,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "crossover-children") {
-        const [result] = args3;
+        const [result] = args2;
         if (result instanceof Map) {
           return [result.get("child1"), result.get("child2")];
         }
@@ -19201,7 +18485,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       if (op === "blend") {
         let alpha = 0.5;
-        let cleanArgs = [...args3];
+        let cleanArgs = [...args2];
         const alphaIdx = cleanArgs.findIndex((v) => v === "alpha" || v === ":alpha");
         if (alphaIdx !== -1) {
           alpha = Number(cleanArgs[alphaIdx + 1]);
@@ -19218,21 +18502,21 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return a;
       }
       if (op === "export") return null;
-      if (op === "call" && args3.length >= 1) {
-        const fnRef = ev(args3[0]);
-        const callArgs = args3.slice(1);
+      if (op === "call" && args2.length >= 1) {
+        const fnRef = ev(args2[0]);
+        const callArgs = args2.slice(1);
         if (typeof fnRef === "string") return callUser(fnRef, callArgs);
         if (typeof fnRef === "function" || fnRef?.kind === "function-value") return callFn2(fnRef, callArgs);
         return null;
       }
       if (op === "evolve-numbers") {
-        const target = Array.isArray(args3[0]) ? args3[0].map(Number) : [0];
+        const target = Array.isArray(args2[0]) ? args2[0].map(Number) : [0];
         let popSize = 20;
         let maxGens = 50;
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const key = String(args3[i]);
-          if (key === ":pop") popSize = Number(args3[i + 1]);
-          if (key === ":gens") maxGens = Number(args3[i + 1]);
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const key = String(args2[i]);
+          if (key === ":pop") popSize = Number(args2[i + 1]);
+          if (key === ":gens") maxGens = Number(args2[i + 1]);
         }
         const result = evolveNumbers(target, popSize, maxGens);
         return /* @__PURE__ */ new Map([
@@ -19252,13 +18536,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "evolve-strings") {
-        const target = String(args3[0] ?? "");
+        const target = String(args2[0] ?? "");
         let popSize = 30;
         let maxGens = 100;
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const key = String(args3[i]);
-          if (key === ":pop") popSize = Number(args3[i + 1]);
-          if (key === ":gens") maxGens = Number(args3[i + 1]);
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const key = String(args2[i]);
+          if (key === ":pop") popSize = Number(args2[i + 1]);
+          if (key === ":gens") maxGens = Number(args2[i + 1]);
         }
         const result = evolveStrings(target, popSize, maxGens);
         return /* @__PURE__ */ new Map([
@@ -19283,13 +18567,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         let mutationRate = 0.1;
         let eliteRatio = 0.1;
         let fitnessGoal = null;
-        for (let i = 0; i < args3.length - 1; i += 2) {
-          const key = String(args3[i]);
-          if (key === ":pop") popSize = Number(args3[i + 1]);
-          if (key === ":gens") maxGens = Number(args3[i + 1]);
-          if (key === ":mutation") mutationRate = Number(args3[i + 1]);
-          if (key === ":elite") eliteRatio = Number(args3[i + 1]);
-          if (key === ":goal") fitnessGoal = Number(args3[i + 1]);
+        for (let i = 0; i < args2.length - 1; i += 2) {
+          const key = String(args2[i]);
+          if (key === ":pop") popSize = Number(args2[i + 1]);
+          if (key === ":gens") maxGens = Number(args2[i + 1]);
+          if (key === ":mutation") mutationRate = Number(args2[i + 1]);
+          if (key === ":elite") eliteRatio = Number(args2[i + 1]);
+          if (key === ":goal") fitnessGoal = Number(args2[i + 1]);
         }
         return /* @__PURE__ */ new Map([
           ["populationSize", popSize],
@@ -19300,7 +18584,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "evolve-step") {
-        const engine = args3[0];
+        const engine = args2[0];
         if (engine instanceof EvolutionEngine) {
           const stepResult = engine.step();
           return /* @__PURE__ */ new Map([
@@ -19311,7 +18595,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return null;
       }
       if (op === "evolve-best") {
-        const engine = args3[0];
+        const engine = args2[0];
         if (engine instanceof EvolutionEngine) {
           const best = engine.getBest();
           if (!best) return null;
@@ -19325,7 +18609,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return null;
       }
       if (op === "evolve-population") {
-        const engine = args3[0];
+        const engine = args2[0];
         if (engine instanceof EvolutionEngine) {
           return engine.getPopulation().map((ind) => /* @__PURE__ */ new Map([
             ["genome", ind.genome],
@@ -19337,7 +18621,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return [];
       }
       if (op === "evolve-run") {
-        const engine = args3[0];
+        const engine = args2[0];
         if (engine instanceof EvolutionEngine) {
           const result = engine.run();
           return /* @__PURE__ */ new Map([
@@ -19359,7 +18643,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return null;
       }
       if (op === "evolve-history") {
-        const arg = args3[0];
+        const arg = args2[0];
         if (arg instanceof EvolutionEngine) {
           return arg.getHistory().map((h) => /* @__PURE__ */ new Map([
             ["gen", h.gen],
@@ -19375,9 +18659,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       if (op === "mutate-config") {
         const config = {};
-        for (let i = 0; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 0; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -19389,11 +18673,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "mutate-numbers") {
-        const arr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+        const arr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
         const config = {};
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -19408,11 +18692,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "mutate-string") {
-        const s = String(args3[0] ?? "");
+        const s = String(args2[0] ?? "");
         const config = {};
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -19427,12 +18711,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "mutate-object") {
-        const raw = args3[0];
+        const raw = args2[0];
         const obj = raw instanceof Map ? Object.fromEntries(raw.entries()) : typeof raw === "object" && raw !== null ? raw : {};
         const config = {};
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "rate") config.rate = Number(v);
           else if (k === "strength") config.strength = Number(v);
           else if (k === "type") config.type = String(v);
@@ -19448,11 +18732,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "mutate-swap") {
-        const arr = Array.isArray(args3[0]) ? args3[0] : [];
+        const arr = Array.isArray(args2[0]) ? args2[0] : [];
         const config = { type: "swap", rate: 0.3 };
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "rate") config.rate = Number(v);
         }
         const m = new Mutator(config);
@@ -19465,11 +18749,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "mutate-flip") {
-        const arr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+        const arr = Array.isArray(args2[0]) ? args2[0].map(Number) : [];
         const config = { type: "flip" };
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "rate") config.rate = Number(v);
         }
         const m = new Mutator(config);
@@ -19482,11 +18766,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "mutate-select") {
-        const rawList = Array.isArray(args3[0]) ? args3[0] : [];
+        const rawList = Array.isArray(args2[0]) ? args2[0] : [];
         let n = 1;
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "n") n = Number(v);
         }
         const candidates = rawList.map((item) => {
@@ -19501,12 +18785,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalMutator.select(candidates, n);
       }
       if (op === "mutation-count") {
-        const r = args3[0];
+        const r = args2[0];
         if (r instanceof Map) return r.get("mutations") ?? 0;
         return 0;
       }
       if (op === "generation-run") {
-        const [popArg, fitnessFnArg, nextGenFnArg, ...rest] = args3;
+        const [popArg, fitnessFnArg, nextGenFnArg, ...rest] = args2;
         const population = Array.isArray(popArg) ? popArg : [];
         const maxGen = rest.length >= 2 && rest[0] === "max" ? Number(rest[1]) : 50;
         const fitnessFunc = (item) => {
@@ -19547,7 +18831,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "generation-stats") {
-        const [arg] = args3;
+        const [arg] = args2;
         if (arg instanceof Map) {
           const history = arg.get("history");
           return Array.isArray(history) ? history : [];
@@ -19555,12 +18839,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return [];
       }
       if (op === "generation-best") {
-        const [arg] = args3;
+        const [arg] = args2;
         if (arg instanceof Map) return arg.get("best") ?? null;
         return null;
       }
       if (op === "generation-history") {
-        const [arg] = args3;
+        const [arg] = args2;
         if (arg instanceof Map) {
           const history = arg.get("history");
           return Array.isArray(history) ? history : [];
@@ -19568,7 +18852,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return [];
       }
       if (op === "generation-converged") {
-        const [arg] = args3;
+        const [arg] = args2;
         if (arg instanceof GenerationLoop) return arg.hasConverged();
         if (arg instanceof Map) {
           const history = arg.get("history") ?? [];
@@ -19583,44 +18867,44 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return false;
       }
       if (op === "generation-diversity") {
-        const [arr] = args3;
+        const [arr] = args2;
         const fitnesses = Array.isArray(arr) ? arr.map(Number) : [];
         const tmpLoop = new GenerationLoop({ maxGenerations: 1 });
         return tmpLoop.calculateDiversity(fitnesses);
       }
       if (op === "gen-improvement") {
-        const [arg] = args3;
+        const [arg] = args2;
         if (arg instanceof Map) return arg.get("improvementRatio") ?? 0;
         return 0;
       }
       if (op === "gen-termination") {
-        const [arg] = args3;
+        const [arg] = args2;
         if (arg instanceof Map) return arg.get("terminationReason") ?? "max-generations";
         return "max-generations";
       }
       if (op === "fitness-proximity") {
-        const fpValue = Number(args3[0]);
-        const fpTarget = Number(args3[1]);
-        const fpTol = args3[2] !== void 0 ? Number(args3[2]) : void 0;
+        const fpValue = Number(args2[0]);
+        const fpTarget = Number(args2[1]);
+        const fpTol = args2[2] !== void 0 ? Number(args2[2]) : void 0;
         const fpRes = globalFitness.proximity(fpValue, fpTarget, fpTol);
         return /* @__PURE__ */ new Map([["score", fpRes.score], ["rawScore", fpRes.rawScore], ["details", new Map(Object.entries(fpRes.details))]]);
       }
       if (op === "fitness-string") {
-        const fsA = String(args3[0] ?? "");
-        const fsB = String(args3[1] ?? "");
+        const fsA = String(args2[0] ?? "");
+        const fsB = String(args2[1] ?? "");
         const fsRes = globalFitness.stringSimilarity(fsA, fsB);
         return /* @__PURE__ */ new Map([["score", fsRes.score], ["rawScore", fsRes.rawScore], ["details", new Map(Object.entries(fsRes.details))]]);
       }
       if (op === "fitness-array") {
-        const faArr = Array.isArray(args3[0]) ? args3[0] : [];
-        const faTgt = Array.isArray(args3[1]) ? args3[1] : [];
+        const faArr = Array.isArray(args2[0]) ? args2[0] : [];
+        const faTgt = Array.isArray(args2[1]) ? args2[1] : [];
         const faRes = globalFitness.arrayMatch(faArr, faTgt);
         return /* @__PURE__ */ new Map([["score", faRes.score], ["rawScore", faRes.rawScore], ["details", new Map(Object.entries(faRes.details))]]);
       }
       if (op === "fitness-multi") {
-        const fmVMap = args3[0] instanceof Map ? args3[0] : /* @__PURE__ */ new Map();
-        const fmTMap = args3[1] instanceof Map ? args3[1] : /* @__PURE__ */ new Map();
-        const fmWMap = args3[2] instanceof Map ? args3[2] : void 0;
+        const fmVMap = args2[0] instanceof Map ? args2[0] : /* @__PURE__ */ new Map();
+        const fmTMap = args2[1] instanceof Map ? args2[1] : /* @__PURE__ */ new Map();
+        const fmWMap = args2[2] instanceof Map ? args2[2] : void 0;
         const fmV = {};
         const fmT = {};
         const fmW = fmWMap ? {} : void 0;
@@ -19637,8 +18921,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return /* @__PURE__ */ new Map([["score", fmRes.score], ["rawScore", fmRes.rawScore], ["details", new Map(Object.entries(fmRes.details))]]);
       }
       if (op === "fitness-constraint") {
-        const fcVal = args3[0];
-        const fcRaw = Array.isArray(args3[1]) ? args3[1] : [];
+        const fcVal = args2[0];
+        const fcRaw = Array.isArray(args2[1]) ? args2[1] : [];
         const fcFns = fcRaw.map((c) => {
           if (typeof c === "function") return c;
           if (c?.kind === "function-value") return (v) => callFn2(c, [v]);
@@ -19653,8 +18937,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return /* @__PURE__ */ new Map([["score", fcRes.score], ["rawScore", fcRes.rawScore], ["details", new Map(Object.entries(fcRes.details))]]);
       }
       if (op === "fitness-rank") {
-        const frItems = Array.isArray(args3[0]) ? args3[0] : [];
-        const frScorer = args3[1];
+        const frItems = Array.isArray(args2[0]) ? args2[0] : [];
+        const frScorer = args2[1];
         const frFn = (item) => {
           if (typeof frScorer === "function") return frScorer(item);
           if (frScorer?.kind === "function-value") return callFn2(frScorer, [item]);
@@ -19664,8 +18948,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return frRanked.map((r) => new Map(Object.entries(r)));
       }
       if (op === "fitness-pareto") {
-        const fpPItems = Array.isArray(args3[0]) ? args3[0] : [];
-        const fpObjs = (Array.isArray(args3[1]) ? args3[1] : []).map((f) => {
+        const fpPItems = Array.isArray(args2[0]) ? args2[0] : [];
+        const fpObjs = (Array.isArray(args2[1]) ? args2[1] : []).map((f) => {
           if (typeof f === "function") return f;
           if (f?.kind === "function-value") return (item) => callFn2(f, [item]);
           return () => 0;
@@ -19673,13 +18957,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return globalFitness.paretoFront(fpPItems, fpObjs);
       }
       if (op === "fitness-score") {
-        const fsResult = args3[0];
+        const fsResult = args2[0];
         if (fsResult instanceof Map) return fsResult.get("score") ?? 0;
         if (typeof fsResult === "object" && fsResult !== null) return fsResult.score ?? 0;
         return Number(fsResult);
       }
       if (op === "prune-threshold") {
-        const [pItems, pScorerFn, ...pKw] = args3;
+        const [pItems, pScorerFn, ...pKw] = args2;
         const pThreshold = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
@@ -19692,7 +18976,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return pruneResultToMap(pruner1.pruneByThreshold(pArr1, pScorer1, pThreshold));
       }
       if (op === "prune-top-k") {
-        const [pItems, pScorerFn, ...pKw] = args3;
+        const [pItems, pScorerFn, ...pKw] = args2;
         const pK = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
@@ -19705,7 +18989,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return pruneResultToMap(pruner2.pruneToTopK(pArr2, pScorer2, pK));
       }
       if (op === "prune-top-percent") {
-        const [pItems, pScorerFn, ...pKw] = args3;
+        const [pItems, pScorerFn, ...pKw] = args2;
         const pPct = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":percent" || pKw[i] === "percent") return Number(pKw[i + 1]);
@@ -19718,7 +19002,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return pruneResultToMap(pruner3.pruneToTopPercent(pArr3, pScorer3, pPct));
       }
       if (op === "prune-diversity") {
-        const [pItems, pScorerFn, pSimFn, ...pKw] = args3;
+        const [pItems, pScorerFn, pSimFn, ...pKw] = args2;
         const pMinDiv = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
@@ -19732,21 +19016,21 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return pruneResultToMap(pruner4.pruneForDiversity(pArr4, pScorer4, pSim4, pMinDiv));
       }
       if (op === "prune-dedup") {
-        const [pItems, pKeyFn] = args3;
+        const [pItems, pKeyFn] = args2;
         const pArr5 = Array.isArray(pItems) ? pItems : [];
         const pruner5 = new Pruner();
         const pKeyFnWrapped = pKeyFn ? (item) => String(callFn2(pKeyFn, [item])) : void 0;
         return pruneResultToMap(pruner5.dedup(pArr5, pKeyFnWrapped));
       }
       if (op === "prune-weak") {
-        const [pItems, pScorerFn] = args3;
+        const [pItems, pScorerFn] = args2;
         const pScorer6 = (item) => Number(callFn2(pScorerFn, [item]));
         const pArr6 = Array.isArray(pItems) ? pItems : [];
         const pruner6 = new Pruner();
         return pruneResultToMap(pruner6.pruneWeak(pArr6, pScorer6));
       }
       if (op === "keep-best") {
-        const [pItems, pScorerFn, ...pKw] = args3;
+        const [pItems, pScorerFn, ...pKw] = args2;
         const pK7 = (() => {
           for (let i = 0; i < pKw.length - 1; i++) {
             if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
@@ -19758,24 +19042,24 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return keepBest(pArr7, pScorer7, pK7);
       }
       if (op === "prune-stats") {
-        const pRes = args3[0];
+        const pRes = args2[0];
         if (pRes instanceof Map && pRes.has("stats")) {
           return pRes.get("stats");
         }
         return null;
       }
       if (op.startsWith("refactor-")) {
-        const r137 = evalRefactorSelf(op, args3);
+        const r137 = evalRefactorSelf(op, args2);
         if (r137 !== null) return r137;
       }
       if (op === "version-snapshot") {
-        const data = args3[0] ?? null;
-        const description = String(args3[1] ?? "snapshot");
+        const data = args2[0] ?? null;
+        const description = String(args2[1] ?? "snapshot");
         const tags = [];
         let performance2;
-        for (let i = 2; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 2; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "tags" && Array.isArray(v)) tags.push(...v.map(String));
           if (k === "performance") performance2 = Number(v);
         }
@@ -19793,7 +19077,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "version-rollback") {
-        const id = String(args3[0] ?? "");
+        const id = String(args2[0] ?? "");
         const result = globalVersioning.rollback(id);
         return /* @__PURE__ */ new Map([
           ["success", result.success],
@@ -19812,12 +19096,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "version-diff") {
-        const id1 = String(args3[0] ?? "");
-        const id2 = String(args3[1] ?? "");
+        const id1 = String(args2[0] ?? "");
+        const id2 = String(args2[1] ?? "");
         return globalVersioning.diff(id1, id2);
       }
       if (op === "version-get") {
-        const id = String(args3[0] ?? "");
+        const id = String(args2[0] ?? "");
         const snap = globalVersioning.get(id);
         if (!snap) return null;
         return /* @__PURE__ */ new Map([
@@ -19857,12 +19141,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]));
       }
       if (op === "version-branch") {
-        const name = String(args3[0] ?? "");
-        const fromId = args3[1] ? String(args3[1]) : void 0;
+        const name = String(args2[0] ?? "");
+        const fromId = args2[1] ? String(args2[1]) : void 0;
         return globalVersioning.branch(name, fromId);
       }
       if (op === "version-checkout") {
-        const name = String(args3[0] ?? "");
+        const name = String(args2[0] ?? "");
         const snap = globalVersioning.checkout(name);
         if (!snap) return null;
         return /* @__PURE__ */ new Map([
@@ -19882,12 +19166,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "bench-measure") {
-        const bName = String(args3[0] ?? "unnamed");
-        const bFn = args3[1];
+        const bName = String(args2[0] ?? "unnamed");
+        const bFn = args2[1];
         let bRuns = 100;
-        for (let i = 2; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          if (k === "runs") bRuns = Number(args3[i + 1]);
+        for (let i = 2; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          if (k === "runs") bRuns = Number(args2[i + 1]);
         }
         const bCallable = () => typeof bFn === "function" ? bFn() : callFnVal(bFn, []);
         const bResult = globalBenchmark.measure(bName, bCallable, bRuns);
@@ -19906,12 +19190,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "bench-compare") {
-        const bcFn1 = args3[0];
-        const bcFn2 = args3[1];
+        const bcFn1 = args2[0];
+        const bcFn2 = args2[1];
         let bcRuns = 50;
-        for (let i = 2; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          if (k === "runs") bcRuns = Number(args3[i + 1]);
+        for (let i = 2; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          if (k === "runs") bcRuns = Number(args2[i + 1]);
         }
         const bcCallable1 = () => typeof bcFn1 === "function" ? bcFn1() : callFnVal(bcFn1, []);
         const bcCallable2 = () => typeof bcFn2 === "function" ? bcFn2() : callFnVal(bcFn2, []);
@@ -19936,13 +19220,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "bench-suite") {
-        const bsName = String(args3[0] ?? "suite");
+        const bsName = String(args2[0] ?? "suite");
         return new SelfBenchmark(bsName);
       }
       if (op === "bench-add") {
-        const baSuite = args3[0];
-        const baName = String(args3[1] ?? "test");
-        const baFn = args3[2];
+        const baSuite = args2[0];
+        const baName = String(args2[1] ?? "test");
+        const baFn = args2[2];
         if (baSuite instanceof SelfBenchmark) {
           const baCallable = () => typeof baFn === "function" ? baFn() : callFnVal(baFn, []);
           baSuite.add(baName, baCallable);
@@ -19951,11 +19235,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return null;
       }
       if (op === "bench-run") {
-        const brSuite = args3[0];
+        const brSuite = args2[0];
         let brRuns = 100;
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          if (k === "runs") brRuns = Number(args3[i + 1]);
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          if (k === "runs") brRuns = Number(args2[i + 1]);
         }
         if (brSuite instanceof SelfBenchmark) {
           const brResult = brSuite.run(brRuns);
@@ -19983,7 +19267,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return null;
       }
       if (op === "bench-report") {
-        const rpResult = args3[0];
+        const rpResult = args2[0];
         if (rpResult instanceof Map) {
           const r = {
             name: String(rpResult.get("name") ?? ""),
@@ -20003,14 +19287,14 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return "No benchmark result provided";
       }
       if (op === "bench-speedup") {
-        const spComp = args3[0];
+        const spComp = args2[0];
         if (spComp instanceof Map) {
           return Number(spComp.get("speedup") ?? 1);
         }
         return 1;
       }
       if (op === "bench-stats") {
-        const stResult = args3[0];
+        const stResult = args2[0];
         if (stResult instanceof Map) {
           return /* @__PURE__ */ new Map([
             ["avg", stResult.get("avgMs")],
@@ -20031,7 +19315,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "self-evolve") {
-        const [popArg, fitnessFnArg, mutateFnArg, crossoverFnArg, ...rest] = args3;
+        const [popArg, fitnessFnArg, mutateFnArg, crossoverFnArg, ...rest] = args2;
         const population = Array.isArray(popArg) ? popArg : [];
         const cfg = {};
         for (let i = 0; i < rest.length - 1; i += 2) {
@@ -20071,11 +19355,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "self-evolve-numbers") {
-        const target140 = Array.isArray(args3[0]) ? args3[0].map(Number) : [1, 2, 3];
+        const target140 = Array.isArray(args2[0]) ? args2[0].map(Number) : [1, 2, 3];
         const cfg140 = {};
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "gens" || k === "generations") cfg140.generations = Number(v);
           else if (k === "pop" || k === "populationSize") cfg140.populationSize = Number(v);
           else if (k === "rate" || k === "mutationRate") cfg140.mutationRate = Number(v);
@@ -20096,11 +19380,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "self-evolve-string") {
-        const target140s = String(args3[0] ?? "hello");
+        const target140s = String(args2[0] ?? "hello");
         const cfg140s = {};
-        for (let i = 1; i < args3.length - 1; i += 2) {
-          const k = String(args3[i]).replace(/^:/, "");
-          const v = args3[i + 1];
+        for (let i = 1; i < args2.length - 1; i += 2) {
+          const k = String(args2[i]).replace(/^:/, "");
+          const v = args2[i + 1];
           if (k === "gens" || k === "generations") cfg140s.generations = Number(v);
           else if (k === "pop" || k === "populationSize") cfg140s.populationSize = Number(v);
           else if (k === "rate" || k === "mutationRate") cfg140s.mutationRate = Number(v);
@@ -20120,7 +19404,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "evolution-report") {
-        const rawResults140 = Array.isArray(args3[0]) ? args3[0] : [args3[0]].filter(Boolean);
+        const rawResults140 = Array.isArray(args2[0]) ? args2[0] : [args2[0]].filter(Boolean);
         const results140 = rawResults140.map((r) => {
           if (r instanceof Map) {
             return {
@@ -20148,7 +19432,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "self-improve") {
-        const rawCfg140 = args3[0];
+        const rawCfg140 = args2[0];
         const cfg140i = {};
         if (rawCfg140 instanceof Map) {
           const gens = rawCfg140.get("generations") ?? rawCfg140.get("gens");
@@ -20165,7 +19449,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "evolve-cycle") {
-        const [popArg140, fitnessFnArg140] = args3;
+        const [popArg140, fitnessFnArg140] = args2;
         const population140 = Array.isArray(popArg140) ? popArg140 : [];
         const fitnessFunc140c = (item) => {
           if (typeof fitnessFnArg140 === "function") return Number(fitnessFnArg140(item));
@@ -20199,32 +19483,32 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "evolution-best") {
-        const [arg140] = args3;
+        const [arg140] = args2;
         if (arg140 instanceof Map) return arg140.get("best") ?? null;
         return null;
       }
       if (op === "evolution-fitness") {
-        const [arg140f] = args3;
+        const [arg140f] = args2;
         if (arg140f instanceof Map) return arg140f.get("bestFitness") ?? 0;
         return 0;
       }
       if (op.startsWith("world-")) {
-        const r141 = evalWorldModel141(op, args3);
+        const r141 = evalWorldModel141(op, args2);
         if (r141 !== void 0) return r141;
       }
       if (op.startsWith("cf-")) {
-        const r143 = evalCounterfactual(op, args3, callFn2);
+        const r143 = evalCounterfactual(op, args2, callFn2);
         if (r143 !== null) return r143;
       }
       if (op.startsWith("align-")) {
-        const r146 = evalAlign(op, args3);
+        const r146 = evalAlign(op, args2);
         if (r146 !== null) return r146;
       }
       if (op === "causal-add-node") {
         const kw142 = {};
-        for (let i = 0; i < args3.length - 1; i += 2) {
-          const key = String(args3[i]).replace(/^:/, "");
-          kw142[key] = args3[i + 1];
+        for (let i = 0; i < args2.length - 1; i += 2) {
+          const key = String(args2[i]).replace(/^:/, "");
+          kw142[key] = args2[i + 1];
         }
         const node142 = { id: String(kw142["id"] ?? ""), name: String(kw142["name"] ?? kw142["id"] ?? ""), description: String(kw142["desc"] ?? kw142["description"] ?? ""), value: kw142["value"] !== void 0 ? Number(kw142["value"]) : void 0 };
         globalCausal.addNode(node142);
@@ -20232,16 +19516,16 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       if (op === "causal-add-edge") {
         const kw142e = {};
-        for (let i = 0; i < args3.length - 1; i += 2) {
-          const key = String(args3[i]).replace(/^:/, "");
-          kw142e[key] = args3[i + 1];
+        for (let i = 0; i < args2.length - 1; i += 2) {
+          const key = String(args2[i]).replace(/^:/, "");
+          kw142e[key] = args2[i + 1];
         }
         const edge142 = { from: String(kw142e["from"] ?? ""), to: String(kw142e["to"] ?? ""), strength: Number(kw142e["strength"] ?? 1), confidence: Number(kw142e["confidence"] ?? 1), delay: kw142e["delay"] !== void 0 ? Number(kw142e["delay"]) : void 0, mechanism: kw142e["mechanism"] !== void 0 ? String(kw142e["mechanism"]) : void 0 };
         globalCausal.addEdge(edge142);
         return /* @__PURE__ */ new Map([["from", edge142.from], ["to", edge142.to], ["strength", edge142.strength], ["confidence", edge142.confidence]]);
       }
       if (op === "causal-explain") {
-        const expl142 = globalCausal.explain(String(args3[0] ?? ""));
+        const expl142 = globalCausal.explain(String(args2[0] ?? ""));
         return /* @__PURE__ */ new Map([
           ["effect", expl142.effect],
           ["primaryCause", expl142.primaryCause],
@@ -20260,20 +19544,20 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "causal-chains") {
-        const ch142 = globalCausal.findCausalChains(String(args3[0] ?? ""), String(args3[1] ?? ""));
+        const ch142 = globalCausal.findCausalChains(String(args2[0] ?? ""), String(args2[1] ?? ""));
         return ch142.map((c) => /* @__PURE__ */ new Map([["path", c.path], ["totalStrength", c.totalStrength], ["explanation", c.explanation], ["confidence", c.confidence]]));
       }
       if (op === "causal-causes") {
-        return globalCausal.getDirectCauses(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
+        return globalCausal.getDirectCauses(String(args2[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
       }
       if (op === "causal-effects") {
-        return globalCausal.getDirectEffects(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
+        return globalCausal.getDirectEffects(String(args2[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
       }
       if (op === "causal-roots") {
-        return globalCausal.findRootCauses(String(args3[0] ?? ""));
+        return globalCausal.findRootCauses(String(args2[0] ?? ""));
       }
       if (op === "causal-simulate") {
-        const arg142 = args3[0];
+        const arg142 = args2[0];
         const iv142 = {};
         if (arg142 instanceof Map) {
           for (const [k, v] of arg142.entries()) iv142[String(k)] = Number(v);
@@ -20281,36 +19565,36 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return new Map(Object.entries(globalCausal.simulate(iv142)));
       }
       if (op === "causal-why") {
-        const chain142 = whyCaused(String(args3[0] ?? ""), String(args3[1] ?? ""));
+        const chain142 = whyCaused(String(args2[0] ?? ""), String(args2[1] ?? ""));
         if (chain142 === null) return null;
         return /* @__PURE__ */ new Map([["path", chain142.path], ["totalStrength", chain142.totalStrength], ["explanation", chain142.explanation], ["confidence", chain142.confidence]]);
       }
       if (op === "causal-summary") {
-        return globalCausal.summarize(String(args3[0] ?? ""));
+        return globalCausal.summarize(String(args2[0] ?? ""));
       }
       if (op.startsWith("predict-")) {
-        const r144 = evalPredict_PHASE144(op, args3);
+        const r144 = evalPredict_PHASE144(op, args2);
         if (r144 !== null) return r144;
       }
       if (op.startsWith("curiosity-")) {
-        const r148 = evalCuriosity(op, args3, callFn2);
+        const r148 = evalCuriosity(op, args2, callFn2);
         if (r148 !== null) return r148;
       }
       if (op.startsWith("wisdom-")) {
-        const r149 = evalWisdom(op, args3);
+        const r149 = evalWisdom(op, args2);
         if (r149 !== null) return r149;
       }
       if (op.startsWith("explain-")) {
-        const r145 = evalExplain_PHASE145(op, args3, callFnVal);
+        const r145 = evalExplain_PHASE145(op, args2, callFnVal);
         if (r145 !== null) return r145;
       }
       switch (normalizedOp2) {
         case "file-mkdir":
         case "file_mkdir": {
-          const dirPath = String(args3[0] ?? "");
-          const fs21 = require("fs");
+          const dirPath = String(args2[0] ?? "");
+          const fs15 = require("fs");
           try {
-            fs21.mkdirSync(dirPath, { recursive: true });
+            fs15.mkdirSync(dirPath, { recursive: true });
             return true;
           } catch {
             return false;
@@ -20318,10 +19602,10 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         }
         case "http-get":
         case "http_get": {
-          const url2 = String(args3[0] ?? "");
+          const url2 = String(args2[0] ?? "");
           try {
             const { execSync: execSync2 } = require("child_process");
-            const { writeFileSync: writeFileSync12, unlinkSync: unlinkSync5 } = require("fs");
+            const { writeFileSync: writeFileSync10, unlinkSync: unlinkSync4 } = require("fs");
             const { randomUUID: randomUUID5 } = require("crypto");
             const tmpFile = `/tmp/fl-http-${randomUUID5()}.js`;
             const nodeScript = `process.env.FL_URL=${JSON.stringify(url2)};
@@ -20335,10 +19619,10 @@ const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'
 req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
 req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
 req.end();`;
-            writeFileSync12(tmpFile, nodeScript, "utf-8");
+            writeFileSync10(tmpFile, nodeScript, "utf-8");
             const result = execSync2(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15e3 });
             try {
-              unlinkSync5(tmpFile);
+              unlinkSync4(tmpFile);
             } catch {
             }
             const parsed = JSON.parse(result);
@@ -20353,7 +19637,7 @@ req.end();`;
         }
         // AI-First #5: (help "keyword") — 런타임 함수 검색
         case "help": {
-          const query = String(args3[0] ?? "").toLowerCase();
+          const query = String(args2[0] ?? "").toLowerCase();
           let sigs = [];
           try {
             sigs = require_stdlib_signatures();
@@ -20387,7 +19671,7 @@ req.end();`;
           return null;
         }
       }
-      return callUser(op, args3);
+      return callUser(op, args2);
     }
   }
 }
@@ -20561,7 +19845,7 @@ function evalInfraBlock(interp2, op, expr2) {
     let expose = [];
     let copy = [];
     let run2 = [];
-    let cmd2 = ["node", "server.js"];
+    let cmd = ["node", "server.js"];
     let env2 = {};
     for (let i = 0; i < expr2.args.length; i++) {
       const arg = expr2.args[i];
@@ -20586,7 +19870,7 @@ function evalInfraBlock(interp2, op, expr2) {
               run2.push(String(val));
               break;
             case "cmd":
-              cmd2 = Array.isArray(val) ? val : [String(val)];
+              cmd = Array.isArray(val) ? val : [String(val)];
               break;
             case "env":
               if (typeof val === "object") Object.assign(env2, val);
@@ -20615,7 +19899,7 @@ WORKDIR ${workdir}
       dockerfile += `EXPOSE ${p}
 `;
     });
-    dockerfile += `CMD [${cmd2.map((c) => `"${c}"`).join(", ")}]
+    dockerfile += `CMD [${cmd.map((c) => `"${c}"`).join(", ")}]
 `;
     const outfile = path4.join(cwd, "Dockerfile");
     fs3.writeFileSync(outfile, dockerfile, "utf-8");
@@ -21232,8 +20516,8 @@ init_ast();
 
 // src/tco.ts
 var TAIL_CALL = /* @__PURE__ */ Symbol("TAIL_CALL");
-function tailCall(fn, args3) {
-  return { [TAIL_CALL]: true, fn, args: args3 };
+function tailCall(fn, args2) {
+  return { [TAIL_CALL]: true, fn, args: args2 };
 }
 function isTailCall(v) {
   return v !== null && typeof v === "object" && v[TAIL_CALL] === true;
@@ -21599,26 +20883,26 @@ function runProp(prop, callFn2, callCheck) {
   let failed = 0;
   let firstFailure = null;
   for (let i = 0; i < prop.samples; i++) {
-    const args3 = generateSample(prop.args);
+    const args2 = generateSample(prop.args);
     try {
-      const result = callFn2(prop.fn, args3);
+      const result = callFn2(prop.fn, args2);
       let checkArgs;
       try {
         const fnParams = prop.check?.params ?? [];
-        checkArgs = fnParams.length === args3.length + 1 ? [...args3, result] : args3;
+        checkArgs = fnParams.length === args2.length + 1 ? [...args2, result] : args2;
       } catch {
-        checkArgs = [...args3, result];
+        checkArgs = [...args2, result];
       }
       const ok2 = callCheck(prop.check, checkArgs);
       if (ok2 || ok2 === null) {
         passed++;
       } else {
         failed++;
-        if (!firstFailure) firstFailure = { args: args3, result };
+        if (!firstFailure) firstFailure = { args: args2, result };
       }
     } catch (err4) {
       failed++;
-      if (!firstFailure) firstFailure = { args: args3, result: null, error: err4?.message ?? String(err4) };
+      if (!firstFailure) firstFailure = { args: args2, result: null, error: err4?.message ?? String(err4) };
     }
     if (failed > 0 && firstFailure) break;
   }
@@ -21952,8 +21236,8 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "use") {
     if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
-    const fs21 = require("fs");
-    const path19 = require("path");
+    const fs15 = require("fs");
+    const path15 = require("path");
     let loadedAny = false;
     for (const arg of expr2.args) {
       let name = null;
@@ -21962,15 +21246,15 @@ function evalSpecialForm(interp2, op, expr2) {
       if (!name) throwInvalidForm("use", "module name must be symbol or string", expr2.line);
       const homeDir = require("os").homedir();
       const candidates = [
-        path19.resolve(process.cwd(), "plugins", name + ".fl"),
-        path19.resolve(homeDir, ".fl", "plugins", name + ".fl"),
-        path19.resolve(process.cwd(), "self/stdlib", name + ".fl"),
-        path19.resolve(process.cwd(), name + ".fl"),
-        path19.resolve(process.cwd(), name)
+        path15.resolve(process.cwd(), "plugins", name + ".fl"),
+        path15.resolve(homeDir, ".fl", "plugins", name + ".fl"),
+        path15.resolve(process.cwd(), "self/stdlib", name + ".fl"),
+        path15.resolve(process.cwd(), name + ".fl"),
+        path15.resolve(process.cwd(), name)
       ];
       let absPath = null;
       for (const c of candidates) {
-        if (fs21.existsSync(c) && fs21.statSync(c).isFile()) {
+        if (fs15.existsSync(c) && fs15.statSync(c).isFile()) {
           absPath = c;
           break;
         }
@@ -21988,7 +21272,7 @@ function evalSpecialForm(interp2, op, expr2) {
       if (importedSet.has(absPath)) continue;
       importedSet.add(absPath);
       interp2.importedFiles = importedSet;
-      const src = fs21.readFileSync(absPath, "utf-8");
+      const src = fs15.readFileSync(absPath, "utf-8");
       const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
       const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
       interp2.interpret(parse3(lex2(src, absPath)));
@@ -23036,10 +22320,10 @@ Test Results: ${r.passed}/${total} passed`);
     if (expr2.args.length < 1) throwArgCount("memoize", "1", expr2.args.length, expr2.line);
     const fn = ev(expr2.args[0]);
     const cache = /* @__PURE__ */ new Map();
-    return (...args3) => {
-      const key = JSON.stringify(args3);
+    return (...args2) => {
+      const key = JSON.stringify(args2);
       if (cache.has(key)) return cache.get(key);
-      const result = callFn2(fn, args3);
+      const result = callFn2(fn, args2);
       cache.set(key, result);
       return result;
     };
@@ -23383,9 +22667,9 @@ Test Results: ${r.passed}/${total} passed`);
   }
   throw new Error(`evalSpecialForm: unknown op "${op}"`);
 }
-function evalLet(interp2, args3) {
-  if (args3.length < 2) throw new Error(`let requires at least 2 arguments`);
-  const bindings = args3[0];
+function evalLet(interp2, args2) {
+  if (args2.length < 2) throw new Error(`let requires at least 2 arguments`);
+  const bindings = args2[0];
   const ctx = interp2.context;
   const ev = (node) => interp2.eval(node);
   const toVarName = (node) => {
@@ -23471,33 +22755,33 @@ function evalLet(interp2, args3) {
   }
   let result = null;
   try {
-    for (let bodyIdx = 1; bodyIdx < args3.length; bodyIdx++) {
-      result = ev(args3[bodyIdx]);
+    for (let bodyIdx = 1; bodyIdx < args2.length; bodyIdx++) {
+      result = ev(args2[bodyIdx]);
     }
   } finally {
     ctx.variables.pop();
   }
   return result;
 }
-function evalCond(interp2, args3) {
+function evalCond(interp2, args2) {
   const ev = (node) => interp2.eval(node);
-  const firstArg = args3[0];
+  const firstArg = args2[0];
   const isBracketed = firstArg?.kind === "block" && firstArg?.type === "Array" || firstArg?.kind === "sexpr" && firstArg?.op === "do";
-  if (args3.length >= 2 && !isBracketed) {
+  if (args2.length >= 2 && !isBracketed) {
     let i = 0;
-    while (i < args3.length - 1) {
-      const testArg = args3[i];
+    while (i < args2.length - 1) {
+      const testArg = args2[i];
       const isElse = testArg?.kind === "variable" && (testArg?.name === "else" || testArg?.name === ":else" || testArg?.name === "$else");
       const test = isElse ? true : ev(testArg);
       if (test !== null && test !== void 0 && test !== false) {
-        return ev(args3[i + 1]);
+        return ev(args2[i + 1]);
       }
       i += 2;
     }
-    if (i < args3.length) return ev(args3[i]);
+    if (i < args2.length) return ev(args2[i]);
     return null;
   }
-  for (const arg of args3) {
+  for (const arg of args2) {
     let testNode = null;
     let bodyNodes = [];
     if (arg.kind === "block" && arg.type === "Array") {
@@ -24261,14 +23545,14 @@ function createFileModule() {
 var fs6 = __toESM(require("fs"));
 var fdCache = /* @__PURE__ */ new Map();
 var nextFd = 1e3;
-function _fdGet(fd, op) {
+function getEntry(fd, op) {
   const entry = fdCache.get(fd);
-  if (entry === void 0) throw new Error(op + ": invalid file descriptor " + fd);
+  if (entry === void 0) throw new Error(`${op}: invalid file descriptor ${fd}`);
   return entry;
 }
 function createFdModule() {
   return {
-    // fd_open path mode -> number (fd, mode: r/w/a/r+)
+    // fd_open path mode -> fd  (modes: "r" "w" "a" "r+")
     "fd_open": (filePath, mode) => {
       const validModes = { r: "r", w: "w", a: "a", "r+": "r+" };
       const fsMode = validModes[mode];
@@ -24280,44 +23564,52 @@ function createFdModule() {
     },
     // fd_close fd -> boolean
     "fd_close": (fd) => {
-      const entry = _fdGet(fd, "fd_close");
+      const entry = getEntry(fd, "fd_close");
       fs6.closeSync(entry.nativeFd);
       fdCache.delete(fd);
       return true;
     },
-    // fd_seek fd offset whence -> number (new position; whence: 0=SET 1=CUR 2=END)
+    // fd_seek fd offset whence -> number (new position)
+    // whence: 0 = SEEK_SET, 1 = SEEK_CUR, 2 = SEEK_END
     "fd_seek": (fd, offset, whence) => {
-      const entry = _fdGet(fd, "fd_seek");
-      const size = fs6.fstatSync(entry.nativeFd).size;
+      const entry = getEntry(fd, "fd_seek");
+      const size2 = fs6.fstatSync(entry.nativeFd).size;
       switch (whence) {
-        case 0: entry.position = offset; break;
-        case 1: entry.position += offset; break;
-        case 2: entry.position = size + offset; break;
-        default: throw new Error(`fd_seek: unknown whence ${whence}`);
+        case 0:
+          entry.position = offset;
+          break;
+        case 1:
+          entry.position += offset;
+          break;
+        case 2:
+          entry.position = size2 + offset;
+          break;
+        default:
+          throw new Error(`fd_seek: unknown whence ${whence} (use 0/1/2)`);
       }
       if (entry.position < 0) entry.position = 0;
       return entry.position;
     },
     // fd_tell fd -> number (current position)
     "fd_tell": (fd) => {
-      return _fdGet(fd, "fd_tell").position;
+      return getEntry(fd, "fd_tell").position;
     },
     // fd_size fd -> number (file size in bytes)
     "fd_size": (fd) => {
-      const entry = _fdGet(fd, "fd_size");
+      const entry = getEntry(fd, "fd_size");
       return fs6.fstatSync(entry.nativeFd).size;
     },
     // fd_read fd bytes -> string (UTF-8, advances position)
     "fd_read": (fd, bytes) => {
-      const entry = _fdGet(fd, "fd_read");
+      const entry = getEntry(fd, "fd_read");
       const buf = Buffer.alloc(bytes);
       const bytesRead = fs6.readSync(entry.nativeFd, buf, 0, bytes, entry.position);
       entry.position += bytesRead;
       return buf.toString("utf-8", 0, bytesRead);
     },
-    // fd_read_bytes fd bytes -> string (base64, advances position)
+    // fd_read_bytes fd bytes -> string (base64-encoded binary, advances position)
     "fd_read_bytes": (fd, bytes) => {
-      const entry = _fdGet(fd, "fd_read_bytes");
+      const entry = getEntry(fd, "fd_read_bytes");
       const buf = Buffer.alloc(bytes);
       const bytesRead = fs6.readSync(entry.nativeFd, buf, 0, bytes, entry.position);
       entry.position += bytesRead;
@@ -24325,30 +23617,30 @@ function createFdModule() {
     },
     // fd_write fd data -> boolean (UTF-8, advances position)
     "fd_write": (fd, data) => {
-      const entry = _fdGet(fd, "fd_write");
+      const entry = getEntry(fd, "fd_write");
       const buf = Buffer.from(data, "utf-8");
       const written = fs6.writeSync(entry.nativeFd, buf, 0, buf.length, entry.position);
       entry.position += written;
       return true;
     },
-    // fd_write_bytes fd base64data -> number (binary via base64, advances position)
+    // fd_write_bytes fd base64data -> number (bytes written, binary via base64)
     "fd_write_bytes": (fd, base64data) => {
-      const entry = _fdGet(fd, "fd_write_bytes");
+      const entry = getEntry(fd, "fd_write_bytes");
       const buf = Buffer.from(base64data, "base64");
       const written = fs6.writeSync(entry.nativeFd, buf, 0, buf.length, entry.position);
       entry.position += written;
       return written;
     },
     // fd_truncate fd size -> boolean (truncate file at given byte offset)
-    "fd_truncate": (fd, size) => {
-      const entry = _fdGet(fd, "fd_truncate");
-      fs6.ftruncateSync(entry.nativeFd, size);
-      if (entry.position > size) entry.position = size;
+    "fd_truncate": (fd, size2) => {
+      const entry = getEntry(fd, "fd_truncate");
+      fs6.ftruncateSync(entry.nativeFd, size2);
+      if (entry.position > size2) entry.position = size2;
       return true;
     },
     // fd_fsync fd -> boolean (flush fd to disk)
     "fd_fsync": (fd) => {
-      const entry = _fdGet(fd, "fd_fsync");
+      const entry = getEntry(fd, "fd_fsync");
       fs6.fsyncSync(entry.nativeFd);
       return true;
     },
@@ -24359,67 +23651,6 @@ function createFdModule() {
       }
       return true;
     }
-  };
-}
-
-// src/stdlib-binary.ts
-var CRC32_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-    t[i] = c;
-  }
-  return t;
-})();
-function _crc32buf(buf) {
-  let crc = 0xFFFFFFFF;
-  for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ buf[i]) & 0xFF];
-  return (crc ^ 0xFFFFFFFF) >>> 0;
-}
-function createBinaryModule() {
-  return {
-    // buf_u32be n -> string (base64 of 4-byte big-endian uint32)
-    "buf_u32be": (n) => {
-      const b = Buffer.alloc(4);
-      b.writeUInt32BE(n >>> 0, 0);
-      return b.toString("base64");
-    },
-    // buf_u8 n -> string (base64 of 1 byte)
-    "buf_u8": (n) => {
-      const b = Buffer.alloc(1);
-      b[0] = n & 0xFF;
-      return b.toString("base64");
-    },
-    // buf_str s -> string (base64 of UTF-8 encoded string)
-    "buf_str": (s) => Buffer.from(s, "utf-8").toString("base64"),
-    // buf_concat list -> string (base64 of concatenated byte buffers)
-    "buf_concat": (list) => {
-      const parts = list.map(b64 => Buffer.from(b64, "base64"));
-      return Buffer.concat(parts).toString("base64");
-    },
-    // buf_len b64 -> number (byte count)
-    "buf_len": (b64) => Buffer.from(b64, "base64").length,
-    // buf_read_u32be b64 offset -> number (big-endian uint32 at byte offset)
-    "buf_read_u32be": (b64, offset) => Buffer.from(b64, "base64").readUInt32BE(offset) >>> 0,
-    // buf_read_u8 b64 offset -> number (uint8 at byte offset)
-    "buf_read_u8": (b64, offset) => Buffer.from(b64, "base64")[offset] & 0xFF,
-    // buf_read_str b64 offset len -> string (UTF-8 string from byte range)
-    "buf_read_str": (b64, offset, len) => Buffer.from(b64, "base64").toString("utf-8", offset, offset + len),
-    // buf_crc32 b64 -> number (IEEE 802.3 CRC32)
-    "buf_crc32": (b64) => _crc32buf(Buffer.from(b64, "base64")),
-    // buf_slice b64 offset len -> string (sub-buffer as base64)
-    "buf_slice": (b64, offset, len) => Buffer.from(b64, "base64").slice(offset, offset + len).toString("base64"),
-    // buf_from_bytes b64 -> string (identity alias)
-    "buf_from_bytes": (b64) => b64,
-    // buf_f64le n -> string (base64 of 8-byte float64 little-endian)
-    "buf_f64le": (n) => { const b = Buffer.allocUnsafe(8); b.writeDoubleLE(n, 0); return b.toString("base64"); },
-    // buf_read_f64le b64 offset -> number
-    "buf_read_f64le": (b64, offset) => Buffer.from(b64, "base64").readDoubleLE(offset),
-    // buf_u32le n -> string (base64 of 4-byte uint32 little-endian)
-    "buf_u32le": (n) => { const b = Buffer.allocUnsafe(4); b.writeUInt32LE(n >>> 0, 0); return b.toString("base64"); },
-    // buf_read_u32le b64 offset -> number
-    "buf_read_u32le": (b64, offset) => Buffer.from(b64, "base64").readUInt32LE(offset) >>> 0,
   };
 }
 
@@ -24487,6 +23718,97 @@ function createBitsModule() {
       a = a >>> 0;
       n = n % 32;
       return (a >>> n | a << 32 - n) >>> 0;
+    }
+  };
+}
+
+// src/stdlib-binary.ts
+var CRC32_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    t[i] = c;
+  }
+  return t;
+})();
+function crc32buf(buf) {
+  let crc = 4294967295;
+  for (let i = 0; i < buf.length; i++) crc = crc >>> 8 ^ CRC32_TABLE[(crc ^ buf[i]) & 255];
+  return (crc ^ 4294967295) >>> 0;
+}
+function createBinaryModule() {
+  return {
+    // buf_u32be n -> string (base64 of 4-byte big-endian uint32)
+    "buf_u32be": (n) => {
+      const b = Buffer.alloc(4);
+      b.writeUInt32BE(n >>> 0, 0);
+      return b.toString("base64");
+    },
+    // buf_u8 n -> string (base64 of 1 byte)
+    "buf_u8": (n) => {
+      const b = Buffer.alloc(1);
+      b[0] = n & 255;
+      return b.toString("base64");
+    },
+    // buf_str s -> string (base64 of UTF-8 encoded string)
+    "buf_str": (s) => {
+      return Buffer.from(s, "utf-8").toString("base64");
+    },
+    // buf_concat list -> string (base64 of concatenated byte buffers)
+    "buf_concat": (list) => {
+      const parts = list.map((b64) => Buffer.from(b64, "base64"));
+      return Buffer.concat(parts).toString("base64");
+    },
+    // buf_len b64 -> number (byte count)
+    "buf_len": (b64) => {
+      return Buffer.from(b64, "base64").length;
+    },
+    // buf_read_u32be b64 offset -> number (big-endian uint32 at byte offset)
+    "buf_read_u32be": (b64, offset) => {
+      const buf = Buffer.from(b64, "base64");
+      return buf.readUInt32BE(offset) >>> 0;
+    },
+    // buf_read_u8 b64 offset -> number (uint8 at byte offset)
+    "buf_read_u8": (b64, offset) => {
+      const buf = Buffer.from(b64, "base64");
+      return buf[offset] & 255;
+    },
+    // buf_read_str b64 offset len -> string (UTF-8 string from byte range)
+    "buf_read_str": (b64, offset, len) => {
+      const buf = Buffer.from(b64, "base64");
+      return buf.toString("utf-8", offset, offset + len);
+    },
+    // buf_crc32 b64 -> number (IEEE 802.3 CRC32 of all bytes)
+    "buf_crc32": (b64) => {
+      return crc32buf(Buffer.from(b64, "base64"));
+    },
+    // buf_slice b64 offset len -> string (sub-buffer as base64)
+    "buf_slice": (b64, offset, len) => {
+      const buf = Buffer.from(b64, "base64");
+      return buf.slice(offset, offset + len).toString("base64");
+    },
+    // buf_from_bytes b64 -> string (alias: identity, for clarity in code)
+    "buf_from_bytes": (b64) => b64,
+    // buf_f64le n -> string (base64 of 8-byte float64 little-endian)
+    "buf_f64le": (n) => {
+      const b = Buffer.allocUnsafe(8);
+      b.writeDoubleLE(n, 0);
+      return b.toString("base64");
+    },
+    // buf_read_f64le b64 offset -> number (float64 LE at byte offset)
+    "buf_read_f64le": (b64, offset) => {
+      return Buffer.from(b64, "base64").readDoubleLE(offset);
+    },
+    // buf_u32le n -> string (base64 of 4-byte uint32 little-endian)
+    "buf_u32le": (n) => {
+      const b = Buffer.allocUnsafe(4);
+      b.writeUInt32LE(n >>> 0, 0);
+      return b.toString("base64");
+    },
+    // buf_read_u32le b64 offset -> number (uint32 LE at byte offset)
+    "buf_read_u32le": (b64, offset) => {
+      return Buffer.from(b64, "base64").readUInt32LE(offset) >>> 0;
     }
   };
 }
@@ -25058,8 +24380,8 @@ var import_child_process2 = require("child_process");
 function createShellModule() {
   return {
     // shell cmd -> string (run command, return stdout)
-    "shell": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+    "shell": (cmd) => {
+      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd], { timeout: 3e4 });
       if (result.error) throw new Error(`shell failed: ${result.error.message}`);
       if ((result.status ?? 1) !== 0) {
         const stderr = result.stderr?.toString().trim() ?? "";
@@ -25068,13 +24390,13 @@ function createShellModule() {
       return result.stdout?.toString() ?? "";
     },
     // shell_status cmd -> number (run command, return exit code)
-    "shell_status": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+    "shell_status": (cmd) => {
+      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd], { timeout: 3e4 });
       return result.status ?? 1;
     },
     // shell_ok cmd -> boolean (returns true if exit code is 0)
-    "shell_ok": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+    "shell_ok": (cmd) => {
+      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd], { timeout: 3e4 });
       return (result.status ?? 1) === 0;
     },
     // shell_pipe cmd1 cmd2 -> string (pipe output of cmd1 into cmd2)
@@ -25088,8 +24410,8 @@ function createShellModule() {
       return result.stdout?.toString() ?? "";
     },
     // shell_capture cmd -> {stdout, stderr, code} (capture all output)
-    "shell_capture": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], {
+    "shell_capture": (cmd) => {
+      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd], {
         encoding: "utf-8",
         timeout: 3e4
       });
@@ -25105,10 +24427,10 @@ function createShellModule() {
       return (result.status ?? 1) === 0;
     },
     // shell_safe program args -> string (인자 배열 방식 — 사용자 입력 안전 실행, sh -c 미사용)
-    "shell_safe": (program, args3) => {
+    "shell_safe": (program, args2) => {
       if (typeof program !== "string" || !program) throw new Error("shell_safe: program\uC740 \uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
-      if (!Array.isArray(args3)) throw new Error("shell_safe: args\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
-      const result = (0, import_child_process2.spawnSync)(program, args3.map(String), { timeout: 3e4, encoding: "utf-8" });
+      if (!Array.isArray(args2)) throw new Error("shell_safe: args\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
+      const result = (0, import_child_process2.spawnSync)(program, args2.map(String), { timeout: 3e4, encoding: "utf-8" });
       if (result.error) throw new Error(`shell_safe failed: ${result.error.message}`);
       if ((result.status ?? 1) !== 0) {
         const stderr = result.stderr?.trim() ?? "";
@@ -25133,8 +24455,8 @@ function createDataModule() {
   return {
     // ── JSON ──────────────────────────────────────────────────
     // json_get obj path -> any  (dot-path access: "user.name" or "items.0")
-    "json_get": (obj, path19) => {
-      const parts = path19.split(".");
+    "json_get": (obj, path15) => {
+      const parts = path15.split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -25143,7 +24465,7 @@ function createDataModule() {
       return cur ?? null;
     },
     // json_set obj path value -> object (immutable update, returns new obj)
-    "json_set": (obj, path19, value) => {
+    "json_set": (obj, path15, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const deepClone = (o) => {
         if (o instanceof Map) return new Map(o);
@@ -25158,7 +24480,7 @@ function createDataModule() {
         return o;
       };
       const clone = deepClone(parsed);
-      const parts = path19.split(".");
+      const parts = path15.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -25343,8 +24665,8 @@ function createDataModule() {
       const y = typeof b === "string" ? JSON.parse(b) : b;
       return { ...x, ...y };
     },
-    "json-get": (obj, path19) => {
-      const parts = String(path19).split(".");
+    "json-get": (obj, path15) => {
+      const parts = String(path15).split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -25352,7 +24674,7 @@ function createDataModule() {
       }
       return cur ?? null;
     },
-    "json-set": (obj, path19, value) => {
+    "json-set": (obj, path15, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const deepClone = (o) => {
         if (o instanceof Map) return new Map(o);
@@ -25367,7 +24689,7 @@ function createDataModule() {
         return o;
       };
       const clone = deepClone(parsed);
-      const parts = String(path19).split(".");
+      const parts = String(path15).split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -25896,10 +25218,10 @@ function createCollectionModule() {
     // memoize fn -> fn  (return memoized version of fn, keyed by JSON args)
     "memoize": (fn) => {
       const cache = /* @__PURE__ */ new Map();
-      return (...args3) => {
-        const key = JSON.stringify(args3);
+      return (...args2) => {
+        const key = JSON.stringify(args2);
         if (cache.has(key)) return cache.get(key);
-        const result = fn(...args3);
+        const result = fn(...args2);
         cache.set(key, result);
         return result;
       };
@@ -25907,10 +25229,10 @@ function createCollectionModule() {
     // once fn -> fn  (return version of fn that only executes once)
     "once": (fn) => {
       let called = false, result;
-      return (...args3) => {
+      return (...args2) => {
         if (!called) {
           called = true;
-          result = fn(...args3);
+          result = fn(...args2);
         }
         return result;
       };
@@ -25995,10 +25317,10 @@ function createAgentModule() {
       tools: { ...agent.tools, [toolName]: fn }
     }),
     // agent_call_tool agent toolName ...args -> any
-    "agent_call_tool": (agent, toolName, ...args3) => {
+    "agent_call_tool": (agent, toolName, ...args2) => {
       const tool = agent.tools[toolName];
       if (!tool) throw new Error(`Tool not found: "${toolName}". Available: ${Object.keys(agent.tools).join(", ")}`);
-      return tool(...args3);
+      return tool(...args2);
     },
     // agent_tools agent -> [string] (list registered tool names)
     "agent_tools": (agent) => Object.keys(agent.tools),
@@ -26340,9 +25662,9 @@ function percentile(sorted, p) {
   const idx = Math.ceil(p / 100 * sorted.length) - 1;
   return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
 }
-function invokeFL(fn, args3, callFnValue) {
-  if (typeof fn === "function") return fn(...args3);
-  if (fn?.kind === "function-value" && callFnValue) return callFnValue(fn, args3);
+function invokeFL(fn, args2, callFnValue) {
+  if (typeof fn === "function") return fn(...args2);
+  if (fn?.kind === "function-value" && callFnValue) return callFnValue(fn, args2);
   throw new Error("profile_fn/trace_expr: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 \uD568\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4");
 }
 function createPerfModule(callFnValue) {
@@ -26414,9 +25736,9 @@ function createPerfModule(callFnValue) {
       };
     },
     // time_fn fn args... -> {result, ms}
-    "time_fn": (fn, ...args3) => {
+    "time_fn": (fn, ...args2) => {
       const t0 = performance.now();
-      const result = invokeFL(fn, args3, callFnValue);
+      const result = invokeFL(fn, args2, callFnValue);
       return {
         result,
         ms: Math.round((performance.now() - t0) * 1e3) / 1e3
@@ -26954,12 +26276,12 @@ function createOptionalModule() {
       return mod[fnPath] ?? notAvailable(modName, fnPath);
     },
     // optional_call modName fnPath args -> result or throws
-    "optional_call": (modName, fnPath, ...args3) => {
+    "optional_call": (modName, fnPath, ...args2) => {
       const mod = tryRequire(modName);
       if (!mod) throw new Error(`${modName} \uBBF8\uC124\uCE58. npm install ${modName} \uD544\uC694`);
       const fn = fnPath === "default" ? mod.default ?? mod : mod[fnPath] ?? mod;
       if (typeof fn !== "function") throw new Error(`${modName}.${fnPath}\uB294 \uD568\uC218\uAC00 \uC544\uB2D8`);
-      return fn(...args3);
+      return fn(...args2);
     },
     // optional_has? modName -> boolean
     "optional_has?": (modName) => tryRequire(modName) !== null,
@@ -27141,9 +26463,9 @@ function createCaptureErrorModule(callFnValue) {
       return m;
     },
     // capture_error_args fn args context? -> {ok, result, error?}
-    "capture_error_args": (fn, args3, context) => {
+    "capture_error_args": (fn, args2, context) => {
       const m = /* @__PURE__ */ new Map();
-      const argsArr = Array.isArray(args3) ? args3 : [];
+      const argsArr = Array.isArray(args2) ? args2 : [];
       try {
         let result;
         if (typeof fn === "function") {
@@ -28183,15 +27505,15 @@ function createWorkflowModule() {
 // src/stdlib-resource.ts
 var import_child_process3 = require("child_process");
 var os = __toESM(require("os"));
-function run(cmd2, timeout = 1e4) {
+function run(cmd, timeout = 1e4) {
   try {
-    return (0, import_child_process3.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
+    return (0, import_child_process3.execSync)(cmd, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
   } catch {
     return "";
   }
 }
-function runLines(cmd2) {
-  const out = run(cmd2);
+function runLines(cmd) {
+  const out = run(cmd);
   return out ? out.split("\n").map((l) => l.trim()).filter(Boolean) : [];
 }
 function parseKv(lines, sep2 = ":") {
@@ -28271,8 +27593,8 @@ function createResourceModule() {
       });
     },
     // res_disk_usage path -> {total_gb, used_gb, avail_gb, use_pct}
-    "res_disk_usage": (path19) => {
-      const line = run(`df -BG --output=size,used,avail,pcent "${path19}" 2>/dev/null | tail -1`);
+    "res_disk_usage": (path15) => {
+      const line = run(`df -BG --output=size,used,avail,pcent "${path15}" 2>/dev/null | tail -1`);
       if (!line) return { total_gb: 0, used_gb: 0, avail_gb: 0, use_pct: 0 };
       const [total, used, avail, pct] = line.trim().split(/\s+/);
       return {
@@ -28621,13 +27943,13 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
     const counter = ++requestCounter;
     return `req_${timestamp}_${counter}`;
   }
-  function logAccess(method, path19, status, duration, requestId) {
+  function logAccess(method, path15, status, duration, requestId) {
     const icon = status >= 400 ? "\u274C" : "\u2705";
-    console.log(`${icon} [${requestId}] ${method} ${path19} ${status} ${duration}ms`);
+    console.log(`${icon} [${requestId}] ${method} ${path15} ${status} ${duration}ms`);
   }
-  function pathToRegex(path19) {
+  function pathToRegex(path15) {
     const params = [];
-    const pattern = path19.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
+    const pattern = path15.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
       params.push(param);
       return "([^\\/]+)";
     });
@@ -28641,7 +27963,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
     };
   }
   async function readBody(req) {
-    return new Promise((resolve9) => {
+    return new Promise((resolve7) => {
       const chunks = [];
       req.on("data", (chunk) => chunks.push(chunk));
       req.on("end", () => {
@@ -28649,14 +27971,14 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
         const ct = (req.headers["content-type"] || "").toString();
         if (ct.includes("application/json")) {
           try {
-            resolve9(JSON.parse(raw.toString()));
+            resolve7(JSON.parse(raw.toString()));
             return;
           } catch {
           }
         }
         if (ct.includes("multipart/form-data")) {
           try {
-            resolve9(parseMultipart(raw, ct));
+            resolve7(parseMultipart(raw, ct));
             return;
           } catch {
           }
@@ -28667,12 +27989,12 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
             new url.URLSearchParams(raw.toString()).forEach((v, k) => {
               params[k] = v;
             });
-            resolve9(params);
+            resolve7(params);
             return;
           } catch {
           }
         }
-        resolve9(raw.toString());
+        resolve7(raw.toString());
       });
     });
   }
@@ -28774,11 +28096,11 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
       res.end(String(body ?? ""));
     }
   }
-  function createFlRequest(method, path19, query, headers, body, params, requestId) {
+  function createFlRequest(method, path15, query, headers, body, params, requestId) {
     return {
       __fl_request: true,
       method,
-      path: path19,
+      path: path15,
       query,
       headers,
       body: body || void 0,
@@ -28812,8 +28134,8 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
     // server_use path middlewareName — 경로 패턴 매칭 시 미들웨어 실행
     // handler가 null/undefined 반환 → 다음 미들웨어/라우트 진행
     // handler가 응답 객체 반환 → 즉시 응답 (라우트 실행 안 함)
-    "server_use": (path19, handlerName) => {
-      const [pattern] = pathToRegex(path19);
+    "server_use": (path15, handlerName) => {
+      const [pattern] = pathToRegex(path15);
       middlewares.push({ pattern, handler: handlerName });
       return null;
     },
@@ -28824,42 +28146,42 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
       return null;
     },
     // server_get path handlerName -> null
-    "server_get": (path19, handlerName) => {
-      const [pattern, params] = pathToRegex(path19);
-      routes.push({ method: "GET", path: path19, pattern, params, handler: handlerName });
+    "server_get": (path15, handlerName) => {
+      const [pattern, params] = pathToRegex(path15);
+      routes.push({ method: "GET", path: path15, pattern, params, handler: handlerName });
       return null;
     },
     // server_post path handlerName -> null
-    "server_post": (path19, handlerName) => {
-      const [pattern, params] = pathToRegex(path19);
-      routes.push({ method: "POST", path: path19, pattern, params, handler: handlerName });
+    "server_post": (path15, handlerName) => {
+      const [pattern, params] = pathToRegex(path15);
+      routes.push({ method: "POST", path: path15, pattern, params, handler: handlerName });
       return null;
     },
     // server_put path handlerName -> null
-    "server_put": (path19, handlerName) => {
-      const [pattern, params] = pathToRegex(path19);
-      routes.push({ method: "PUT", path: path19, pattern, params, handler: handlerName });
+    "server_put": (path15, handlerName) => {
+      const [pattern, params] = pathToRegex(path15);
+      routes.push({ method: "PUT", path: path15, pattern, params, handler: handlerName });
       return null;
     },
     // server_patch path handlerName -> null
-    "server_patch": (path19, handlerName) => {
-      const [pattern, params] = pathToRegex(path19);
-      routes.push({ method: "PATCH", path: path19, pattern, params, handler: handlerName });
+    "server_patch": (path15, handlerName) => {
+      const [pattern, params] = pathToRegex(path15);
+      routes.push({ method: "PATCH", path: path15, pattern, params, handler: handlerName });
       return null;
     },
     // server_delete path handlerName -> null
-    "server_delete": (path19, handlerName) => {
-      const [pattern, params] = pathToRegex(path19);
-      routes.push({ method: "DELETE", path: path19, pattern, params, handler: handlerName });
+    "server_delete": (path15, handlerName) => {
+      const [pattern, params] = pathToRegex(path15);
+      routes.push({ method: "DELETE", path: path15, pattern, params, handler: handlerName });
       return null;
     },
     // route method path handler → 메서드 문자열로 등록
     // (route "GET"    "/api/x" handler-fn)
     // (route "POST"   "/api/x" handler-fn)
-    "route": (method, path19, handlerName) => {
+    "route": (method, path15, handlerName) => {
       const m = String(method).toUpperCase();
-      const [pattern, params] = pathToRegex(path19);
-      routes.push({ method: m, path: path19, pattern, params, handler: handlerName });
+      const [pattern, params] = pathToRegex(path15);
+      routes.push({ method: m, path: path15, pattern, params, handler: handlerName });
       return null;
     },
     // v12: 라우트 초기화 (hot reload 시 재등록 전 호출)
@@ -28927,10 +28249,10 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
       return null;
     },
     // server_all path handler → 모든 메서드 등록 (catch-all)
-    "server_all": (path19, handlerName) => {
-      const [pattern, params] = pathToRegex(path19);
+    "server_all": (path15, handlerName) => {
+      const [pattern, params] = pathToRegex(path15);
       for (const m of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
-        routes.push({ method: m, path: path19, pattern, params, handler: handlerName });
+        routes.push({ method: m, path: path15, pattern, params, handler: handlerName });
       }
       return null;
     },
@@ -28953,7 +28275,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
         const cspNonce = crypto.randomBytes(16).toString("base64url");
         currentNonce = cspNonce;
         const method = req.method || "GET";
-        const { path: path19, query } = parseUrl(req.url || "/");
+        const { path: path15, query } = parseUrl(req.url || "/");
         const headers = req.headers;
         const body = await readBody(req);
         const allowedOrigins = process.env.FL_ALLOWED_ORIGINS;
@@ -28985,7 +28307,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
           res.end(JSON.stringify({ error: "Too Many Requests", retry_after: Math.ceil(rlWindowMs / 1e3) }));
           return;
         }
-        if (process.env.FL_DEV === "1" && path19 === "/__hot" && method === "GET") {
+        if (process.env.FL_DEV === "1" && path15 === "/__hot" && method === "GET") {
           res.writeHead(200, {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -28995,9 +28317,9 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
           res.write("retry: 400\n\n");
           return;
         }
-        const baseReq = createFlRequest(method, path19, query, headers, body, {}, requestId);
+        const baseReq = createFlRequest(method, path15, query, headers, body, {}, requestId);
         for (const mw of middlewares) {
-          if (!mw.pattern.exec(path19)) continue;
+          if (!mw.pattern.exec(path15)) continue;
           try {
             let mwResult;
             if (typeof mw.handler === "string") {
@@ -29013,7 +28335,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
               const mwBody = mwResult.__fl_response ? typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? "") : typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult);
               const mwCT = mwResult.contentType ?? "application/json";
               sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
-              logAccess(method, path19, mwStatus, Date.now() - requestStart, requestId);
+              logAccess(method, path15, mwStatus, Date.now() - requestStart, requestId);
               return;
             }
           } catch (mwErr) {
@@ -29024,7 +28346,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
-          const match = route.pattern.exec(path19);
+          const match = route.pattern.exec(path15);
           if (!match) continue;
           matched = true;
           let status = 200;
@@ -29033,12 +28355,12 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
             for (let i = 0; i < route.params.length; i++) {
               params[route.params[i]] = match[i + 1];
             }
-            const flReq = createFlRequest(method, path19, query, headers, body, params, requestId);
+            const flReq = createFlRequest(method, path15, query, headers, body, params, requestId);
             let rawResult;
             if (typeof route.handler === "string") {
               rawResult = callFn2(route.handler, [flReq]);
             } else if (route.handler && route.handler.__fl_static_handler === true) {
-              const served = route.handler.fn(req, res, path19);
+              const served = route.handler.fn(req, res, path15);
               if (served) return;
               sendResponse(res, 404, { error: "Not found" });
               return;
@@ -29099,20 +28421,20 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
               }
             }
             const duration = Date.now() - requestStart;
-            logAccess(method, path19, status, duration, requestId);
+            logAccess(method, path15, status, duration, requestId);
           } catch (err4) {
             const status2 = 500;
             sendResponse(res, status2, { error: err4.message });
             const duration = Date.now() - requestStart;
-            logAccess(method, path19, status2, duration, requestId);
+            logAccess(method, path15, status2, duration, requestId);
           }
           return;
         }
         if (!matched) {
           const status = 404;
-          sendResponse(res, status, { error: "Not Found", path: path19 });
+          sendResponse(res, status, { error: "Not Found", path: path15 });
           const duration = Date.now() - requestStart;
-          logAccess(method, path19, status, duration, requestId);
+          logAccess(method, path15, status, duration, requestId);
         }
       });
       server.on("upgrade", (req, socket, head2) => {
@@ -29697,7 +29019,7 @@ function getDatabaseSync() {
   return _DatabaseSync;
 }
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
-function kimdbReq(method, path19, body) {
+function kimdbReq(method, path15, body) {
   const toSerializable4 = (obj) => {
     if (obj instanceof Map) return Object.fromEntries(obj);
     if (Array.isArray(obj)) return obj.map(toSerializable4);
@@ -29710,16 +29032,16 @@ function kimdbReq(method, path19, body) {
     }
     return obj;
   };
-  const url2 = `${KIMDB}${path19}`;
-  const args3 = ["-sf", "--max-time", "5"];
+  const url2 = `${KIMDB}${path15}`;
+  const args2 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
-    args3.push("-X", method);
+    args2.push("-X", method);
     if (body !== void 0) {
-      args3.push("-H", "Content-Type: application/json", "-d", JSON.stringify(toSerializable4(body)));
+      args2.push("-H", "Content-Type: application/json", "-d", JSON.stringify(toSerializable4(body)));
     }
   }
-  args3.push(url2);
-  const r = (0, import_child_process4.spawnSync)("curl", args3, { timeout: 6e3 });
+  args2.push(url2);
+  const r = (0, import_child_process4.spawnSync)("curl", args2, { timeout: 6e3 });
   if (r.error) throw new Error(`kimdb request failed: ${r.error.message}`);
   const raw = r.stdout?.toString().trim() ?? "";
   if (!raw) return null;
@@ -30787,17 +30109,17 @@ function createCacheModule() {
     // Phase F: wait_for_cache key timeoutMs intervalMs → Promise<value or null>
     // 캐시에 값이 생길 때까지 비동기 대기 (이벤트 루프 비블로킹)
     "wait_for_cache": (key, timeoutMs = 3e4, intervalMs = 50) => {
-      return new Promise((resolve9) => {
+      return new Promise((resolve7) => {
         const start = Date.now();
         const check = () => {
           const entry = _cache.get(key);
           if (entry && (!entry.expiresAt || Date.now() <= entry.expiresAt)) {
             _cache.delete(key);
-            resolve9(entry.value);
+            resolve7(entry.value);
             return;
           }
           if (Date.now() - start >= timeoutMs) {
-            resolve9(null);
+            resolve7(null);
             return;
           }
           setTimeout(check, intervalMs);
@@ -30952,18 +30274,18 @@ function createProcessModule() {
     "process_exit": (code) => process.exit(code ?? 0),
     "process_argv": () => process.argv.slice(2),
     "process_argv_get": (key, defaultVal = null) => {
-      const args3 = process.argv.slice(2);
-      const idx = args3.indexOf(key);
-      if (idx === -1 || idx + 1 >= args3.length) return defaultVal;
-      return args3[idx + 1];
+      const args2 = process.argv.slice(2);
+      const idx = args2.indexOf(key);
+      if (idx === -1 || idx + 1 >= args2.length) return defaultVal;
+      return args2[idx + 1];
     },
     // shell_exec_stdout cmd cwd? -> string | null (stdout만 반환, 실패 시 null)
-    "shell_exec_stdout": (cmd2, cwd2) => {
+    "shell_exec_stdout": (cmd, cwd2) => {
       try {
         const { execSync: execSync2 } = require("child_process");
         const opts = { encoding: "utf8", timeout: 3e4 };
         if (cwd2) opts.cwd = cwd2;
-        const stdout = execSync2(cmd2, opts);
+        const stdout = execSync2(cmd, opts);
         return typeof stdout === "string" ? stdout : String(stdout);
       } catch {
         return null;
@@ -30980,9 +30302,9 @@ function createModuleSystem() {
   return {
     // module_load path -> {exports} | null
     // Load a module from file or registry
-    "module_load": (path19) => {
-      if (registry.has(path19)) {
-        return registry.get(path19);
+    "module_load": (path15) => {
+      if (registry.has(path15)) {
+        return registry.get(path15);
       }
       return null;
     },
@@ -30998,9 +30320,9 @@ function createModuleSystem() {
     },
     // module_require path -> {exports}
     // Require and return all exports from a module
-    "module_require": (path19) => {
-      if (registry.has(path19)) {
-        return registry.get(path19) || {};
+    "module_require": (path15) => {
+      if (registry.has(path15)) {
+        return registry.get(path15) || {};
       }
       return {};
     },
@@ -31319,9 +30641,9 @@ function createWsModule(callFn2) {
   let onMessageFn = "ws_on_message";
   let onCloseFn = "ws_on_close";
   let onErrorFn = "ws_on_error";
-  function tryCall(fnName, args3) {
+  function tryCall(fnName, args2) {
     try {
-      callFn2(fnName, args3);
+      callFn2(fnName, args2);
     } catch {
     }
   }
@@ -31589,9 +30911,9 @@ function createWscModule(callFn2) {
   let onMessageFn = "wsc_on_message";
   let onCloseFn = "wsc_on_close";
   let onErrorFn = "wsc_on_error";
-  function tryCall(fnName, args3) {
+  function tryCall(fnName, args2) {
     try {
-      callFn2(fnName, args3);
+      callFn2(fnName, args2);
     } catch {
     }
   }
@@ -31970,7 +31292,7 @@ function createMailModule() {
     // 동기적 비동기 — Node tls 콜백 기반이지만 Promise 인터페이스로 노출.
     // 호출 측은 await 또는 then. FL의 async_call 헬퍼로 호출 가능.
     "smtp_send_tls": (host, port, user, pass, from, to, subject, body) => {
-      return new Promise((resolve9) => {
+      return new Promise((resolve7) => {
         const log2 = [];
         const socket = tls.connect({ host, port, servername: host }, () => {
         });
@@ -31987,7 +31309,7 @@ function createMailModule() {
             socket.end();
           } catch {
           }
-          resolve9({ ok: false, log: log2.join("\n"), error: msg });
+          resolve7({ ok: false, log: log2.join("\n"), error: msg });
         };
         socket.on("data", (chunk) => {
           buf += chunk.toString();
@@ -32057,7 +31379,7 @@ function createMailModule() {
                   stage = 9;
                   break;
                 case 9:
-                  resolve9({ ok: true, log: log2.join("\n") });
+                  resolve7({ ok: true, log: log2.join("\n") });
                   try {
                     socket.end();
                   } catch {
@@ -32077,7 +31399,7 @@ function createMailModule() {
     // mailgun_send api_key domain from to subject text -> {ok, id, error}
     // Mailgun REST API v3 사용 (npm 0, Node https만 사용)
     "mailgun_send": (api_key, domain, from, to, subject, text) => {
-      return new Promise((resolve9) => {
+      return new Promise((resolve7) => {
         try {
           const https = require("https");
           const querystring = require("querystring");
@@ -32108,19 +31430,19 @@ function createMailModule() {
               try {
                 const json = JSON.parse(data);
                 if (res.statusCode === 200) {
-                  resolve9({
+                  resolve7({
                     ok: true,
                     id: json.id,
                     message: "\uBA54\uC77C \uC804\uC1A1 \uC644\uB8CC"
                   });
                 } else {
-                  resolve9({
+                  resolve7({
                     ok: false,
                     error: json.message || "Mailgun API \uC624\uB958"
                   });
                 }
               } catch (e) {
-                resolve9({
+                resolve7({
                   ok: false,
                   error: `\uD30C\uC2F1 \uC2E4\uD328: ${e.message}`
                 });
@@ -32128,7 +31450,7 @@ function createMailModule() {
             });
           });
           req.on("error", (e) => {
-            resolve9({
+            resolve7({
               ok: false,
               error: `\uC694\uCCAD \uC2E4\uD328: ${e.message}`
             });
@@ -32136,7 +31458,7 @@ function createMailModule() {
           req.write(postData);
           req.end();
         } catch (e) {
-          resolve9({
+          resolve7({
             ok: false,
             error: `\uC608\uC678: ${e.message}`
           });
@@ -32267,22 +31589,22 @@ function createWebauthnModule() {
     // webauthn_verify_assertion args -> boolean
     //   args = {jwk, authenticator_data, client_data_json_b64url, signature_b64url, expected_challenge, expected_origin, expected_rp_id, prev_sign_count}
     // 반환: {ok, sign_count} 또는 {ok:false, error}
-    "webauthn_verify_assertion": (args3) => {
+    "webauthn_verify_assertion": (args2) => {
       try {
-        const jwk = args3.jwk;
-        const authenticatorData = Buffer.from(args3.authenticator_data_b64url, "base64url");
-        const clientDataJson = Buffer.from(args3.client_data_json_b64url, "base64url");
-        const signature = Buffer.from(args3.signature_b64url, "base64url");
+        const jwk = args2.jwk;
+        const authenticatorData = Buffer.from(args2.authenticator_data_b64url, "base64url");
+        const clientDataJson = Buffer.from(args2.client_data_json_b64url, "base64url");
+        const signature = Buffer.from(args2.signature_b64url, "base64url");
         const clientData = JSON.parse(clientDataJson.toString("utf8"));
         if (clientData.type !== "webauthn.get") return { ok: false, error: "type!=webauthn.get" };
-        if (clientData.challenge !== args3.expected_challenge) return { ok: false, error: "challenge mismatch" };
-        if (clientData.origin !== args3.expected_origin) return { ok: false, error: "origin mismatch" };
+        if (clientData.challenge !== args2.expected_challenge) return { ok: false, error: "challenge mismatch" };
+        if (clientData.origin !== args2.expected_origin) return { ok: false, error: "origin mismatch" };
         const auth = parseAuthData(authenticatorData);
-        const expectedRpHash = (0, import_crypto9.createHash)("sha256").update(args3.expected_rp_id).digest();
+        const expectedRpHash = (0, import_crypto9.createHash)("sha256").update(args2.expected_rp_id).digest();
         if (Buffer.compare(auth.rpIdHash, expectedRpHash) !== 0) return { ok: false, error: "rp_id_hash mismatch" };
         if (!(auth.flags & 1)) return { ok: false, error: "user not present" };
-        if (auth.signCount !== 0 && auth.signCount <= (args3.prev_sign_count ?? 0)) {
-          return { ok: false, error: `signCount regression (${auth.signCount} <= ${args3.prev_sign_count})` };
+        if (auth.signCount !== 0 && auth.signCount <= (args2.prev_sign_count ?? 0)) {
+          return { ok: false, error: `signCount regression (${auth.signCount} <= ${args2.prev_sign_count})` };
         }
         const cdHash = (0, import_crypto9.createHash)("sha256").update(clientDataJson).digest();
         const signedData = Buffer.concat([authenticatorData, cdHash]);
@@ -32383,7 +31705,7 @@ var cachedSock = null;
 function resolveSocket() {
   if (cachedSock) return cachedSock;
   if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
-  const fs21 = require("fs");
+  const fs15 = require("fs");
   const candidates = [
     "/data/data/com.termux/files/usr/tmp/mysqld.sock",
     "/var/run/mysqld/mysqld.sock",
@@ -32393,7 +31715,7 @@ function resolveSocket() {
   ];
   for (const s of candidates) {
     try {
-      if (fs21.existsSync(s)) return cachedSock = s;
+      if (fs15.existsSync(s)) return cachedSock = s;
     } catch {
     }
   }
@@ -32405,17 +31727,17 @@ function buildArgs(db, sql) {
   const pass = process.env.MARIADB_PASS || "";
   const host = process.env.MARIADB_HOST;
   const port = process.env.MARIADB_PORT;
-  const args3 = ["-u", user];
+  const args2 = ["-u", user];
   if (host) {
-    args3.push("-h", host);
-    if (port) args3.push("-P", port);
+    args2.push("-h", host);
+    if (port) args2.push("-P", port);
   } else {
-    args3.push("--socket=" + sock);
+    args2.push("--socket=" + sock);
   }
-  if (pass) args3.push("-p" + pass);
-  if (db) args3.push(db);
-  args3.push("--batch", "-e", sql);
-  return args3;
+  if (pass) args2.push("-p" + pass);
+  if (db) args2.push(db);
+  args2.push("--batch", "-e", sql);
+  return args2;
 }
 var MARIADB_SEARCH_PATHS = [
   "/data/data/com.termux/files/usr/bin",
@@ -32428,12 +31750,12 @@ var MARIADB_SEARCH_PATHS = [
 var resolvedMariadbBin = null;
 function resolveMariadBin() {
   if (resolvedMariadbBin) return resolvedMariadbBin;
-  const fs21 = require("fs");
-  const path19 = require("path");
+  const fs15 = require("fs");
+  const path15 = require("path");
   for (const dir of MARIADB_SEARCH_PATHS) {
-    const full = path19.join(dir, "mariadb");
+    const full = path15.join(dir, "mariadb");
     try {
-      if (fs21.existsSync(full)) return resolvedMariadbBin = full;
+      if (fs15.existsSync(full)) return resolvedMariadbBin = full;
     } catch {
     }
   }
@@ -32692,8 +32014,8 @@ function getSqliteDb(path) {
   }
   return _sqliteCache.get(path);
 }
-function sqliteQuery(path19, sql, params) {
-  const db = getSqliteDb(path19);
+function sqliteQuery(path15, sql, params) {
+  const db = getSqliteDb(path15);
   const rows = db.prepare(sql).all(...params);
   return rows.map((r) => {
     const m = /* @__PURE__ */ new Map();
@@ -32701,8 +32023,8 @@ function sqliteQuery(path19, sql, params) {
     return m;
   });
 }
-function sqliteExec(path19, sql, params) {
-  const db = getSqliteDb(path19);
+function sqliteExec(path15, sql, params) {
+  const db = getSqliteDb(path15);
   const result = db.prepare(sql).run(...params);
   const m = /* @__PURE__ */ new Map();
   m.set("affectedRows", result.changes ?? 0);
@@ -32816,30 +32138,30 @@ function createMariadbModule(callFn2) {
     // ── mariadb_connect — 맵/positional 양방향 지원 ──────────────────────────
     // (mariadb_connect {:host "h" :user "u" :password "p" :database "d"})
     // (mariadb_connect "host" "user" "password" "database" [port])  ← #67 해결
-    "mariadb_connect": (...args3) => {
-      let config = args3[0];
+    "mariadb_connect": (...args2) => {
+      let config = args2[0];
       if (typeof config === "string") {
         config = {
-          host: args3[0] ?? "localhost",
-          user: args3[1] ?? "",
-          password: args3[2] ?? "",
-          database: args3[3] ?? "",
-          port: typeof args3[4] === "number" ? args3[4] : 3306
+          host: args2[0] ?? "localhost",
+          user: args2[1] ?? "",
+          password: args2[2] ?? "",
+          database: args2[3] ?? "",
+          port: typeof args2[4] === "number" ? args2[4] : 3306
         };
       }
       const poolId = `pool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       poolCall({ type: "connect", poolId, config });
       return poolId;
     },
-    "mariadb-connect": (...args3) => {
-      let config = args3[0];
+    "mariadb-connect": (...args2) => {
+      let config = args2[0];
       if (typeof config === "string") {
         config = {
-          host: args3[0] ?? "localhost",
-          user: args3[1] ?? "",
-          password: args3[2] ?? "",
-          database: args3[3] ?? "",
-          port: typeof args3[4] === "number" ? args3[4] : 3306
+          host: args2[0] ?? "localhost",
+          user: args2[1] ?? "",
+          password: args2[2] ?? "",
+          database: args2[3] ?? "",
+          port: typeof args2[4] === "number" ? args2[4] : 3306
         };
       }
       const poolId = `pool_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -32872,13 +32194,13 @@ function createMariadbModule(callFn2) {
     },
     // ── 유틸 ─────────────────────────────────────────────────────────────────
     "mariadb_health": () => {
-      const args3 = [
+      const args2 = [
         "-u",
         process.env.MARIADB_USER || "root",
         "--socket=" + resolveSocket(),
         "ping"
       ];
-      const r = (0, import_child_process6.spawnSync)("mariadb-admin", args3, { timeout: 3e3, encoding: "utf-8" });
+      const r = (0, import_child_process6.spawnSync)("mariadb-admin", args2, { timeout: 3e3, encoding: "utf-8" });
       return (r.status ?? 1) === 0;
     },
     "mariadb_databases": () => parseRows(runMariadb("", "SHOW DATABASES")).map((r) => r.Database),
@@ -33149,12 +32471,12 @@ function createAsyncModule(callFn2) {
   return {
     // async_call fn_name args -> Promise
     // Call a function asynchronously and return a promise
-    "async_call": (fnName, args3 = []) => {
-      return new FreeLangPromise((resolve9, reject) => {
+    "async_call": (fnName, args2 = []) => {
+      return new FreeLangPromise((resolve7, reject) => {
         setImmediate(() => {
           try {
-            const result = callFn2(fnName, args3);
-            resolve9(result);
+            const result = callFn2(fnName, args2);
+            resolve7(result);
           } catch (e) {
             reject(new Error(`async_call error: ${e.message}`));
           }
@@ -33176,9 +32498,9 @@ function createAsyncModule(callFn2) {
     // promise_all promises -> Promise
     // Wait for all promises to resolve
     "promise_all": (promises) => {
-      return new FreeLangPromise((resolve9, reject) => {
+      return new FreeLangPromise((resolve7, reject) => {
         if (!Array.isArray(promises) || promises.length === 0) {
-          resolve9([]);
+          resolve7([]);
           return;
         }
         const results = [];
@@ -33192,7 +32514,7 @@ function createAsyncModule(callFn2) {
           if (state === "resolved") {
             results[idx] = p.getValue();
             completed++;
-            if (completed === promises.length) resolve9(results);
+            if (completed === promises.length) resolve7(results);
           } else if (state === "rejected") {
             reject(p.getError() || new Error(`promise_all: promise ${idx} rejected`));
           } else {
@@ -33204,7 +32526,7 @@ function createAsyncModule(callFn2) {
     // promise_race promises -> Promise
     // Return first resolved promise
     "promise_race": (promises) => {
-      return new FreeLangPromise((resolve9, reject) => {
+      return new FreeLangPromise((resolve7, reject) => {
         if (!Array.isArray(promises) || promises.length === 0) {
           reject(new Error("promise_race: empty promise array"));
           return;
@@ -33217,7 +32539,7 @@ function createAsyncModule(callFn2) {
           }
           const state = p.getState();
           if (state === "resolved") {
-            resolve9(p.getValue());
+            resolve7(p.getValue());
             return;
           } else if (state === "rejected") {
             reject(p.getError() || new Error(`promise_race: promise ${i} rejected`));
@@ -33230,14 +32552,14 @@ function createAsyncModule(callFn2) {
     // promise_delay ms -> Promise
     // Create a promise that resolves after delay
     "promise_delay": (ms) => {
-      return new FreeLangPromise((resolve9) => {
-        setTimeout(() => resolve9(null), ms);
+      return new FreeLangPromise((resolve7) => {
+        setTimeout(() => resolve7(null), ms);
       });
     },
     // promise_timeout ms fn_name args -> Promise
     // Call function with timeout
-    "promise_timeout": (ms, fnName, args3 = []) => {
-      return new FreeLangPromise((resolve9, reject) => {
+    "promise_timeout": (ms, fnName, args2 = []) => {
+      return new FreeLangPromise((resolve7, reject) => {
         let done = false;
         const timeout = setTimeout(() => {
           if (!done) {
@@ -33246,10 +32568,10 @@ function createAsyncModule(callFn2) {
           }
         }, ms);
         try {
-          const result = callFn2(fnName, args3);
+          const result = callFn2(fnName, args2);
           done = true;
           clearTimeout(timeout);
-          resolve9(result);
+          resolve7(result);
         } catch (e) {
           done = true;
           clearTimeout(timeout);
@@ -34217,22 +33539,22 @@ ${exportsStr}
     return JSON.stringify(node.name);
   }
   genSExpr(node) {
-    const { op, args: args3 } = node;
+    const { op, args: args2 } = node;
     if (op === "and") {
-      if (args3.length === 0) return "true";
-      return "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
+      if (args2.length === 0) return "true";
+      return "(" + args2.map((a) => this.genNode(a)).join(" && ") + ")";
     }
     if (op === "or") {
-      if (args3.length === 0) return "false";
-      return "(" + args3.map((a) => this.genNode(a)).join(" || ") + ")";
+      if (args2.length === 0) return "false";
+      return "(" + args2.map((a) => this.genNode(a)).join(" || ") + ")";
     }
-    if (op === "cond") return this.genCond(args3);
-    if (op === "while") return this.genWhile(args3);
+    if (op === "cond") return this.genCond(args2);
+    if (op === "while") return this.genWhile(args2);
     if (op === "->") {
-      if (args3.length === 0) return "null";
-      let acc = this.genNode(args3[0]);
-      for (let i = 1; i < args3.length; i++) {
-        const step = args3[i];
+      if (args2.length === 0) return "null";
+      let acc = this.genNode(args2[0]);
+      for (let i = 1; i < args2.length; i++) {
+        const step = args2[i];
         if (step.kind === "sexpr") {
           const { op: fn, args: fnArgs } = step;
           const fnJs = flNameToJs(fn);
@@ -34245,10 +33567,10 @@ ${exportsStr}
       return acc;
     }
     if (op === "->>") {
-      if (args3.length === 0) return "null";
-      let acc = this.genNode(args3[0]);
-      for (let i = 1; i < args3.length; i++) {
-        const step = args3[i];
+      if (args2.length === 0) return "null";
+      let acc = this.genNode(args2[0]);
+      for (let i = 1; i < args2.length; i++) {
+        const step = args2[i];
         if (step.kind === "sexpr") {
           const { op: fn, args: fnArgs } = step;
           const fnJs = flNameToJs(fn);
@@ -34261,12 +33583,12 @@ ${exportsStr}
       return acc;
     }
     if (op === "recur") {
-      const argStrs = args3.map((a) => this.genNode(a));
+      const argStrs = args2.map((a) => this.genNode(a));
       return `{ __recur: true, a: [${argStrs.join(", ")}] }`;
     }
     if (op === "loop") {
-      const bindingsArg = args3[0];
-      const bodyExprs = args3.slice(1);
+      const bindingsArg = args2[0];
+      const bodyExprs = args2.slice(1);
       let items = [];
       if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
         items = bindingsArg.fields.get("items") || [];
@@ -34295,8 +33617,8 @@ ${exportsStr}
       return `((() => { ${inits.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } })())`;
     }
     if (op === "let") {
-      if (args3.length >= 2) {
-        const bindingsArg = args3[0];
+      if (args2.length >= 2) {
+        const bindingsArg = args2[0];
         let bindings = [];
         if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
           bindings = bindingsArg.fields.get("items") || [];
@@ -34324,7 +33646,7 @@ ${exportsStr}
             bindingStmts.push(`let ${varName} = ${value};`);
           }
         }
-        const bodyParts = args3.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
+        const bodyParts = args2.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
         let bodyCode = "";
         if (bodyParts.length === 0) {
           bodyCode = "return null;";
@@ -34338,7 +33660,7 @@ ${exportsStr}
       }
       return "(() => null)()";
     }
-    if (op === "do") return this.genDo(args3);
+    if (op === "do") return this.genDo(args2);
     const BINARY_OPS = {
       "+": "+",
       "-": "-",
@@ -34353,59 +33675,59 @@ ${exportsStr}
       "!=": "!==",
       "=": "==="
     };
-    if (op in BINARY_OPS && args3.length === 2) {
-      const left = this.genNode(args3[0]);
-      const right = this.genNode(args3[1]);
+    if (op in BINARY_OPS && args2.length === 2) {
+      const left = this.genNode(args2[0]);
+      const right = this.genNode(args2[1]);
       return `(${left} ${BINARY_OPS[op]} ${right})`;
     }
-    if (op === "-" && args3.length === 1) {
-      return `(-${this.genNode(args3[0])})`;
+    if (op === "-" && args2.length === 1) {
+      return `(-${this.genNode(args2[0])})`;
     }
-    if (op === "not" && args3.length === 1) {
-      return `(!${this.genNode(args3[0])})`;
+    if (op === "not" && args2.length === 1) {
+      return `(!${this.genNode(args2[0])})`;
     }
     if (op === "if") {
-      const cond = this.genNode(args3[0]);
-      const thenExpr = this.genNode(args3[1]);
-      const elseExpr = args3[2] ? this.genNode(args3[2]) : "undefined";
+      const cond = this.genNode(args2[0]);
+      const thenExpr = this.genNode(args2[1]);
+      const elseExpr = args2[2] ? this.genNode(args2[2]) : "undefined";
       return `(${cond} ? ${thenExpr} : ${elseExpr})`;
     }
     if (op === "define") {
-      const varName = this.extractVarName(args3[0]);
-      const value = this.genNode(args3[1]);
+      const varName = this.extractVarName(args2[0]);
+      const value = this.genNode(args2[1]);
       return `const ${varName} = ${value};`;
     }
     if (op === "set!") {
-      const varName = this.extractVarName(args3[0]);
-      const value = this.genNode(args3[1]);
+      const varName = this.extractVarName(args2[0]);
+      const value = this.genNode(args2[1]);
       return `(${varName} = ${value})`;
     }
     if (op === "defn" || op === "defun") {
-      const name = this.extractVarName(args3[0]);
-      const { params, preamble } = this.extractParamListWithDestructuring(args3[1]);
-      const bodyNode = args3[2];
+      const name = this.extractVarName(args2[0]);
+      const { params, preamble } = this.extractParamListWithDestructuring(args2[1]);
+      const bodyNode = args2[2];
       const body = bodyNode ? this.genNode(bodyNode) : "null";
       const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
       return `const ${name} = (${params.join(", ")}) => ${finalBody}`;
     }
-    if (op === "fn") return this.genFn(args3);
+    if (op === "fn") return this.genFn(args2);
     if (op === "list") {
-      const elements = args3.map((a) => this.genNode(a));
+      const elements = args2.map((a) => this.genNode(a));
       return `[${elements.join(", ")}]`;
     }
     if (op === "str-concat") {
-      const parts = args3.map((a) => this.genNode(a));
+      const parts = args2.map((a) => this.genNode(a));
       return `('' + ${parts.join(" + ")})`;
     }
     if (op === "print" || op === "println") {
-      const arg = args3.length > 0 ? this.genNode(args3[0]) : '""';
+      const arg = args2.length > 0 ? this.genNode(args2[0]) : '""';
       return `_fl_print(${arg})`;
     }
-    if (op === "map") return `_fl_map(${this.genNode(args3[1])}, ${this.genNode(args3[0])})`;
-    if (op === "filter") return `_fl_filter(${this.genNode(args3[1])}, ${this.genNode(args3[0])})`;
-    if (op === "reduce") return `_fl_reduce(${this.genNode(args3[2])}, ${this.genNode(args3[0])}, ${this.genNode(args3[1])})`;
+    if (op === "map") return `_fl_map(${this.genNode(args2[1])}, ${this.genNode(args2[0])})`;
+    if (op === "filter") return `_fl_filter(${this.genNode(args2[1])}, ${this.genNode(args2[0])})`;
+    if (op === "reduce") return `_fl_reduce(${this.genNode(args2[2])}, ${this.genNode(args2[0])}, ${this.genNode(args2[1])})`;
     if (op === "export") {
-      for (const arg of args3) {
+      for (const arg of args2) {
         if (arg.kind === "variable") {
           this.exportedNames.push(arg.name);
         } else if (arg.kind === "literal" && typeof arg.value === "string") {
@@ -34415,8 +33737,8 @@ ${exportsStr}
       return "";
     }
     if (op === "let") {
-      if (args3.length >= 2) {
-        const bindingsArg = args3[0];
+      if (args2.length >= 2) {
+        const bindingsArg = args2[0];
         let bindings = [];
         if (bindingsArg.kind === "block" && bindingsArg.type === "Array") {
           bindings = bindingsArg.fields.get("items") || [];
@@ -34443,37 +33765,37 @@ ${exportsStr}
             }
           }
         }
-        const bodyStmts = args3.slice(1).map((a) => this.genNode(a)).join("; ");
+        const bodyStmts = args2.slice(1).map((a) => this.genNode(a)).join("; ");
         return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
       }
-      const varName = this.extractVarName(args3[0]);
-      const value = args3[1] ? this.genNode(args3[1]) : "undefined";
+      const varName = this.extractVarName(args2[0]);
+      const value = args2[1] ? this.genNode(args2[1]) : "undefined";
       return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
     }
-    return this.genFuncCall(op, args3);
+    return this.genFuncCall(op, args2);
   }
-  genDo(args3) {
-    if (args3.length === 0) return "(() => undefined)()";
-    if (args3.length === 1) return `(() => ${this.genNode(args3[0])})()`;
-    const stmts = args3.slice(0, -1).map((a) => {
+  genDo(args2) {
+    if (args2.length === 0) return "(() => undefined)()";
+    if (args2.length === 1) return `(() => ${this.genNode(args2[0])})()`;
+    const stmts = args2.slice(0, -1).map((a) => {
       const c = this.genNode(a).trim();
       return c === "" || c.endsWith(";") ? c : c + ";";
     }).filter((s) => s !== "");
-    const last = this.genNode(args3[args3.length - 1]);
+    const last = this.genNode(args2[args2.length - 1]);
     return `(() => { ${stmts.join(" ")} return ${last}; })()`;
   }
-  genCond(args3) {
-    if (args3.length === 0) return "null";
+  genCond(args2) {
+    if (args2.length === 0) return "null";
     let isNested = false;
-    if (args3[0].kind === "block" && args3[0].type === "Array") {
-      const items = args3[0].fields.get("items");
+    if (args2[0].kind === "block" && args2[0].type === "Array") {
+      const items = args2[0].fields.get("items");
       if (Array.isArray(items) && items.length >= 1) {
         isNested = true;
       }
     }
     let pairs;
     if (isNested) {
-      pairs = args3.map((arg) => {
+      pairs = args2.map((arg) => {
         if (arg.kind === "block" && arg.type === "Array") {
           const items = arg.fields.get("items") || [];
           return [items[0], items[1]];
@@ -34482,11 +33804,11 @@ ${exportsStr}
       });
     } else {
       pairs = [];
-      for (let i = 0; i < args3.length - 1; i += 2) {
-        pairs.push([args3[i], args3[i + 1]]);
+      for (let i = 0; i < args2.length - 1; i += 2) {
+        pairs.push([args2[i], args2[i + 1]]);
       }
-      if (args3.length % 2 === 1) {
-        pairs.push([{ kind: "literal", type: "boolean", value: true }, args3[args3.length - 1]]);
+      if (args2.length % 2 === 1) {
+        pairs.push([{ kind: "literal", type: "boolean", value: true }, args2[args2.length - 1]]);
       }
     }
     let res = "null";
@@ -34499,21 +33821,21 @@ ${exportsStr}
     }
     return res;
   }
-  genWhile(args3) {
-    const cond = this.genNode(args3[0]);
-    const bodyParts = args3.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
+  genWhile(args2) {
+    const cond = this.genNode(args2[0]);
+    const bodyParts = args2.slice(1).map((a) => this.genNode(a).trim()).filter((s) => s !== "");
     const bodyCode = bodyParts.map((s) => s.endsWith(";") ? s : s + ";").join(" ");
     return "(() => { while(" + cond + ") { " + bodyCode + " } })()";
   }
-  genFn(args3) {
-    const { params, preamble } = this.extractParamListWithDestructuring(args3[0]);
+  genFn(args2) {
+    const { params, preamble } = this.extractParamListWithDestructuring(args2[0]);
     let body;
-    if (args3.length <= 1) {
+    if (args2.length <= 1) {
       body = "undefined";
-    } else if (args3.length === 2) {
-      body = this.genNode(args3[1]);
+    } else if (args2.length === 2) {
+      body = this.genNode(args2[1]);
     } else {
-      const bodyNodes = args3.slice(1);
+      const bodyNodes = args2.slice(1);
       const stmts = bodyNodes.slice(0, -1).map((n) => this.genNode(n) + ";").join(" ");
       const last = this.genNode(bodyNodes[bodyNodes.length - 1]);
       body = `((() => { ${stmts} return ${last}; })())`;
@@ -34568,8 +33890,8 @@ ${exportsStr}
     let pNodes = Array.isArray(params) ? params : params.kind === "block" && params.type === "Array" ? params.fields.get("items") : [params];
     return (pNodes || []).map((p) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map((n) => flNameToJs(n));
   }
-  genFuncCall(op, args3) {
-    const argStrs = args3.map((a) => this.genNode(a));
+  genFuncCall(op, args2) {
+    const argStrs = args2.map((a) => this.genNode(a));
     const jsOp = flNameToJs(op);
     return `${jsOp}(${argStrs.join(", ")})`;
   }
@@ -34822,8 +34144,8 @@ function createRegistryModule() {
 function httpRequest(method, url2, body) {
   try {
     const { execSync: execSync2 } = require("child_process");
-    const cmd2 = `curl -s -X ${method} ${body ? `-d '${body}'` : ""} "${url2}"`;
-    const result = execSync2(cmd2, { encoding: "utf-8" });
+    const cmd = `curl -s -X ${method} ${body ? `-d '${body}'` : ""} "${url2}"`;
+    const result = execSync2(cmd, { encoding: "utf-8" });
     try {
       return JSON.parse(result);
     } catch {
@@ -36013,7 +35335,7 @@ function createBlogModule() {
 // src/stdlib-audit.ts
 var import_child_process8 = require("child_process");
 function postJson(url2, body, apiKey) {
-  const args3 = [
+  const args2 = [
     "-s",
     "-o",
     "/dev/null",
@@ -36029,7 +35351,7 @@ function postJson(url2, body, apiKey) {
     url2
   ];
   try {
-    const result = (0, import_child_process8.spawnSync)("curl", args3, { timeout: 3e3 });
+    const result = (0, import_child_process8.spawnSync)("curl", args2, { timeout: 3e3 });
     const code = parseInt(result.stdout?.toString().trim() ?? "0", 10);
     return { ok: code >= 200 && code < 300, status: code };
   } catch {
@@ -36171,8 +35493,8 @@ function tmpPath(ext) {
   if (!fs13.existsSync(dir)) fs13.mkdirSync(dir, { recursive: true });
   return path13.join(dir, crypto3.randomBytes(8).toString("hex") + ext);
 }
-function im(args3) {
-  const r = (0, import_child_process9.spawnSync)("convert", args3, { timeout: 3e4 });
+function im(args2) {
+  const r = (0, import_child_process9.spawnSync)("convert", args2, { timeout: 3e4 });
   if (r.error) throw new Error("ImageMagick not found: " + r.error.message);
   const stderr = r.stderr?.toString() ?? "";
   if (r.status !== 0) throw new Error("ImageMagick error: " + stderr);
@@ -37910,9 +37232,9 @@ var isArr = (x) => Array.isArray(x);
 var isMap = (x) => x instanceof Map || x !== null && typeof x === "object" && !Array.isArray(x) && x.kind !== "function-value";
 var isCol = (x) => Array.isArray(x) || x instanceof Map || x !== null && typeof x === "object" && x.kind !== "function-value";
 var truthy = (v) => v !== false && v !== null && v !== void 0 && v !== 0 && v !== "";
-function callFn(fn, args3, cfv) {
-  if (typeof fn === "function") return fn(...args3);
-  if (cfv) return cfv(fn, args3);
+function callFn(fn, args2, cfv) {
+  if (typeof fn === "function") return fn(...args2);
+  if (cfv) return cfv(fn, args2);
   throw new Error("\uD638\uCD9C \uAC00\uB2A5\uD55C \uD568\uC218\uAC00 \uC544\uB2D9\uB2C8\uB2E4");
 }
 function extractBody(resp) {
@@ -38194,7 +37516,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(timeModule);
   interp2.registerModule(createPerfModule(
     // Phase F-2: 성능 프로파일링
-    (fn, args3) => interp2.callFunctionValue(fn, args3)
+    (fn, args2) => interp2.callFunctionValue(fn, args2)
   ));
   const verifyModule = createVerifyModule();
   const httpMacroModule = createHttpMacroModule();
@@ -38208,7 +37530,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(restCrudModule);
   interp2.registerModule(createCaptureErrorModule(
     // Phase F-4: 에러 추적 + retry
-    (fn, args3) => interp2.callFunctionValue(fn, args3)
+    (fn, args2) => interp2.callFunctionValue(fn, args2)
   ));
   const cryptoModule = createCryptoModule();
   const workflowModule = createWorkflowModule();
@@ -38239,12 +37561,12 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(moduleSystem);
   interp2.registerModule(createTestModule(
     // Phase 76: deftest, describe, assert-eq, ...
-    (fnValue, args3) => interp2.callFunctionValue(fnValue, args3)
+    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2)
   ));
   interp2.registerModule(createMaybeModule(
     // Phase 91: 불확실성 타입 (maybe/none/confident)
-    (fnValue, args3) => interp2.callFunctionValue(fnValue, args3),
-    (name, args3) => interp2.callUserFunction(name, args3)
+    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2),
+    (name, args2) => interp2.callUserFunction(name, args2)
   ));
   interp2.registerModule(createTestEnhancedModule());
   const imageModule = createImageModule();
@@ -38252,7 +37574,7 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(imageModule);
   interp2.registerModule(mongodbModule);
   const helpersModule = createHelpersModule(
-    (fnValue, args3) => interp2.callFunctionValue(fnValue, args3),
+    (fnValue, args2) => interp2.callFunctionValue(fnValue, args2),
     httpModule.http_get,
     httpModule.http_post
   );
@@ -38290,7 +37612,7 @@ function loadAllStdlib(interp2) {
   ];
   interp2.registerModule(createKebabAliasesModule(aliasSourceModules));
   interp2.registerModule(createMariadbModule(
-    (fn, args3) => interp2.callFunctionValue(fn, args3)
+    (fn, args2) => interp2.callFunctionValue(fn, args2)
   ));
   interp2.registerModule({
     "fl_require": (name) => requireModule(name, interp2),
@@ -38300,12 +37622,12 @@ function loadAllStdlib(interp2) {
     // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
     // 이미 로드된 파일은 캐싱으로 중복 실행 방지 (importedFiles 공유)
     "fl_load": (filePath) => {
-      const fs21 = require("fs");
-      const path19 = require("path");
+      const fs15 = require("fs");
+      const path15 = require("path");
       const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
       const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
-      const resolved = path19.isAbsolute(filePath) ? filePath : path19.resolve(process.cwd(), filePath);
-      if (!fs21.existsSync(resolved)) {
+      const resolved = path15.isAbsolute(filePath) ? filePath : path15.resolve(process.cwd(), filePath);
+      if (!fs15.existsSync(resolved)) {
         console.error(`\u274C [fl_load] \uD30C\uC77C \uC5C6\uC74C: ${resolved}`);
         return false;
       }
@@ -38314,7 +37636,7 @@ function loadAllStdlib(interp2) {
       loadedFiles.add(resolved);
       interp2.importedFiles = loadedFiles;
       try {
-        const src = fs21.readFileSync(resolved, "utf-8");
+        const src = fs15.readFileSync(resolved, "utf-8");
         interp2.interpret(parse3(lex2(src)));
         return true;
       } catch (e) {
@@ -38326,18 +37648,18 @@ function loadAllStdlib(interp2) {
   });
   const _aliases = {
     // ── get-in / assoc-in / update-in (깊은 접근 + 업데이트) ─────────────────
-    "get-in": (m, path19) => {
+    "get-in": (m, path15) => {
       let cur = m;
-      for (const k of path19) {
+      for (const k of path15) {
         if (cur === null || cur === void 0) return null;
         cur = cur instanceof Map ? cur.get(k) ?? cur.get(String(k)) ?? null : cur?.[k] ?? null;
       }
       return cur ?? null;
     },
-    "assoc-in": (m, path19, val) => {
-      if (!path19 || path19.length === 0) return val;
-      const key = path19[0];
-      const rest = path19.slice(1);
+    "assoc-in": (m, path15, val) => {
+      if (!path15 || path15.length === 0) return val;
+      const key = path15[0];
+      const rest = path15.slice(1);
       const child = m instanceof Map ? m.get(key) ?? m.get(String(key)) : m?.[key];
       const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? /* @__PURE__ */ new Map(), rest, val) : val;
       if (m instanceof Map) {
@@ -38347,29 +37669,29 @@ function loadAllStdlib(interp2) {
       }
       return Object.assign({}, m ?? {}, { [String(key)]: updated });
     },
-    "update-in": (m, path19, fn, ...args3) => {
-      const cur = _aliases["get-in"](m, path19);
+    "update-in": (m, path15, fn, ...args2) => {
+      const cur = _aliases["get-in"](m, path15);
       let newVal;
       if (typeof fn === "function") {
-        newVal = fn(cur, ...args3);
+        newVal = fn(cur, ...args2);
       } else if (fn?.kind === "function-value" || fn?.kind === "async-function-value") {
-        newVal = interp2.callFunctionValue(fn, [cur, ...args3]);
+        newVal = interp2.callFunctionValue(fn, [cur, ...args2]);
       } else if (typeof fn?.body === "function") {
-        newVal = fn.body(cur, ...args3);
+        newVal = fn.body(cur, ...args2);
       } else if (typeof fn === "string") {
-        newVal = interp2.callUserFunction(fn, [cur, ...args3]);
+        newVal = interp2.callUserFunction(fn, [cur, ...args2]);
       } else {
         newVal = cur;
       }
-      return _aliases["assoc-in"](m, path19, newVal);
+      return _aliases["assoc-in"](m, path15, newVal);
     },
     // ── format (sprintf 스타일) ──────────────────────────────────────────────
     // (format "%.2f" 3.14) → "3.14"  (format "%d items" 5) → "5 items"
-    "format": (fmt, ...args3) => {
+    "format": (fmt, ...args2) => {
       let i = 0;
       return String(fmt).replace(/%([-+]?\d*\.?\d*)?([dfsoxXbeE%])/g, (_, flags, spec) => {
         if (spec === "%") return "%";
-        const val = args3[i++];
+        const val = args2[i++];
         const precMatch = (flags ?? "").match(/\.(\d+)/);
         const prec = precMatch ? parseInt(precMatch[1]) : 6;
         const width = parseInt((flags ?? "").replace(/\.\d+/, "")) || 0;
@@ -38668,8 +37990,8 @@ function loadAllStdlib(interp2) {
     "check_arg_type": function(arg, expectedType) {
       return this["check-arg-type"](arg, expectedType);
     },
-    "validate-args": (args3, types) => {
-      const argsArray = Array.isArray(args3) ? args3 : [args3];
+    "validate-args": (args2, types) => {
+      const argsArray = Array.isArray(args2) ? args2 : [args2];
       const typesArray = Array.isArray(types) ? types : [types];
       for (let i = 0; i < Math.min(argsArray.length, typesArray.length); i++) {
         const actual = typeof argsArray[i] === "number" ? "number" : typeof argsArray[i] === "string" ? "string" : typeof argsArray[i] === "boolean" ? "boolean" : argsArray[i] === null ? "nil" : Array.isArray(argsArray[i]) ? "array" : typeof argsArray[i] === "function" ? "function" : "map";
@@ -38682,8 +38004,8 @@ function loadAllStdlib(interp2) {
       }
       return argsArray;
     },
-    "validate_args": function(args3, types) {
-      return this["validate-args"](args3, types);
+    "validate_args": function(args2, types) {
+      return this["validate-args"](args2, types);
     },
     // AI-Native Phase 4: property-based testing 런타임 함수
     "run-props": () => {
@@ -38693,14 +38015,14 @@ function loadAllStdlib(interp2) {
       for (const [, prop] of propRegistry) {
         const result = runProp(
           prop,
-          (fnName, args3) => {
+          (fnName, args2) => {
             const fnVal = interp2.context?.variables?.get(fnName) ?? interp2.context?.variables?.get("$" + fnName);
             if (!fnVal) throw new Error(`\uD568\uC218 \uC5C6\uC74C: ${fnName}`);
-            return interp2.callFunctionValue(fnVal, args3);
+            return interp2.callFunctionValue(fnVal, args2);
           },
-          (checkFn, args3) => {
+          (checkFn, args2) => {
             if (!checkFn) return true;
-            return interp2.callFunctionValue(checkFn, args3);
+            return interp2.callFunctionValue(checkFn, args2);
           }
         );
         totalPassed += result.passed;
@@ -38868,7 +38190,7 @@ function loadAllStdlib(interp2) {
     "nil_or": (v, d) => v === null || v === void 0 ? d : v,
     "or-default": (v, d) => v === null || v === void 0 ? d : v,
     "or_default": (v, d) => v === null || v === void 0 ? d : v,
-    "coalesce": (...args3) => args3.find((v) => v !== null && v !== void 0) ?? null,
+    "coalesce": (...args2) => args2.find((v) => v !== null && v !== void 0) ?? null,
     // 숫자 inc/dec (Clojure 스타일, swap! 콜백으로 자주 쓰임)
     "inc": (n) => typeof n === "number" ? n + 1 : Number(n) + 1,
     "dec": (n) => typeof n === "number" ? n - 1 : Number(n) - 1,
@@ -38968,40 +38290,40 @@ function loadAllStdlib(interp2) {
     }
   }
   const _overrides = {
-    "log-info": (...args3) => {
-      if (args3.length === 2 && args3[0] && Array.isArray(args3[0].entries))
-        return { ...args3[0], entries: [...args3[0].entries, { ts: Date.now(), level: "info", msg: String(args3[1]) }] };
-      console.log(`[INFO]  ${args3.map(String).join(" ")}`);
+    "log-info": (...args2) => {
+      if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+        return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "info", msg: String(args2[1]) }] };
+      console.log(`[INFO]  ${args2.map(String).join(" ")}`);
       return null;
     },
-    "log_info": (...args3) => {
-      if (args3.length === 2 && args3[0] && Array.isArray(args3[0].entries))
-        return { ...args3[0], entries: [...args3[0].entries, { ts: Date.now(), level: "info", msg: String(args3[1]) }] };
-      console.log(`[INFO]  ${args3.map(String).join(" ")}`);
+    "log_info": (...args2) => {
+      if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+        return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "info", msg: String(args2[1]) }] };
+      console.log(`[INFO]  ${args2.map(String).join(" ")}`);
       return null;
     },
-    "log-warn": (...args3) => {
-      if (args3.length === 2 && args3[0] && Array.isArray(args3[0].entries))
-        return { ...args3[0], entries: [...args3[0].entries, { ts: Date.now(), level: "warn", msg: String(args3[1]) }] };
-      console.warn(`[WARN]  ${args3.map(String).join(" ")}`);
+    "log-warn": (...args2) => {
+      if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+        return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "warn", msg: String(args2[1]) }] };
+      console.warn(`[WARN]  ${args2.map(String).join(" ")}`);
       return null;
     },
-    "log_warn": (...args3) => {
-      if (args3.length === 2 && args3[0] && Array.isArray(args3[0].entries))
-        return { ...args3[0], entries: [...args3[0].entries, { ts: Date.now(), level: "warn", msg: String(args3[1]) }] };
-      console.warn(`[WARN]  ${args3.map(String).join(" ")}`);
+    "log_warn": (...args2) => {
+      if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+        return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "warn", msg: String(args2[1]) }] };
+      console.warn(`[WARN]  ${args2.map(String).join(" ")}`);
       return null;
     },
-    "log-error": (...args3) => {
-      if (args3.length === 2 && args3[0] && Array.isArray(args3[0].entries))
-        return { ...args3[0], entries: [...args3[0].entries, { ts: Date.now(), level: "error", msg: String(args3[1]) }] };
-      console.error(`[ERROR] ${args3.map(String).join(" ")}`);
+    "log-error": (...args2) => {
+      if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+        return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "error", msg: String(args2[1]) }] };
+      console.error(`[ERROR] ${args2.map(String).join(" ")}`);
       return null;
     },
-    "log_error": (...args3) => {
-      if (args3.length === 2 && args3[0] && Array.isArray(args3[0].entries))
-        return { ...args3[0], entries: [...args3[0].entries, { ts: Date.now(), level: "error", msg: String(args3[1]) }] };
-      console.error(`[ERROR] ${args3.map(String).join(" ")}`);
+    "log_error": (...args2) => {
+      if (args2.length === 2 && args2[0] && Array.isArray(args2[0].entries))
+        return { ...args2[0], entries: [...args2[0].entries, { ts: Date.now(), level: "error", msg: String(args2[1]) }] };
+      console.error(`[ERROR] ${args2.map(String).join(" ")}`);
       return null;
     },
     "stdlib-list": () => [...interp2.context.functions.keys()].sort(),
@@ -39744,9 +39066,9 @@ function bindParam(interp2, param, value) {
     }
   }
 }
-function callUserFunction(interp2, name, args3) {
+function callUserFunction(interp2, name, args2) {
   if (interp2.tcoMode) {
-    return callUserFunctionTCO(interp2, name, args3);
+    return callUserFunctionTCO(interp2, name, args2);
   }
   if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
     try {
@@ -39767,7 +39089,7 @@ function callUserFunction(interp2, name, args3) {
         initialVars.set(vmName, vmFuncObj);
       }
       for (let i = 0; i < vmFunc._params.length; i++) {
-        initialVars.set(vmFunc._params[i], args3[i] ?? null);
+        initialVars.set(vmFunc._params[i], args2[i] ?? null);
       }
       return _callVM.run(vmFunc._chunk, initialVars);
     } catch {
@@ -39792,9 +39114,9 @@ function callUserFunction(interp2, name, args3) {
   if (!func) {
     const v = interp2.context.variables.get(baseName) ?? interp2.context.variables.get("$" + baseName);
     if (v && (v.kind === "function-value" || v.kind === "async-function-value" || typeof v === "function" || v.params && v.body)) {
-      if (v.kind === "function-value") return callFunctionValue(interp2, v, args3);
-      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp2, v, args3);
-      if (typeof v === "function") return v(...args3);
+      if (v.kind === "function-value") return callFunctionValue(interp2, v, args2);
+      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp2, v, args2);
+      if (typeof v === "function") return v(...args2);
       func = v;
     }
   }
@@ -39817,7 +39139,7 @@ function callUserFunction(interp2, name, args3) {
       hint
     );
   }
-  if (func._call) return func._call(...args3);
+  if (func._call) return func._call(...args2);
   let isGenericCall = false;
   if (func.generics && func.generics.length > 0) {
     if (!typeArgs) {
@@ -39832,23 +39154,23 @@ function callUserFunction(interp2, name, args3) {
     isGenericCall = true;
   }
   if (!isGenericCall && interp2.context.runtimeTypeChecker) {
-    interp2.context.runtimeTypeChecker.checkCall(baseName, args3);
+    interp2.context.runtimeTypeChecker.checkCall(baseName, args2);
   }
   if (typeof func.body === "function") {
-    return func.body(...args3);
+    return func.body(...args2);
   }
   if (func.paramDefaults) {
-    while (args3.length < func.params.length) {
-      const def = func.paramDefaults[args3.length];
-      if (def !== void 0) args3 = [...args3, interp2.eval(def)];
+    while (args2.length < func.params.length) {
+      const def = func.paramDefaults[args2.length];
+      if (def !== void 0) args2 = [...args2, interp2.eval(def)];
       else break;
     }
   }
-  if (func.params.length > args3.length) {
+  if (func.params.length > args2.length) {
     const paramNames = func.params.map(
       (p) => typeof p === "string" ? p.replace(/^\$/, "") : p?.kind === "variable" ? p.name.replace(/^\$/, "") : "\u2026"
     );
-    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
+    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args2.length}`);
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
     const _stack2 = interp2.callStack ?? [];
@@ -39875,7 +39197,7 @@ ${tail}` : "")
   }
   const exitProfiler = globalProfiler.enter(baseName);
   const _callStack = interp2.context.callStack;
-  const _argsBrief = args3.slice(0, 5).map(
+  const _argsBrief = args2.slice(0, 5).map(
     (a) => a === null ? "nil" : Array.isArray(a) ? `[${a.length}]` : typeof a === "object" ? "{obj}" : typeof a === "function" ? "<fn>" : typeof a === "string" ? a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"` : String(a)
   );
   const _stackEntry = { name: baseName, line: interp2.currentLine, args: _argsBrief };
@@ -39885,9 +39207,9 @@ ${tail}` : "")
   if (func.paramAnnotations) {
     for (let _ti = 0; _ti < func.params.length; _ti++) {
       const _ann = func.paramAnnotations[_ti];
-      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args2[_ti])) {
         throw new TypeError(
-          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uD30C\uB77C\uBBF8\uD130 '${func.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uD30C\uB77C\uBBF8\uD130 '${func.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args2[_ti])} \uC804\uB2EC\uB428`
         );
       }
     }
@@ -39903,7 +39225,7 @@ ${tail}` : "")
     try {
       interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
-        bindParam(interp2, func.params[i], args3[i]);
+        bindParam(interp2, func.params[i], args2[i]);
       }
       result = interp2.eval(func.body);
       if (func.returnAnnotation && func.returnAnnotation !== "any" && !_flCheckType(func.returnAnnotation, result)) {
@@ -39941,7 +39263,7 @@ ${tail}` : "")
         checkBudget(Date.now(), 0, 0);
       }
       for (let i = 0; i < func.params.length; i++) {
-        bindParam(interp2, func.params[i], args3[i]);
+        bindParam(interp2, func.params[i], args2[i]);
       }
       let result;
       try {
@@ -39954,7 +39276,7 @@ ${tail}` : "")
         throw e;
       }
       if (result && typeof result === "object" && result.__FL_RECUR__) {
-        args3 = result.__args;
+        args2 = result.__args;
         continue;
       }
       return result;
@@ -39968,18 +39290,18 @@ ${tail}` : "")
     exitProfiler();
   }
 }
-function callFunctionValue(interp2, fn, args3) {
+function callFunctionValue(interp2, fn, args2) {
   if (interp2.tcoMode) {
-    return callFunctionValueTCO(interp2, fn, args3);
+    return callFunctionValueTCO(interp2, fn, args2);
   }
-  if (fn._call) return fn._call(...args3);
+  if (fn._call) return fn._call(...args2);
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
   }
   if (fn.paramDefaults) {
-    while (args3.length < fn.params.length) {
-      const def = fn.paramDefaults[args3.length];
-      if (def !== void 0) args3 = [...args3, def];
+    while (args2.length < fn.params.length) {
+      const def = fn.paramDefaults[args2.length];
+      if (def !== void 0) args2 = [...args2, def];
       else break;
     }
   }
@@ -39989,10 +39311,10 @@ function callFunctionValue(interp2, fn, args3) {
   if (fn.paramAnnotations) {
     for (let _ti = 0; _ti < fn.params.length; _ti++) {
       const _ann = fn.paramAnnotations[_ti];
-      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args2[_ti])) {
         const _fn = fn.name ?? "\uC775\uBA85";
         throw new TypeError(
-          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uD30C\uB77C\uBBF8\uD130 '${fn.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uD30C\uB77C\uBBF8\uD130 '${fn.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args2[_ti])} \uC804\uB2EC\uB428`
         );
       }
     }
@@ -40004,7 +39326,7 @@ function callFunctionValue(interp2, fn, args3) {
   try {
     interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
-      bindParam(interp2, fn.params[i], args3[i]);
+      bindParam(interp2, fn.params[i], args2[i]);
     }
     result = interp2.eval(fn.body);
     if (fn.returnAnnotation && fn.returnAnnotation !== "any") {
@@ -40032,22 +39354,22 @@ function callFunctionValue(interp2, fn, args3) {
   }
   return result;
 }
-function callAsyncFunctionValue(interp2, fn, args3) {
+function callAsyncFunctionValue(interp2, fn, args2) {
   if (fn.kind !== "async-function-value") {
     throw new Error(`Expected async-function-value, got ${fn.kind}`);
   }
-  return new FreeLangPromise((resolve9, reject) => {
+  return new FreeLangPromise((resolve7, reject) => {
     const savedStack = interp2.context.variables.saveStack();
     try {
       interp2.context.variables.fromSnapshot(fn.capturedEnv);
       for (let i = 0; i < fn.params.length; i++) {
-        bindParam(interp2, fn.params[i], args3[i]);
+        bindParam(interp2, fn.params[i], args2[i]);
       }
       const result = interp2.eval(fn.body);
       if (result instanceof FreeLangPromise) {
-        result.then((value) => resolve9(value)).catch((error) => reject(error));
+        result.then((value) => resolve7(value)).catch((error) => reject(error));
       } else {
-        resolve9(result);
+        resolve7(result);
       }
     } catch (error) {
       reject(error);
@@ -40056,31 +39378,31 @@ function callAsyncFunctionValue(interp2, fn, args3) {
     }
   });
 }
-function callFunction(interp2, fn, args3) {
+function callFunction(interp2, fn, args2) {
   if (fn.kind === "builtin-function") {
-    return fn.fn(args3.map((arg) => interp2.eval(arg)));
+    return fn.fn(args2.map((arg) => interp2.eval(arg)));
   } else if (fn.kind === "function-value") {
-    return callFunctionValue(interp2, fn, args3);
+    return callFunctionValue(interp2, fn, args2);
   } else if (fn.kind === "async-function-value") {
-    return callAsyncFunctionValue(interp2, fn, args3);
+    return callAsyncFunctionValue(interp2, fn, args2);
   } else if (typeof fn === "function") {
-    return fn(...args3);
+    return fn(...args2);
   } else if (typeof fn === "string") {
-    const wrappedArgs = args3.map((v) => ({
+    const wrappedArgs = args2.map((v) => ({
       kind: "literal",
       value: v,
       type: v === null ? "any" : Array.isArray(v) ? "list" : typeof v
     }));
     return interp2.eval({ kind: "sexpr", op: fn, args: wrappedArgs });
   } else if (fn && fn.params && fn.body) {
-    return callUserFunction(interp2, fn.name || "anonymous", args3);
+    return callUserFunction(interp2, fn.name || "anonymous", args2);
   } else {
     throw new Error(`Cannot call ${typeof fn}: ${JSON.stringify(fn).slice(0, 100)}`);
   }
 }
-function callUserFunctionTCO(interp2, name, args3) {
+function callUserFunctionTCO(interp2, name, args2) {
   let currentName = name;
-  let currentArgs = args3;
+  let currentArgs = args2;
   const prevTcoMode = interp2.tcoMode;
   interp2.tcoMode = true;
   try {
@@ -40168,12 +39490,12 @@ function callUserFunctionTCO(interp2, name, args3) {
     interp2.tcoMode = prevTcoMode;
   }
 }
-function callFunctionValueTCO(interp2, fn, args3) {
+function callFunctionValueTCO(interp2, fn, args2) {
   const prevTcoMode = interp2.tcoMode;
   interp2.tcoMode = true;
   try {
     let currentFn = fn;
-    let currentArgs = args3;
+    let currentArgs = args2;
     for (let i = 0; i < 1e6; i++) {
       if (currentFn.kind !== "function-value") {
         throw new Error(`Expected function-value, got ${currentFn.kind}`);
@@ -40205,17 +39527,17 @@ function callFunctionValueTCO(interp2, fn, args3) {
     interp2.tcoMode = prevTcoMode;
   }
 }
-function callUserFunctionRaw(interp2, name, args3) {
+function callUserFunctionRaw(interp2, name, args2) {
   const func = interp2.context.functions.get(name);
   if (!func) throw new FunctionNotFoundError(name, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0);
-  if (typeof func.body === "function") return func.body(...args3);
+  if (typeof func.body === "function") return func.body(...args2);
   let result;
   if (func.capturedEnv) {
     const savedStack = interp2.context.variables.saveStack();
     try {
       interp2.context.variables.fromSnapshot(func.capturedEnv);
       for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args3[i]);
+        interp2.context.variables.set(func.params[i], args2[i]);
       }
       result = interp2.eval(func.body);
     } finally {
@@ -40225,7 +39547,7 @@ function callUserFunctionRaw(interp2, name, args3) {
     interp2.context.variables.push();
     try {
       for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args3[i]);
+        interp2.context.variables.set(func.params[i], args2[i]);
       }
       result = interp2.eval(func.body);
     } finally {
@@ -40234,13 +39556,13 @@ function callUserFunctionRaw(interp2, name, args3) {
   }
   return result;
 }
-function callFunctionValueRaw(interp2, fn, args3) {
+function callFunctionValueRaw(interp2, fn, args2) {
   if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
   const savedStack = interp2.context.variables.saveStack();
   try {
     interp2.context.variables.fromSnapshot(fn.capturedEnv);
     for (let i = 0; i < fn.params.length; i++) {
-      interp2.context.variables.set(fn.params[i], args3[i]);
+      interp2.context.variables.set(fn.params[i], args2[i]);
     }
     return interp2.eval(fn.body);
   } finally {
@@ -40361,8 +39683,8 @@ var MacroExpander = class {
   astToString(node) {
     if (node.kind === "sexpr") {
       const s = node;
-      const args3 = s.args.map((a) => this.astToString(a)).join(" ");
-      return `(${s.op}${args3 ? " " + args3 : ""})`;
+      const args2 = s.args.map((a) => this.astToString(a)).join(" ");
+      return `(${s.op}${args2 ? " " + args2 : ""})`;
     }
     if (node.kind === "literal") {
       const l = node;
@@ -40509,15 +39831,15 @@ var StructRegistry = class {
   makeConstructor(name) {
     const def = this.structs.get(name);
     if (!def) throw new Error(`StructRegistry: unknown struct "${name}"`);
-    return (...args3) => {
-      if (args3.length !== def.fields.length) {
+    return (...args2) => {
+      if (args2.length !== def.fields.length) {
         throw new Error(
-          `${name} constructor: expected ${def.fields.length} arguments, got ${args3.length}`
+          `${name} constructor: expected ${def.fields.length} arguments, got ${args2.length}`
         );
       }
       const obj = { __type: name };
       for (let i = 0; i < def.fields.length; i++) {
-        obj[def.fields[i].name] = args3[i];
+        obj[def.fields[i].name] = args2[i];
       }
       return obj;
     };
@@ -40568,8 +39890,135 @@ var StructRegistry = class {
   }
 };
 
-// src/interpreter.ts
-init_debugger();
+// src/debugger.ts
+var DebugSession = class _DebugSession {
+  constructor() {
+    /** 중단점 집합 — "file:line" 형태 */
+    this.breakpoints = /* @__PURE__ */ new Set();
+    /** step 모드 — true면 모든 줄에서 break */
+    this.stepMode = false;
+    /** 디버그 모드 활성화 여부 */
+    this.enabled = false;
+    /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
+    this.onBreakCallback = null;
+    /** 소스맵 (선택적) */
+    this.sourceMap = null;
+    /** 브레이크 이벤트 로그 (테스트 검증용) */
+    this.breakLog = [];
+    /** watch 변수 목록 */
+    this.watchList = /* @__PURE__ */ new Set();
+    /** 호출 스택 */
+    this.callStack = [];
+  }
+  static _key(file, line) {
+    return `${file}:${line}`;
+  }
+  /** 중단점 추가 */
+  addBreakpoint(file, line) {
+    this.breakpoints.add(_DebugSession._key(file, line));
+  }
+  /** 중단점 제거 */
+  removeBreakpoint(file, line) {
+    this.breakpoints.delete(_DebugSession._key(file, line));
+  }
+  /** 해당 위치가 중단점인지 확인 */
+  isBreakpoint(file, line) {
+    return this.breakpoints.has(_DebugSession._key(file, line));
+  }
+  /**
+   * 중단점 도달 시 처리:
+   * - 콘솔에 "[BREAK] file:line:col" 출력
+   * - 환경 변수 스냅샷 기록
+   * - watch 변수 값 출력
+   * - 호출 스택 출력
+   * - 콜백 실행
+   */
+  onBreak(loc, env2) {
+    if (!this.enabled) return;
+    const event = { loc, env: { ...env2 } };
+    this.breakLog.push(event);
+    const locStr = `${loc.file}:${loc.line}:${loc.col}`;
+    console.log(`[BREAK] ${locStr}`);
+    if (this.callStack.length > 0) {
+      console.log(`  stack: [${this.callStack.join(" > ")}]`);
+    }
+    if (this.watchList.size > 0) {
+      const watchValues = this.getWatchValues(env2);
+      const hasWatched = Object.keys(watchValues).length > 0;
+      if (hasWatched) {
+        console.log(`  \u{1F441} watch:`);
+        for (const [k, v] of Object.entries(watchValues)) {
+          const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+          console.log(`    ${k} = ${display.slice(0, 80)}`);
+        }
+      }
+    }
+    const entries = Object.entries(env2).slice(0, 10);
+    if (entries.length > 0) {
+      console.log(`  env:`);
+      for (const [k, v] of entries) {
+        const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+        console.log(`    ${k} = ${display.slice(0, 80)}`);
+      }
+    }
+    if (this.onBreakCallback) {
+      this.onBreakCallback(event);
+    }
+  }
+  /** 중단점 모두 제거 */
+  clearBreakpoints() {
+    this.breakpoints.clear();
+  }
+  /** 중단점 개수 */
+  breakpointCount() {
+    return this.breakpoints.size;
+  }
+  /** watch에 변수 추가 */
+  addWatch(varName) {
+    this.watchList.add(varName);
+  }
+  /** watch에서 변수 제거 */
+  removeWatch(varName) {
+    this.watchList.delete(varName);
+  }
+  /** watch 중인 변수들의 현재값 반환 */
+  getWatchValues(env2) {
+    const values = {};
+    for (const varName of this.watchList) {
+      if (varName in env2) {
+        values[varName] = env2[varName];
+      } else {
+        values[varName] = void 0;
+      }
+    }
+    return values;
+  }
+  /** 호출 스택에 함수명 추가 */
+  pushCall(fnName) {
+    this.callStack.push(fnName);
+  }
+  /** 호출 스택에서 제거 */
+  popCall() {
+    if (this.callStack.length > 0) {
+      this.callStack.pop();
+    }
+  }
+  /** 현재 호출 스택 반환 */
+  getStack() {
+    return [...this.callStack];
+  }
+};
+var _globalSession = null;
+function getGlobalDebugSession() {
+  if (!_globalSession) {
+    _globalSession = new DebugSession();
+  }
+  return _globalSession;
+}
+function handleBreak(session, loc, env2) {
+  if (!session.enabled) return;
+  session.onBreak(loc, env2);
+}
 
 // src/cot.ts
 var ChainOfThought = class {
@@ -40659,7 +40108,7 @@ var ChainOfThought = class {
     return this;
   }
 };
-function evalCotForm(args3, evalFn, setVar, getVar) {
+function evalCotForm(args2, evalFn, setVar, getVar) {
   const cot = new ChainOfThought();
   let concludeFn = null;
   function isKeyword(node, name) {
@@ -40669,12 +40118,12 @@ function evalCotForm(args3, evalFn, setVar, getVar) {
     return false;
   }
   let i = 0;
-  while (i < args3.length) {
-    const arg = args3[i];
+  while (i < args2.length) {
+    const arg = args2[i];
     if (isKeyword(arg, "step")) {
       i++;
-      if (i >= args3.length) throw new Error("COT :step requires a description string");
-      const descNode = args3[i];
+      if (i >= args2.length) throw new Error("COT :step requires a description string");
+      const descNode = args2[i];
       let desc;
       if (descNode?.kind === "literal" && typeof descNode.value === "string") {
         desc = descNode.value;
@@ -40682,14 +40131,14 @@ function evalCotForm(args3, evalFn, setVar, getVar) {
         desc = String(evalFn(descNode));
       }
       i++;
-      if (i >= args3.length) throw new Error(`COT :step "${desc}" requires an expression`);
-      const stepExpr = args3[i];
+      if (i >= args2.length) throw new Error(`COT :step "${desc}" requires an expression`);
+      const stepExpr = args2[i];
       i++;
       let confidence;
-      if (i < args3.length && isKeyword(args3[i], "confidence")) {
+      if (i < args2.length && isKeyword(args2[i], "confidence")) {
         i++;
-        if (i < args3.length) {
-          confidence = Number(evalFn(args3[i]));
+        if (i < args2.length) {
+          confidence = Number(evalFn(args2[i]));
           i++;
         }
       }
@@ -40701,8 +40150,8 @@ function evalCotForm(args3, evalFn, setVar, getVar) {
     }
     if (isKeyword(arg, "conclude")) {
       i++;
-      if (i >= args3.length) throw new Error("COT :conclude requires a function");
-      concludeFn = evalFn(args3[i]);
+      if (i >= args2.length) throw new Error("COT :conclude requires a function");
+      concludeFn = evalFn(args2[i]);
       i++;
       continue;
     }
@@ -41114,11 +40563,11 @@ function evalAgentBlock(fields, evalFn, callFnVal) {
 function createAgentBuiltins(interp2) {
   return {
     // (agent-new :goal "..." :max-steps 10)
-    "agent-new": (...args3) => {
+    "agent-new": (...args2) => {
       const opts = { goal: "unnamed" };
-      for (let i = 0; i < args3.length; i += 2) {
-        const key = String(args3[i]).replace(/^:/, "");
-        const val = args3[i + 1];
+      for (let i = 0; i < args2.length; i += 2) {
+        const key = String(args2[i]).replace(/^:/, "");
+        const val = args2[i + 1];
         if (key === "goal") opts.goal = String(val);
         else if (key === "max-steps") opts.maxSteps = Number(val);
         else if (key === "tools") opts.tools = Array.isArray(val) ? val.map(String) : [];
@@ -41718,7 +41167,7 @@ var Interpreter = class _Interpreter {
   handleAgentBlock(block) {
     const interp2 = this;
     const ev = (node) => interp2.eval(node);
-    const callFnVal = (fn, args3) => interp2.callFunctionValue(fn, args3);
+    const callFnVal = (fn, args2) => interp2.callFunctionValue(fn, args2);
     const state = evalAgentBlock(block.fields, ev, callFnVal);
     this.context.lastValue = state;
   }
@@ -42136,13 +41585,13 @@ var Interpreter = class _Interpreter {
     const base = this.eval(block.fields.get("base")) || "node:20-alpine";
     const workdir = this.eval(block.fields.get("workdir")) || "/app";
     const expose = this.eval(block.fields.get("expose")) || 3e3;
-    const cmd2 = this.eval(block.fields.get("cmd")) || "npm start";
+    const cmd = this.eval(block.fields.get("cmd")) || "npm start";
     const dockerfile = {
       name,
       base,
       workdir,
       expose,
-      cmd: cmd2
+      cmd
     };
     this.context.dockerfiles = this.context.dockerfiles || /* @__PURE__ */ new Map();
     this.context.dockerfiles.set(name, dockerfile);
@@ -42303,10 +41752,10 @@ var Interpreter = class _Interpreter {
       description: String(desc || ""),
       inputSchema,
       outputSchema,
-      execute: (args3) => {
+      execute: (args2) => {
         interp2.context.variables.push();
         try {
-          for (const [k, v] of Object.entries(args3)) {
+          for (const [k, v] of Object.entries(args2)) {
             interp2.context.variables.set(`$${k}`, v);
           }
           return interp2.eval(bodyNode);
@@ -42321,7 +41770,7 @@ var Interpreter = class _Interpreter {
   // Phase 97: [USE-TOOL toolname :args {key val ...}]
   handleUseToolBlock(block) {
     const name = block.name;
-    const args3 = {};
+    const args2 = {};
     if (block.fields.has("args")) {
       const argsNode = block.fields.get("args");
       if (argsNode?.kind === "block" && argsNode?.type === "Map") {
@@ -42329,12 +41778,12 @@ var Interpreter = class _Interpreter {
         if (Array.isArray(entries)) {
           for (let i = 0; i < entries.length - 1; i += 2) {
             const key = entries[i]?.kind === "keyword" ? entries[i].name : entries[i]?.kind === "literal" ? String(entries[i].value) : String(entries[i]);
-            args3[key] = this.eval(entries[i + 1]);
+            args2[key] = this.eval(entries[i + 1]);
           }
         }
       }
     }
-    const result = globalToolRegistry.executeSync(name, args3);
+    const result = globalToolRegistry.executeSync(name, args2);
     return result.success ? result.output : (() => {
       throw new Error(result.error || `Tool failed: ${name}`);
     })();
@@ -42346,7 +41795,7 @@ var Interpreter = class _Interpreter {
   }
   handleRouteBlock(block) {
     const method = this.getFieldValue(block, "method", "GET");
-    const path19 = this.getFieldValue(block, "path", "/");
+    const path15 = this.getFieldValue(block, "path", "/");
     const handler = block.fields.get("handler");
     if (!handler) {
       throw new Error(`[ROUTE ${block.name}] Missing :handler`);
@@ -42354,7 +41803,7 @@ var Interpreter = class _Interpreter {
     this.context.routes.set(block.name, {
       name: block.name,
       method: method.toLowerCase(),
-      path: path19,
+      path: path15,
       handler
     });
   }
@@ -42628,11 +42077,11 @@ var Interpreter = class _Interpreter {
         if (concreteType) {
           const method = this.resolveMethod(className, concreteType, methodName);
           if (method) {
-            const args4 = expr2.args.slice(1).map((arg) => this.eval(arg));
+            const args3 = expr2.args.slice(1).map((arg) => this.eval(arg));
             if (method.kind === "function-value") {
-              return this.callFunctionValue(method, [concreteValue, ...args4]);
+              return this.callFunctionValue(method, [concreteValue, ...args3]);
             } else if (typeof method === "function") {
-              return method(concreteValue, ...args4);
+              return method(concreteValue, ...args3);
             }
           }
         }
@@ -42649,7 +42098,7 @@ var Interpreter = class _Interpreter {
     if (op === "REFLECT") {
       const interp2 = this;
       const ev = (node) => interp2.eval(node);
-      const callFnVal = (fn, args4) => interp2.callFunctionValue(fn, args4);
+      const callFnVal = (fn, args3) => interp2.callFunctionValue(fn, args3);
       let outputExpr = null;
       let criteriaExpr = null;
       let thresholdExpr = null;
@@ -42753,40 +42202,40 @@ var Interpreter = class _Interpreter {
       };
       const interp2 = this;
       const tot = new TreeOfThought();
-      const args4 = expr2.args;
+      const args3 = expr2.args;
       let i = 0;
       let scoreFnNode = null;
       let pruneThreshold = null;
       let selectStrategy = "best";
       let selectK = 1;
-      while (i < args4.length) {
-        const arg = args4[i];
+      while (i < args3.length) {
+        const arg = args3[i];
         if (isTotKeyword(arg, "branch")) {
           i++;
-          const hypoNode = args4[i];
+          const hypoNode = args3[i];
           i++;
-          const exprNode = args4[i];
+          const exprNode = args3[i];
           i++;
           const hypo = String(interp2.eval(hypoNode));
           const capturedNode = exprNode;
           tot.branch(hypo, () => interp2.eval(capturedNode));
         } else if (isTotKeyword(arg, "eval")) {
           i++;
-          scoreFnNode = args4[i];
+          scoreFnNode = args3[i];
           i++;
         } else if (isTotKeyword(arg, "prune")) {
           i++;
-          pruneThreshold = Number(interp2.eval(args4[i]));
+          pruneThreshold = Number(interp2.eval(args3[i]));
           i++;
         } else if (isTotKeyword(arg, "select")) {
           i++;
-          const selVal = interp2.eval(args4[i]);
+          const selVal = interp2.eval(args3[i]);
           i++;
           if (selVal === "top-k") selectStrategy = "top-k";
           else selectStrategy = "best";
         } else if (isTotKeyword(arg, "k")) {
           i++;
-          selectK = Number(interp2.eval(args4[i]));
+          selectK = Number(interp2.eval(args3[i]));
           i++;
         } else {
           i++;
@@ -42838,30 +42287,30 @@ var Interpreter = class _Interpreter {
       } catch (_vmErr) {
       }
     }
-    const args3 = expr2.args.map((arg) => this.eval(arg));
-    if (args3.length >= 1 && typeof args3[0] === "string") {
-      const qualifiedName = `${op}:${args3[0]}`;
+    const args2 = expr2.args.map((arg) => this.eval(arg));
+    if (args2.length >= 1 && typeof args2[0] === "string") {
+      const qualifiedName = `${op}:${args2[0]}`;
       if (this.context.functions.has(qualifiedName)) {
-        return this.callUserFunction(qualifiedName, args3.slice(1));
+        return this.callUserFunction(qualifiedName, args2.slice(1));
       }
     }
     if (this.context.protocols.hasMethod(op)) {
-      if (args3.length >= 1) {
-        const selfVal = args3[0];
+      if (args2.length >= 1) {
+        const selfVal = args2[0];
         const impl = this.context.protocols.resolveMethod(op, selfVal);
         if (impl) {
           const methodDef = impl.methods.get(op);
-          return this.callProtocolMethod(methodDef, selfVal, args3.slice(1));
+          return this.callProtocolMethod(methodDef, selfVal, args2.slice(1));
         }
       }
     }
     const nativeKey = `__native_${op}`;
     if (this.context[nativeKey] !== void 0) {
       const nativeFn = this.context[nativeKey];
-      return nativeFn(...args3);
+      return nativeFn(...args2);
     }
     try {
-      return evalBuiltin(this, op, args3, expr2);
+      return evalBuiltin(this, op, args2, expr2);
     } catch (err4) {
       if (err4 && err4.constructor && err4.constructor.name === "ReturnSignal") throw err4;
       if (err4?.name === "BudgetExceededError") throw err4;
@@ -43036,31 +42485,31 @@ var Interpreter = class _Interpreter {
     return String(val);
   }
   // Phase 58: 함수 호출 로직 eval-call-function.ts로 분리
-  callUserFunction(name, args3) {
-    return callUserFunction(this, name, args3);
+  callUserFunction(name, args2) {
+    return callUserFunction(this, name, args2);
   }
-  callFunctionValue(fn, args3) {
-    return callFunctionValue(this, fn, args3);
+  callFunctionValue(fn, args2) {
+    return callFunctionValue(this, fn, args2);
   }
-  callAsyncFunctionValue(fn, args3) {
-    return callAsyncFunctionValue(this, fn, args3);
+  callAsyncFunctionValue(fn, args2) {
+    return callAsyncFunctionValue(this, fn, args2);
   }
-  callFunction(fn, args3) {
-    return callFunction(this, fn, args3);
+  callFunction(fn, args2) {
+    return callFunction(this, fn, args2);
   }
   // Phase 61: TCO 메서드 — 꼬리 재귀를 반복문으로 (100만 재귀 스택 없이)
-  callUserFunctionTCO(name, args3) {
-    return callUserFunctionTCO(this, name, args3);
+  callUserFunctionTCO(name, args2) {
+    return callUserFunctionTCO(this, name, args2);
   }
-  callFunctionValueTCO(fn, args3) {
-    return callFunctionValueTCO(this, fn, args3);
+  callFunctionValueTCO(fn, args2) {
+    return callFunctionValueTCO(this, fn, args2);
   }
   // trampoline용 raw 메서드 (TailCall 토큰 그대로 반환)
-  callUserFunctionRaw(name, args3) {
-    return callUserFunctionRaw(this, name, args3);
+  callUserFunctionRaw(name, args2) {
+    return callUserFunctionRaw(this, name, args2);
   }
-  callFunctionValueRaw(fn, args3) {
-    return callFunctionValueRaw(this, fn, args3);
+  callFunctionValueRaw(fn, args2) {
+    return callFunctionValueRaw(this, fn, args2);
   }
   getFieldValue(block, key, defaultValue = null) {
     const field = block.fields.get(key);
@@ -43095,12 +42544,12 @@ var Interpreter = class _Interpreter {
       throw new Error(`Loop init must be sexpr, got: ${init.kind}`);
     }
     const op = init.op;
-    const args3 = init.args || [];
-    if (!op || args3.length < 1) {
+    const args2 = init.args || [];
+    if (!op || args2.length < 1) {
       throw new Error("Loop init must be ($var val)");
     }
     const varName = String(op);
-    const initVal = this.eval(args3[0]);
+    const initVal = this.eval(args2[0]);
     const loopScope = /* @__PURE__ */ new Map();
     loopScope.set(varName, initVal);
     this.scopes.push(loopScope);
@@ -43227,4567 +42676,30 @@ var Interpreter = class _Interpreter {
     this.logger.info("Interpreter cleanup completed");
   }
 };
+var globalInterpreterInstance = null;
+function interpret(blocks, logger) {
+  const interpreter = new Interpreter(logger);
+  globalInterpreterInstance = interpreter;
+  if (!process.listeners("exit").some((l) => l.name === "cleanupInterpreter")) {
+    const cleanupInterpreter = function() {
+      if (globalInterpreterInstance) {
+        globalInterpreterInstance.destroy();
+        globalInterpreterInstance = null;
+      }
+    };
+    Object.defineProperty(cleanupInterpreter, "name", { value: "cleanupInterpreter" });
+    process.on("exit", cleanupInterpreter);
+  }
+  return interpreter.interpret(blocks);
+}
 
-// src/formatter.ts
+// src/runtime-entry.ts
 init_lexer();
 init_parser();
-function extractComments(src) {
-  const result = [];
-  const lines = src.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed.startsWith(";")) {
-      result.push({ line: i + 1, text: trimmed });
-    } else {
-      const idx = lines[i].indexOf(";");
-      if (idx >= 0) {
-        const before = lines[i].slice(0, idx);
-        const quoteCount = (before.match(/(?<!\\)"/g) || []).length;
-        if (quoteCount % 2 === 0) {
-          result.push({ line: i + 1, text: lines[i].slice(idx).trim() });
-        }
-      }
-    }
-  }
-  return result;
-}
-var FLFormatter = class {
-  constructor() {
-    this.indentStr = "  ";
-    // 2칸
-    this.maxWidth = 80;
-  }
-  /** 소스 코드를 정형화된 문자열로 변환 */
-  format(src) {
-    const trimmed = src.trim();
-    if (!trimmed) return "";
-    const comments = extractComments(src);
-    const tokens = lex(src);
-    const nodes = parse(tokens);
-    const parts = [];
-    for (const node of nodes) {
-      parts.push(this.formatNode(node, 0));
-    }
-    const lines = [];
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const node = nodes[i];
-      if (i > 0 && (node.kind === "block" || node.kind === "module")) {
-        lines.push("");
-      }
-      lines.push(part);
-    }
-    return lines.join("\n") + "\n";
-  }
-  // ───────────────────────────────────────
-  // 노드 포맷 디스패처
-  // ───────────────────────────────────────
-  formatNode(node, depth) {
-    switch (node.kind) {
-      case "literal":
-        return this.formatLiteral(node);
-      case "variable":
-        return `$${node.name}`;
-      case "keyword":
-        return `:${node.name}`;
-      case "sexpr":
-        return this.formatSExpr(node, depth);
-      case "block":
-        return this.formatBlock(node, depth);
-      case "pattern-match":
-        return this.formatPatternMatch(node, depth);
-      case "function-value":
-        return this.formatFunctionValue(node, depth);
-      case "type-class":
-        return this.formatTypeClass(node, depth);
-      case "type-class-instance":
-        return this.formatTypeClassInstance(node, depth);
-      case "module":
-        return this.formatModuleBlock(node, depth);
-      case "import":
-        return this.formatImportBlock(node);
-      case "open":
-        return this.formatOpenBlock(node);
-      case "search-block":
-        return this.formatSearchBlock(node, depth);
-      case "learn-block":
-        return this.formatLearnBlock(node, depth);
-      case "reasoning-block":
-        return this.formatReasoningBlock(node, depth);
-      case "reasoning-sequence":
-        return this.formatReasoningSequence(node, depth);
-      case "async-function":
-        return this.formatAsyncFunction(node, depth);
-      case "await":
-        return this.formatAwait(node, depth);
-      case "try-block":
-        return this.formatTryBlock(node, depth);
-      case "catch-clause":
-        return this.formatCatchClause(node, depth);
-      case "throw":
-        return this.formatThrow(node, depth);
-      case "type-variable":
-        return node.name;
-      default:
-        return String(node.value ?? "");
-    }
-  }
-  // ───────────────────────────────────────
-  // Literal
-  // ───────────────────────────────────────
-  formatLiteral(node) {
-    if (node.type === "string") {
-      return `"${String(node.value).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-    }
-    if (node.type === "null") return "null";
-    if (node.type === "boolean") return String(node.value);
-    if (node.type === "symbol") return String(node.value);
-    return String(node.value);
-  }
-  // ───────────────────────────────────────
-  // SExpr: (op arg1 arg2 ...)
-  // ───────────────────────────────────────
-  formatSExpr(node, depth) {
-    const op = node.op;
-    const args3 = node.args;
-    if (args3.length === 0) {
-      return `(${op})`;
-    }
-    if (op === "fn" || op === "lambda") {
-      return this.formatFn(op, args3, depth);
-    }
-    if (op === "define" || op === "def") {
-      return this.formatDefine(op, args3, depth);
-    }
-    if (op === "let") {
-      return this.formatLet(args3, depth);
-    }
-    if (op === "if") {
-      return this.formatIf(args3, depth);
-    }
-    if (op === "do" || op === "begin") {
-      return this.formatDo(op, args3, depth);
-    }
-    if (op === "cond") {
-      return this.formatCond(args3, depth);
-    }
-    if (op === "match") {
-      return this.formatMatch(args3, depth);
-    }
-    const inlineArgs = args3.map((a) => this.formatNode(a, depth));
-    const inline = `(${op} ${inlineArgs.join(" ")})`;
-    const indent = this.ind(depth);
-    if (inline.length <= this.maxWidth - depth * 2) {
-      return inline;
-    }
-    const innerIndent = this.ind(depth + 1);
-    const formatted = args3.map(
-      (a) => innerIndent + this.formatNode(a, depth + 1)
-    );
-    return `(${op}
-${formatted.join("\n")})`;
-  }
-  // fn/lambda 포맷
-  formatFn(op, args3, depth) {
-    if (args3.length < 2) {
-      return `(${op} ${args3.map((a) => this.formatNode(a, depth)).join(" ")})`;
-    }
-    const params = this.formatNode(args3[0], depth);
-    const bodyParts = args3.slice(1).map((a) => this.formatNode(a, depth + 1));
-    const innerIndent = this.ind(depth + 1);
-    const inline = `(${op} ${params} ${bodyParts.join(" ")})`;
-    if (inline.length <= this.maxWidth - depth * 2) return inline;
-    return `(${op} ${params}
-${bodyParts.map((b) => innerIndent + b).join("\n")})`;
-  }
-  // define/def 포맷
-  formatDefine(op, args3, depth) {
-    if (args3.length === 0) return `(${op})`;
-    const nameNode = args3[0];
-    const name = this.formatNode(nameNode, depth);
-    if (args3.length === 1) return `(${op} ${name})`;
-    const rest = args3.slice(1).map((a) => this.formatNode(a, depth + 1));
-    const inline = `(${op} ${name} ${rest.join(" ")})`;
-    if (inline.length <= this.maxWidth - depth * 2) return inline;
-    const innerIndent = this.ind(depth + 1);
-    return `(${op} ${name}
-${rest.map((r) => innerIndent + r).join("\n")})`;
-  }
-  // let 포맷: (let [[$x val] ...] body)
-  formatLet(args3, depth) {
-    if (args3.length === 0) return "(let)";
-    const bindingsNode = args3[0];
-    const body = args3.slice(1).map((a) => this.formatNode(a, depth + 1));
-    const bindings = this.formatNode(bindingsNode, depth + 1);
-    const inline = `(let ${bindings} ${body.join(" ")})`;
-    if (inline.length <= this.maxWidth - depth * 2) return inline;
-    const innerIndent = this.ind(depth + 1);
-    return `(let ${bindings}
-${body.map((b) => innerIndent + b).join("\n")})`;
-  }
-  // if 포맷
-  formatIf(args3, depth) {
-    const parts = args3.map((a) => this.formatNode(a, depth + 1));
-    const inline = `(if ${parts.join(" ")})`;
-    if (inline.length <= this.maxWidth - depth * 2) return inline;
-    const innerIndent = this.ind(depth + 1);
-    return `(if ${parts[0]}
-${parts.slice(1).map((p) => innerIndent + p).join("\n")})`;
-  }
-  // do/begin 포맷
-  formatDo(op, args3, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const parts = args3.map((a) => innerIndent + this.formatNode(a, depth + 1));
-    return `(${op}
-${parts.join("\n")})`;
-  }
-  // cond 포맷
-  formatCond(args3, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const parts = args3.map((a) => innerIndent + this.formatNode(a, depth + 1));
-    return `(cond
-${parts.join("\n")})`;
-  }
-  // match 포맷
-  formatMatch(args3, depth) {
-    if (args3.length === 0) return "(match)";
-    const subject = this.formatNode(args3[0], depth);
-    const innerIndent = this.ind(depth + 1);
-    const cases = args3.slice(1).map((a) => innerIndent + this.formatNode(a, depth + 1));
-    return `(match ${subject}
-${cases.join("\n")})`;
-  }
-  // ───────────────────────────────────────
-  // Block: [TYPE name :key val ...]
-  // Array Block: [$a $b $c] — items 배열
-  // ───────────────────────────────────────
-  formatBlock(node, depth) {
-    if (node.type === "Array") {
-      const items = node.fields.get("items");
-      if (items) {
-        return this.formatNodeArray(items, depth);
-      }
-      return "[]";
-    }
-    if (node.type === "Map") {
-      const parts = [];
-      for (const [key, val] of node.fields) {
-        const formattedVal = Array.isArray(val) ? this.formatNodeArray(val, depth + 1) : this.formatNode(val, depth + 1);
-        parts.push(`:${key} ${formattedVal}`);
-      }
-      if (parts.length === 0) return "{}";
-      const inline2 = `{${parts.join(" ")}}`;
-      const limit2 = this.maxWidth - depth * 2;
-      if (inline2.length <= limit2) return inline2;
-      const innerIndent2 = this.ind(depth + 1);
-      return `{
-${parts.map((p) => innerIndent2 + p).join("\n")}
-${this.ind(depth)}}`;
-    }
-    const innerIndent = this.ind(depth + 1);
-    const lines = [];
-    const header = `[${node.type} ${node.name}`;
-    const fieldParts = [];
-    for (const [key, val] of node.fields) {
-      const formattedVal = Array.isArray(val) ? this.formatNodeArray(val, depth + 1) : this.formatNode(val, depth + 1);
-      fieldParts.push(`:${key}`, formattedVal);
-    }
-    const inline = fieldParts.length > 0 ? `${header} ${fieldParts.join(" ")}]` : `${header}]`;
-    const limit = this.maxWidth - depth * 2;
-    if (inline.length <= limit) {
-      return inline;
-    }
-    lines.push(header);
-    for (let i = 0; i < fieldParts.length; i += 2) {
-      const key = fieldParts[i];
-      const val = fieldParts[i + 1];
-      lines.push(`${innerIndent}${key} ${val}`);
-    }
-    return lines.join("\n") + "]";
-  }
-  // 배열 노드들을 [...] 형태로 포맷
-  formatNodeArray(nodes, depth) {
-    if (nodes.length === 0) return "[]";
-    const parts = nodes.map((n) => this.formatNode(n, depth));
-    const inline = `[${parts.join(" ")}]`;
-    if (inline.length <= this.maxWidth - depth * 2) return inline;
-    const innerIndent = this.ind(depth + 1);
-    return `[
-${parts.map((p) => innerIndent + p).join("\n")}
-${this.ind(depth)}]`;
-  }
-  // ───────────────────────────────────────
-  // PatternMatch: (match val cases...)
-  // ───────────────────────────────────────
-  formatPatternMatch(node, depth) {
-    const subject = this.formatNode(node.value, depth + 1);
-    const innerIndent = this.ind(depth + 1);
-    const cases = node.cases.map(
-      (c) => innerIndent + this.formatMatchCase(c, depth + 1)
-    );
-    let result = `(match ${subject}
-${cases.join("\n")}`;
-    if (node.defaultCase) {
-      result += `
-${innerIndent}(_ ${this.formatNode(node.defaultCase, depth + 1)})`;
-    }
-    return result + ")";
-  }
-  formatMatchCase(mc, depth) {
-    const pat = this.formatPattern(mc.pattern);
-    const body = this.formatNode(mc.body, depth);
-    if (mc.guard) {
-      const guard = this.formatNode(mc.guard, depth);
-      return `(${pat} :when ${guard} ${body})`;
-    }
-    return `(${pat} ${body})`;
-  }
-  formatPattern(pat) {
-    switch (pat.kind) {
-      case "literal-pattern":
-        return String(pat.value);
-      case "variable-pattern":
-        return `$${pat.name}`;
-      case "wildcard-pattern":
-        return "_";
-      case "list-pattern": {
-        const elems = pat.elements.map((e) => this.formatPattern(e));
-        if (pat.restElement) elems.push(`& $${pat.restElement}`);
-        return `[${elems.join(" ")}]`;
-      }
-      case "struct-pattern": {
-        const fields = [];
-        for (const [k, v] of pat.fields) {
-          fields.push(`:${k} ${this.formatPattern(v)}`);
-        }
-        let s = `{${fields.join(" ")}}`;
-        if (pat.asBinding) s += ` :as $${pat.asBinding}`;
-        return s;
-      }
-      case "or-pattern":
-        return pat.alternatives.map((a) => this.formatPattern(a)).join(" | ");
-      case "range-pattern":
-        return `(range ${pat.min} ${pat.max})`;
-      default:
-        return "_";
-    }
-  }
-  // ───────────────────────────────────────
-  // FunctionValue
-  // ───────────────────────────────────────
-  formatFunctionValue(node, depth) {
-    const params = node.params.map((p) => `$${p}`).join(" ");
-    const body = this.formatNode(node.body, depth + 1);
-    const inline = `(fn [${params}] ${body})`;
-    if (inline.length <= this.maxWidth - depth * 2) return inline;
-    const innerIndent = this.ind(depth + 1);
-    return `(fn [${params}]
-${innerIndent}${body})`;
-  }
-  // ───────────────────────────────────────
-  // TypeClass / Instance
-  // ───────────────────────────────────────
-  formatTypeClass(node, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const typeParams = node.typeParams.join(" ");
-    const methods = [];
-    for (const [name, method] of node.methods) {
-      methods.push(`${innerIndent}:${name} ${this.formatNode(method.type, depth + 1)}`);
-    }
-    return `[TYPECLASS ${node.name} [${typeParams}]
-${innerIndent}:methods [
-${methods.join("\n")}
-${innerIndent}]
-${this.ind(depth)}]`;
-  }
-  formatTypeClassInstance(node, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const impls = [];
-    for (const [name, impl] of node.implementations) {
-      impls.push(`${innerIndent}:${name} ${this.formatNode(impl, depth + 1)}`);
-    }
-    return `[INSTANCE (${node.className} ${node.concreteType})
-${impls.join("\n")}
-${this.ind(depth)}]`;
-  }
-  // ───────────────────────────────────────
-  // Module / Import / Open
-  // ───────────────────────────────────────
-  formatModuleBlock(node, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const exports2 = `[${node.exports.join(" ")}]`;
-    const body = node.body.map((b) => innerIndent + this.formatNode(b, depth + 1)).join("\n");
-    return `[MODULE ${node.name}
-${innerIndent}:exports ${exports2}
-${innerIndent}:body [
-${body}
-${innerIndent}]
-${this.ind(depth)}]`;
-  }
-  formatImportBlock(node) {
-    let s = `(import ${node.moduleName}`;
-    if (node.source) s += ` :from "${node.source}"`;
-    if (node.selective) s += ` :only [${node.selective.join(" ")}]`;
-    if (node.alias) s += ` :as ${node.alias}`;
-    return s + ")";
-  }
-  formatOpenBlock(node) {
-    let s = `(open ${node.moduleName}`;
-    if (node.source) s += ` :from "${node.source}"`;
-    return s + ")";
-  }
-  // ───────────────────────────────────────
-  // Search / Learn / Reasoning
-  // ───────────────────────────────────────
-  formatSearchBlock(node, depth) {
-    let s = `[search "${node.query}" :source "${node.source}"`;
-    if (node.cache !== void 0) s += ` :cache ${node.cache}`;
-    if (node.limit !== void 0) s += ` :limit ${node.limit}`;
-    if (node.name) s += ` :name "${node.name}"`;
-    return s + "]";
-  }
-  formatLearnBlock(node, depth) {
-    let s = `(learn "${node.key}" ${JSON.stringify(node.data)}`;
-    if (node.source) s += ` :source "${node.source}"`;
-    if (node.confidence !== void 0) s += ` :confidence ${node.confidence}`;
-    return s + ")";
-  }
-  formatReasoningBlock(node, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const parts = [];
-    for (const [k, v] of node.data) {
-      parts.push(`${innerIndent}:${k} ${JSON.stringify(v)}`);
-    }
-    if (parts.length === 0) return `(${node.stage})`;
-    return `(${node.stage}
-${parts.join("\n")})`;
-  }
-  formatReasoningSequence(node, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const stages = node.stages.map(
-      (s) => innerIndent + this.formatNode(s, depth + 1)
-    );
-    return `(reasoning-sequence
-${stages.join("\n")})`;
-  }
-  // ───────────────────────────────────────
-  // Async / Await / Try / Throw
-  // ───────────────────────────────────────
-  formatAsyncFunction(node, depth) {
-    const params = node.params.map((p) => `$${p.name}`).join(" ");
-    const body = this.formatNode(node.body, depth + 1);
-    const innerIndent = this.ind(depth + 1);
-    const inline = `[async ${node.name} [${params}] ${body}]`;
-    if (inline.length <= this.maxWidth - depth * 2) return inline;
-    return `[async ${node.name} [${params}]
-${innerIndent}${body}]`;
-  }
-  formatAwait(node, depth) {
-    return `(await ${this.formatNode(node.argument, depth)})`;
-  }
-  formatTryBlock(node, depth) {
-    const innerIndent = this.ind(depth + 1);
-    const body = this.formatNode(node.body, depth + 1);
-    let s = `(try
-${innerIndent}${body}`;
-    if (node.catchClauses) {
-      for (const c of node.catchClauses) {
-        s += `
-${innerIndent}${this.formatCatchClause(c, depth + 1)}`;
-      }
-    }
-    if (node.finallyBlock) {
-      s += `
-${innerIndent}(finally ${this.formatNode(node.finallyBlock, depth + 1)})`;
-    }
-    return s + ")";
-  }
-  formatCatchClause(node, depth) {
-    const handler = this.formatNode(node.handler, depth);
-    if (node.pattern) {
-      return `(catch [${this.formatPattern(node.pattern)}${node.variable ? ` $${node.variable}` : ""}] ${handler})`;
-    }
-    if (node.variable) {
-      return `(catch [$${node.variable}] ${handler})`;
-    }
-    return `(catch ${handler})`;
-  }
-  formatThrow(node, depth) {
-    return `(throw ${this.formatNode(node.argument, depth)})`;
-  }
-  // ───────────────────────────────────────
-  // 유틸
-  // ───────────────────────────────────────
-  ind(depth) {
-    return this.indentStr.repeat(depth);
-  }
-};
-function formatFL(src) {
-  return new FLFormatter().format(src);
-}
-
-// src/type-check-static.ts
-init_lexer();
-init_parser();
-function hintToType(hint) {
-  const h = hint.replace(/^\^/, "").toLowerCase();
-  if (h === "string" || h === "str") return "string";
-  if (h === "number" || h === "num" || h === "int" || h === "float") return "number";
-  if (h === "bool" || h === "boolean") return "bool";
-  if (h === "array" || h === "list" || h === "vec") return "array";
-  if (h === "map" || h === "object" || h === "obj") return "map";
-  if (h === "nil" || h === "null") return "nil";
-  if (h === "fn" || h === "function") return "fn";
-  return "any";
-}
-function literalType(node) {
-  if (!node) return null;
-  if (node.kind === "literal") {
-    if (node.type === "string") return "string";
-    if (node.type === "number") return "number";
-    if (node.type === "boolean") return "bool";
-    if (node.type === "nil") return "nil";
-  }
-  if (node.kind === "block") {
-    if (node.type === "Array") return "array";
-    if (node.type === "Map") return "map";
-  }
-  if (node.kind === "keyword") return "string";
-  return null;
-}
-function resolveArgType(node, varTypes) {
-  const lit = literalType(node);
-  if (lit !== null) return lit;
-  if (node?.kind === "variable" && varTypes.has(node.name)) {
-    return varTypes.get(node.name);
-  }
-  if (node?.kind === "literal" && node?.type === "symbol") {
-    const sym = String(node.value ?? "");
-    if (varTypes.has(sym)) return varTypes.get(sym);
-  }
-  return null;
-}
-function typesCompatible(expected, actual) {
-  if (expected === "any" || actual === "any") return true;
-  return expected === actual;
-}
-var STDLIB_ARITY = /* @__PURE__ */ new Map([
-  ["str", { min: 0, max: Infinity }],
-  ["println", { min: 0, max: Infinity }],
-  ["print", { min: 0, max: Infinity }],
-  ["get", { min: 2, max: 3 }],
-  ["assoc", { min: 3, max: Infinity }],
-  ["dissoc", { min: 2, max: 2 }],
-  ["keys", { min: 1, max: 1 }],
-  ["values", { min: 1, max: 1 }],
-  ["length", { min: 1, max: 1 }],
-  ["map", { min: 2, max: 2 }],
-  ["filter", { min: 2, max: 2 }],
-  ["reduce", { min: 3, max: 3 }],
-  ["append", { min: 2, max: 2 }],
-  ["slice", { min: 2, max: 3 }],
-  ["str-slice", { min: 2, max: 3 }],
-  ["str-substr", { min: 3, max: 3 }],
-  ["str-split", { min: 2, max: 2 }],
-  ["json-parse", { min: 1, max: 1 }],
-  ["json-stringify", { min: 1, max: 2 }],
-  ["now-ms", { min: 0, max: 0 }],
-  ["now-iso", { min: 0, max: 0 }],
-  ["nil?", { min: 1, max: 1 }],
-  ["not", { min: 1, max: 1 }],
-  ["if", { min: 2, max: 3 }],
-  ["let", { min: 2, max: Infinity }],
-  ["do", { min: 1, max: Infinity }],
-  ["or", { min: 2, max: Infinity }],
-  ["and", { min: 2, max: Infinity }],
-  ["contains?", { min: 2, max: 2 }],
-  ["has-key?", { min: 2, max: 2 }],
-  ["http-get-bearer", { min: 2, max: 2 }],
-  ["http-post-bearer", { min: 3, max: 3 }],
-  ["http-parallel", { min: 1, max: 1 }],
-  ["http-retry", { min: 2, max: 3 }],
-  ["http-retry-post", { min: 3, max: 4 }],
-  ["frequencies", { min: 1, max: 1 }],
-  ["auth-sha256", { min: 1, max: 1 }],
-  ["auth-hmac", { min: 2, max: 2 }],
-  ["math-round-dec", { min: 2, max: 2 }],
-  ["server-get", { min: 2, max: 2 }],
-  ["server-post", { min: 2, max: 2 }],
-  ["server-put", { min: 2, max: 2 }],
-  ["server-json", { min: 1, max: 2 }]
-]);
-var SPECIAL_FORMS = /* @__PURE__ */ new Set([
-  "define",
-  "defn",
-  "defun",
-  "fn",
-  "lambda",
-  "if",
-  "cond",
-  "let",
-  "let*",
-  "when",
-  "unless",
-  "do",
-  "begin",
-  "and",
-  "or",
-  "not",
-  "match",
-  "try",
-  "catch",
-  "throw",
-  "load",
-  "fl-require",
-  "server-get",
-  "server-post",
-  "server-put",
-  "server-delete",
-  "server-start",
-  "server-json",
-  "server-html",
-  "server-text",
-  "server-status",
-  "db-create",
-  "db-query",
-  "db-exec",
-  "db-insert"
-]);
-function collectDefns(ast) {
-  const defs = /* @__PURE__ */ new Map();
-  const varTypes = /* @__PURE__ */ new Map();
-  function walkNode(node) {
-    if (!node || typeof node !== "object") return;
-    if (node.kind !== "sexpr") {
-      if (Array.isArray(node.body)) node.body.forEach(walkNode);
-      return;
-    }
-    const op = node.op;
-    if (op !== "defn" && op !== "defun") {
-      if (op === "define" && (node.args?.length ?? 0) >= 2) {
-        const nameNode2 = node.args[0];
-        const valueNode = node.args[1];
-        let varName = "";
-        if (nameNode2?.kind === "variable") varName = nameNode2.name;
-        else if (nameNode2?.kind === "literal" && nameNode2?.type === "symbol") varName = String(nameNode2.value ?? "");
-        const t = literalType(valueNode);
-        if (varName && t !== null) varTypes.set(varName, t);
-      }
-      if ((op === "let" || op === "let*") && (node.args?.length ?? 0) >= 1) {
-        const bindingsNode = node.args[0];
-        if (bindingsNode?.kind === "block" && bindingsNode?.type === "Array") {
-          const pairs = bindingsNode.fields?.get?.("items") ?? [];
-          for (const pair of pairs) {
-            if (pair?.kind === "block" && pair?.type === "Array") {
-              const pairItems = pair.fields?.get?.("items") ?? [];
-              if (pairItems.length >= 2) {
-                const varNode = pairItems[0];
-                const valNode = pairItems[1];
-                let vName = "";
-                if (varNode?.kind === "variable") vName = varNode.name;
-                else if (varNode?.kind === "literal" && varNode?.type === "symbol") vName = String(varNode.value ?? "");
-                const t = literalType(valNode);
-                if (vName && t !== null) varTypes.set(vName, t);
-              }
-            }
-          }
-        }
-      }
-      node.args?.forEach(walkNode);
-      return;
-    }
-    let idx = 0;
-    const args3 = node.args || [];
-    let returnType = "any";
-    if (args3[idx]?.kind === "literal" && String(args3[idx]?.value ?? "").startsWith("^")) {
-      const hint = String(args3[idx].value);
-      if (hint !== "^pure") returnType = hintToType(hint);
-      idx++;
-    }
-    const nameNode = args3[idx++];
-    let name = "";
-    if (nameNode?.kind === "variable") name = nameNode.name;
-    else if (nameNode?.kind === "literal" && nameNode?.type === "symbol") name = String(nameNode.value);
-    if (!name) return;
-    const paramsNode = args3[idx];
-    const params = [];
-    let variadic = false;
-    if (paramsNode?.kind === "block" && paramsNode?.type === "Array") {
-      const items = paramsNode.fields?.get?.("items") ?? [];
-      let i = 0;
-      while (i < items.length) {
-        const item = items[i];
-        if (item?.kind === "literal" && String(item?.value ?? "").startsWith("^")) {
-          const paramType = hintToType(String(item.value));
-          i++;
-          const paramNode = items[i];
-          if (paramNode?.kind === "variable") {
-            params.push({ name: paramNode.name, type: paramType });
-          }
-        } else if (item?.kind === "variable") {
-          const pname = item.name;
-          if (pname.startsWith("...") || pname.startsWith("rest")) variadic = true;
-          params.push({ name: pname, type: "any" });
-        }
-        i++;
-      }
-    }
-    const bodyExprs = args3.slice(idx + 1);
-    const lastExprNode = bodyExprs.length > 0 ? bodyExprs[bodyExprs.length - 1] : void 0;
-    defs.set(name, { name, params, returnType, line: node.line ?? 0, variadic, lastExprNode });
-    bodyExprs.forEach(walkNode);
-  }
-  if (Array.isArray(ast)) ast.forEach(walkNode);
-  return { defs, varTypes };
-}
-function checkCalls(ast, defs, varTypes) {
-  const issues = [];
-  function walkNode(node, insideDefn) {
-    if (!node || typeof node !== "object") return;
-    if (node.kind !== "sexpr") {
-      if (Array.isArray(node.body)) node.body.forEach((n) => walkNode(n, insideDefn));
-      return;
-    }
-    const op = String(node.op ?? "");
-    const args3 = node.args ?? [];
-    const line = node.line ?? 0;
-    if (op === "defn" || op === "defun") {
-      let idx = 0;
-      if (args3[idx]?.kind === "literal" && String(args3[idx]?.value ?? "").startsWith("^")) idx++;
-      const nameNode = args3[idx++];
-      let fnName = "";
-      if (nameNode?.kind === "variable") fnName = nameNode.name;
-      else if (nameNode?.kind === "literal") fnName = String(nameNode.value);
-      const fnDef = fnName ? defs.get(fnName) : void 0;
-      if (fnDef && fnDef.returnType !== "any" && fnDef.lastExprNode) {
-        const actualReturn = literalType(fnDef.lastExprNode);
-        if (actualReturn !== null && !typesCompatible(fnDef.returnType, actualReturn)) {
-          issues.push({
-            kind: "warning",
-            code: "return-type",
-            line: fnDef.line,
-            message: `(${fnName}) \u2014 \uC120\uC5B8 \uBC18\uD658 \uD0C0\uC785 ^${fnDef.returnType}\uC774\uB098 ${actualReturn} \uB9AC\uD130\uB7F4 \uBC18\uD658`
-          });
-        }
-      }
-      args3.slice(idx + 1).forEach((a) => walkNode(a, fnName));
-      return;
-    }
-    if (SPECIAL_FORMS.has(op)) {
-      args3.forEach((a) => walkNode(a, insideDefn));
-      return;
-    }
-    const def = defs.get(op);
-    if (def && !def.variadic) {
-      const argCount = args3.length;
-      const paramCount = def.params.length;
-      if (argCount !== paramCount) {
-        issues.push({
-          kind: "error",
-          code: "arity",
-          line,
-          message: `(${op}) \u2014 \uC778\uC790 ${argCount}\uAC1C \uC804\uB2EC, ${paramCount}\uAC1C \uD544\uC694 (${def.params.map((p) => "$" + p.name).join(" ")})`
-        });
-      } else {
-        for (let i = 0; i < def.params.length; i++) {
-          const param = def.params[i];
-          if (param.type === "any") continue;
-          const actual = resolveArgType(args3[i], varTypes);
-          if (actual === null) continue;
-          if (!typesCompatible(param.type, actual)) {
-            issues.push({
-              kind: "warning",
-              code: "type-mismatch",
-              line,
-              message: `(${op}) \u2014 $${param.name}: ^${param.type} \uD30C\uB77C\uBBF8\uD130\uC5D0 ${actual} \uC804\uB2EC`
-            });
-          }
-        }
-      }
-    }
-    const stdlib = STDLIB_ARITY.get(op);
-    if (stdlib && !def) {
-      const ac = args3.length;
-      if (ac < stdlib.min || ac > stdlib.max) {
-        const range = stdlib.max === Infinity ? `${stdlib.min}\uAC1C \uC774\uC0C1` : stdlib.min === stdlib.max ? `${stdlib.min}\uAC1C` : `${stdlib.min}~${stdlib.max}\uAC1C`;
-        issues.push({
-          kind: "error",
-          code: "arity",
-          line,
-          message: `(${op}) \u2014 \uC778\uC790 ${ac}\uAC1C \uC804\uB2EC, ${range} \uD544\uC694`
-        });
-      }
-    }
-    args3.forEach((a) => walkNode(a, insideDefn));
-  }
-  if (Array.isArray(ast)) ast.forEach((n) => walkNode(n));
-  return issues;
-}
-function typeCheckSource(source) {
-  try {
-    const tokens = lex(source);
-    const ast = parse(tokens);
-    const { defs, varTypes } = collectDefns(ast);
-    const issues = checkCalls(ast, defs, varTypes);
-    return {
-      errors: issues.filter((i) => i.kind === "error"),
-      warnings: issues.filter((i) => i.kind === "warning"),
-      fnCount: defs.size,
-      checkedCalls: issues.length
-    };
-  } catch {
-    return { errors: [], warnings: [], fnCount: 0, checkedCalls: 0 };
-  }
-}
-function formatTypeIssues(issues, filePath) {
-  if (issues.length === 0) return "";
-  const base = require("path").basename(filePath);
-  const lines = [`
-\x1B[36m[type-check]\x1B[0m  ${base} \u2014 ${issues.length}\uAC74`];
-  for (const issue of issues) {
-    const icon = issue.kind === "error" ? "\x1B[31m\u2716\x1B[0m" : "\x1B[33m\u26A0\x1B[0m";
-    const label = issue.kind === "error" ? "\x1B[31m" : "\x1B[33m";
-    lines.push(`  ${icon}  line ${issue.line}: ${label}${issue.code}\x1B[0m \u2014 ${issue.message}`);
-  }
-  return lines.join("\n");
-}
-
-// src/cli.ts
-init_debugger();
-
-// src/hot-reload.ts
-var fs15 = __toESM(require("fs"));
-var path15 = __toESM(require("path"));
-init_lexer();
-init_parser();
-function createDebounce(ms) {
-  let timer = null;
-  return function debounced(fn) {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-    timer = setTimeout(() => {
-      timer = null;
-      fn();
-    }, ms);
-  };
-}
-var FileWatcher = class {
-  constructor() {
-    this.watchers = [];
-  }
-  /**
-   * 단일 파일 감시
-   * @returns stop 함수
-   */
-  watch(file, opts) {
-    const debounceMs = opts?.debounceMs ?? 300;
-    const clearConsole = opts?.clearConsole ?? true;
-    const onReload = opts?.onReload;
-    const onError = opts?.onError;
-    const debounced = createDebounce(debounceMs);
-    const basename4 = path15.basename(file);
-    const handleChange = () => {
-      debounced(() => {
-        if (clearConsole) {
-          process.stdout.write("\x1B[2J\x1B[0f");
-        }
-        console.log(`\x1B[36m[RELOAD]\x1B[0m ${basename4} changed`);
-        if (onReload) {
-          try {
-            onReload(file);
-          } catch (err4) {
-            if (onError) {
-              onError(file, err4 instanceof Error ? err4 : new Error(String(err4)));
-            } else {
-              console.error(`\x1B[31m[ERROR]\x1B[0m ${basename4}: ${err4.message ?? err4}`);
-            }
-          }
-        }
-      });
-    };
-    let lastMtime = 0;
-    let lastSize = -1;
-    try {
-      const st = fs15.statSync(file);
-      lastMtime = st.mtimeMs;
-      lastSize = st.size;
-    } catch (_e) {
-    }
-    const interval = setInterval(() => {
-      try {
-        const st = fs15.statSync(file);
-        if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
-          lastMtime = st.mtimeMs;
-          lastSize = st.size;
-          handleChange();
-        }
-      } catch (_e) {
-      }
-    }, 500);
-    interval.unref?.();
-    let stopped = false;
-    return () => {
-      if (stopped) return;
-      stopped = true;
-      clearInterval(interval);
-    };
-  }
-  /**
-   * 디렉토리 내 pattern에 맞는 파일 감시
-   * @returns stop 함수
-   */
-  watchDir(dir, pattern, opts) {
-    const debounceMs = opts?.debounceMs ?? 300;
-    const clearConsole = opts?.clearConsole ?? true;
-    const onReload = opts?.onReload;
-    const onError = opts?.onError;
-    const debounced = createDebounce(debounceMs);
-    const ext = pattern.replace(/^\*/, "");
-    const regex = new RegExp(ext.replace(".", "\\.") + "$");
-    let watcher = null;
-    try {
-      watcher = fs15.watch(dir, (_event, filename) => {
-        if (!filename) return;
-        if (!regex.test(filename)) return;
-        debounced(() => {
-          if (clearConsole) {
-            process.stdout.write("\x1B[2J\x1B[0f");
-          }
-          console.log(`\x1B[36m[RELOAD]\x1B[0m ${filename} changed`);
-          const fullPath = path15.join(dir, filename);
-          if (onReload) {
-            try {
-              onReload(fullPath);
-            } catch (err4) {
-              if (onError) {
-                onError(fullPath, err4 instanceof Error ? err4 : new Error(String(err4)));
-              } else {
-                console.error(`\x1B[31m[ERROR]\x1B[0m ${filename}: ${err4.message ?? err4}`);
-              }
-            }
-          }
-        });
-      });
-      this.watchers.push(watcher);
-    } catch (_err) {
-    }
-    let stopped = false;
-    return () => {
-      if (!stopped && watcher) {
-        stopped = true;
-        try {
-          watcher.close();
-        } catch (_e) {
-        }
-        const idx = this.watchers.indexOf(watcher);
-        if (idx !== -1) this.watchers.splice(idx, 1);
-      }
-    };
-  }
-  /** 모든 감시 중단 */
-  stopAll() {
-    for (const w of this.watchers) {
-      try {
-        w.close();
-      } catch (_e) {
-      }
-    }
-    this.watchers = [];
-  }
-};
-function runWithWatch(file, opts) {
-  const absPath = path15.resolve(file);
-  function executeFile() {
-    try {
-      const source = fs15.readFileSync(absPath, "utf-8");
-      const tokens = lex(source);
-      const ast = parse(tokens);
-      const interp2 = new Interpreter();
-      interp2.currentFilePath = absPath;
-      const ctx = interp2.interpret(ast);
-      const val = ctx.lastValue;
-      if (val !== null && val !== void 0) {
-        if (typeof val === "object") {
-          console.log(JSON.stringify(val, null, 2));
-        } else {
-          console.log(String(val));
-        }
-      }
-      if (opts?.onReload) {
-        opts.onReload(file);
-      }
-    } catch (err4) {
-      const e = err4 instanceof Error ? err4 : new Error(String(err4));
-      if (opts?.onError) {
-        opts.onError(file, e);
-      } else {
-        console.error(`\x1B[31m[ERROR]\x1B[0m ${path15.basename(absPath)}: ${e.message}`);
-      }
-    }
-  }
-  executeFile();
-  const watcher = new FileWatcher();
-  const mergedOpts = {
-    ...opts,
-    onReload: (_f) => {
-      executeFile();
-    }
-  };
-  console.log(`\x1B[2m  watching ${path15.basename(absPath)}...\x1B[0m`);
-  watcher.watch(absPath, mergedOpts);
-}
-
-// src/doc-extractor.ts
-function parseDocComment(lines) {
-  const docLines = [];
-  const examples = [];
-  let inExample = false;
-  let exampleLines = [];
-  for (const line of lines) {
-    const stripped = line.replace(/^;;;\s?/, "");
-    if (stripped.startsWith("@example")) {
-      if (exampleLines.length > 0) {
-        examples.push(exampleLines.join("\n").trim());
-        exampleLines = [];
-      }
-      inExample = true;
-      const rest = stripped.replace(/^@example\s*/, "");
-      if (rest) exampleLines.push(rest);
-    } else if (inExample) {
-      exampleLines.push(stripped);
-    } else {
-      docLines.push(stripped);
-    }
-  }
-  if (exampleLines.length > 0) {
-    examples.push(exampleLines.join("\n").trim());
-  }
-  return {
-    doc: docLines.join("\n").trim(),
-    examples
-  };
-}
-function extractParams(text) {
-  const m = text.match(/:params\s*\[([^\]]*)\]/);
-  if (!m) return [];
-  return m[1].split(/\s+/).map((p) => p.trim()).filter((p) => p.startsWith("$")).map((p) => p.slice(1));
-}
-function extractBlock(src, startIdx) {
-  let depth = 0;
-  let i = startIdx;
-  let started = false;
-  const openChar = src[startIdx];
-  const closeChar = openChar === "[" ? "]" : ")";
-  while (i < src.length) {
-    const ch = src[i];
-    if (ch === '"') {
-      i++;
-      while (i < src.length && src[i] !== '"') {
-        if (src[i] === "\\") i++;
-        i++;
-      }
-    } else if (ch === openChar) {
-      depth++;
-      started = true;
-    } else if (ch === closeChar) {
-      depth--;
-      if (started && depth === 0) {
-        return src.slice(startIdx, i + 1);
-      }
-    }
-    i++;
-  }
-  return src.slice(startIdx, i);
-}
-function extractDocs(src) {
-  const entries = [];
-  const lines = src.split("\n");
-  const lineOffsets = [];
-  let offset = 0;
-  for (const line of lines) {
-    lineOffsets.push(offset);
-    offset += line.length + 1;
-  }
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    const funcMatch = trimmed.match(/^\[FUNC\s+(\S+)/);
-    if (funcMatch) {
-      const name = funcMatch[1];
-      const commentLines = collectCommentAbove(lines, i);
-      const { doc, examples } = parseDocComment(commentLines);
-      const charOffset = lineOffsets[i];
-      const blockSrc = extractBlock(src, charOffset + line.indexOf("[FUNC"));
-      const params = extractParams(blockSrc);
-      entries.push({ name, kind: "function", params, doc, examples, source: blockSrc });
-      i++;
-      continue;
-    }
-    const macroMatch = trimmed.match(/^\(defmacro\s+(\S+)/);
-    if (macroMatch) {
-      const name = macroMatch[1];
-      const commentLines = collectCommentAbove(lines, i);
-      const { doc, examples } = parseDocComment(commentLines);
-      const charOffset = lineOffsets[i];
-      const col = line.indexOf("(defmacro");
-      const blockSrc = extractBlock(src, charOffset + col);
-      const paramMatch = blockSrc.match(/\(defmacro\s+\S+\s+\[([^\]]*)\]/);
-      const params = paramMatch ? paramMatch[1].split(/\s+/).map((p) => p.trim()).filter((p) => p.startsWith("$")).map((p) => p.slice(1)) : [];
-      entries.push({ name, kind: "macro", params, doc, examples, source: blockSrc });
-      i++;
-      continue;
-    }
-    const structMatch = trimmed.match(/^\(defstruct\s+(\S+)/);
-    if (structMatch) {
-      const name = structMatch[1];
-      const commentLines = collectCommentAbove(lines, i);
-      const { doc, examples } = parseDocComment(commentLines);
-      const charOffset = lineOffsets[i];
-      const col = line.indexOf("(defstruct");
-      const blockSrc = extractBlock(src, charOffset + col);
-      const fieldMatch = blockSrc.match(/\(defstruct\s+\S+\s+\[([^\]]*)\]/);
-      const params = fieldMatch ? fieldMatch[1].split(/\s+/).map((p) => p.trim()).filter((p) => p.startsWith(":")).map((p) => p.slice(1)) : [];
-      entries.push({ name, kind: "struct", params, doc, examples, source: blockSrc });
-      i++;
-      continue;
-    }
-    const protoMatch = trimmed.match(/^\(defprotocol\s+(\S+)/);
-    if (protoMatch) {
-      const name = protoMatch[1];
-      const commentLines = collectCommentAbove(lines, i);
-      const { doc, examples } = parseDocComment(commentLines);
-      const charOffset = lineOffsets[i];
-      const col = line.indexOf("(defprotocol");
-      const blockSrc = extractBlock(src, charOffset + col);
-      entries.push({ name, kind: "protocol", params: [], doc, examples, source: blockSrc });
-      i++;
-      continue;
-    }
-    const moduleMatch = trimmed.match(/^\[MODULE\s+(\S+)/);
-    if (moduleMatch) {
-      const charOffset = lineOffsets[i];
-      const col = line.indexOf("[MODULE");
-      const blockSrc = extractBlock(src, charOffset + col);
-      const innerEntries = extractDocs(blockSrc.replace(/^\[MODULE[^\n]*\n/, ""));
-      entries.push(...innerEntries);
-      i++;
-      continue;
-    }
-    i++;
-  }
-  return entries;
-}
-function collectCommentAbove(lines, lineIdx) {
-  const result = [];
-  let j = lineIdx - 1;
-  while (j >= 0) {
-    const t = lines[j].trim();
-    if (t.startsWith(";;;")) {
-      result.unshift(lines[j].trim());
-      j--;
-    } else if (t === "") {
-      break;
-    } else {
-      break;
-    }
-  }
-  return result;
-}
-
-// src/doc-renderer.ts
-function renderMarkdown(entries, title) {
-  const lines = [];
-  const heading = title ?? "FreeLang API \uBB38\uC11C";
-  lines.push(`# ${heading}`);
-  lines.push("");
-  if (entries.length === 0) {
-    lines.push("(\uBB38\uC11C\uD654\uB41C \uD56D\uBAA9 \uC5C6\uC74C)");
-    return lines.join("\n");
-  }
-  lines.push("## \uBAA9\uCC28");
-  lines.push("");
-  for (const entry of entries) {
-    const badge = kindBadge(entry.kind);
-    const anchor = toAnchor(entry.name);
-    lines.push(`- [${badge} \`${entry.name}\`](#${anchor})`);
-  }
-  lines.push("");
-  for (const entry of entries) {
-    lines.push(`## ${entry.name}`);
-    lines.push("");
-    lines.push(`**\uC885\uB958**: ${kindLabel(entry.kind)}`);
-    lines.push("");
-    if (entry.doc) {
-      lines.push(entry.doc);
-      lines.push("");
-    }
-    if (entry.params.length > 0) {
-      lines.push("### \uD30C\uB77C\uBBF8\uD130");
-      lines.push("");
-      lines.push("| \uC774\uB984 | \uC124\uBA85 |");
-      lines.push("|------|------|");
-      for (const param of entry.params) {
-        lines.push(`| \`${param}\` |  |`);
-      }
-      lines.push("");
-    } else if (entry.kind === "function" || entry.kind === "macro") {
-      lines.push("*\uD30C\uB77C\uBBF8\uD130 \uC5C6\uC74C*");
-      lines.push("");
-    }
-    if (entry.examples.length > 0) {
-      lines.push("### \uC608\uC81C");
-      lines.push("");
-      for (const example of entry.examples) {
-        lines.push("```freelang");
-        lines.push(example);
-        lines.push("```");
-        lines.push("");
-      }
-    }
-    lines.push("### \uC18C\uC2A4");
-    lines.push("");
-    lines.push("```freelang");
-    lines.push(entry.source);
-    lines.push("```");
-    lines.push("");
-    lines.push("---");
-    lines.push("");
-  }
-  return lines.join("\n");
-}
-function kindBadge(kind) {
-  switch (kind) {
-    case "function":
-      return "fn";
-    case "macro":
-      return "macro";
-    case "struct":
-      return "struct";
-    case "protocol":
-      return "protocol";
-  }
-}
-function kindLabel(kind) {
-  switch (kind) {
-    case "function":
-      return "\uD568\uC218 (FUNC)";
-    case "macro":
-      return "\uB9E4\uD06C\uB85C (defmacro)";
-    case "struct":
-      return "\uAD6C\uC870\uCCB4 (defstruct)";
-    case "protocol":
-      return "\uD504\uB85C\uD1A0\uCF5C (defprotocol)";
-  }
-}
-function toAnchor(name) {
-  return name.toLowerCase().replace(/[^a-z0-9가-힣]/g, "-");
-}
-
-// src/ci-runner.ts
-var fs16 = __toESM(require("fs"));
-init_linter();
-var CIPipeline = class {
-  constructor(opts = {}) {
-    this.steps = [];
-    this.failFast = true;
-    if (opts.failFast !== void 0) {
-      this.failFast = opts.failFast;
-    }
-  }
-  setFailFast(value) {
-    this.failFast = value;
-    return this;
-  }
-  addStep(step) {
-    this.steps.push(step);
-    return this;
-  }
-  async run() {
-    const results = [];
-    let pipelinePassed = true;
-    let totalMs = 0;
-    let shouldSkip = false;
-    for (const step of this.steps) {
-      if (shouldSkip) {
-        results.push({
-          name: step.name,
-          passed: false,
-          output: "(skipped)",
-          durationMs: 0,
-          skipped: true
-        });
-        continue;
-      }
-      let result;
-      try {
-        result = await step.run();
-      } catch (err4) {
-        result = {
-          passed: false,
-          output: `Exception: ${err4.message ?? String(err4)}`,
-          durationMs: 0
-        };
-      }
-      const icon = result.passed ? "\u2705" : "\u274C";
-      console.log(`${icon} ${step.name} (${result.durationMs}ms)`);
-      if (!result.passed && result.output && result.output !== "(skipped)") {
-        const indented = result.output.split("\n").map((l) => "    " + l).join("\n");
-        console.log(indented);
-      }
-      results.push({
-        name: step.name,
-        passed: result.passed,
-        output: result.output,
-        durationMs: result.durationMs,
-        skipped: false
-      });
-      totalMs += result.durationMs;
-      if (!result.passed) {
-        pipelinePassed = false;
-        if (this.failFast) {
-          shouldSkip = true;
-        }
-      }
-    }
-    return {
-      passed: pipelinePassed,
-      steps: results,
-      totalMs
-    };
-  }
-};
-async function timed(fn) {
-  const start = Date.now();
-  const { passed, output } = await fn();
-  const durationMs = Date.now() - start;
-  return { passed, output, durationMs };
-}
-function createFmtCheckStep(files) {
-  return {
-    name: "fmt-check",
-    run: () => timed(async () => {
-      if (files.length === 0) {
-        return { passed: true, output: "\uAC80\uC0AC\uD560 \uD30C\uC77C \uC5C6\uC74C" };
-      }
-      const needsFormat = [];
-      for (const f of files) {
-        if (!fs16.existsSync(f)) continue;
-        const src = fs16.readFileSync(f, "utf-8");
-        try {
-          const formatted = formatFL(src);
-          if (src !== formatted) {
-            needsFormat.push(f);
-          }
-        } catch (err4) {
-          return {
-            passed: false,
-            output: `\uD3EC\uB9F7 \uC624\uB958 ${f}: ${err4.message}`
-          };
-        }
-      }
-      if (needsFormat.length > 0) {
-        return {
-          passed: false,
-          output: `\uD3EC\uB9F7 \uD544\uC694 \uD30C\uC77C:
-${needsFormat.map((f) => `  - ${f}`).join("\n")}`
-        };
-      }
-      return { passed: true, output: `${files.length}\uAC1C \uD30C\uC77C \uD3EC\uB9F7 OK` };
-    })
-  };
-}
-function createLintStep(files) {
-  return {
-    name: "lint",
-    run: () => timed(async () => {
-      if (files.length === 0) {
-        return { passed: true, output: "\uAC80\uC0AC\uD560 \uD30C\uC77C \uC5C6\uC74C" };
-      }
-      const linter = createDefaultLinter();
-      const errors = [];
-      for (const f of files) {
-        if (!fs16.existsSync(f)) continue;
-        const src = fs16.readFileSync(f, "utf-8");
-        const diags = linter.lint(src);
-        const errs = diags.filter((d) => d.severity === "error");
-        for (const e of errs) {
-          errors.push(`  ${f}:${e.line ?? "?"}:${e.col ?? "?"} [${e.rule}] ${e.message}`);
-        }
-      }
-      if (errors.length > 0) {
-        return {
-          passed: false,
-          output: `Lint \uC624\uB958 ${errors.length}\uAC1C:
-${errors.join("\n")}`
-        };
-      }
-      return { passed: true, output: `${files.length}\uAC1C \uD30C\uC77C lint OK` };
-    })
-  };
-}
-function createTypeCheckStep() {
-  return {
-    name: "type-check",
-    run: () => timed(async () => {
-      const { execSync: execSync2 } = require("child_process");
-      try {
-        const cwd2 = process.cwd();
-        execSync2("npx tsc --noEmit", { cwd: cwd2, stdio: "pipe" });
-        return { passed: true, output: "TypeScript \uD0C0\uC785 \uCCB4\uD06C OK" };
-      } catch (err4) {
-        const output = err4.stdout?.toString() ?? err4.stderr?.toString() ?? String(err4);
-        return { passed: false, output: output.trim() };
-      }
-    })
-  };
-}
-function createDefaultPipeline(files, opts = {}) {
-  const pipeline = new CIPipeline(opts);
-  pipeline.addStep(createFmtCheckStep(files));
-  pipeline.addStep(createLintStep(files));
-  pipeline.addStep(createTypeCheckStep());
-  return pipeline;
-}
-
-// src/web/app-router.ts
-var fs17 = __toESM(require("fs"));
-var path16 = __toESM(require("path"));
-var AppRouter = class {
-  // W4: not-found.fl 파일
-  constructor(appDir = "app") {
-    this.routes = [];
-    this.layoutChain = {};
-    this.middlewares = /* @__PURE__ */ new Map();
-    // W3: 경로 → middleware.fl 파일
-    this.errorHandlers = /* @__PURE__ */ new Map();
-    // W4: 경로 → error.fl 파일
-    this.notFoundHandler = null;
-    this.appDir = appDir;
-    this.scan();
-  }
-  /**
-   * W4: not-found.fl 스캔
-   */
-  scanNotFound(dir) {
-    try {
-      const notFoundPath = path16.join(dir, "not-found.fl");
-      if (fs17.existsSync(notFoundPath)) {
-        this.notFoundHandler = notFoundPath;
-        console.log(`approuter.not-found file=${notFoundPath}`);
-      }
-    } catch (err4) {
-    }
-  }
-  /**
-   * 파일시스템 스캔 시작
-   */
-  scan() {
-    if (!fs17.existsSync(this.appDir)) {
-      console.log(`approuter.warn event=app_dir_missing path=${this.appDir}`);
-      return;
-    }
-    this.scanDirectory(this.appDir, "", "layout");
-    this.scanDirectory(this.appDir, "", "middleware");
-    this.scanDirectory(this.appDir, "", "error");
-    this.scanNotFound(this.appDir);
-    this.scanDirectory(this.appDir, "", "page");
-    this.scanDirectory(this.appDir, "", "route");
-    this.buildLayoutChain();
-  }
-  /**
-   * Recursive directory scan.
-   * @param phase "layout" = register only layout.fl files;
-   *              "page" = register only page.fl files (so layouts exist first)
-   */
-  scanDirectory(dir, currentPath = "", phase = "page") {
-    try {
-      const entries = fs17.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path16.join(dir, entry.name);
-        const nextPath = currentPath === "" ? "/" + entry.name : currentPath + "/" + entry.name;
-        if (entry.isDirectory()) {
-          const isRouteGroup = entry.name.startsWith("(") && entry.name.endsWith(")");
-          const pathForChild = isRouteGroup ? currentPath : nextPath;
-          this.scanDirectory(fullPath, pathForChild, phase);
-        } else if (phase === "page" && entry.name === "page.fl") {
-          const routePath = currentPath === "" ? "/" : currentPath;
-          this.registerRoute(routePath, fullPath, "page");
-        } else if (phase === "route" && entry.name === "route.fl") {
-          const routePath = currentPath === "" ? "/" : currentPath;
-          this.registerRoute(routePath, fullPath, "route");
-        } else if (phase === "layout" && entry.name === "layout.fl") {
-          const layoutPath = currentPath === "" ? "/" : currentPath;
-          if (!this.layoutChain[layoutPath]) {
-            this.layoutChain[layoutPath] = [];
-          }
-          this.layoutChain[layoutPath].push(fullPath);
-          console.log(`approuter.layout scope=${layoutPath} file=${fullPath}`);
-        } else if (phase === "middleware" && entry.name === "middleware.fl") {
-          const middlewarePath = currentPath === "" ? "/" : currentPath;
-          this.middlewares.set(middlewarePath, fullPath);
-          console.log(`approuter.middleware scope=${middlewarePath} file=${fullPath}`);
-        } else if (phase === "error" && entry.name === "error.fl") {
-          const errorPath = currentPath === "" ? "/" : currentPath;
-          this.errorHandlers.set(errorPath, fullPath);
-          console.log(`approuter.error scope=${errorPath} file=${fullPath}`);
-        }
-      }
-    } catch (err4) {
-      console.error(`Error scanning directory ${dir}:`, err4.message);
-    }
-  }
-  /**
-   * 라우트 등록
-   */
-  registerRoute(routePath, filePath, kind = "page") {
-    const pattern = this.buildPattern(routePath);
-    const params = this.extractParams(routePath);
-    const isDynamic = routePath.includes("[");
-    const route = {
-      path: routePath,
-      pattern,
-      filePath,
-      params,
-      isDynamic,
-      layouts: kind === "route" ? [] : this.getLayoutsForPath(routePath),
-      kind
-    };
-    this.routes.push(route);
-    console.log(`approuter.${kind} path=${routePath} file=${filePath} dynamic=${isDynamic}`);
-  }
-  /**
-   * [id] 문법을 정규표현식으로 변환
-   * /users/[id] → /^\/users\/([^/]+)$/
-   */
-  buildPattern(routePath) {
-    const escaped = routePath.split("/").map((segment) => {
-      if (segment.startsWith("[") && segment.endsWith("]")) {
-        return "([^/]+)";
-      }
-      return segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    }).join("\\/");
-    return new RegExp(`^${escaped}$`);
-  }
-  /**
-   * 라우트에서 파라미터 이름 추출
-   * /users/[id] → ['id']
-   */
-  extractParams(routePath) {
-    const matches = routePath.match(/\[([^\]]+)\]/g);
-    return matches ? matches.map((m) => m.slice(1, -1)) : [];
-  }
-  /**
-   * 라우트에 대한 레이아웃 체인 구성 (루트 → 부모 → 현재)
-   */
-  getLayoutsForPath(routePath) {
-    const layouts = [];
-    const segments = routePath.split("/").filter(Boolean);
-    if (this.layoutChain["/"] || this.layoutChain[""]) {
-      layouts.push(...this.layoutChain["/"] || this.layoutChain[""] || []);
-    }
-    let currentPath = "";
-    for (const segment of segments) {
-      currentPath += "/" + segment;
-      if (this.layoutChain[currentPath]) {
-        layouts.push(...this.layoutChain[currentPath]);
-      }
-    }
-    return layouts;
-  }
-  /**
-   * 레이아웃 체인 정렬 (깊이 기반)
-   */
-  buildLayoutChain() {
-  }
-  /**
-   * URL 경로와 매칭 및 파라미터 추출
-   */
-  match(pathname) {
-    for (const route of this.routes) {
-      const match = pathname.match(route.pattern);
-      if (match) {
-        const params = {};
-        route.params.forEach((param, index) => {
-          params[param] = match[index + 1];
-        });
-        return { route, params };
-      }
-    }
-    return null;
-  }
-  /**
-   * 등록된 모든 라우트 반환 (디버깅용)
-   */
-  getRoutes() {
-    return this.routes;
-  }
-  /**
-   * W3: 특정 경로에 대한 미들웨어 파일 조회
-   */
-  getMiddlewareForPath(routePath) {
-    return this.middlewares.get(routePath) || null;
-  }
-  /**
-   * W4: 특정 경로에 대한 에러 핸들러 파일 조회
-   */
-  getErrorHandlerForPath(routePath) {
-    if (this.errorHandlers.has(routePath)) {
-      return this.errorHandlers.get(routePath) || null;
-    }
-    return this.errorHandlers.get("/") || null;
-  }
-  /**
-   * W4: 404 핸들러 파일 조회
-   */
-  getNotFoundHandler() {
-    return this.notFoundHandler;
-  }
-  /**
-   * 특정 경로에 대한 레이아웃 체인 조회
-   */
-  getLayoutsForRoute(routePath) {
-    return this.layoutChain[routePath] || [];
-  }
-};
-
-// src/web/fl-executor.ts
-var fs18 = __toESM(require("fs"));
-var crypto4 = __toESM(require("crypto"));
-init_lexer();
-init_parser();
-var FLExecutor = class {
-  constructor(interpreter) {
-    this.cache = /* @__PURE__ */ new Map();
-    this.cacheTimeout = 5 * 60 * 1e3;
-    // 5분
-    this._helpersInjected = false;
-    this.interpreter = interpreter;
-  }
-  /**
-   * JWT/Auth/DB/Meta/Fetch 헬퍼 주입 (1회만 실행)
-   */
-  ensureHelpers() {
-    if (this._helpersInjected) return;
-    this.injectJWTFunctions();
-    this.injectAuthHelpers();
-    this.injectDBHelpers();
-    this.injectMetaHelpers();
-    this.injectFetchHelpers();
-    this.injectHTTPServerHelpers();
-    this._helpersInjected = true;
-  }
-  /**
-   * .fl 파일 읽기 및 파싱 (캐싱 적용)
-   */
-  parseFile(filePath) {
-    const now = Date.now();
-    const cached = this.cache.get(filePath);
-    if (cached && now - cached.timestamp < this.cacheTimeout) {
-      return cached.ast;
-    }
-    const code = fs18.readFileSync(filePath, "utf-8");
-    const tokens = lex(code);
-    const ast = parse(tokens);
-    this.cache.set(filePath, { ast, timestamp: now });
-    return ast;
-  }
-  /**
-   * 인메모리 데이터 스토어 초기화
-   */
-  initializeDataStore() {
-    const ctx = this.interpreter.context;
-    if (!ctx.__db) {
-      ctx.__db = {
-        users: /* @__PURE__ */ new Map(),
-        projects: /* @__PURE__ */ new Map(),
-        todos: /* @__PURE__ */ new Map(),
-        sessions: /* @__PURE__ */ new Map(),
-        messages: /* @__PURE__ */ new Map(),
-        boards: /* @__PURE__ */ new Map(),
-        documents: [],
-        boardMembers: /* @__PURE__ */ new Map(),
-        _nextId: { users: 1, projects: 1, todos: 1, messages: 1, boards: 1 }
-      };
-    }
-  }
-  /**
-   * 페이지 컴포넌트 실행
-   * 반환 값: { html, json, statusCode 등 }
-   */
-  async executePage(filePath, context) {
-    try {
-      if (!fs18.existsSync(filePath)) {
-        return {
-          success: false,
-          status: 404,
-          error: `Page not found: ${filePath}`
-        };
-      }
-      const astList = this.parseFile(filePath);
-      const flRequest = this.createFlRequest(context);
-      this.initializeDataStore();
-      const ctx = this.interpreter.context;
-      const db = ctx.__db;
-      ctx.__params = context.params || {};
-      ctx.__body = context.body || {};
-      ctx.__method = context.method || "GET";
-      ctx.__headers = context.headers || {};
-      ctx.__query = context.query || {};
-      this.interpreter.context.variables.set("$__params", context.params || {});
-      this.interpreter.context.variables.set("$__query", context.query || {});
-      ctx.__page_meta = {};
-      ctx.__db_users = db.users;
-      ctx.__db_projects = db.projects;
-      ctx.__db_todos = db.todos;
-      ctx.__db_sessions = db.sessions;
-      ctx.__db_messages = db.messages;
-      ctx.__db_boards = db.boards;
-      ctx.__db_members = db.boardMembers;
-      this.ensureHelpers();
-      const execContext = this.interpreter.interpret(astList);
-      const result = execContext.lastValue;
-      const meta = ctx.__page_meta && Object.keys(ctx.__page_meta).length > 0 ? ctx.__page_meta : void 0;
-      const executionResult = this.processResult(result);
-      if (meta) {
-        executionResult.meta = meta;
-      }
-      return executionResult;
-    } catch (err4) {
-      return {
-        success: false,
-        status: 500,
-        error: err4.message,
-        stack: err4.stack
-      };
-    }
-  }
-  /**
-   * API 라우트 실행 (route.fl)
-   */
-  async executeRoute(filePath, context) {
-    try {
-      if (!fs18.existsSync(filePath)) {
-        return {
-          success: false,
-          status: 404,
-          error: `Route not found: ${filePath}`
-        };
-      }
-      const astList = this.parseFile(filePath);
-      const flRequest = this.createFlRequest(context);
-      this.ensureHelpers();
-      this.interpreter.globals = this.interpreter.globals || {};
-      this.interpreter.globals.__request = flRequest;
-      this.interpreter.globals.__params = context.params || {};
-      this.interpreter.context.variables.set("$__request", flRequest);
-      this.interpreter.context.variables.set("$__params", context.params || {});
-      let result = null;
-      for (const ast of astList) {
-        result = this.interpreter.eval(ast);
-      }
-      const method = (context.method || context.req?.method || "GET").toUpperCase();
-      const vars = this.interpreter.context.variables;
-      const fnValue = vars.has(method) ? vars.get(method) : vars.has("$" + method) ? vars.get("$" + method) : null;
-      if (fnValue && typeof fnValue === "object" && fnValue.kind === "function-value") {
-        try {
-          result = this.interpreter.callFunctionValue(fnValue, [flRequest]);
-        } catch (err4) {
-          console.error(`[executeRoute] \uD578\uB4E4\uB7EC \uC2E4\uD589 \uC624\uB958 (${method}): ${err4.message}`, err4.stack);
-          return { success: false, status: 500, error: err4.message, stack: err4.stack };
-        }
-      }
-      return this.processResult(result);
-    } catch (err4) {
-      console.error(`[executeRoute] \uD30C\uC77C \uC2E4\uD589 \uC624\uB958: ${err4.message}`, err4.stack);
-      return {
-        success: false,
-        status: 500,
-        error: err4.message,
-        stack: err4.stack
-      };
-    }
-  }
-  /**
-   * 실행 컨텍스트를 v9 요청 객체로 변환
-   */
-  createFlRequest(context) {
-    return {
-      __fl_request: true,
-      method: context.req?.method || "GET",
-      path: context.req?.path || "/",
-      query: context.query || {},
-      params: context.params || {},
-      headers: context.headers || {},
-      body: context.body || "",
-      timestamp: Date.now()
-    };
-  }
-  /**
-   * 인터프리터 결과를 HTTP 응답으로 변환
-   */
-  processResult(result) {
-    if (result && typeof result === "object") {
-      if (result.__fl_response === true) {
-        return {
-          success: true,
-          status: result.status || 200,
-          body: result.body,
-          contentType: result.contentType || "application/json"
-        };
-      }
-      return {
-        success: true,
-        status: 200,
-        body: result,
-        contentType: "application/json"
-      };
-    }
-    if (typeof result === "string") {
-      return {
-        success: true,
-        status: 200,
-        body: result,
-        contentType: result.includes("<") ? "text/html; charset=utf-8" : "text/plain"
-      };
-    }
-    return {
-      success: true,
-      status: 204,
-      body: "",
-      contentType: "text/plain"
-    };
-  }
-  /**
-   * 캐시 비우기
-   */
-  clearCache(filePath) {
-    if (filePath) {
-      this.cache.delete(filePath);
-    } else {
-      this.cache.clear();
-    }
-  }
-  /**
-   * 캐시 상태 조회
-   */
-  getCacheStats() {
-    return {
-      size: this.cache.size,
-      files: Array.from(this.cache.keys())
-    };
-  }
-  /**
-   * JWT 함수 주입 (HMAC-SHA256 + exp 검증)
-   */
-  injectJWTFunctions() {
-    const ctx = this.interpreter.context;
-    const JWT_SECRET = process.env.JWT_SECRET || "freelang-v11-default-secret";
-    ctx["jwt-sign"] = (payload) => {
-      const header = { alg: "HS256", typ: "JWT" };
-      const now = Math.floor(Date.now() / 1e3);
-      const fullPayload = { ...payload, iat: now, exp: now + 24 * 60 * 60 };
-      const encodedHeader = Buffer.from(JSON.stringify(header)).toString("base64url");
-      const encodedPayload = Buffer.from(JSON.stringify(fullPayload)).toString("base64url");
-      const signingInput = `${encodedHeader}.${encodedPayload}`;
-      const signature = crypto4.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
-      return `${encodedHeader}.${encodedPayload}.${signature}`;
-    };
-    ctx["jwt-verify"] = (token) => {
-      try {
-        const parts = token.split(".");
-        if (parts.length !== 3) return null;
-        const signingInput = `${parts[0]}.${parts[1]}`;
-        const expectedSig = crypto4.createHmac("sha256", JWT_SECRET).update(signingInput).digest("base64url");
-        const actualSigBuf = Buffer.from(parts[2]);
-        const expectedSigBuf = Buffer.from(expectedSig);
-        if (actualSigBuf.length !== expectedSigBuf.length || !crypto4.timingSafeEqual(actualSigBuf, expectedSigBuf)) {
-          return null;
-        }
-        const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
-        const now = Math.floor(Date.now() / 1e3);
-        if (payload.exp && payload.exp < now) return null;
-        return payload;
-      } catch (e) {
-        return null;
-      }
-    };
-  }
-  /**
-   * W2: 서버 데이터 페칭 헬퍼 주입
-   */
-  injectFetchHelpers() {
-    const ctx = this.interpreter.context;
-    const serverFetchFn = (url2, options) => {
-      try {
-        const method = (options?.method || "GET").toUpperCase();
-        const headers = options?.headers || {};
-        const body = options?.body || null;
-        const urlObj = new URL(url2);
-        const protocol = urlObj.protocol === "https:" ? require("https") : require("http");
-        let responseData = "";
-        let error = null;
-        const req = protocol.request(urlObj, { method, headers }, (res) => {
-          res.on("data", (chunk) => {
-            responseData += chunk;
-          });
-          res.on("end", () => {
-          });
-        });
-        req.on("error", (err4) => {
-          error = err4;
-        });
-        if (body) {
-          req.write(body);
-        }
-        req.end();
-        if (error) return null;
-        return responseData || null;
-      } catch (err4) {
-        return null;
-      }
-    };
-    const serverFetchJsonFn = (url2, options) => {
-      try {
-        const response = serverFetchFn(url2, options);
-        if (!response) return null;
-        return JSON.parse(response);
-      } catch (err4) {
-        return null;
-      }
-    };
-    ctx["server-fetch"] = serverFetchFn;
-    ctx["server-fetch-json"] = serverFetchJsonFn;
-    this.interpreter.context.variables.set("$server-fetch", serverFetchFn);
-    this.interpreter.context.variables.set("server-fetch", serverFetchFn);
-    this.interpreter.context.variables.set("$server-fetch-json", serverFetchJsonFn);
-    this.interpreter.context.variables.set("server-fetch-json", serverFetchJsonFn);
-  }
-  /**
-   * 인증 헬퍼 함수 주입
-   */
-  injectAuthHelpers() {
-    const ctx = this.interpreter.context;
-    ctx["auth-user"] = (authHeader) => {
-      if (!authHeader) return null;
-      const token = authHeader.replace("Bearer ", "");
-      const payload = ctx["jwt-verify"](token);
-      if (!payload) return null;
-      const db = ctx.__db;
-      if (db && db.users) {
-        const user = Array.from(db.users.values()).find(
-          (u) => u.id === payload.userId
-        );
-        return user || null;
-      }
-      return payload;
-    };
-  }
-  /**
-   * DB 헬퍼 함수 주입
-   */
-  injectDBHelpers() {
-    const ctx = this.interpreter.context;
-    ctx["create"] = (collection, data) => {
-      const db = ctx.__db;
-      const tableName = Object.keys(db).find(
-        (key) => db[key] === collection
-      );
-      let id = db._nextId[tableName] || 1;
-      db._nextId[tableName] = id + 1;
-      const item = { id, ...data, created_at: /* @__PURE__ */ new Date() };
-      collection.set(id, item);
-      return item;
-    };
-    ctx["get"] = (collection, id) => {
-      return collection.get(id);
-    };
-    ctx["list"] = (collection) => {
-      return Array.from(collection.values());
-    };
-    ctx["update"] = (collection, id, data) => {
-      const item = collection.get(id);
-      if (item) {
-        const updated = { ...item, ...data, updated_at: /* @__PURE__ */ new Date() };
-        collection.set(id, updated);
-        return updated;
-      }
-      return null;
-    };
-    ctx["delete"] = (collection, id) => {
-      return collection.delete(id);
-    };
-    ctx["get-member"] = (memberCollection, boardId, userId) => {
-      const key = `${boardId}:${userId}`;
-      return memberCollection.get(key);
-    };
-    ctx["add-member"] = (memberCollection, boardId, userId, role = "member") => {
-      const key = `${boardId}:${userId}`;
-      const member = { boardId, userId, role, joined_at: /* @__PURE__ */ new Date() };
-      memberCollection.set(key, member);
-      return member;
-    };
-    ctx["str-to-int"] = (str) => {
-      return parseInt(String(str), 10);
-    };
-    ctx["merge"] = (obj1, obj2) => {
-      return { ...obj1, ...obj2 };
-    };
-    ctx["count"] = (obj) => {
-      if (obj instanceof Map) return obj.size;
-      if (Array.isArray(obj)) return obj.length;
-      if (typeof obj === "object" && obj !== null) return Object.keys(obj).length;
-      return 0;
-    };
-  }
-  /**
-   * W1: 동적 메타데이터 헬퍼 주입
-   */
-  injectMetaHelpers() {
-    const ctx = this.interpreter.context;
-    const setMetaFn = (meta) => {
-      if (!ctx.__page_meta) {
-        ctx.__page_meta = {};
-      }
-      if (meta && typeof meta === "object") {
-        Object.assign(ctx.__page_meta, meta);
-      }
-      return meta;
-    };
-    ctx["set-meta!"] = setMetaFn;
-    this.interpreter.context.variables.set("$set-meta!", setMetaFn);
-    this.interpreter.context.variables.set("set-meta!", setMetaFn);
-  }
-  /**
-   * HTTP 서버 응답 헬퍼 주입 (server_json, server_html 등)
-   */
-  injectHTTPServerHelpers() {
-    const ctx = this.interpreter.context;
-    ctx["server_json"] = (body) => {
-      return {
-        __fl_response: true,
-        status: 200,
-        contentType: "application/json",
-        body
-      };
-    };
-    ctx["server_html"] = (body) => {
-      return {
-        __fl_response: true,
-        status: 200,
-        contentType: "text/html; charset=utf-8",
-        body
-      };
-    };
-    ctx["server_text"] = (body) => {
-      return {
-        __fl_response: true,
-        status: 200,
-        contentType: "text/plain",
-        body
-      };
-    };
-    ctx["server_status"] = (code, body) => {
-      return {
-        __fl_response: true,
-        status: code,
-        contentType: "application/json",
-        body
-      };
-    };
-    this.interpreter.context.variables.set("$server_json", ctx["server_json"]);
-    this.interpreter.context.variables.set("server_json", ctx["server_json"]);
-    this.interpreter.context.variables.set("$server_html", ctx["server_html"]);
-    this.interpreter.context.variables.set("server_html", ctx["server_html"]);
-    this.interpreter.context.variables.set("$server_text", ctx["server_text"]);
-    this.interpreter.context.variables.set("server_text", ctx["server_text"]);
-    this.interpreter.context.variables.set("$server_status", ctx["server_status"]);
-    this.interpreter.context.variables.set("server_status", ctx["server_status"]);
-  }
-};
-var fl_executor_default = FLExecutor;
-
-// src/web/page-renderer.ts
-var fs19 = __toESM(require("fs"));
-var path17 = __toESM(require("path"));
-var PageRenderer = class {
-  constructor(executor, buildOutputDir) {
-    this.ssrCache = /* @__PURE__ */ new Map();
-    this.buildOutputDir = ".next";
-    this.executor = executor;
-    if (buildOutputDir) {
-      this.buildOutputDir = buildOutputDir;
-    }
-  }
-  /**
-   * 페이지 렌더링 (모드별)
-   */
-  async render(context) {
-    switch (context.mode) {
-      case "ssr":
-        return this.renderSSR(context);
-      case "isr":
-        return this.renderISR(context);
-      case "ssg":
-        return this.renderSSG(context);
-      default:
-        throw new Error(`Unknown render mode: ${context.mode}`);
-    }
-  }
-  /**
-   * SSR: 매번 서버에서 렌더링
-   */
-  async renderSSR(context) {
-    const startTime = Date.now();
-    const result = await this.executor.executePage(context.filePath, {
-      req: { method: "GET", path: "/" },
-      params: context.params,
-      query: context.query,
-      headers: context.headers,
-      body: context.body
-    });
-    if (!result.success) {
-      throw new Error(`Failed to render page: ${result.error}`);
-    }
-    const html = typeof result.body === "string" ? result.body : JSON.stringify(result.body);
-    return {
-      html,
-      timestamp: Date.now(),
-      cached: false,
-      cacheAge: Date.now() - startTime
-    };
-  }
-  /**
-   * ISR: 캐시 된 페이지 반환, 백그라운드에서 재생성
-   */
-  async renderISR(context) {
-    const cacheKey = this.getCacheKey(context.filePath, context.params);
-    const revalidateAfter = context.revalidateAfter || 60;
-    const cached = this.ssrCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < revalidateAfter * 1e3) {
-      return {
-        html: cached.html,
-        timestamp: cached.timestamp,
-        cached: true,
-        cacheAge: Date.now() - cached.timestamp
-      };
-    }
-    const result = await this.renderSSR(context);
-    this.ssrCache.set(cacheKey, {
-      html: result.html,
-      timestamp: result.timestamp,
-      revalidate: revalidateAfter
-    });
-    return {
-      ...result,
-      cached: false
-    };
-  }
-  /**
-   * SSG: 빌드 시점에 정적 HTML 생성
-   */
-  async renderSSG(context) {
-    const cacheKey = this.getCacheKey(context.filePath, context.params);
-    const outputPath = path17.join(
-      this.buildOutputDir,
-      cacheKey.replace(/\//g, "_") + ".html"
-    );
-    if (fs19.existsSync(outputPath)) {
-      const html = fs19.readFileSync(outputPath, "utf-8");
-      const stat = fs19.statSync(outputPath);
-      return {
-        html,
-        timestamp: stat.mtime.getTime(),
-        cached: true,
-        cacheAge: Date.now() - stat.mtime.getTime()
-      };
-    }
-    const result = await this.renderSSR(context);
-    if (!fs19.existsSync(this.buildOutputDir)) {
-      fs19.mkdirSync(this.buildOutputDir, { recursive: true });
-    }
-    fs19.writeFileSync(outputPath, result.html, "utf-8");
-    return result;
-  }
-  /**
-   * Wrap page HTML with layout chain.
-   * Convention: each layout.fl returns a string (via last expression or
-   * server_html) containing {{children}} or <Outlet /> where the page goes.
-   * Layouts are applied outermost → innermost. Unresolved layouts are
-   * skipped so pages still render.
-   */
-  async renderWithLayout(pageHtml, layoutChain) {
-    let html = pageHtml;
-    for (const layoutPath of [...layoutChain].reverse()) {
-      const layoutResult = await this.executor.executePage(layoutPath, {
-        req: { method: "GET", path: "/" }
-      });
-      if (!layoutResult.success) continue;
-      const layoutHtml = typeof layoutResult.body === "string" ? layoutResult.body : typeof layoutResult.body === "object" && layoutResult.body !== null && typeof layoutResult.body.html === "string" ? layoutResult.body.html : "";
-      if (!layoutHtml) continue;
-      const placeholder = /\{\{\s*children\s*\}\}|\{\{\{\s*children\s*\}\}\}|<Outlet\s*\/?>/i;
-      if (placeholder.test(layoutHtml)) {
-        html = layoutHtml.replace(placeholder, html);
-      }
-    }
-    return html;
-  }
-  /**
-   * 캐시 키 생성
-   */
-  getCacheKey(filePath, params) {
-    let key = filePath;
-    if (params && Object.keys(params).length > 0) {
-      const paramStr = Object.entries(params).sort().map(([k, v]) => `${k}=${v}`).join("&");
-      key += `?${paramStr}`;
-    }
-    return key;
-  }
-  /**
-   * ISR 캐시 전체 비우기
-   */
-  invalidateISRCache() {
-    this.ssrCache.clear();
-  }
-  /**
-   * 특정 경로의 ISR 캐시 비우기
-   */
-  invalidateISRPath(filePath, params) {
-    const cacheKey = this.getCacheKey(filePath, params);
-    this.ssrCache.delete(cacheKey);
-  }
-  /**
-   * SSG 빌드 (모든 경로 정적 생성)
-   */
-  async buildSSG(routes) {
-    let count2 = 0;
-    for (const route of routes) {
-      const paramSets = route.params || [{}];
-      for (const params of paramSets) {
-        try {
-          await this.renderSSG({
-            filePath: route.filePath,
-            mode: "ssg",
-            params
-          });
-          count2++;
-        } catch (err4) {
-          console.error(`Failed to build ${route.filePath}:`, err4.message);
-        }
-      }
-    }
-    return count2;
-  }
-  /**
-   * 캐시 상태 조회
-   */
-  getCacheStats() {
-    return {
-      isrCacheSize: this.ssrCache.size,
-      isrCachedPaths: Array.from(this.ssrCache.keys())
-    };
-  }
-};
-var page_renderer_default = PageRenderer;
-
-// src/web/server.ts
-var http2 = __toESM(require("http"));
-function escHtml(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function generatePageHTML(route, params = {}) {
-  const title = route.filePath || "Page";
-  let content = `<h1>${title}</h1>`;
-  if (Object.keys(params).length > 0) {
-    content += "<p><strong>Route Parameters:</strong></p><ul>";
-    for (const [key, value] of Object.entries(params)) {
-      content += `<li>${key}: ${value}</li>`;
-    }
-    content += "</ul>";
-  }
-  return generateHTML(title, content);
-}
-function generateHTML(title, content, extraCss = "") {
-  const defaultCss = `
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-      padding: 40px;
-      max-width: 600px;
-      width: 100%;
-    }
-    h1 { color: #667eea; margin-bottom: 20px; }
-    p { color: #666; margin-bottom: 15px; }
-    ul { margin-left: 20px; }
-    li { margin-bottom: 10px; }
-    a { color: #667eea; text-decoration: none; }
-    a:hover { text-decoration: underline; }`;
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FreeLang v11 - ${title}</title>
-  <style>
-${defaultCss}
-${extraCss ? "\n" + extraCss : ""}
-  </style>
-</head>
-<body>
-  <div class="container">
-    ${content}
-    <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-    <p><small>Powered by FreeLang v11 App Router</small></p>
-    <p><a href="/">\u2190 Back to Home</a></p>
-  </div>
-</body>
-</html>`;
-}
-function generateIndexHTML() {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FreeLang v11</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .hero {
-      text-align: center;
-      color: white;
-      max-width: 800px;
-    }
-    h1 { font-size: 3em; margin-bottom: 10px; }
-    p { font-size: 1.2em; margin-bottom: 30px; opacity: 0.9; }
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 20px;
-      margin: 40px 0;
-    }
-    .feature {
-      background: rgba(255,255,255,0.1);
-      backdrop-filter: blur(10px);
-      padding: 20px;
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-    .feature h3 { margin-bottom: 10px; }
-    .links {
-      display: flex;
-      gap: 15px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 30px;
-    }
-    a {
-      background: white;
-      color: #667eea;
-      padding: 12px 24px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: bold;
-      transition: all 0.2s;
-    }
-    a:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
-  </style>
-</head>
-<body>
-  <div class="hero">
-    <h1>FreeLang v11</h1>
-    <p>AI-Native Language with App Router</p>
-
-    <div class="features">
-      <div class="feature">
-        <h3>Pure v11</h3>
-        <p>100% FreeLang v11</p>
-      </div>
-      <div class="feature">
-        <h3>Zero Deps</h3>
-        <p>No npm dependencies</p>
-      </div>
-      <div class="feature">
-        <h3>App Router</h3>
-        <p>Filesystem-based routing</p>
-      </div>
-      <div class="feature">
-        <h3>AGENT</h3>
-        <p>Native AI blocks</p>
-      </div>
-    </div>
-
-    <div class="links">
-      <a href="/demo">Demo</a>
-      <a href="/api/status">Status API</a>
-    </div>
-  </div>
-</body>
-</html>`;
-}
-var WebServer = class {
-  constructor(config = {}) {
-    this.executor = null;
-    this.renderer = null;
-    this.server = null;
-    this.config = {
-      appDir: config.appDir || "app",
-      port: config.port || 3e3,
-      renderMode: config.renderMode || "ssr"
-    };
-    this.router = new AppRouter(this.config.appDir);
-  }
-  /**
-   * 인터프리터 설정 (외부에서 주입)
-   */
-  setInterpreter(interpreter) {
-    this.executor = new fl_executor_default(interpreter);
-    this.renderer = new page_renderer_default(this.executor);
-  }
-  /**
-   * 서버 시작
-   */
-  async start() {
-    this.server = http2.createServer(async (req, res) => {
-      await this.handleRequest(req, res);
-    });
-    return new Promise((resolve9) => {
-      this.server.listen(this.config.port, () => {
-        const port = this.config.port;
-        const routes = this.router.getRoutes();
-        const msg = `server.listening port=${port}`;
-        console.log(`server.start port=${port} app_routes=${routes.length}`);
-        for (const route of routes) {
-          console.log(`server.route path=${route.path} file=${route.filePath}`);
-        }
-        resolve9(msg);
-      });
-    });
-  }
-  /**
-   * 서버 중지
-   */
-  stop() {
-    if (this.server) {
-      this.server.close();
-      this.server = null;
-    }
-  }
-  /**
-   * HTTP 요청 처리
-   */
-  async handleRequest(req, res) {
-    const urlPath = (req.url || "/").split("?")[0];
-    const query = this.parseQuery(req.url || "/");
-    let body = {};
-    if (req.method !== "GET" && req.method !== "HEAD") {
-      try {
-        const chunks = [];
-        for await (const chunk of req) {
-          chunks.push(chunk);
-        }
-        const bodyStr = Buffer.concat(chunks).toString("utf-8");
-        if (bodyStr && req.headers["content-type"]?.includes("application/json")) {
-          body = JSON.parse(bodyStr);
-        }
-      } catch (e) {
-      }
-    }
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-    );
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    if (req.method === "OPTIONS") {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-    const match = this.router.match(urlPath);
-    if (match) {
-      if (this.executor) {
-        try {
-          const routeKind = match.route.kind || "page";
-          const isApiPath = routeKind === "route" || urlPath.startsWith("/api/");
-          const executorContext = {
-            req: { method: req.method, path: urlPath, headers: req.headers },
-            params: match.params,
-            query,
-            body,
-            method: req.method,
-            isApiPath
-          };
-          const result = routeKind === "route" ? await this.executor.executeRoute(match.route.filePath, executorContext) : await this.executor.executePage(match.route.filePath, executorContext);
-          if (isApiPath) {
-            res.setHeader("Content-Type", "application/json");
-            res.writeHead(result.status || 200);
-            if (typeof result.body === "string") {
-              res.end(result.body);
-            } else if (result.body !== null && typeof result.body === "object") {
-              res.end(JSON.stringify(result.body));
-            } else {
-              res.end(JSON.stringify({ success: result.success, body: result.body }));
-            }
-            return;
-          }
-          if (result.success && typeof result.body === "string") {
-            let finalBody = result.body;
-            const layouts = match.route.layouts;
-            if (this.renderer && layouts && layouts.length > 0) {
-              try {
-                finalBody = await this.renderer.renderWithLayout(finalBody, layouts);
-              } catch {
-              }
-            }
-            if (result.meta && Object.keys(result.meta).length > 0) {
-              finalBody = this.injectMetaIntoHead(finalBody, result.meta);
-            }
-            res.setHeader("Content-Type", result.contentType || "text/html; charset=utf-8");
-            res.writeHead(result.status || 200);
-            res.end(finalBody);
-          } else {
-            res.setHeader("Content-Type", "text/html; charset=utf-8");
-            res.writeHead(result.status || 500);
-            res.end(result.error || "Internal Server Error");
-          }
-          return;
-        } catch (err4) {
-          const isApiPath = urlPath.startsWith("/api/");
-          if (isApiPath) {
-            res.setHeader("Content-Type", "application/json");
-            res.writeHead(500);
-            res.end(JSON.stringify({ error: err4.message }));
-          } else {
-            res.setHeader("Content-Type", "text/html; charset=utf-8");
-            res.writeHead(500);
-            res.end(generateHTML("Error", `<h1>Error</h1><p>${err4.message}</p>`));
-          }
-          return;
-        }
-      }
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.writeHead(200);
-      res.end(generatePageHTML(match.route, match.params));
-      return;
-    }
-    if (urlPath === "/demo") {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.writeHead(200);
-      res.end(generateHTML("Demo", "<h1>Demo Page</h1><p>App Router demo</p>"));
-      return;
-    }
-    if (urlPath === "/api/status") {
-      res.setHeader("Content-Type", "application/json");
-      res.writeHead(200);
-      res.end(
-        JSON.stringify({
-          status: "ok",
-          framework: "FreeLang v11",
-          router: "App Router v1.0",
-          routes: this.router.getRoutes().length,
-          message: "Pure v11 web framework with filesystem routing"
-        })
-      );
-      return;
-    }
-    if (urlPath === "/" || urlPath === "") {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.writeHead(200);
-      res.end(generateIndexHTML());
-      return;
-    }
-    const notFoundFile = this.router.getNotFoundHandler();
-    if (notFoundFile && this.executor && this.renderer) {
-      try {
-        const result = await this.executor.executePage(notFoundFile, {
-          req: { method: req.method, path: urlPath }
-        });
-        if (result.success && typeof result.body === "string") {
-          let finalBody = result.body;
-          const rootLayouts = this.router.getLayoutsForRoute("/");
-          if (rootLayouts && rootLayouts.length > 0) {
-            try {
-              finalBody = await this.renderer.renderWithLayout(finalBody, rootLayouts);
-            } catch {
-            }
-          }
-          if (result.meta) {
-            finalBody = this.injectMetaIntoHead(finalBody, result.meta);
-          }
-          res.setHeader("Content-Type", "text/html; charset=utf-8");
-          res.writeHead(404);
-          res.end(finalBody);
-          return;
-        }
-      } catch {
-      }
-    }
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.writeHead(404);
-    res.end(
-      generateHTML(
-        "404",
-        `<h1>404 Not Found</h1><p>Route not found: ${escHtml(urlPath)}</p>`
-      )
-    );
-  }
-  /**
-   * W1: HTML <head>에 메타데이터 주입
-   */
-  injectMetaIntoHead(html, meta) {
-    const headMatch = html.match(/<head[^>]*>/i);
-    if (!headMatch) return html;
-    const headTag = headMatch[0];
-    const headIndex = html.indexOf(headTag);
-    const headEndIndex = headIndex + headTag.length;
-    const existingMeta = html.substring(headIndex, html.indexOf("</head>", headIndex));
-    const metaTags = [];
-    if (meta.title && !existingMeta.includes("<title>")) {
-      metaTags.push(`<title>${escHtml(meta.title)}</title>`);
-    }
-    if (meta.description && !existingMeta.includes('name="description"')) {
-      metaTags.push(`<meta name="description" content="${escHtml(meta.description)}">`);
-    }
-    if (meta["og-image"] && !existingMeta.includes('property="og:image"')) {
-      metaTags.push(`<meta property="og:image" content="${escHtml(meta["og-image"])}">`);
-    }
-    if (meta["og-url"] && !existingMeta.includes('property="og:url"')) {
-      metaTags.push(`<meta property="og:url" content="${escHtml(meta["og-url"])}">`);
-    }
-    if (meta.canonical && !existingMeta.includes('rel="canonical"')) {
-      metaTags.push(`<link rel="canonical" href="${escHtml(meta.canonical)}">`);
-    }
-    if (meta["og-title"] && !existingMeta.includes('property="og:title"')) {
-      metaTags.push(`<meta property="og:title" content="${escHtml(meta["og-title"])}">`);
-    }
-    if (meta["og-description"] && !existingMeta.includes('property="og:description"')) {
-      metaTags.push(`<meta property="og:description" content="${escHtml(meta["og-description"])}">`);
-    }
-    const metaString = metaTags.join("\n  ");
-    return html.substring(0, headEndIndex) + "\n  " + metaString + html.substring(headEndIndex);
-  }
-  /**
-   * URL 쿼리 파싱
-   */
-  parseQuery(url2) {
-    const queryStr = url2.split("?")[1];
-    if (!queryStr) return {};
-    const query = {};
-    for (const pair of queryStr.split("&")) {
-      const [key, value] = pair.split("=");
-      if (key) {
-        query[decodeURIComponent(key)] = decodeURIComponent(value || "");
-      }
-    }
-    return query;
-  }
-  /**
-   * 라우터 조회
-   */
-  getRouter() {
-    return this.router;
-  }
-  /**
-   * 렌더러 조회
-   */
-  getRenderer() {
-    return this.renderer;
-  }
-  /**
-   * 실행기 조회
-   */
-  getExecutor() {
-    return this.executor;
-  }
-};
-
-// src/cli.ts
-function formatCallStack(stack) {
-  if (!stack || stack.length === 0) return "";
-  const frames = stack.slice().reverse().slice(0, 10);
-  return "\n\x1B[2m\uCF5C \uC2A4\uD0DD:\x1B[0m\n" + frames.map(
-    (f, i) => `  \x1B[2m${i === 0 ? "\u2192" : " "} ${f.name ?? f.fn ?? "?"} (line ${f.line})\x1B[0m`
-  ).join("\n");
-}
-function mapJsError(msg) {
-  if (msg.includes("Cannot read properties of null") || msg.includes("Cannot read properties of undefined")) {
-    const m = msg.match(/reading '([^']+)'/);
-    return m ? `nil \uAC12\uC758 '${m[1]}' \uC18D\uC131\uC5D0 \uC811\uADFC \uBD88\uAC00 \u2014 (nil? x)\uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694` : "nil \uAC12\uC5D0 \uC811\uADFC \uBD88\uAC00 \u2014 (nil? x)\uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694";
-  }
-  if (msg.includes("is not a function")) {
-    const m = msg.match(/^(.+?) is not a function/);
-    return `${m?.[1] ?? "\uD574\uB2F9 \uAC12"}\uC740 \uD568\uC218\uAC00 \uC544\uB2D9\uB2C8\uB2E4 \u2014 (fn? x)\uB85C \uBA3C\uC800 \uD655\uC778\uD558\uC138\uC694`;
-  }
-  if (msg.includes("Maximum call stack size exceeded")) {
-    return "\uC2A4\uD0DD \uC624\uBC84\uD50C\uB85C\uC6B0 \u2014 \uC7AC\uADC0 \uAE4A\uC774 \uCD08\uACFC. (loop/recur)\uC73C\uB85C \uBCC0\uD658\uD558\uAC70\uB098 \uC885\uB8CC \uC870\uAC74 \uD655\uC778";
-  }
-  return msg;
-}
-function formatError(err4, source, filePath, callStack) {
-  const fileName = filePath ? path18.basename(filePath) : "<stdin>";
-  const lines = [];
-  if (err4 instanceof ParserError) {
-    lines.push(`
-\x1B[31m\uD30C\uC2F1 \uC624\uB958\x1B[0m  ${fileName}:${err4.line}:${err4.col}`);
-    if (source) {
-      const srcLines = source.split("\n");
-      const lineIdx = err4.line - 1;
-      if (lineIdx >= 0 && lineIdx < srcLines.length) {
-        const lineNum = String(err4.line).padStart(4, " ");
-        lines.push(`  ${lineNum} \u2502 ${srcLines[lineIdx]}`);
-        lines.push(`       ${"\u2500".repeat(err4.col - 1)}^`);
-      }
-    }
-    lines.push(`  ${err4.message}`);
-  } else if (err4 instanceof Error) {
-    const lineMatch = err4.message.match(/^FreeLang line (\d+):\s*/);
-    const errLine = lineMatch ? parseInt(lineMatch[1]) : 0;
-    const cleanMsg = lineMatch ? err4.message.slice(lineMatch[0].length) : err4.message;
-    lines.push(`
-\x1B[31m\uC2E4\uD589 \uC624\uB958\x1B[0m  ${fileName}${errLine ? `:${errLine}` : ""}`);
-    if (source && errLine > 0) {
-      const srcLines = source.split("\n");
-      const start = Math.max(0, errLine - 2);
-      const end = Math.min(srcLines.length - 1, errLine);
-      for (let i = start; i <= end; i++) {
-        const num = String(i + 1).padStart(4, " ");
-        const marker = i + 1 === errLine ? "\x1B[31m\u2192\x1B[0m" : " ";
-        const lineColor = i + 1 === errLine ? `\x1B[31m${srcLines[i]}\x1B[0m` : `\x1B[2m${srcLines[i]}\x1B[0m`;
-        lines.push(`  ${marker} ${num} \u2502 ${lineColor}`);
-      }
-      lines.push("");
-    }
-    lines.push(`  \x1B[31m\u2716\x1B[0m ${mapJsError(cleanMsg)}`);
-    const stack = callStack ?? err4.__flCallStack;
-    if (stack && stack.length > 0) lines.push(formatCallStack(stack));
-  } else {
-    lines.push(`
-\x1B[31m\uC624\uB958\x1B[0m  ${String(err4)}`);
-  }
-  return lines.join("\n");
-}
-function checkSource(source, filePath) {
-  try {
-    const tokens = lex(source);
-    parse(tokens);
-    const fileName = filePath ? path18.basename(filePath) : "<stdin>";
-    console.log(`\x1B[32m\u2713\x1B[0m  ${fileName}  \uBB38\uBC95 \uC774\uC0C1 \uC5C6\uC74C`);
-    return true;
-  } catch (err4) {
-    console.error(formatError(err4, source, filePath));
-    return false;
-  }
-}
-function flPidFile(absPath) {
-  const safe = absPath.replace(/[^a-zA-Z0-9]/g, "_");
-  return `/tmp/fl_${safe}.pid`;
-}
-function cmdRun(filePath, watch2, extraArgs = []) {
-  const absPath = path18.resolve(filePath);
-  const vmBench = extraArgs.includes("--vm-bench");
-  if (!fs20.existsSync(absPath)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
-    process.exit(1);
-  }
-  const pidFile = flPidFile(absPath);
-  try {
-    fs20.writeFileSync(pidFile, `${process.pid}
-${absPath}`);
-  } catch {
-  }
-  process.on("exit", () => {
-    try {
-      fs20.unlinkSync(pidFile);
-    } catch {
-    }
-  });
-  function execute() {
-    const source = fs20.readFileSync(absPath, "utf-8");
-    let ctx;
-    try {
-      const tokens = lex(source);
-      const ast = parse(tokens);
-      const interp2 = new Interpreter();
-      interp2.currentFilePath = absPath;
-      if (extraArgs.length > 0) {
-        interp2.context.variables.set("$__argv__", extraArgs);
-      }
-      ctx = interp2.interpret(ast);
-    } catch (err4) {
-      console.error(formatError(err4, source, absPath));
-      if (!watch2) process.exit(1);
-      return;
-    }
-    const value = ctx?.lastValue;
-    if (value !== null && value !== void 0) {
-      if (typeof value === "object") {
-        console.log(JSON.stringify(value, null, 2));
-      } else {
-        console.log(String(value));
-      }
-    }
-  }
-  if (watch2) {
-    process.env.FL_DEV = "1";
-  }
-  if (vmBench) {
-    console.log("\n\x1B[36m[vm-bench] \uC131\uB2A5 \uCE21\uC815 \uC2DC\uC791...\x1B[0m");
-    const ITERATIONS = 100;
-    const source = fs20.readFileSync(absPath, "utf-8");
-    const t0 = performance.now();
-    for (let i = 0; i < ITERATIONS; i++) {
-      delete process.env.FL_VM;
-      try {
-        const tokens = lex(source);
-        const ast = parse(tokens);
-        const interp2 = new Interpreter();
-        interp2.currentFilePath = absPath;
-        if (extraArgs.length > 0) {
-          interp2.context.variables.set("$__argv__", extraArgs.filter((a) => a !== "--vm-bench"));
-        }
-        interp2.interpret(ast);
-      } catch (_e) {
-      }
-    }
-    const interpMs = performance.now() - t0;
-    const t1 = performance.now();
-    for (let i = 0; i < ITERATIONS; i++) {
-      process.env.FL_VM = "1";
-      try {
-        const tokens = lex(source);
-        const ast = parse(tokens);
-        const interp2 = new Interpreter();
-        interp2.currentFilePath = absPath;
-        if (extraArgs.length > 0) {
-          interp2.context.variables.set("$__argv__", extraArgs.filter((a) => a !== "--vm-bench"));
-        }
-        interp2.interpret(ast);
-      } catch (_e) {
-      }
-    }
-    const vmMs = performance.now() - t1;
-    delete process.env.FL_VM;
-    const speedup = interpMs / vmMs;
-    console.log(`\x1B[36m[vm-bench]\x1B[0m interpreter: ${interpMs.toFixed(1)}ms (${ITERATIONS} iter)`);
-    console.log(`\x1B[36m[vm-bench]\x1B[0m          vm: ${vmMs.toFixed(1)}ms (${ITERATIONS} iter)`);
-    console.log(`\x1B[36m[vm-bench]\x1B[0m    speedup: ${speedup.toFixed(2)}x`);
-    if (speedup < 1) {
-      console.log(`\x1B[33m\u26A0\uFE0F  VM\uC774 \uB290\uB9BC (\uC0B0\uC220 \uC9D1\uC57D \uCF54\uB4DC\uAC00 \uC544\uB2D0 \uC218 \uC788\uC74C)\x1B[0m`);
-    } else if (speedup >= 1.5) {
-      console.log(`\x1B[32m\u2713 \uBAA9\uD45C \uB2EC\uC131 (1.5\uBC30 \uC774\uC0C1)\x1B[0m`);
-    } else {
-      console.log(`\x1B[2m\u25CB 1.0x ~ 1.5x \uBC94\uC704\x1B[0m`);
-    }
-    console.log("");
-    if (!watch2) return;
-  }
-  if (!watch2 && !vmBench && !process.env.FL_NO_HINT) {
-    const isServerFile = fs20.readFileSync(absPath, "utf-8").includes("server_start");
-    if (isServerFile) {
-      process.stderr.write(`\x1B[2m\u{1F4A1}  \uAC1C\uBC1C \uC911\uC5D0\uB294: freelang watch ${path18.basename(absPath)}\x1B[0m
-`);
-    }
-  }
-  execute();
-  if (watch2) {
-    console.log(`\x1B[2m  watching ${path18.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
-    let lastMtime = 0;
-    let lastSize = -1;
-    try {
-      const st = fs20.statSync(absPath);
-      lastMtime = st.mtimeMs;
-      lastSize = st.size;
-    } catch (_e) {
-    }
-    let debounce = null;
-    setInterval(() => {
-      try {
-        const st = fs20.statSync(absPath);
-        if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
-          lastMtime = st.mtimeMs;
-          lastSize = st.size;
-          if (debounce) clearTimeout(debounce);
-          debounce = setTimeout(() => {
-            console.log(`
-\x1B[2m\u2500\u2500\u2500 \uBCC0\uACBD \uAC10\uC9C0, \uC7AC\uC2E4\uD589 \u2500\u2500\u2500\x1B[0m`);
-            execute();
-          }, 100);
-        }
-      } catch (_e) {
-      }
-    }, 500);
-  }
-}
-function cmdProps(filePath, extraArgs) {
-  const absPath = path18.resolve(filePath);
-  if (!fs20.existsSync(absPath)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
-    process.exit(1);
-  }
-  const samplesIdx = extraArgs.indexOf("--samples");
-  const samplesOverride = samplesIdx >= 0 ? parseInt(extraArgs[samplesIdx + 1], 10) : void 0;
-  const source = fs20.readFileSync(absPath, "utf-8");
-  try {
-    const tokens = lex(source);
-    const ast = parse(tokens);
-    const interp3 = new Interpreter();
-    interp3.currentFilePath = absPath;
-    interp3.interpret(ast);
-  } catch (err4) {
-  }
-  if (propRegistry.size === 0) {
-    console.log(`\x1B[33m[props]\x1B[0m  ${path18.basename(absPath)} \u2014 defprop \uC5C6\uC74C`);
-    console.log(`\x1B[2m  \uD301: (defprop my-prop {:fn "add" :args [:int :int] :check (fn [$a $b] (= (add $a $b) (add $b $a)))})\x1B[0m`);
-    return;
-  }
-  console.log(`\x1B[36m[props]\x1B[0m  ${path18.basename(absPath)} \u2014 ${propRegistry.size}\uAC1C property \uC2E4\uD589
-`);
-  let interp2;
-  try {
-    const tokens = lex(source);
-    const ast = parse(tokens);
-    interp2 = new Interpreter();
-    interp2.currentFilePath = absPath;
-    interp2.interpret(ast);
-  } catch {
-  }
-  let totalPassed = 0;
-  let totalFailed = 0;
-  let exitCode = 0;
-  for (const [, prop] of propRegistry) {
-    const p = samplesOverride ? { ...prop, samples: samplesOverride } : prop;
-    const result = runProp(
-      p,
-      (fnName, fnArgs) => {
-        const fnVal = interp2?.context?.variables?.get(fnName) ?? interp2?.context?.variables?.get("$" + fnName);
-        if (!fnVal) throw new Error(`\uD568\uC218 \uC5C6\uC74C: ${fnName}`);
-        return interp2.callFunctionValue(fnVal, fnArgs);
-      },
-      (checkFn, checkArgs) => {
-        if (!checkFn) return true;
-        return interp2.callFunctionValue(checkFn, checkArgs);
-      }
-    );
-    totalPassed += result.passed;
-    totalFailed += result.failed;
-    const ok2 = result.failed === 0;
-    const status = ok2 ? "\x1B[32m\u2713\x1B[0m" : "\x1B[31m\u2716\x1B[0m";
-    process.stdout.write(
-      `  ${status}  \x1B[1m${result.name}\x1B[0m  \x1B[2m${result.fn}  ${result.passed}/${result.samples}  ${result.durationMs}ms\x1B[0m
-`
-    );
-    if (!ok2 && result.firstFailure) {
-      const f = result.firstFailure;
-      process.stdout.write(
-        `     \x1B[31m\uBC18\uB840\x1B[0m: args=${JSON.stringify(f.args)}` + (f.error ? ` error=${f.error}` : ` result=${JSON.stringify(f.result)}`) + "\n"
-      );
-      exitCode = 1;
-    }
-  }
-  const allOk = totalFailed === 0;
-  process.stdout.write(
-    `
-  ${allOk ? "\x1B[32m[PROPS PASS]\x1B[0m" : "\x1B[31m[PROPS FAIL]\x1B[0m"}  ${propRegistry.size}\uAC1C property \u2014 ${totalPassed} passed / ${totalFailed} failed
-`
-  );
-  if (exitCode) process.exit(exitCode);
-}
-function cmdCheck(filePath) {
-  const absPath = path18.resolve(filePath);
-  if (!fs20.existsSync(absPath)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
-    process.exit(1);
-  }
-  const source = fs20.readFileSync(absPath, "utf-8");
-  const ok2 = checkSource(source, absPath);
-  if (!ok2) process.exit(1);
-  const { metaMissing, effectsWarn } = checkDefnMeta(source, absPath);
-  let hasWarnings = false;
-  if (metaMissing.length > 0) {
-    hasWarnings = true;
-    process.stderr.write(`
-\x1B[33m[meta-check]\x1B[0m  ${path18.basename(absPath)} \u2014 ${metaMissing.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
-`);
-    for (const w of metaMissing) {
-      process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 :context/:returns \uC5C6\uC74C
-`);
-    }
-    process.stderr.write(`\x1B[2m  \uD301: (defn ${metaMissing[0].name} [...] {:context "..." :returns "..."} ...)\x1B[0m
-`);
-  }
-  const pureErrors = effectsWarn.filter((w) => w.isPure);
-  const effectsOnly = effectsWarn.filter((w) => !w.isPure);
-  if (pureErrors.length > 0) {
-    hasWarnings = true;
-    process.stderr.write(`
-\x1B[31m[pure-violation]\x1B[0m  ${path18.basename(absPath)} \u2014 ${pureErrors.length}\uAC1C ^pure \uD568\uC218\uC5D0\uC11C side effect \uBC1C\uACAC
-`);
-    for (const w of pureErrors) {
-      const hint = w.undeclared.map((e) => `:${e}`).join(" ");
-      process.stderr.write(`  \x1B[31m\u2716\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 \x1B[31m${hint}\x1B[0m  (\uC21C\uC218 \uD568\uC218 \uC704\uBC18)
-`);
-    }
-    process.stderr.write(`\x1B[2m  :effects [] \uB610\uB294 ^pure \uC120\uC5B8 \uC2DC side effect \uD638\uCD9C \uBD88\uAC00\x1B[0m
-`);
-  }
-  if (effectsOnly.length > 0) {
-    hasWarnings = true;
-    process.stderr.write(`
-\x1B[33m[effects-check]\x1B[0m  ${path18.basename(absPath)} \u2014 ${effectsOnly.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
-`);
-    for (const w of effectsOnly) {
-      const hint = w.undeclared.map((e) => `:${e}`).join(" ");
-      process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 \uBBF8\uC120\uC5B8 effect: \x1B[33m${hint}\x1B[0m
-`);
-    }
-  }
-  if (hasWarnings) process.stderr.write("\n");
-  const { errors: typeErrors, warnings: typeWarns, fnCount } = typeCheckSource(source);
-  if (typeErrors.length > 0 || typeWarns.length > 0) {
-    process.stderr.write(formatTypeIssues([...typeErrors, ...typeWarns], absPath) + "\n\n");
-    if (typeErrors.length > 0) process.exit(1);
-  } else if (fnCount > 0) {
-    console.log(`\x1B[36m[type-check]\x1B[0m  ${path18.basename(absPath)}  \uD0C0\uC785 \uC774\uC0C1 \uC5C6\uC74C (\uD568\uC218 ${fnCount}\uAC1C \uBD84\uC11D)`);
-  }
-}
-function checkDefnMeta(source, filePath) {
-  const metaMissing = [];
-  const effectsWarn = [];
-  try {
-    let collectCalls = function(node, found) {
-      if (!node) return;
-      if (node.kind === "sexpr") {
-        if (node.op) found.add(node.op);
-        if (Array.isArray(node.args)) node.args.forEach((a) => collectCalls(a, found));
-      } else if (node.kind === "block" && node.fields instanceof Map) {
-        node.fields.forEach((v) => collectCalls(v, found));
-      }
-    }, walkNodes = function(nodes) {
-      for (const node of nodes) {
-        if (!node) continue;
-        if (node.kind === "sexpr" && (node.op === "defn" || node.op === "defun")) {
-          let argIdx = 0;
-          const args3 = node.args ?? [];
-          let isPureHint = false;
-          if (args3[argIdx]?.kind === "literal" && String(args3[argIdx].value ?? "").startsWith("^")) {
-            if (String(args3[argIdx].value) === "^pure") isPureHint = true;
-            argIdx++;
-          }
-          const nameNode = args3[argIdx];
-          const name = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "?";
-          let bodyArgs = args3.slice(argIdx + 2);
-          const first2 = bodyArgs[0];
-          let metaMap = null;
-          if (first2?.kind === "block" && first2?.type === "Map" && first2.fields instanceof Map) {
-            if ([...first2.fields.keys()].some((k) => META_KEYS2.has(k))) {
-              metaMap = first2.fields;
-              bodyArgs = bodyArgs.slice(1);
-            }
-          }
-          if (!metaMap && bodyArgs.length > 0) {
-            metaMissing.push({ name, line: node.line ?? 0 });
-          }
-          const effectsDeclared = metaMap?.has("effects") || isPureHint;
-          if (effectsDeclared) {
-            let declared = [];
-            if (!isPureHint && metaMap?.has("effects")) {
-              const eNode = metaMap.get("effects");
-              if (eNode?.kind === "block" && eNode?.type === "Array") {
-                const items = eNode.fields?.get("items");
-                if (Array.isArray(items)) {
-                  declared = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "?");
-                }
-              }
-            }
-            const isPure = isPureHint || declared.length === 0;
-            const declaredSet = new Set(declared);
-            const calledOps = /* @__PURE__ */ new Set();
-            bodyArgs.forEach((b) => collectCalls(b, calledOps));
-            const undeclared = [];
-            calledOps.forEach((op) => {
-              const eff = EFFECT_CATALOG.get(op);
-              if (eff && !declaredSet.has(eff)) undeclared.push(eff);
-            });
-            if (undeclared.length > 0) {
-              effectsWarn.push({ name, line: node.line ?? 0, undeclared: [...new Set(undeclared)], isPure });
-            }
-          }
-          walkNodes(bodyArgs);
-        } else if (node.kind === "sexpr" && node.args) {
-          walkNodes(node.args);
-        } else if (node.kind === "block" && node.fields instanceof Map) {
-          walkNodes([...node.fields.values()]);
-        }
-      }
-    };
-    const tokens = lex(source);
-    const ast = parse(tokens);
-    const META_KEYS2 = /* @__PURE__ */ new Set(["returns", "context", "effects", "examples"]);
-    walkNodes(ast);
-  } catch {
-  }
-  return { metaMissing, effectsWarn };
-}
-function cmdCodegen(args3) {
-  const inputFile = args3.find((a) => !a.startsWith("-") && a.endsWith(".fl"));
-  const target = args3.includes("--target") ? args3[args3.indexOf("--target") + 1] : "all";
-  if (!inputFile) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
-    process.exit(1);
-  }
-  const absInput = path18.resolve(inputFile);
-  if (!fs20.existsSync(absInput)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
-    process.exit(1);
-  }
-  try {
-    const source = fs20.readFileSync(absInput, "utf-8");
-    const tokens = lex(source);
-    const ast = parse(tokens);
-    const cg = new JSCodegen();
-    for (const node of ast) {
-      if (node.kind === "block") {
-        const blockType = node.type;
-        if (["SERVICE", "MODEL", "CONTROLLER"].includes(blockType)) {
-          if (target === "all" || target === "typescript" && blockType !== "MODEL" || target === "sql" && blockType === "MODEL") {
-            const code = cg.generate([node]);
-            console.log(code);
-            console.log("\n" + "\u2500".repeat(80) + "\n");
-          }
-        }
-      }
-    }
-  } catch (err4) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs20.readFileSync(absInput, "utf-8"), absInput)}`);
-    process.exit(1);
-  }
-}
-function cmdCompile(args3) {
-  const outputIdx = args3.indexOf("-o");
-  const inputFile = args3.find((a) => !a.startsWith("-") && a !== args3[outputIdx + 1]);
-  const outputFile = outputIdx !== -1 ? args3[outputIdx + 1] : null;
-  const useEsm = args3.includes("--esm");
-  const withRuntime = args3.includes("--runtime");
-  if (!inputFile) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> [-o <out.js>]`);
-    process.exit(1);
-  }
-  const absInput = path18.resolve(inputFile);
-  if (!fs20.existsSync(absInput)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
-    process.exit(1);
-  }
-  try {
-    const source = fs20.readFileSync(absInput, "utf-8");
-    const tokens = lex(source);
-    const ast = parse(tokens);
-    const cg = new JSCodegen();
-    const js = cg.generate(ast, {
-      module: useEsm ? "esm" : "commonjs",
-      runtime: withRuntime,
-      minify: false,
-      target: "node"
-    });
-    if (outputFile) {
-      const absOutput = path18.resolve(outputFile);
-      const dir = path18.dirname(absOutput);
-      if (dir !== "." && !fs20.existsSync(dir)) {
-        fs20.mkdirSync(dir, { recursive: true });
-      }
-      fs20.writeFileSync(absOutput, js, "utf-8");
-      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path18.basename(inputFile)} \u2192 ${outputFile}`);
-    } else {
-      process.stdout.write(js);
-    }
-  } catch (err4) {
-    console.error(formatError(err4, fs20.readFileSync(absInput, "utf-8"), absInput));
-    process.exit(1);
-  }
-}
-function cmdRepl() {
-  console.log(`FreeLang v11 REPL  (\x1B[2m:q / (exit) / (quit) \uC885\uB8CC  :help \uB3C4\uC6C0\uB9D0  :reset \uC138\uC158 \uCD08\uAE30\uD654\x1B[0m)`);
-  console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  const historyPath = (() => {
-    try {
-      const os4 = require("os");
-      const path19 = require("path");
-      return path19.join(os4.homedir(), ".fl_history");
-    } catch {
-      return null;
-    }
-  })();
-  let initialHistory = [];
-  if (historyPath) {
-    try {
-      const fs21 = require("fs");
-      if (fs21.existsSync(historyPath)) {
-        initialHistory = fs21.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
-      }
-    } catch {
-    }
-  }
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: "\x1B[36mfl>\x1B[0m ",
-    terminal: true,
-    history: initialHistory,
-    historySize: 500
-  });
-  let buffer = "";
-  let sessionInterp = new Interpreter();
-  function countBalance(s) {
-    let balance = 0;
-    let inStr = false;
-    for (let i = 0; i < s.length; i++) {
-      const ch = s[i];
-      if (ch === '"') {
-        let backslashCount = 0;
-        let j = i - 1;
-        while (j >= 0 && s[j] === "\\") {
-          backslashCount++;
-          j--;
-        }
-        if (backslashCount % 2 === 0) inStr = !inStr;
-      }
-      if (!inStr) {
-        if (ch === "(" || ch === "[" || ch === "{") balance++;
-        if (ch === ")" || ch === "]" || ch === "}") balance--;
-      }
-    }
-    return balance;
-  }
-  rl.prompt();
-  rl.on("line", (line) => {
-    const trimmed = line.trim();
-    if (trimmed === ":q" || trimmed === ":quit" || trimmed === ":exit" || trimmed === "(exit)" || trimmed === "(quit)" || trimmed === "exit" || trimmed === "quit") {
-      console.log("bye.");
-      rl.close();
-      process.exit(0);
-    }
-    if (trimmed === "(exit" || trimmed === "(quit") {
-      console.log(`\x1B[33m\u{1F4A1} \uC885\uB8CC\uD558\uB824\uBA74: :q  \uB610\uB294  (exit)  \uC785\uB825\x1B[0m`);
-      return;
-    }
-    if (trimmed === ":help") {
-      console.log([
-        "  :q / :quit    \uC885\uB8CC",
-        "  :clear        \uBC84\uD37C \uCD08\uAE30\uD654",
-        "  :help         \uC774 \uB3C4\uC6C0\uB9D0",
-        "  :ls           \uC815\uC758\uB41C \uD568\uC218 \uBAA9\uB85D",
-        "  :stack        callStack \uCD9C\uB825 (\uCD5C\uADFC 20\uAC1C)",
-        "  :locals       \uD604\uC7AC \uBCC0\uC218 dump",
-        "  :debug        debugger ON/OFF toggle",
-        "  :step         step \uBAA8\uB4DC toggle",
-        "",
-        "  \uC608\uC81C:",
-        "    (+ 1 2)",
-        '    (println "Hello, World!")',
-        '    (let [[$x 42]] (println "x = {$x}"))',
-        "    [FUNC add :params [$a $b] :body (+ $a $b)]",
-        "    (add 3 5)"
-      ].join("\n"));
-      rl.prompt();
-      return;
-    }
-    if (trimmed === ":clear") {
-      buffer = "";
-      console.log("  \uBC84\uD37C \uCD08\uAE30\uD654\uB428.");
-      rl.prompt();
-      return;
-    }
-    if (trimmed === ":reset") {
-      buffer = "";
-      sessionInterp = new Interpreter();
-      console.log("  \uC138\uC158 \uCD08\uAE30\uD654\uB428 (\uBAA8\uB4E0 \uBCC0\uC218/\uD568\uC218 \uC81C\uAC70).");
-      rl.prompt();
-      return;
-    }
-    if (trimmed === ":ls") {
-      const fns = [...sessionInterp.context.functions.keys()];
-      console.log(fns.length === 0 ? "(\uD568\uC218 \uC5C6\uC74C)" : fns.slice(0, 50).join("  "));
-      if (fns.length > 50) console.log(`  ... \uC678 ${fns.length - 50}\uAC1C`);
-      rl.prompt();
-      return;
-    }
-    if (trimmed === ":stack") {
-      const stack = sessionInterp.callStack ?? [];
-      if (stack.length === 0) console.log("  (callStack \uBE44\uC5B4\uC788\uC74C \u2014 \uD638\uCD9C \uC911\uC77C \uB54C\uB9CC \uD45C\uC2DC)");
-      else {
-        const tail = stack.slice(-20);
-        for (let i = 0; i < tail.length; i++) {
-          const argsStr = tail[i].args ? `(${tail[i].args.join(", ")})` : "";
-          console.log(`  #${stack.length - tail.length + i}: ${tail[i].fn}${argsStr} (line ${tail[i].line})`);
-        }
-      }
-      rl.prompt();
-      return;
-    }
-    if (trimmed === ":locals") {
-      const vars = sessionInterp.context.variables.snapshot?.() ?? /* @__PURE__ */ new Map();
-      if (vars.size === 0) console.log("  (\uBCC0\uC218 \uC5C6\uC74C)");
-      else {
-        let count2 = 0;
-        for (const [k, v] of vars) {
-          if (count2++ >= 30) {
-            console.log(`  ... ${vars.size - 30}\uAC1C \uB354`);
-            break;
-          }
-          const valStr = typeof v === "function" ? "<function>" : v?.kind === "function-value" ? "<fn-value>" : (() => {
-            try {
-              return JSON.stringify(v)?.slice(0, 60);
-            } catch {
-              return "<unserializable>";
-            }
-          })();
-          console.log(`  ${k} = ${valStr}`);
-        }
-      }
-      rl.prompt();
-      return;
-    }
-    if (trimmed === ":debug") {
-      try {
-        const { getGlobalDebugSession: getGlobalDebugSession2 } = (init_debugger(), __toCommonJS(debugger_exports));
-        const sess = getGlobalDebugSession2();
-        sess.enabled = !sess.enabled;
-        console.log(`  debugger: ${sess.enabled ? "ON" : "OFF"}`);
-      } catch (e) {
-        console.log(`  debug \uBAA8\uB4C8 \uB85C\uB4DC \uC2E4\uD328: ${e.message}`);
-      }
-      rl.prompt();
-      return;
-    }
-    if (trimmed === ":step") {
-      try {
-        const { getGlobalDebugSession: getGlobalDebugSession2 } = (init_debugger(), __toCommonJS(debugger_exports));
-        const sess = getGlobalDebugSession2();
-        sess.enabled = true;
-        sess.stepMode = !sess.stepMode;
-        console.log(`  step \uBAA8\uB4DC: ${sess.stepMode ? "ON (\uBAA8\uB4E0 \uC904\uC5D0\uC11C break)" : "OFF"}`);
-      } catch (e) {
-        console.log(`  debug \uBAA8\uB4C8 \uB85C\uB4DC \uC2E4\uD328: ${e.message}`);
-      }
-      rl.prompt();
-      return;
-    }
-    if (trimmed.startsWith(";")) {
-      rl.prompt();
-      return;
-    }
-    buffer += (buffer ? "\n" : "") + line;
-    const balance = countBalance(buffer);
-    if (balance > 0) {
-      process.stdout.write("\x1B[2m  \u2026\x1B[0m ");
-      return;
-    }
-    const source = buffer.trim();
-    buffer = "";
-    if (!source) {
-      rl.prompt();
-      return;
-    }
-    try {
-      const tokens = lex(source);
-      const ast = parse(tokens);
-      const ctx = sessionInterp.interpret(ast);
-      const val = ctx.lastValue;
-      if (val !== null && val !== void 0) {
-        if (typeof val === "object") {
-          console.log("\x1B[33m=>\x1B[0m", JSON.stringify(val, null, 2));
-        } else {
-          console.log("\x1B[33m=>\x1B[0m", String(val));
-        }
-      }
-    } catch (err4) {
-      console.error(formatError(err4, source));
-    }
-    if (historyPath && source) {
-      try {
-        const fs21 = require("fs");
-        fs21.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
-      } catch {
-      }
-    }
-    rl.prompt();
-  });
-  rl.on("close", () => {
-    process.exit(0);
-  });
-}
-function loadEmbeddedSignatures() {
-  try {
-    return require_stdlib_signatures();
-  } catch {
-    return [];
-  }
-}
-function cmdStdlibDoc(query) {
-  const signatures = loadEmbeddedSignatures();
-  const entries = signatures.map((s) => ({
-    module: s.module,
-    name: s.name,
-    params: s.params,
-    ret: s.returns
-  }));
-  if (entries.length === 0) {
-    console.error(JSON.stringify({ error: "stdlib_signatures_missing", hint: "run `npm run build` to regenerate" }));
-    process.exit(2);
-  }
-  const q = query.toLowerCase();
-  const exact = entries.filter((e) => e.name === query);
-  const partial = entries.filter((e) => e.name.toLowerCase().includes(q) && e.name !== query);
-  if (exact.length === 0 && partial.length === 0) {
-    const near = entries.map((e) => ({ e, d: levenshtein4(e.name.toLowerCase(), q) })).filter((x) => x.d <= 3).sort((a, b) => a.d - b.d).slice(0, 5);
-    console.log(JSON.stringify({
-      query,
-      found: false,
-      suggestions: near.map(({ e }) => ({ name: e.name, module: e.module }))
-    }));
-    process.exit(1);
-  }
-  const trim20 = partial.slice(0, 20);
-  console.log(JSON.stringify({
-    query,
-    found: true,
-    exact: exact.map((e) => ({ name: e.name, module: e.module, params: e.params, returns: e.ret })),
-    partial: trim20.map((e) => ({ name: e.name, module: e.module, params: e.params, returns: e.ret })),
-    partial_truncated: partial.length > 20 ? partial.length - 20 : 0
-  }));
-}
-function levenshtein4(a, b) {
-  if (a === b) return 0;
-  if (!a.length) return b.length;
-  if (!b.length) return a.length;
-  const prev = new Array(b.length + 1).fill(0).map((_, i) => i);
-  for (let i = 1; i <= a.length; i++) {
-    let next = [i];
-    for (let j = 1; j <= b.length; j++) {
-      next[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : Math.min(prev[j - 1], prev[j], next[j - 1]) + 1;
-    }
-    for (let j = 0; j <= b.length; j++) prev[j] = next[j];
-  }
-  return prev[b.length];
-}
-function cmdFmt(args3) {
-  if (args3.includes("--stdin")) {
-    let src = "";
-    process.stdin.setEncoding("utf-8");
-    process.stdin.on("data", (chunk) => {
-      src += chunk;
-    });
-    process.stdin.on("end", () => {
-      try {
-        const formatted = formatFL(src);
-        process.stdout.write(formatted);
-      } catch (err4) {
-        console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${err4.message}`);
-        process.exit(1);
-      }
-    });
-    return;
-  }
-  const checkMode = args3.includes("--check");
-  const filePaths = args3.filter((a) => !a.startsWith("--"));
-  if (filePaths.length === 0) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
-    process.exit(1);
-  }
-  let needsChange = false;
-  for (const filePath of filePaths) {
-    const absPath = path18.resolve(filePath);
-    if (!fs20.existsSync(absPath)) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
-      process.exit(1);
-    }
-    const src = fs20.readFileSync(absPath, "utf-8");
-    let formatted;
-    try {
-      formatted = formatFL(src);
-    } catch (err4) {
-      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path18.basename(absPath)}: ${err4.message}`);
-      process.exit(1);
-    }
-    if (checkMode) {
-      if (src !== formatted) {
-        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path18.basename(absPath)}`);
-        needsChange = true;
-      } else {
-        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path18.basename(absPath)}`);
-      }
-    } else {
-      if (src !== formatted) {
-        fs20.writeFileSync(absPath, formatted, "utf-8");
-        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path18.basename(absPath)}`);
-      } else {
-        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path18.basename(absPath)}`);
-      }
-    }
-  }
-  if (checkMode && needsChange) {
-    process.exit(1);
-  }
-}
-function cmdDebug(filePath, stepMode) {
-  const absPath = path18.resolve(filePath);
-  if (!fs20.existsSync(absPath)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
-    process.exit(1);
-  }
-  const session = new DebugSession();
-  session.enabled = true;
-  session.stepMode = stepMode;
-  setGlobalDebugSession(session);
-  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path18.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
-  console.log(`\x1B[2m  (break!) \uC704\uCE58\uC5D0\uC11C \uC911\uB2E8\uC810 \uBC1C\uC0DD\x1B[0m`);
-  console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  try {
-    const source = fs20.readFileSync(absPath, "utf-8");
-    const tokens = lex(source);
-    const ast = parse(tokens);
-    const interp2 = new Interpreter();
-    interp2.currentFilePath = absPath;
-    interp2.debugSession = session;
-    const ctx = interp2.interpret(ast);
-    if (ctx.lastValue !== null && ctx.lastValue !== void 0) {
-      if (typeof ctx.lastValue === "object") {
-        console.log(JSON.stringify(ctx.lastValue, null, 2));
-      } else {
-        console.log(String(ctx.lastValue));
-      }
-    }
-    console.log(`
-\x1B[35m[\uB514\uBC84\uADF8 \uC644\uB8CC]\x1B[0m  \uC911\uB2E8\uC810 ${session.breakLog.length}\uD68C \uB3C4\uB2EC`);
-  } catch (err4) {
-    console.error(formatError(err4, void 0, absPath));
-    process.exit(1);
-  }
-}
-async function cmdCi(ciArgs) {
-  const noFailFast = ciArgs.includes("--no-fail-fast");
-  const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
-  let targetFiles;
-  if (filePaths.length > 0) {
-    targetFiles = filePaths.map((f) => path18.resolve(f)).filter((f) => fs20.existsSync(f));
-    if (targetFiles.length === 0) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC9C0\uC815\uD55C \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
-      process.exit(1);
-    }
-  } else {
-    const cwd2 = process.cwd();
-    targetFiles = fs20.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path18.join(cwd2, f));
-  }
-  console.log(`\x1B[36m[FreeLang CI]\x1B[0m  \uD30C\uC77C ${targetFiles.length}\uAC1C  fail-fast=${!noFailFast}`);
-  console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  const pipeline = createDefaultPipeline(targetFiles, { failFast: !noFailFast });
-  const summary = await pipeline.run();
-  console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  const stepCount = summary.steps.length;
-  const passCount = summary.steps.filter((s) => s.passed && !s.skipped).length;
-  const skipCount = summary.steps.filter((s) => s.skipped).length;
-  if (summary.passed) {
-    console.log(`\x1B[32m[CI PASS]\x1B[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms)`);
-  } else {
-    console.log(`\x1B[31m[CI FAIL]\x1B[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms, ${skipCount} skipped)`);
-    process.exit(1);
-  }
-}
-function cmdDoc(docArgs) {
-  const dirIdx = docArgs.indexOf("--dir");
-  if (dirIdx !== -1) {
-    const dirPath = docArgs[dirIdx + 1];
-    if (!dirPath) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  --dir \uB4A4\uC5D0 \uB514\uB809\uD1A0\uB9AC \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
-      process.exit(1);
-    }
-    const absDir = path18.resolve(dirPath);
-    if (!fs20.existsSync(absDir) || !fs20.statSync(absDir).isDirectory()) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
-      process.exit(1);
-    }
-    const flFiles = fs20.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path18.join(absDir, f));
-    if (flFiles.length === 0) {
-      console.error(`\x1B[33m\uACBD\uACE0\x1B[0m  .fl \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
-      return;
-    }
-    const allEntries = [];
-    for (const filePath2 of flFiles) {
-      const src2 = fs20.readFileSync(filePath2, "utf-8");
-      allEntries.push(...extractDocs(src2));
-    }
-    const title2 = path18.basename(absDir) + " API \uBB38\uC11C";
-    const md2 = renderMarkdown(allEntries, title2);
-    const outIdx2 = docArgs.indexOf("-o");
-    if (outIdx2 !== -1 && docArgs[outIdx2 + 1]) {
-      const outPath = path18.resolve(docArgs[outIdx2 + 1]);
-      fs20.writeFileSync(outPath, md2, "utf-8");
-      console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${allEntries.length}\uAC1C \uD56D\uBAA9)`);
-    } else {
-      process.stdout.write(md2);
-    }
-    return;
-  }
-  const filePaths = docArgs.filter((a) => !a.startsWith("-"));
-  if (filePaths.length === 0) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
-    process.exit(1);
-  }
-  const filePath = filePaths[0];
-  const absPath = path18.resolve(filePath);
-  if (!fs20.existsSync(absPath)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
-    process.exit(1);
-  }
-  const src = fs20.readFileSync(absPath, "utf-8");
-  const entries = extractDocs(src);
-  const title = path18.basename(absPath, ".fl") + " API \uBB38\uC11C";
-  const md = renderMarkdown(entries, title);
-  const outIdx = docArgs.indexOf("-o");
-  if (outIdx !== -1 && docArgs[outIdx + 1]) {
-    const outPath = path18.resolve(docArgs[outIdx + 1]);
-    fs20.writeFileSync(outPath, md, "utf-8");
-    console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${entries.length}\uAC1C \uD56D\uBAA9)`);
-  } else {
-    process.stdout.write(md);
-  }
-}
-function cmdBuild(buildArgs2) {
-  const isOci = buildArgs2.includes("--oci");
-  const isStatic = buildArgs2.includes("--static");
-  if (isStatic) {
-    let expandDynamicParams = function(dir, paramName) {
-      const paramsFile = path18.join(dir, "generate-static-params.fl");
-      if (!fs20.existsSync(paramsFile)) return [];
-      try {
-        const cwdBootstrap2 = path18.resolve(process.cwd(), "bootstrap.js");
-        const bs = fs20.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path18.resolve(__dirname, "bootstrap.js");
-        const { execSync: execSync2 } = require("child_process");
-        const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
-        const m = out.match(/\[[\s\S]*\]/);
-        if (!m) return [];
-        const parsed = JSON.parse(m[0]);
-        return Array.isArray(parsed) ? parsed : [];
-      } catch (err4) {
-        console.log(`build.params_error dir=${dir} err=${(err4.message || String(err4)).split("\n")[0]}`);
-        return [];
-      }
-    }, walk = function(dir, routeBase) {
-      const entries = fs20.readdirSync(dir, { withFileTypes: true });
-      for (const e of entries) {
-        const full = path18.join(dir, e.name);
-        if (e.isDirectory()) {
-          if (e.name.startsWith("[") && e.name.endsWith("]")) {
-            const paramName = e.name.slice(1, -1);
-            const params = expandDynamicParams(full, paramName);
-            const pageFile = path18.join(full, "page.fl");
-            if (params.length === 0) {
-              console.log(`build.skip reason=dynamic_no_params path=/${path18.relative(absApp, full)} param=${paramName}`);
-              continue;
-            }
-            if (!fs20.existsSync(pageFile)) {
-              console.log(`build.skip reason=dynamic_no_page path=/${path18.relative(absApp, full)}`);
-              continue;
-            }
-            for (const p of params) {
-              const value = p && typeof p === "object" ? p[paramName] : null;
-              if (!value) continue;
-              pages.push({ filePath: pageFile, route: routeBase + "/" + String(value) });
-            }
-            continue;
-          }
-          if (e.name === "api") continue;
-          walk(full, routeBase + "/" + e.name);
-        } else if (e.name === "page.fl") {
-          pages.push({ filePath: full, route: routeBase || "/" });
-        }
-      }
-    };
-    const appIdx = buildArgs2.indexOf("--app");
-    const outIdx = buildArgs2.indexOf("--out");
-    const portIdx = buildArgs2.indexOf("--port");
-    const appDir = appIdx !== -1 ? buildArgs2[appIdx + 1] : "app";
-    const outDir = outIdx !== -1 ? buildArgs2[outIdx + 1] : "dist";
-    const port = portIdx !== -1 ? parseInt(buildArgs2[portIdx + 1], 10) : 43099;
-    const absApp = path18.resolve(appDir);
-    const absOut = path18.resolve(outDir);
-    if (!fs20.existsSync(absApp)) {
-      console.error(`build.error event=app_not_found path=${appDir}`);
-      process.exit(1);
-    }
-    console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
-    fs20.mkdirSync(absOut, { recursive: true });
-    const pages = [];
-    walk(absApp, "");
-    const notFoundFile = path18.join(absApp, "not-found.fl");
-    if (fs20.existsSync(notFoundFile)) {
-      pages.push({ filePath: notFoundFile, route: "/__404__" });
-    }
-    if (pages.length === 0) {
-      console.log(`build.error event=no_pages app=${appDir}`);
-      return;
-    }
-    const { spawn } = require("child_process");
-    const http3 = require("http");
-    const cwdBootstrap = path18.resolve(process.cwd(), "bootstrap.js");
-    const bootstrap = fs20.existsSync(cwdBootstrap) ? cwdBootstrap : path18.resolve(__dirname, "bootstrap.js");
-    const serveProc = spawn(
-      "node",
-      [bootstrap, "serve", "--app", absApp, "--port", String(port)],
-      { stdio: ["ignore", "pipe", "pipe"] }
-    );
-    const waitForServer = async () => {
-      for (let i = 0; i < 30; i++) {
-        const ready = await new Promise((resolve9) => {
-          const req = http3.get(
-            { host: "localhost", port, path: "/", timeout: 500 },
-            (res) => {
-              res.destroy();
-              resolve9(true);
-            }
-          );
-          req.on("error", () => resolve9(false));
-          req.on("timeout", () => {
-            req.destroy();
-            resolve9(false);
-          });
-        });
-        if (ready) return true;
-        await new Promise((r) => setTimeout(r, 200));
-      }
-      return false;
-    };
-    const fetchRoute = (route) => new Promise((resolve9, reject) => {
-      const req = http3.get(
-        { host: "localhost", port, path: route, timeout: 5e3 },
-        (res) => {
-          let buf = "";
-          res.on("data", (c) => {
-            buf += c.toString();
-          });
-          res.on("end", () => {
-            if (res.statusCode && res.statusCode >= 400) {
-              reject(new Error(`HTTP ${res.statusCode}`));
-            } else {
-              resolve9(buf);
-            }
-          });
-        }
-      );
-      req.on("error", reject);
-      req.on("timeout", () => {
-        req.destroy();
-        reject(new Error("timeout"));
-      });
-    });
-    const runPage = (p) => {
-      try {
-        const { execSync: execSync2 } = require("child_process");
-        const out = execSync2(`node "${bootstrap}" run "${p.filePath}"`, {
-          encoding: "utf-8",
-          stdio: ["ignore", "pipe", "pipe"]
-        });
-        const m = out.match(/<!DOCTYPE html[\s\S]*?<\/html>/i) || out.match(/<html[\s\S]*?<\/html>/i);
-        return m ? m[0] : null;
-      } catch {
-        return null;
-      }
-    };
-    const isUseful = (html) => {
-      if (!html) return false;
-      const t = html.trim();
-      if (t.length < 50) return false;
-      if (t.startsWith("Internal Server Error")) return false;
-      return true;
-    };
-    const concIdx = buildArgs2.indexOf("--concurrency");
-    const concurrency = Math.max(1, concIdx !== -1 ? parseInt(buildArgs2[concIdx + 1] || "8", 10) : 8);
-    (async () => {
-      const ready = await waitForServer();
-      const t0 = Date.now();
-      let ok2 = 0;
-      let fail = 0;
-      const renderOne = async (p) => {
-        let html = null;
-        if (ready) {
-          try {
-            const res = await fetchRoute(p.route);
-            if (isUseful(res)) html = res;
-          } catch {
-          }
-        }
-        if (!html) {
-          const out = runPage(p);
-          if (isUseful(out)) html = out;
-        }
-        if (html) {
-          const outPath = p.route === "/__404__" ? path18.join(absOut, "404.html") : path18.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-          fs20.mkdirSync(path18.dirname(outPath), { recursive: true });
-          fs20.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path18.relative(process.cwd(), outPath)} bytes=${html.length}`);
-          ok2++;
-        } else {
-          console.log(`build.page route=${p.route} ok=false`);
-          fail++;
-        }
-      };
-      for (let i = 0; i < pages.length; i += concurrency) {
-        const batch = pages.slice(i, i + concurrency);
-        await Promise.all(batch.map(renderOne));
-      }
-      serveProc.kill();
-      const ms = Date.now() - t0;
-      console.log(`build.done ok=${ok2} fail=${fail} out=${outDir} ms=${ms} concurrency=${concurrency}`);
-      if (fail > 0) process.exit(1);
-      process.exit(0);
-    })();
-    return;
-  }
-  if (isOci) {
-    const fileIdx = buildArgs2.indexOf("--oci") + 1;
-    const appFile = buildArgs2[fileIdx];
-    const tagIdx = buildArgs2.indexOf("--tag");
-    const tag = tagIdx !== -1 ? buildArgs2[tagIdx + 1] : "my-app:latest";
-    const registryIdx = buildArgs2.indexOf("--registry");
-    const registry = registryIdx !== -1 ? buildArgs2[registryIdx + 1] : void 0;
-    if (!appFile) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: fl build --oci <app.fl> --tag <tag>`);
-      process.exit(1);
-    }
-    const absPath = path18.resolve(appFile);
-    if (!fs20.existsSync(absPath)) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appFile}`);
-      process.exit(1);
-    }
-    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path18.basename(appFile)} \u2192 ${tag}`);
-    const ociScriptPath = path18.resolve(__dirname, "../vpm/v9-oci.fl");
-    if (!fs20.existsSync(ociScriptPath)) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  v9-oci.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
-      process.exit(1);
-    }
-    const { execSync: execSync2 } = require("child_process");
-    try {
-      const cmd2 = registry ? `node ${path18.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path18.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
-      console.log(`\x1B[2m  Command: ${cmd2}\x1B[0m`);
-      execSync2(cmd2, { stdio: "inherit" });
-      console.log(`\x1B[32m[OK]\x1B[0m  OCI \uBE4C\uB4DC \uC644\uB8CC: ${tag}`);
-    } catch (err4) {
-      console.error(`\x1B[31m[Error]\x1B[0m  OCI \uBE4C\uB4DC \uC2E4\uD328: ${err4.message}`);
-      process.exit(1);
-    }
-  } else {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  --oci \uD50C\uB798\uADF8\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
-    console.log(`
-\uC0AC\uC6A9\uBC95:
-  fl build --oci <app.fl> --tag <tag> [--registry <url>]`);
-    process.exit(1);
-  }
-}
-function cmdRegistry(registryArgs) {
-  const subCmd = registryArgs[0];
-  if (subCmd === "start") {
-    const portIdx = registryArgs.indexOf("--port");
-    const port = portIdx !== -1 && registryArgs[portIdx + 1] ? parseInt(registryArgs[portIdx + 1], 10) : 4873;
-    if (isNaN(port) || port < 1024 || port > 65535) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC720\uD6A8\uD558\uC9C0 \uC54A\uC740 \uD3EC\uD2B8: ${port}`);
-      process.exit(1);
-    }
-    console.log(`\x1B[36m[Registry]\x1B[0m  v9 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (\uD3EC\uD2B8 ${port})`);
-    console.log(`\x1B[36m[Registry]\x1B[0m  http://localhost:${port}/`);
-    const registryPath = path18.resolve(__dirname, "../vpm/registry-server.fl");
-    if (!fs20.existsSync(registryPath)) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  registry-server.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${registryPath}`);
-      process.exit(1);
-    }
-    const { execSync: execSync2 } = require("child_process");
-    try {
-      process.env.REGISTRY_PORT = String(port);
-      execSync2(`node ${path18.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
-        stdio: "inherit",
-        env: { ...process.env, REGISTRY_PORT: String(port) }
-      });
-    } catch (err4) {
-      console.error(`\x1B[31m\uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 \uC624\uB958:\x1B[0m  ${err4.message}`);
-      process.exit(1);
-    }
-  } else if (subCmd === "status") {
-    const portIdx = registryArgs.indexOf("--port");
-    const port = portIdx !== -1 && registryArgs[portIdx + 1] ? parseInt(registryArgs[portIdx + 1], 10) : 4873;
-    try {
-      const http3 = require("http");
-      const req = http3.get(`http://localhost:${port}/-/all`, (res) => {
-        if (res.statusCode === 200) {
-          console.log(`\x1B[32m[OK]\x1B[0m  \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC815\uC0C1 \uC6B4\uC601 \uC911 (\uD3EC\uD2B8 ${port})`);
-          process.exit(0);
-        } else {
-          console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC751\uB2F5 \uC774\uC0C1 (\uC0C1\uD0DC: ${res.statusCode})`);
-          process.exit(1);
-        }
-      });
-      req.on("error", (err4) => {
-        console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC5F0\uACB0 \uC2E4\uD328: ${err4.message}`);
-        process.exit(1);
-      });
-      req.setTimeout(5e3, () => {
-        req.destroy();
-        console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uD0C0\uC784\uC544\uC6C3`);
-        process.exit(1);
-      });
-    } catch (err4) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${err4.message}`);
-      process.exit(1);
-    }
-  } else {
-    console.error(`\x1B[31m\uC54C \uC218 \uC5C6\uB294 \uC11C\uBE0C\uCEE4\uB9E8\uB4DC:\x1B[0m  registry ${subCmd}`);
-    console.log(`
-\uC0AC\uC6A9\uBC95:
-  fl registry start [--port 4873]
-  fl registry status [--port 4873]`);
-    process.exit(1);
-  }
-}
-function cmdInstall(args3) {
-  const pluginName = args3[0];
-  if (!pluginName) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC774\uB984\uC744 \uC9C0\uC815\uD558\uC138\uC694: install <plugin-name>`);
-    process.exit(1);
-  }
-  const homeDir = require("os").homedir();
-  const pluginsDir = path18.resolve(homeDir, ".fl", "plugins");
-  if (!fs20.existsSync(pluginsDir)) {
-    fs20.mkdirSync(pluginsDir, { recursive: true });
-    console.log(`\x1B[36m[Y5]\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uB514\uB809\uD1A0\uB9AC \uC0DD\uC131: ${pluginsDir}`);
-  }
-  const localPath = path18.resolve(process.cwd(), "plugins", pluginName + ".fl");
-  const stdlibPath = path18.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
-  const installedPath = path18.resolve(pluginsDir, pluginName + ".fl");
-  let sourceFile = null;
-  if (fs20.existsSync(localPath)) {
-    sourceFile = localPath;
-    console.log(`\x1B[36m[Y5]\x1B[0m  \uB85C\uCEEC \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${localPath}`);
-  } else if (fs20.existsSync(stdlibPath)) {
-    sourceFile = stdlibPath;
-    console.log(`\x1B[36m[Y5]\x1B[0m  \uB0B4\uC7A5 stdlib \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${stdlibPath}`);
-  } else {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${pluginName}`);
-    console.log(`  \uC2DC\uB3C4\uD55C \uACBD\uB85C:`);
-    console.log(`    - ${localPath}`);
-    console.log(`    - ${stdlibPath}`);
-    process.exit(1);
-  }
-  try {
-    const content = fs20.readFileSync(sourceFile, "utf-8");
-    fs20.writeFileSync(installedPath, content, "utf-8");
-    console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC124\uCE58 \uC644\uB8CC: ${installedPath}`);
-    console.log(`\x1B[2m  \uC0AC\uC6A9: (use ${pluginName})\x1B[0m`);
-  } catch (err4) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC124\uCE58 \uC2E4\uD328: ${err4.message}`);
-    process.exit(1);
-  }
-}
-function cmdPublish(args3) {
-  const filePath = args3[0];
-  if (!filePath) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: publish <plugin-file.fl>`);
-    process.exit(1);
-  }
-  if (!fs20.existsSync(filePath)) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
-    process.exit(1);
-  }
-  const content = fs20.readFileSync(filePath, "utf-8");
-  const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
-  const versionMatch = content.match(/^;; version:\s*(.+)$/m);
-  if (!nameMatch) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uBA54\uD0C0 \uBE14\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uD30C\uC77C \uC0C1\uB2E8\uC5D0 \uB2E4\uC74C\uC744 \uCD94\uAC00\uD558\uC138\uC694:`);
-    console.log(`  ;; plugin: <name>`);
-    console.log(`  ;; version: 1.0.0`);
-    console.log(`  ;; depends:`);
-    process.exit(1);
-  }
-  const pluginName = nameMatch[1].trim();
-  const version = versionMatch ? versionMatch[1].trim() : "1.0.0";
-  console.log(`\x1B[36m[Y5]\x1B[0m  \uBC30\uD3EC \uC911: ${pluginName} (v${version})`);
-  try {
-    const { execSync: execSync2 } = require("child_process");
-    const tmpDir = path18.resolve("/tmp", `fl-publish-${Date.now()}`);
-    fs20.mkdirSync(tmpDir, { recursive: true });
-    execSync2("git clone https://gogs.dclub.kr/kim/fl-plugins.git .", {
-      cwd: tmpDir,
-      stdio: "pipe"
-    });
-    fs20.copyFileSync(filePath, path18.resolve(tmpDir, `${pluginName}.fl`));
-    execSync2(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: "pipe" });
-    execSync2(
-      `git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`,
-      { cwd: tmpDir, stdio: "pipe" }
-    );
-    execSync2("git push origin master", { cwd: tmpDir, stdio: "pipe" });
-    console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 '${pluginName}' \uAC8C\uC2DC \uC644\uB8CC`);
-    console.log(`\x1B[2m  \uC800\uC7A5\uC18C: https://gogs.dclub.kr/kim/fl-plugins\x1B[0m`);
-    fs20.rmSync(tmpDir, { recursive: true, force: true });
-  } catch (err4) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uBC30\uD3EC \uC2E4\uD328: ${err4.message}`);
-    process.exit(1);
-  }
-}
-function cmdServe(args3) {
-  let appDir = "app";
-  let port = null;
-  let renderMode = "ssr";
-  let positionalIdx = 0;
-  for (let i = 0; i < args3.length; i++) {
-    if (args3[i] === "--app" && args3[i + 1]) {
-      appDir = args3[++i];
-    } else if (args3[i] === "--port" && args3[i + 1]) {
-      port = parseInt(args3[++i], 10);
-    } else if (args3[i] === "--mode" && args3[i + 1]) {
-      const m = args3[++i];
-      if (["ssr", "isr", "ssg"].includes(m)) {
-        renderMode = m;
-      }
-    } else if (!args3[i].startsWith("--")) {
-      if (positionalIdx === 0) {
-        appDir = args3[i];
-      }
-      positionalIdx++;
-    }
-  }
-  if (port === null) {
-    if (process.env.PORT) {
-      port = parseInt(process.env.PORT, 10);
-    } else {
-      try {
-        const fs21 = require("fs");
-        const path19 = require("path");
-        const configPath = path19.join(process.cwd(), "fl.config.json");
-        if (fs21.existsSync(configPath)) {
-          const cfg = JSON.parse(fs21.readFileSync(configPath, "utf-8"));
-          if (cfg.port) port = cfg.port;
-        }
-      } catch (_e) {
-      }
-      if (port === null) port = 3e3;
-    }
-  }
-  const server = new WebServer({ appDir, port, renderMode });
-  const interp2 = new Interpreter();
-  server.setInterpreter(interp2);
-  server.start().then((msg) => {
-    console.log(msg);
-    setInterval(() => {
-    }, 1e4).unref();
-  }).catch((err4) => {
-    console.error(`\x1B[31m\uC11C\uBC84 \uC624\uB958\x1B[0m  ${err4.message}`);
-    process.exit(1);
-  });
-}
-var C = {
-  bold: (s) => `\x1B[1m${s}\x1B[0m`,
-  cyan: (s) => `\x1B[36m${s}\x1B[0m`,
-  green: (s) => `\x1B[32m${s}\x1B[0m`,
-  dim: (s) => `\x1B[2m${s}\x1B[0m`,
-  red: (s) => `\x1B[31m${s}\x1B[0m`,
-  yellow: (s) => `\x1B[33m${s}\x1B[0m`
-};
-var FL_VERSION = "11.1.1-dev";
-function printUsage(errCmd) {
-  const b = C.bold, c = C.cyan, g = C.green, d = C.dim;
-  console.log([
-    "",
-    `${b("FreeLang")} ${c("v" + FL_VERSION)}  ${d("AI-Native Lisp \xB7 Self-Hosting \xB7 500+ stdlib")}`,
-    "",
-    `${b("\uC0AC\uC6A9\uBC95:")}  freelang <\uCEE4\uB9E8\uB4DC> [\uC635\uC158]`,
-    "",
-    `${c("\u2500\u2500 \uC2E4\uD589 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
-    `  ${g("run")}    <file.fl> [-- args...]  \uD30C\uC77C \uC2E4\uD589`,
-    `  ${g("run")}    <file.fl> --watch       \uC800\uC7A5 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`,
-    `  ${g("repl")}                           \uB300\uD654\uD615 REPL`,
-    `  ${g("check")}  <file.fl>               \uBB38\uBC95 \uAC80\uC0AC (\uC2E4\uD589 \uC5C6\uC74C)`,
-    "",
-    `${c("\u2500\u2500 \uAC1C\uBC1C \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
-    `  ${g("watch")}  <file.fl>               \uD30C\uC77C \uBCC0\uACBD \uAC10\uC9C0 \uC7AC\uC2E4\uD589`,
-    `  ${g("debug")}  <file.fl>               \uB514\uBC84\uADF8 \uBAA8\uB4DC (break! \uC9C0\uC6D0)`,
-    `  ${g("debug")}  <file.fl> --step        \uC2A4\uD15D \uBAA8\uB4DC`,
-    `  ${g("fmt")}    <file.fl>               \uCF54\uB4DC \uD3EC\uB9F7 (\uC778\uD50C\uB808\uC774\uC2A4)`,
-    `  ${g("fmt")}    --check <file.fl>       \uD3EC\uB9F7 \uAC80\uC0AC (exit 1 if dirty)`,
-    `  ${g("fmt")}    --stdin                 stdin \u2192 stdout \uD3EC\uB9F7`,
-    "",
-    `${c("\u2500\u2500 \uBB38\uC11C / \uD0D0\uC0C9 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
-    `  ${g("ls-fns")}  [\uD0A4\uC6CC\uB4DC]               stdlib \uD568\uC218 \uBAA9\uB85D (\uD0A4\uC6CC\uB4DC \uD544\uD130)`,
-    `  ${g("fn-doc")}  <\uC774\uB984>                 \uD568\uC218 \uC2DC\uADF8\uB2C8\uCC98 + \uC124\uBA85`,
-    `  ${g("doc")}     <file.fl> [-o out.md]  Markdown \uBB38\uC11C \uC0DD\uC131`,
-    `  ${g("doc")}     --dir <dir>            \uB514\uB809\uD1A0\uB9AC \uD1B5\uD569 \uBB38\uC11C\uD654`,
-    "",
-    `${c("\u2500\u2500 \uBE4C\uB4DC / \uBC30\uD3EC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
-    `  ${g("compile")} <file.fl> [-o out.js]  JS\uB85C \uCEF4\uD30C\uC77C (AOT)`,
-    `  ${g("build")}   --oci <app.fl> --tag <tag>  OCI \uC774\uBBF8\uC9C0 \uBE4C\uB4DC`,
-    `  ${g("serve")}   [--port 3000]          \uC6F9 \uC11C\uBC84 \uC2DC\uC791`,
-    `  ${g("ci")}      [file.fl]              CI \uAC80\uC0AC \uC2E4\uD589`,
-    "",
-    `${c("\u2500\u2500 \uD504\uB85C\uC138\uC2A4 \uAD00\uB9AC \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
-    `  ${g("ps")}                           \uC2E4\uD589 \uC911\uC778 fl \uD504\uB85C\uC138\uC2A4 \uBAA9\uB85D`,
-    `  ${g("stop")}   [file.fl]             \uD504\uB85C\uC138\uC2A4 \uC885\uB8CC (\uC5C6\uC73C\uBA74 \uC804\uCCB4)`,
-    "",
-    `${c("\u2500\u2500 \uC5D0\uB7EC \uBD84\uC11D \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
-    `  ${g("errors")}  [N]                  \uBBF8\uBC1C\uACAC \uD568\uC218 TOP N \uBD84\uC11D (\uAE30\uBCF8 20)`,
-    `  ${g("errors-clear")}                 \uC5D0\uB7EC \uB85C\uADF8 \uCD08\uAE30\uD654`,
-    "",
-    `${c("\u2500\u2500 \uAE30\uD0C0 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")}`,
-    `  ${g("--version")} / ${g("-v")}               \uBC84\uC804 \uCD9C\uB825`,
-    `  ${g("--help")}    / ${g("-h")}               \uC774 \uB3C4\uC6C0\uB9D0`,
-    "",
-    `${b("\uC608\uC81C:")}`,
-    `  freelang run app.fl`,
-    `  freelang run app.fl --watch`,
-    `  freelang run app.fl -- arg1 arg2`,
-    `  freelang repl`,
-    `  freelang check app.fl`,
-    `  freelang ls-fns http`,
-    `  freelang fn-doc json_parse`,
-    `  freelang compile app.fl -o app.js`,
-    `  freelang ps`,
-    `  freelang stop app.fl`,
-    `  freelang errors`,
-    ""
-  ].join("\n"));
-  if (errCmd) {
-    const known = [
-      "run",
-      "repl",
-      "check",
-      "watch",
-      "debug",
-      "fmt",
-      "ls-fns",
-      "fn-doc",
-      "doc",
-      "compile",
-      "build",
-      "serve",
-      "ci",
-      "version",
-      "help"
-    ];
-    const suggest = known.find(
-      (k) => k.startsWith(errCmd[0]) || Math.abs(k.length - errCmd.length) <= 2 && [...errCmd].filter((c2, i) => k[i] === c2).length >= Math.min(k.length, errCmd.length) - 2
-    );
-    console.error(`${C.red("\uC624\uB958")}  \uC54C \uC218 \uC5C6\uB294 \uCEE4\uB9E8\uB4DC: ${C.bold(errCmd)}${suggest ? `
-       \uD639\uC2DC ${C.green("freelang " + suggest)} ?` : ""}`);
-    process.exit(1);
-  }
-}
-function printSubHelp(cmd2) {
-  const g = C.green, d = C.dim, b = C.bold;
-  const helps = {
-    run: [
-      `${b("freelang run")} \u2014 \uD30C\uC77C \uC2E4\uD589`,
-      "",
-      `  freelang run <file.fl>             \uC2E4\uD589`,
-      `  freelang run <file.fl> --watch     \uC800\uC7A5 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`,
-      `  freelang run <file.fl> -- a b      \uC2A4\uD06C\uB9BD\uD2B8\uC5D0 \uC778\uC790 \uC804\uB2EC ($__argv__)`,
-      "",
-      `${d("\uC608\uC81C:")}`,
-      `  freelang run app.fl`,
-      `  freelang run server.fl --watch`,
-      `  freelang run cli.fl -- input.txt`
-    ],
-    repl: [
-      `${b("freelang repl")} \u2014 \uB300\uD654\uD615 REPL`,
-      "",
-      `  (+ 1 2)           \uD45C\uD604\uC2DD \uD3C9\uAC00`,
-      `  (defn f [x] ...)  \uD568\uC218 \uC815\uC758 (\uC138\uC158 \uC720\uC9C0)`,
-      `  :stack            \uCF5C \uC2A4\uD0DD \uCD9C\uB825`,
-      `  :env              \uBC14\uC778\uB529 \uBAA9\uB85D`,
-      `  :exit / Ctrl+D    \uC885\uB8CC`
-    ],
-    check: [
-      `${b("freelang check")} \u2014 \uBB38\uBC95 \uAC80\uC0AC (\uC2E4\uD589 \uC5C6\uC74C)`,
-      "",
-      `  freelang check <file.fl>`,
-      "",
-      `  \uD30C\uC2F1 \uC624\uB958 \uBC1C\uC0DD \uC2DC \uB77C\uC778:\uCEEC\uB7FC + \uAD04\uD638 \uD78C\uD2B8 \uD45C\uC2DC`
-    ],
-    fmt: [
-      `${b("freelang fmt")} \u2014 \uCF54\uB4DC \uD3EC\uB9F7`,
-      "",
-      `  freelang fmt <file.fl>             \uC778\uD50C\uB808\uC774\uC2A4 \uD3EC\uB9F7`,
-      `  freelang fmt --check <file.fl>     \uD3EC\uB9F7 \uD544\uC694 \uC5EC\uBD80 \uAC80\uC0AC (exit 1)`,
-      `  freelang fmt --stdin               stdin \u2192 stdout`,
-      "",
-      `${d("CI \uD65C\uC6A9:")}`,
-      `  freelang fmt --check src/*.fl`
-    ],
-    compile: [
-      `${b("freelang compile")} \u2014 JS\uB85C AOT \uCEF4\uD30C\uC77C`,
-      "",
-      `  freelang compile <file.fl>           \u2192 file.fl.out.js`,
-      `  freelang compile <file.fl> -o app.js \u2192 app.js`,
-      "",
-      `  \uC0DD\uC131\uB41C .js\uB294 Node.js / Bun\uC73C\uB85C \uC9C1\uC811 \uC2E4\uD589 \uAC00\uB2A5`,
-      `  \uC2E4\uD589 \uC2DC FreeLang \uBD88\uD544\uC694 (\uB3C5\uB9BD \uBC30\uD3EC)`
-    ],
-    "ls-fns": [
-      `${b("freelang ls-fns")} \u2014 stdlib \uD568\uC218 \uD0D0\uC0C9`,
-      "",
-      `  freelang ls-fns              \uC804\uCCB4 \uBAA9\uB85D (500+)`,
-      `  freelang ls-fns http         "http" \uD3EC\uD568 \uD568\uC218\uB9CC`,
-      `  freelang ls-fns json         json \uAD00\uB828`
-    ],
-    "fn-doc": [
-      `${b("freelang fn-doc")} \u2014 \uD568\uC218 \uC0C1\uC138 \uBB38\uC11C`,
-      "",
-      `  freelang fn-doc json_parse`,
-      `  freelang fn-doc str_split`
-    ]
-  };
-  const lines = helps[cmd2];
-  if (lines) {
-    console.log("\n" + lines.join("\n") + "\n");
-  } else {
-    printUsage();
-  }
-}
-var args2 = process.argv.slice(2);
-var cmd = args2[0];
-switch (cmd) {
-  case "run": {
-    if (args2[1] === "--help" || args2[1] === "-h") {
-      printSubHelp("run");
-      break;
-    }
-    const filePath = args2[1];
-    if (!filePath) {
-      printSubHelp("run");
-      process.exit(1);
-    }
-    const watch2 = args2.includes("--watch") || args2.includes("-w");
-    const ddIdx = args2.indexOf("--");
-    const extraArgs = ddIdx >= 0 ? args2.slice(ddIdx + 1) : args2.slice(2).filter((a) => a !== "--watch" && a !== "-w");
-    cmdRun(filePath, watch2, extraArgs);
-    break;
-  }
-  case "check": {
-    if (args2[1] === "--help" || args2[1] === "-h") {
-      printSubHelp("check");
-      break;
-    }
-    const filePath = args2[1];
-    if (!filePath) {
-      printSubHelp("check");
-      process.exit(1);
-    }
-    cmdCheck(filePath);
-    break;
-  }
-  case "compile": {
-    if (args2[1] === "--help" || args2[1] === "-h") {
-      printSubHelp("compile");
-      break;
-    }
-    if (args2.length < 2) {
-      printSubHelp("compile");
-      process.exit(1);
-    }
-    cmdCompile(args2.slice(1));
-    break;
-  }
-  case "codegen": {
-    if (args2.length < 2) {
-      printUsage();
-      process.exit(1);
-    }
-    cmdCodegen(args2.slice(1));
-    break;
-  }
-  case "fmt": {
-    cmdFmt(args2.slice(1));
-    break;
-  }
-  case "repl":
-    cmdRepl();
-    break;
-  case "fn-doc":
-  case "fl-doc": {
-    const query = args2[1];
-    if (!query) {
-      console.error("Usage: freelang fn-doc <name>");
-      console.error("       (name can be exact or partial)");
-      process.exit(1);
-    }
-    cmdStdlibDoc(query);
-    break;
-  }
-  case "ls-fns":
-  case "ls-fn": {
-    const filter = args2[1] ?? "";
-    const signatures = loadEmbeddedSignatures();
-    if (signatures.length === 0) {
-      console.error("\uD568\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. npm run build \uC2E4\uD589 \uD6C4 \uC7AC\uC2DC\uB3C4\uD558\uC138\uC694.");
-      process.exit(1);
-    }
-    const q = filter.toLowerCase();
-    const filtered = q ? signatures.filter((s) => s.name.toLowerCase().includes(q) || s.module.toLowerCase().includes(q)) : signatures;
-    const byModule = /* @__PURE__ */ new Map();
-    for (const s of filtered) {
-      if (!byModule.has(s.module)) byModule.set(s.module, []);
-      byModule.get(s.module).push(s);
-    }
-    const total = filtered.length;
-    const header = q ? `\x1B[36m[ls-fns]\x1B[0m  "${q}" \uD3EC\uD568 \u2014 ${total}\uAC1C
-` : `\x1B[36m[ls-fns]\x1B[0m  \uC804\uCCB4 ${total}\uAC1C \uD568\uC218
-`;
-    process.stdout.write(header);
-    byModule.forEach((fns, mod) => {
-      process.stdout.write(`
-\x1B[33m${mod}\x1B[0m (${fns.length})
-`);
-      for (const f of fns) {
-        const params = f.params ? ` \x1B[2m${f.params}\x1B[0m` : "";
-        const ret = f.returns ? ` \u2192 \x1B[2m${f.returns}\x1B[0m` : "";
-        process.stdout.write(`  ${f.name}${params}${ret}
-`);
-      }
-    });
-    process.stdout.write(`
-\x1B[2m\u{1F4A1}  freelang fn-doc <\uC774\uB984>  \uC73C\uB85C \uC790\uC138\uD55C \uC124\uBA85\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4\x1B[0m
-`);
-    break;
-  }
-  case "debug": {
-    const filePath = args2[1];
-    if (!filePath) {
-      printUsage();
-      process.exit(1);
-    }
-    const stepMode = args2.includes("--step");
-    cmdDebug(filePath, stepMode);
-    break;
-  }
-  case "watch": {
-    const filePath = args2[1];
-    if (!filePath) {
-      printUsage();
-      process.exit(1);
-    }
-    const noClear = args2.includes("--no-clear");
-    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path18.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
-    runWithWatch(filePath, {
-      clearConsole: !noClear,
-      debounceMs: 300,
-      onError: (file, err4) => {
-        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path18.basename(file)}: ${err4.message}`);
-      }
-    });
-    break;
-  }
-  case "props":
-  case "prop": {
-    const filePath = args2[1];
-    if (!filePath) {
-      console.error("Usage: freelang props <file.fl> [--samples N]");
-      process.exit(1);
-    }
-    cmdProps(filePath, args2.slice(2));
-    break;
-  }
-  case "ci": {
-    cmdCi(args2.slice(1)).catch((err4) => {
-      console.error(`\x1B[31m[CI \uC624\uB958]\x1B[0m  ${err4.message}`);
-      process.exit(1);
-    });
-    break;
-  }
-  case "doc": {
-    cmdDoc(args2.slice(1));
-    break;
-  }
-  case "build": {
-    cmdBuild(args2.slice(1));
-    break;
-  }
-  case "registry": {
-    cmdRegistry(args2.slice(1));
-    break;
-  }
-  case "install": {
-    cmdInstall(args2.slice(1));
-    break;
-  }
-  case "publish": {
-    cmdPublish(args2.slice(1));
-    break;
-  }
-  case "serve": {
-    cmdServe(args2.slice(1));
-    break;
-  }
-  case "errors": {
-    const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
-    const topN = parseInt(args2[1] ?? "20", 10);
-    try {
-      const raw = fs20.readFileSync(logPath, "utf-8").trim();
-      if (!raw) {
-        console.log("(\uAE30\uB85D\uB41C \uC5D0\uB7EC \uC5C6\uC74C)");
-        break;
-      }
-      const freq = {};
-      const examples = {};
-      for (const line of raw.split("\n")) {
-        try {
-          const e = JSON.parse(line);
-          freq[e.name] = (freq[e.name] ?? 0) + 1;
-          if (!examples[e.name] && e.file) examples[e.name] = `${e.file}:${e.line ?? "?"}`;
-        } catch {
-        }
-      }
-      const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, topN);
-      console.log(`
-\u{1F4CA} FreeLang \uBBF8\uBC1C\uACAC \uD568\uC218 TOP ${topN}  (\uB85C\uADF8: ${logPath})
-`);
-      sorted.forEach(([name, count2], i) => {
-        const ex = examples[name] ? `  \u2190 ${examples[name]}` : "";
-        console.log(`  ${String(i + 1).padStart(2)}. ${name.padEnd(30)} ${String(count2).padStart(4)}\uD68C${ex}`);
-      });
-      console.log(`
-\uCD1D ${Object.keys(freq).length}\uC885\uB958 / ${raw.split("\n").length}\uAC74
-`);
-    } catch (e) {
-      if (e.code === "ENOENT") console.log(`(\uC544\uC9C1 \uAE30\uB85D \uC5C6\uC74C \u2014 ${logPath})`);
-      else console.error(e.message);
-    }
-    break;
-  }
-  case "errors-clear": {
-    const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
-    try {
-      fs20.unlinkSync(logPath);
-      console.log(`\u2713 \uB85C\uADF8 \uC0AD\uC81C: ${logPath}`);
-    } catch {
-      console.log("(\uB85C\uADF8 \uC5C6\uC74C)");
-    }
-    break;
-  }
-  case "stop": {
-    const target = args2[1];
-    if (!target) {
-      const pidFiles = fs20.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
-      if (pidFiles.length === 0) {
-        console.log("(\uC2E4\uD589 \uC911\uC778 fl \uD504\uB85C\uC138\uC2A4 \uC5C6\uC74C)");
-        break;
-      }
-      let killed = 0;
-      for (const pf of pidFiles) {
-        try {
-          const content = fs20.readFileSync(`/tmp/${pf}`, "utf-8").trim();
-          const [pidStr, filePath] = content.split("\n");
-          const pid = parseInt(pidStr, 10);
-          process.kill(pid, "SIGTERM");
-          fs20.unlinkSync(`/tmp/${pf}`);
-          console.log(`\u2713 \uC885\uB8CC: PID ${pid}  ${filePath ?? pf}`);
-          killed++;
-        } catch (e) {
-          if (e.code === "ESRCH") {
-            try {
-              fs20.unlinkSync(`/tmp/${pf}`);
-            } catch {
-            }
-            console.log(`\u2713 \uC774\uBBF8 \uC885\uB8CC\uB428: ${pf}`);
-          } else {
-            console.error(`\u2717 \uC2E4\uD328: ${pf} \u2014 ${e.message}`);
-          }
-        }
-      }
-      console.log(`
-\uCD1D ${killed}\uAC1C \uC885\uB8CC`);
-    } else {
-      const absTarget = path18.resolve(target);
-      const pidFile = flPidFile(absTarget);
-      try {
-        const content = fs20.readFileSync(pidFile, "utf-8").trim();
-        const pid = parseInt(content.split("\n")[0], 10);
-        process.kill(pid, "SIGTERM");
-        try {
-          fs20.unlinkSync(pidFile);
-        } catch {
-        }
-        console.log(`\u2713 \uC885\uB8CC: ${target}  (PID ${pid})`);
-      } catch (e) {
-        if (e.code === "ENOENT") console.log(`(PID \uD30C\uC77C \uC5C6\uC74C \u2014 ${target} \uC774 \uC2E4\uD589 \uC911\uC774\uC9C0 \uC54A\uAC70\uB098 \uC774\uBBF8 \uC885\uB8CC\uB428)`);
-        else if (e.code === "ESRCH") {
-          try {
-            fs20.unlinkSync(pidFile);
-          } catch {
-          }
-          console.log(`(\uC774\uBBF8 \uC885\uB8CC\uB428)`);
-        } else console.error(e.message);
-      }
-    }
-    break;
-  }
-  case "ps": {
-    const pidFiles = fs20.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
-    if (pidFiles.length === 0) {
-      console.log("(\uC2E4\uD589 \uC911\uC778 fl \uD504\uB85C\uC138\uC2A4 \uC5C6\uC74C)");
-      break;
-    }
-    console.log("\n\uC2E4\uD589 \uC911\uC778 FreeLang \uD504\uB85C\uC138\uC2A4:\n");
-    for (const pf of pidFiles) {
-      try {
-        const content = fs20.readFileSync(`/tmp/${pf}`, "utf-8").trim();
-        const [pidStr, filePath] = content.split("\n");
-        const pid = parseInt(pidStr, 10);
-        process.kill(pid, 0);
-        const name = filePath ?? pf;
-        console.log(`  PID ${String(pid).padEnd(8)} ${name}`);
-      } catch (e) {
-        if (e.code === "ESRCH") {
-          try {
-            fs20.unlinkSync(`/tmp/${pf}`);
-          } catch {
-          }
-        }
-      }
-    }
-    console.log();
-    break;
-  }
-  case "version":
-  case "-v":
-  case "--version":
-    console.log(`FreeLang v${FL_VERSION}`);
-    break;
-  case "help":
-  case "-h":
-  case "--help":
-    printUsage();
-    break;
-  default:
-    if (cmd) {
-      printUsage(cmd);
-    } else {
-      printUsage();
-    }
-    break;
-}
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  Interpreter,
+  interpret,
+  lex,
+  parse
+});
