@@ -117,6 +117,33 @@ FRICTION {
     fix-target: "sleep을 setTimeout 기반 비블로킹으로 교체. 또는 (fl-yield) 함수 추가 — 한 틱 이벤트 루프 양보"
   }
 
+  p15-shell-exec-space-in-path: {
+    what: "shell-exec: 공백 포함 경로에서 빈 결과 반환"
+    example: "(shell-exec \"find /home/kimjin/kim/Desktop/kim/... -name FREEDOC.fds\") → 빈 문자열"
+    impact: high
+    cause: "execSync(cmd) 직접 호출 — sh -c 없이 실행 시 공백으로 토큰 분리됨"
+    workaround: "(shell-exec-result cmd) 사용 → spawnSync(sh -c cmd) 방식으로 안전"
+    fix-target: "shell-exec 내부를 spawnSync(sh -c) 방식으로 교체. 또는 shell-exec 문서에 공백 경로 제한 명시"
+  }
+
+  p16-shell-exec-in-defn: {
+    what: "defn 내부에서 shell-exec 호출 시 빈 결과 반환"
+    example: "(defn find-files [] (shell-exec \"find ...\")) → 항상 빈 문자열"
+    impact: medium
+    cause: "정확한 원인 미확인 — cwd 컨텍스트 또는 스코프 캡처 문제로 추정"
+    workaround: "최상위 let 바인딩에서 직접 호출. defn 내부 shell-exec 회피."
+    fix-target: "원인 규명 후 수정"
+  }
+
+  p17-check-parens-escape-quote: {
+    what: "check-parens.py: 문자열 내 이스케이프 따옴표를 괄호로 오계산"
+    example: "(str-replace-all x \"\\\"\" \"\") → check-parens.py가 미닫힘 오류 보고"
+    impact: medium
+    cause: "check-parens.py가 문자열 내부 이스케이프 시퀀스를 올바르게 처리 안 함"
+    workaround: "이스케이프 따옴표 대신 변수 우회: (define Q (str-slice \"X\\\"Y\" 1 2))"
+    fix-target: "check-parens.py 문자열 이스케이프 처리 수정"
+  }
+
   p13-define-redefine-warning: {
     what: "(define x ...) 를 같은 스코프에서 반복하면 재정의 경고 발생"
     example: "(define store (metric-write store ...)) → ⚠️ store 이미 정의됨"
