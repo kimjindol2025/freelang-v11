@@ -804,6 +804,8 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
       };
       if ((value as any)._call) funcDef._call = (value as any)._call;
       ctx.functions.set(name, funcDef);
+      ctx.variables.set("$" + name, value);
+      ctx.variables.set(name, value);
       if (ctx.typeChecker) {
         const paramTypes = (value as any).params.map(() => ({ kind: "type" as const, name: "any" }));
         ctx.typeChecker.registerFunction(name, paramTypes, { kind: "type" as const, name: "any" });

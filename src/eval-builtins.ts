@@ -137,6 +137,10 @@ import {
   resetContexts, isContextAborted,
 } from "./runtime-context";
 import { getWatchdogAlerts, checkStall, getRecentAlerts, resetWatchdog } from "./runtime-watchdog";
+import { storeAppendRun, storeLoadRuns, storeClear, newRunId, storeGetDefaultPath } from "./runtime-store";
+import { computeHistory, replayHistory } from "./runtime-history";
+import { computeReputation, computeAllReputations } from "./runtime-reputation";
+import { computeIntelligence } from "./runtime-intelligence";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -1913,6 +1917,74 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         })),
       };
     }
+    // ── Phase 10: Persistent Runtime Memory ───────────────────────────────
+    case "runtime-store-save": {
+      const rstPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      // build run record from current session
+      const rstEvs = getEvents();
+      const rstSummaryEvs = rstEvs.filter(e => e.type === "trace");
+      const rstMs = rstSummaryEvs.map(e => e.elapsedMs ?? 0);
+      const rstSev: Record<string, number> = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rstEvs) rstSev[e.severity ?? "info"] = (rstSev[e.severity ?? "info"] ?? 0) + 1;
+      const rstSummary: Record<string, unknown> = {
+        "event-count": rstEvs.length,
+        "trace-count": rstSummaryEvs.length,
+        "runtime-error-count": rstEvs.filter(e => e.type === "runtime-error").length,
+        "assert-fail-count": rstEvs.filter(e => e.type === "assert-fail").length,
+        "severity-counts": rstSev,
+        "avg-trace-ms": rstMs.length ? Math.round(rstMs.reduce((a, b) => a + b, 0) / rstMs.length) : null,
+        "max-trace-ms": rstMs.length ? Math.max(...rstMs) : null,
+      };
+      const rstViolations: Array<{contractName: string; count: number}> = [];
+      const rstViolMap: Record<string, number> = {};
+      for (const e of rstEvs) {
+        if ((e.type as string) === "contract-violation" && e.contractName) {
+          rstViolMap[e.contractName] = (rstViolMap[e.contractName] ?? 0) + 1;
+        }
+      }
+      for (const [cn, cnt] of Object.entries(rstViolMap)) rstViolations.push({ contractName: cn, count: cnt });
+      const rstNow = Date.now();
+      storeAppendRun({
+        runId: newRunId(),
+        startMs: rstEvs.length > 0 ? rstEvs[0].timestamp : rstNow,
+        endMs: rstNow,
+        durationMs: rstEvs.length > 0 ? rstNow - rstEvs[0].timestamp : 0,
+        summary: rstSummary,
+        issues: [],
+        violations: rstViolations,
+        mode: getRuntimeMode(),
+        budgetExceeded: rstEvs.some(e => (e.type as string) === "budget-exceeded"),
+      }, rstPath);
+      return rstPath;
+    }
+    case "runtime-store-load": {
+      const rslPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return storeLoadRuns(rslPath);
+    }
+    case "runtime-store-clear": {
+      const rscPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      storeClear(rscPath);
+      return true;
+    }
+    case "runtime-replay-history": {
+      const rrhPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return replayHistory(rrhPath);
+    }
+    case "runtime-history": {
+      const rhisPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return computeHistory(rhisPath);
+    }
+    case "runtime-reputation": {
+      const rrepName = String(args[0] ?? "").replace(/^:/, "");
+      const rrepPath = args[1] != null ? String(args[1]) : storeGetDefaultPath();
+      if (!rrepName) return computeAllReputations(rrepPath);
+      return computeReputation(rrepName, rrepPath);
+    }
+    case "runtime-intelligence": {
+      const riPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return computeIntelligence(riPath);
+    }
+    // ──────────────────────────────────────────────────────────────────────
     case "runtime-mode": {
       return getRuntimeMode();
     }
@@ -2964,7 +3036,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (uKey && typeof uKey === "object" && (uKey as any).kind === "keyword") uKey = (uKey as any).name;
       else if (typeof uKey === "string" && uKey.startsWith(":")) uKey = uKey.slice(1);
       const cur = uMap && typeof uMap === "object" ? uMap[uKey] ?? null : null;
-      const next = callFnVal(uFn, [cur]);
+      const next = callFnVal(uFn, [cur, ...args.slice(3)]);
       return { ...uMap, [uKey]: next };
     }
 

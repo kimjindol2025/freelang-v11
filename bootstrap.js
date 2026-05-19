@@ -450,8 +450,8 @@ function makeThrowExpression(argument) {
 function makePageNode(name, title, route, component, metadata, line) {
   return { kind: "page", name, title, route, component, metadata, line };
 }
-function makeRouteNode(name, path18, method, handler, middleware, validation, line) {
-  return { kind: "route", name, path: path18, method, handler, middleware, validation, line };
+function makeRouteNode(name, path19, method, handler, middleware, validation, line) {
+  return { kind: "route", name, path: path19, method, handler, middleware, validation, line };
 }
 function makeComponentNode(name, render, state, computed, watch2, methods, slots, line) {
   return { kind: "component", name, render, state, computed, watch: watch2, methods, slots, line };
@@ -2410,12 +2410,12 @@ ${parenHint}` : parenHint;
       }
       // Phase 11: Parse PAGE block - [PAGE name :path "/" :render "<h1>...</h1>" :title "..." :component ComponentName]
       parsePage(name, fields, line) {
-        const path18 = this.extractStringField(fields, "path");
+        const path19 = this.extractStringField(fields, "path");
         const title = this.extractStringField(fields, "title");
         const render = this.extractStringField(fields, "render");
         const component = this.extractSymbolField(fields, "component");
         const metadata = this.extractMapField(fields, "metadata");
-        const pageNode = makePageNode(name, title, path18, component, metadata, line);
+        const pageNode = makePageNode(name, title, path19, component, metadata, line);
         if (render) {
           pageNode.fields = pageNode.fields || /* @__PURE__ */ new Map();
           pageNode.fields.set("render", { kind: "literal", type: "string", value: render });
@@ -2424,12 +2424,12 @@ ${parenHint}` : parenHint;
       }
       // Phase 11: Parse ROUTE block - [ROUTE name :path "/api/users/:id" :method "GET" :handler handlerName]
       parseRoute(name, fields, line) {
-        const path18 = this.extractStringField(fields, "path");
+        const path19 = this.extractStringField(fields, "path");
         const method = this.extractStringField(fields, "method");
         const handler = this.extractSymbolField(fields, "handler");
         const middleware = this.extractSymbolArrayField(fields, "middleware");
         const validation = this.extractSymbolField(fields, "validation");
-        return makeRouteNode(name, path18, method, handler, middleware, validation, line);
+        return makeRouteNode(name, path19, method, handler, middleware, validation, line);
       }
       // Phase 11: Parse COMPONENT block - [COMPONENT name :render renderFn :state stateName :methods [...]]
       parseComponent(name, fields, line) {
@@ -3703,15 +3703,15 @@ var init_linter = __esm({
 });
 
 // src/cli.ts
-var fs19 = __toESM(require("fs"));
-var path17 = __toESM(require("path"));
+var fs20 = __toESM(require("fs"));
+var path18 = __toESM(require("path"));
 var readline = __toESM(require("readline"));
 init_lexer();
 init_parser();
 
 // src/interpreter.ts
-var fs13 = __toESM(require("fs"));
-var path13 = __toESM(require("path"));
+var fs14 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
 init_lexer();
 init_parser();
 init_ast();
@@ -4942,11 +4942,11 @@ var FreeLangPromise = class _FreeLangPromise {
    * onFulfilled가 성공했을 때 호출되고, 새로운 Promise 반환
    */
   then(onFulfilled) {
-    return new _FreeLangPromise((resolve8, reject) => {
+    return new _FreeLangPromise((resolve9, reject) => {
       if (this.state === "resolved") {
         try {
           const result = onFulfilled(this.value);
-          resolve8(result);
+          resolve9(result);
         } catch (e) {
           reject(e);
         }
@@ -4956,7 +4956,7 @@ var FreeLangPromise = class _FreeLangPromise {
         this.resolvers.push((value) => {
           try {
             const result = onFulfilled(value);
-            resolve8(result);
+            resolve9(result);
           } catch (e) {
             reject(e);
           }
@@ -4969,21 +4969,21 @@ var FreeLangPromise = class _FreeLangPromise {
    * onRejected가 에러일 때 호출되고, 새로운 Promise 반환
    */
   catch(onRejected) {
-    return new _FreeLangPromise((resolve8, reject) => {
+    return new _FreeLangPromise((resolve9, reject) => {
       if (this.state === "rejected") {
         try {
           const result = onRejected(this.error);
-          resolve8(result);
+          resolve9(result);
         } catch (e) {
           reject(e);
         }
       } else if (this.state === "resolved") {
-        resolve8(this.value);
+        resolve9(this.value);
       } else {
         this.rejecters.push((error) => {
           try {
             const result = onRejected(error);
-            resolve8(result);
+            resolve9(result);
           } catch (e) {
             reject(e);
           }
@@ -4995,7 +4995,7 @@ var FreeLangPromise = class _FreeLangPromise {
    * finally 메서드: 성공/실패 상관없이 항상 실행
    */
   finally(onFinally) {
-    return new _FreeLangPromise((resolve8, reject) => {
+    return new _FreeLangPromise((resolve9, reject) => {
       const executeFinally = () => {
         try {
           onFinally();
@@ -5004,7 +5004,7 @@ var FreeLangPromise = class _FreeLangPromise {
           return;
         }
         if (this.state === "resolved") {
-          resolve8(this.value);
+          resolve9(this.value);
         } else if (this.state === "rejected") {
           reject(this.error);
         }
@@ -5021,9 +5021,9 @@ var FreeLangPromise = class _FreeLangPromise {
    * 모든 Promise가 완료될 때까지 대기
    */
   static all(promises) {
-    return new _FreeLangPromise((resolve8, reject) => {
+    return new _FreeLangPromise((resolve9, reject) => {
       if (promises.length === 0) {
-        resolve8([]);
+        resolve9([]);
         return;
       }
       const results = [];
@@ -5041,13 +5041,13 @@ var FreeLangPromise = class _FreeLangPromise {
             results[i] = value;
             completedCount++;
             if (completedCount === promises.length) {
-              resolve8(results);
+              resolve9(results);
             }
           }).catch((error) => reject(error));
         }
       }
       if (completedCount === promises.length) {
-        resolve8(results);
+        resolve9(results);
       }
     });
   }
@@ -5055,24 +5055,24 @@ var FreeLangPromise = class _FreeLangPromise {
    * 첫 번째로 완료된 Promise 반환
    */
   static race(promises) {
-    return new _FreeLangPromise((resolve8, reject) => {
+    return new _FreeLangPromise((resolve9, reject) => {
       for (const promise of promises) {
         if (promise.state === "resolved") {
-          resolve8(promise.value);
+          resolve9(promise.value);
           return;
         } else if (promise.state === "rejected") {
           reject(promise.error);
           return;
         } else {
-          promise.then((value) => resolve8(value)).catch((error) => reject(error));
+          promise.then((value) => resolve9(value)).catch((error) => reject(error));
         }
       }
     });
   }
 };
 function resolvedPromise(value) {
-  return new FreeLangPromise((resolve8) => {
-    resolve8(value);
+  return new FreeLangPromise((resolve9) => {
+    resolve9(value);
   });
 }
 function rejectedPromise(error) {
@@ -5847,8 +5847,8 @@ var FLStream = class extends import_events.EventEmitter {
   }
   collect() {
     if (this._done) return Promise.resolve(this._collected);
-    return new Promise((resolve8) => {
-      this.once("end", resolve8);
+    return new Promise((resolve9) => {
+      this.once("end", resolve9);
     });
   }
   isDone() {
@@ -5866,12 +5866,12 @@ var FLStream = class extends import_events.EventEmitter {
 };
 function streamText(stream, text, delayMs = 0) {
   const words = text.split(" ");
-  return new Promise((resolve8) => {
+  return new Promise((resolve9) => {
     let i = 0;
     function next() {
       if (i >= words.length) {
         stream.end();
-        resolve8();
+        resolve9();
         return;
       }
       stream.write(i === 0 ? words[i] : " " + words[i]);
@@ -11047,14 +11047,14 @@ var WorldModel = class {
     const visited = /* @__PURE__ */ new Set();
     const queue = [{ id: fromId, path: [fromId] }];
     while (queue.length > 0) {
-      const { id, path: path18 } = queue.shift();
+      const { id, path: path19 } = queue.shift();
       if (visited.has(id)) continue;
       visited.add(id);
       const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
       for (const neighbor of neighbors) {
-        if (neighbor === toId) return [...path18, neighbor];
+        if (neighbor === toId) return [...path19, neighbor];
         if (!visited.has(neighbor)) {
-          queue.push({ id: neighbor, path: [...path18, neighbor] });
+          queue.push({ id: neighbor, path: [...path19, neighbor] });
         }
       }
     }
@@ -13503,6 +13503,220 @@ function resetContexts() {
   _counter = 0;
 }
 
+// src/runtime-store.ts
+var fs2 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
+var DEFAULT_PATH = ".runtime-store.json";
+var _runCounter = 0;
+function newRunId() {
+  return `r-${++_runCounter}`;
+}
+function readStore(filePath) {
+  const p = path3.resolve(filePath);
+  if (!fs2.existsSync(p)) return { version: "1", runs: [] };
+  try {
+    return JSON.parse(fs2.readFileSync(p, "utf-8"));
+  } catch {
+    return { version: "1", runs: [] };
+  }
+}
+function writeStore(filePath, store) {
+  const p = path3.resolve(filePath);
+  const dir = path3.dirname(p);
+  if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
+  fs2.writeFileSync(p, JSON.stringify(store, null, 2), "utf-8");
+}
+function storeAppendRun(record, filePath = DEFAULT_PATH) {
+  const store = readStore(filePath);
+  store.runs.push(record);
+  if (store.runs.length > 200) store.runs.splice(0, store.runs.length - 200);
+  writeStore(filePath, store);
+}
+function storeLoadRuns(filePath = DEFAULT_PATH) {
+  return readStore(filePath).runs;
+}
+function storeClear(filePath = DEFAULT_PATH) {
+  const p = path3.resolve(filePath);
+  if (fs2.existsSync(p)) fs2.unlinkSync(p);
+}
+function storeGetDefaultPath() {
+  return DEFAULT_PATH;
+}
+
+// src/runtime-history.ts
+function computeHistory(filePath) {
+  const runs = storeLoadRuns(filePath);
+  if (runs.length === 0) {
+    return {
+      "total-runs": 0,
+      "avg-errors-per-run": 0,
+      "avg-trace-ms": null,
+      "budget-exceeded-runs": 0,
+      "panic-mode-runs": 0,
+      "most-frequent-issue": null,
+      "error-trend": "insufficient-data",
+      "repeated-violations": []
+    };
+  }
+  const errorCounts = runs.map((r) => {
+    const s = r.summary;
+    return (s["runtime-error-count"] ?? 0) + (s["assert-fail-count"] ?? 0);
+  });
+  const avgErrors = Math.round(errorCounts.reduce((a, b) => a + b, 0) / runs.length * 10) / 10;
+  const traceMsList = runs.map((r) => r.summary["avg-trace-ms"]).filter((v) => typeof v === "number");
+  const avgTraceMs = traceMsList.length ? Math.round(traceMsList.reduce((a, b) => a + b, 0) / traceMsList.length) : null;
+  const budgetRuns = runs.filter((r) => r.budgetExceeded).length;
+  const panicRuns = runs.filter((r) => r.mode === "panic").length;
+  const issueFreq = {};
+  for (const r of runs) {
+    for (const iss of r.issues ?? []) {
+      const cause = iss["likely-cause"] ?? "unknown";
+      if (cause !== "healthy") issueFreq[cause] = (issueFreq[cause] ?? 0) + 1;
+    }
+  }
+  const sortedIssues = Object.entries(issueFreq).sort((a, b) => b[1] - a[1]);
+  const mostFrequent = sortedIssues.length > 0 ? sortedIssues[0][0] : null;
+  let trend = "insufficient-data";
+  if (runs.length >= 6) {
+    const recent = errorCounts.slice(-3).reduce((a, b) => a + b, 0);
+    const prior = errorCounts.slice(-6, -3).reduce((a, b) => a + b, 0);
+    if (recent < prior - 1) trend = "improving";
+    else if (recent > prior + 1) trend = "degrading";
+    else trend = "stable";
+  } else if (runs.length >= 2) {
+    const half = Math.floor(runs.length / 2);
+    const recent = errorCounts.slice(-half).reduce((a, b) => a + b, 0);
+    const prior = errorCounts.slice(0, half).reduce((a, b) => a + b, 0);
+    trend = recent <= prior ? "stable" : "degrading";
+  }
+  const violMap = {};
+  for (const r of runs) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const v of r.violations ?? []) {
+      const cn = v.contractName ?? "?";
+      if (!violMap[cn]) violMap[cn] = { total: 0, runs: 0 };
+      violMap[cn].total += v.count ?? 1;
+      if (!seen.has(cn)) {
+        violMap[cn].runs++;
+        seen.add(cn);
+      }
+    }
+  }
+  const repeatedViolations = Object.entries(violMap).filter(([, v]) => v.runs >= 2).sort((a, b) => b[1].total - a[1].total).map(([contractName, v]) => ({ contractName, totalCount: v.total, runs: v.runs }));
+  return {
+    "total-runs": runs.length,
+    "avg-errors-per-run": avgErrors,
+    "avg-trace-ms": avgTraceMs,
+    "budget-exceeded-runs": budgetRuns,
+    "panic-mode-runs": panicRuns,
+    "most-frequent-issue": mostFrequent,
+    "error-trend": trend,
+    "repeated-violations": repeatedViolations
+  };
+}
+function replayHistory(filePath) {
+  return storeLoadRuns(filePath).map((r) => {
+    const s = r.summary;
+    const errors = (s["runtime-error-count"] ?? 0) + (s["assert-fail-count"] ?? 0);
+    const issues = r.issues ?? [];
+    const topIssue = issues.length > 0 && issues[0]["likely-cause"] !== "healthy" ? issues[0]["likely-cause"] : null;
+    return {
+      runId: r.runId,
+      durationMs: r.durationMs,
+      errors,
+      mode: r.mode,
+      budgetExceeded: r.budgetExceeded,
+      topIssue
+    };
+  });
+}
+
+// src/runtime-reputation.ts
+function computeReputation(name, filePath) {
+  const runs = storeLoadRuns(filePath);
+  if (runs.length === 0) {
+    return { name, score: 1, totalViolations: 0, affectedRuns: 0, totalRuns: 0, verdict: "unknown" };
+  }
+  let totalViolations = 0;
+  let affectedRuns = 0;
+  for (const r of runs) {
+    let runViolations = 0;
+    for (const v of r.violations ?? []) {
+      if ((v.contractName ?? "") === name) {
+        runViolations += v.count ?? 1;
+      }
+    }
+    if (runViolations > 0) {
+      totalViolations += runViolations;
+      affectedRuns++;
+    }
+  }
+  const totalRuns = runs.length;
+  const runPenalty = affectedRuns / totalRuns;
+  const violPenalty = Math.min(totalViolations / (totalRuns * 10), 0.5);
+  const score = Math.max(0, Math.round((1 - runPenalty * 0.7 - violPenalty * 0.3) * 100) / 100);
+  let verdict;
+  if (totalRuns < 2) verdict = "unknown";
+  else if (score >= 0.9) verdict = "stable";
+  else if (score >= 0.6) verdict = "unstable";
+  else verdict = "risky";
+  return { name, score, totalViolations, affectedRuns, totalRuns, verdict };
+}
+function computeAllReputations(filePath) {
+  const runs = storeLoadRuns(filePath);
+  const names = /* @__PURE__ */ new Set();
+  for (const r of runs) {
+    for (const v of r.violations ?? []) {
+      if (v.contractName) names.add(v.contractName);
+    }
+  }
+  const contracts = [...names].map((n) => computeReputation(n, filePath)).sort((a, b) => a.score - b.score);
+  const worstContract = contracts.length > 0 && contracts[0].verdict !== "unknown" ? contracts[0].name : null;
+  return { contracts, worstContract };
+}
+
+// src/runtime-intelligence.ts
+function computeIntelligence(filePath) {
+  const history = computeHistory(filePath);
+  const reputation = computeAllReputations(filePath);
+  const recommendations = [];
+  if (history["error-trend"] === "degrading") {
+    recommendations.push("\uC5D0\uB7EC \uC99D\uAC00 \uCD94\uC138 \uAC10\uC9C0 \u2014 runtime-analyze \uC2E4\uD589 \uD6C4 \uADFC\uBCF8 \uC6D0\uC778 \uC218\uC815 \uAD8C\uC7A5");
+  }
+  if (history["budget-exceeded-runs"] > 0) {
+    const pct = Math.round(history["budget-exceeded-runs"] / Math.max(history["total-runs"], 1) * 100);
+    recommendations.push(`\uC608\uC0B0 \uCD08\uACFC \uBC1C\uC0DD ${pct}% \uC2E4\uD589 \u2014 max-ms/max-recursion \uC0C1\uD5A5 \uB610\uB294 \uC54C\uACE0\uB9AC\uC998 \uCD5C\uC801\uD654 \uD544\uC694`);
+  }
+  if (history["panic-mode-runs"] > 0) {
+    recommendations.push("panic \uBAA8\uB4DC \uC9C4\uC785 \uC774\uB825 \uC788\uC74C \u2014 auto:panic-cascade \uCEE8\uD2B8\uB799\uD2B8 \uC784\uACC4\uAC12 \uAC80\uD1A0");
+  }
+  if (reputation.worstContract) {
+    const worst = reputation.contracts[0];
+    recommendations.push(
+      `\uCEE8\uD2B8\uB799\uD2B8 '${worst.name}' \uC548\uC815\uC131 \uB0AE\uC74C (score=${worst.score}, ${worst.affectedRuns}/${worst.totalRuns} \uC2E4\uD589 \uC704\uBC18) \u2014 \uC870\uAC74 \uC644\uD654 \uB610\uB294 \uB85C\uC9C1 \uC218\uC815`
+    );
+  }
+  if (history["most-frequent-issue"] === "slow-operation") {
+    recommendations.push("\uBC18\uBCF5\uC801 \uB290\uB9B0 \uD2B8\uB808\uC774\uC2A4 \uAC10\uC9C0 \u2014 I/O \uBCD1\uBAA9 \uB610\uB294 \uCE90\uC2DC \uC804\uB7B5 \uC7AC\uAC80\uD1A0");
+  }
+  if (recommendations.length === 0 && history["total-runs"] > 0) {
+    recommendations.push("\uC774\uC0C1 \uD328\uD134 \uC5C6\uC74C \u2014 \uC2DC\uC2A4\uD15C \uC548\uC815\uC801");
+  }
+  if (history["total-runs"] === 0) {
+    recommendations.push("\uC800\uC7A5\uB41C \uC2E4\uD589 \uC774\uB825 \uC5C6\uC74C \u2014 (runtime-store-save) \uBA3C\uC800 \uC2E4\uD589");
+  }
+  let health = 100;
+  if (history["error-trend"] === "degrading") health -= 20;
+  if (history["error-trend"] === "stable" && history["avg-errors-per-run"] > 5) health -= 10;
+  const budgetPct = history["total-runs"] > 0 ? history["budget-exceeded-runs"] / history["total-runs"] : 0;
+  health -= Math.round(budgetPct * 30);
+  const panicPct = history["total-runs"] > 0 ? history["panic-mode-runs"] / history["total-runs"] : 0;
+  health -= Math.round(panicPct * 25);
+  if (reputation.worstContract && reputation.contracts[0].verdict === "risky") health -= 15;
+  health = Math.max(0, Math.min(100, health));
+  return { history, reputation, recommendations, "health-score": health };
+}
+
 // src/eval-builtins.ts
 function flDeepEq(a, b) {
   if (a === b) return true;
@@ -13899,11 +14113,11 @@ function flExecOpNative(op, vals) {
     // ── Phase L1: 모듈 시스템 + 파일 I/O ──
     case "load": {
       const filePath = String(v0 ?? "");
-      const fs20 = require("fs");
-      const path18 = require("path");
+      const fs21 = require("fs");
+      const path19 = require("path");
       try {
-        const resolvedPath = path18.resolve(process.cwd(), filePath);
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
+        const resolvedPath = path19.resolve(process.cwd(), filePath);
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -13928,9 +14142,9 @@ function flExecOpNative(op, vals) {
     case "file-mkdir":
     case "file_mkdir": {
       const dirPath = String(v0 ?? "");
-      const fs20 = require("fs");
+      const fs21 = require("fs");
       try {
-        fs20.mkdirSync(dirPath, { recursive: true });
+        fs21.mkdirSync(dirPath, { recursive: true });
         return true;
       } catch {
         return false;
@@ -13940,9 +14154,9 @@ function flExecOpNative(op, vals) {
     case "file_append": {
       const filePath = String(v0 ?? "");
       const content = String(v1 ?? "");
-      const fs20 = require("fs");
+      const fs21 = require("fs");
       try {
-        fs20.appendFileSync(filePath, content);
+        fs21.appendFileSync(filePath, content);
         return true;
       } catch {
         return false;
@@ -13953,7 +14167,7 @@ function flExecOpNative(op, vals) {
       const url2 = String(v0 ?? "");
       try {
         const { execSync: execSync2 } = require("child_process");
-        const { writeFileSync: writeFileSync11, unlinkSync: unlinkSync4 } = require("fs");
+        const { writeFileSync: writeFileSync12, unlinkSync: unlinkSync5 } = require("fs");
         const { randomUUID: randomUUID5 } = require("crypto");
         const tmpFile = `/tmp/fl-http-${randomUUID5()}.js`;
         const nodeScript = `process.env.FL_URL=${JSON.stringify(url2)};
@@ -13967,10 +14181,10 @@ const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'
 req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
 req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
 req.end();`;
-        writeFileSync11(tmpFile, nodeScript, "utf-8");
+        writeFileSync12(tmpFile, nodeScript, "utf-8");
         const result = execSync2(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15e3 });
         try {
-          unlinkSync4(tmpFile);
+          unlinkSync5(tmpFile);
         } catch {
         }
         const parsed = JSON.parse(result);
@@ -14250,17 +14464,17 @@ function evalBuiltin(interp2, op, args3, expr2) {
     case "load": {
       const filePath = String(args3[0] ?? "");
       const nsPrefix = args3[1] != null ? String(args3[1]) : null;
-      const fs20 = require("fs");
-      const path18 = require("path");
+      const fs21 = require("fs");
+      const path19 = require("path");
       try {
-        const resolvedPath = path18.resolve(process.cwd(), filePath);
+        const resolvedPath = path19.resolve(process.cwd(), filePath);
         const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
         if (!MODULE_CACHE_DISABLED && !isWatchMode && !nsPrefix) {
           if (!interp2.__loadCache) interp2.__loadCache = /* @__PURE__ */ new Set();
           if (interp2.__loadCache.has(resolvedPath)) return null;
           interp2.__loadCache.add(resolvedPath);
         }
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -14385,18 +14599,18 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     case "require": {
       const modulePath = String(args3[0] ?? "");
-      const fs20 = require("fs");
-      const path18 = require("path");
+      const fs21 = require("fs");
+      const path19 = require("path");
       try {
         let filePath = modulePath;
         if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
           filePath = filePath + ".fl";
         }
-        const resolvedPath = path18.isAbsolute(filePath) ? filePath : path18.resolve(process.cwd(), filePath);
+        const resolvedPath = path19.isAbsolute(filePath) ? filePath : path19.resolve(process.cwd(), filePath);
         if (MODULE_CACHE.has(resolvedPath)) {
           return MODULE_CACHE.get(resolvedPath);
         }
-        const src = fs20.readFileSync(resolvedPath, "utf-8");
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -15357,6 +15571,73 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         }))
       };
     }
+    // ── Phase 10: Persistent Runtime Memory ───────────────────────────────
+    case "runtime-store-save": {
+      const rstPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const rstEvs = getEvents();
+      const rstSummaryEvs = rstEvs.filter((e) => e.type === "trace");
+      const rstMs = rstSummaryEvs.map((e) => e.elapsedMs ?? 0);
+      const rstSev = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rstEvs) rstSev[e.severity ?? "info"] = (rstSev[e.severity ?? "info"] ?? 0) + 1;
+      const rstSummary = {
+        "event-count": rstEvs.length,
+        "trace-count": rstSummaryEvs.length,
+        "runtime-error-count": rstEvs.filter((e) => e.type === "runtime-error").length,
+        "assert-fail-count": rstEvs.filter((e) => e.type === "assert-fail").length,
+        "severity-counts": rstSev,
+        "avg-trace-ms": rstMs.length ? Math.round(rstMs.reduce((a, b) => a + b, 0) / rstMs.length) : null,
+        "max-trace-ms": rstMs.length ? Math.max(...rstMs) : null
+      };
+      const rstViolations = [];
+      const rstViolMap = {};
+      for (const e of rstEvs) {
+        if (e.type === "contract-violation" && e.contractName) {
+          rstViolMap[e.contractName] = (rstViolMap[e.contractName] ?? 0) + 1;
+        }
+      }
+      for (const [cn, cnt] of Object.entries(rstViolMap)) rstViolations.push({ contractName: cn, count: cnt });
+      const rstNow = Date.now();
+      storeAppendRun({
+        runId: newRunId(),
+        startMs: rstEvs.length > 0 ? rstEvs[0].timestamp : rstNow,
+        endMs: rstNow,
+        durationMs: rstEvs.length > 0 ? rstNow - rstEvs[0].timestamp : 0,
+        summary: rstSummary,
+        issues: [],
+        violations: rstViolations,
+        mode: getRuntimeMode(),
+        budgetExceeded: rstEvs.some((e) => e.type === "budget-exceeded")
+      }, rstPath);
+      return rstPath;
+    }
+    case "runtime-store-load": {
+      const rslPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return storeLoadRuns(rslPath);
+    }
+    case "runtime-store-clear": {
+      const rscPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      storeClear(rscPath);
+      return true;
+    }
+    case "runtime-replay-history": {
+      const rrhPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return replayHistory(rrhPath);
+    }
+    case "runtime-history": {
+      const rhisPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return computeHistory(rhisPath);
+    }
+    case "runtime-reputation": {
+      const rrepName = String(args3[0] ?? "").replace(/^:/, "");
+      const rrepPath = args3[1] != null ? String(args3[1]) : storeGetDefaultPath();
+      if (!rrepName) return computeAllReputations(rrepPath);
+      return computeReputation(rrepName, rrepPath);
+    }
+    case "runtime-intelligence": {
+      const riPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return computeIntelligence(riPath);
+    }
+    // ──────────────────────────────────────────────────────────────────────
     case "runtime-mode": {
       return getRuntimeMode();
     }
@@ -15870,13 +16151,13 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (expr2.args.length < 2) throw new Error(`set-timeout requires callback and delay`);
       const callback = ev(expr2.args[0]);
       const delay = ev(expr2.args[1]);
-      return new FreeLangPromise((resolve8, reject) => {
+      return new FreeLangPromise((resolve9, reject) => {
         setTimeout(() => {
           try {
             if (typeof callback === "function") {
-              resolve8(callback());
+              resolve9(callback());
             } else if (callback.kind === "function-value") {
-              resolve8(callFnVal(callback, []));
+              resolve9(callFnVal(callback, []));
             } else {
               reject(new Error("set-timeout callback must be a function"));
             }
@@ -15890,9 +16171,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (expr2.args.length < 1) throw new Error(`promise requires executor function`);
       const executor = ev(expr2.args[0]);
       if (executor.kind === "function-value") {
-        return new FreeLangPromise((resolve8, reject) => {
+        return new FreeLangPromise((resolve9, reject) => {
           try {
-            const resolveWrapper = { kind: "builtin-function", fn: (a) => resolve8(a[0]) };
+            const resolveWrapper = { kind: "builtin-function", fn: (a) => resolve9(a[0]) };
             const rejectWrapper = {
               kind: "builtin-function",
               fn: (a) => reject(a[0] instanceof Error ? a[0] : new Error(String(a[0])))
@@ -16318,7 +16599,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (uKey && typeof uKey === "object" && uKey.kind === "keyword") uKey = uKey.name;
       else if (typeof uKey === "string" && uKey.startsWith(":")) uKey = uKey.slice(1);
       const cur = uMap && typeof uMap === "object" ? uMap[uKey] ?? null : null;
-      const next = callFnVal(uFn, [cur]);
+      const next = callFnVal(uFn, [cur, ...args3.slice(3)]);
       return { ...uMap, [uKey]: next };
     }
     // ── partition: (partition n arr) ─────────────────────────────────
@@ -19892,9 +20173,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         case "file-mkdir":
         case "file_mkdir": {
           const dirPath = String(args3[0] ?? "");
-          const fs20 = require("fs");
+          const fs21 = require("fs");
           try {
-            fs20.mkdirSync(dirPath, { recursive: true });
+            fs21.mkdirSync(dirPath, { recursive: true });
             return true;
           } catch {
             return false;
@@ -19905,7 +20186,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           const url2 = String(args3[0] ?? "");
           try {
             const { execSync: execSync2 } = require("child_process");
-            const { writeFileSync: writeFileSync11, unlinkSync: unlinkSync4 } = require("fs");
+            const { writeFileSync: writeFileSync12, unlinkSync: unlinkSync5 } = require("fs");
             const { randomUUID: randomUUID5 } = require("crypto");
             const tmpFile = `/tmp/fl-http-${randomUUID5()}.js`;
             const nodeScript = `process.env.FL_URL=${JSON.stringify(url2)};
@@ -19919,10 +20200,10 @@ const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'
 req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
 req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
 req.end();`;
-            writeFileSync11(tmpFile, nodeScript, "utf-8");
+            writeFileSync12(tmpFile, nodeScript, "utf-8");
             const result = execSync2(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15e3 });
             try {
-              unlinkSync4(tmpFile);
+              unlinkSync5(tmpFile);
             } catch {
             }
             const parsed = JSON.parse(result);
@@ -20134,8 +20415,8 @@ function evalAiBlock(interp2, op, expr2) {
 }
 
 // src/eval-infra-blocks.ts
-var fs2 = __toESM(require("fs"));
-var path3 = __toESM(require("path"));
+var fs3 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
 var cwd = process.cwd();
 function evalInfraBlock(interp2, op, expr2) {
   const ev = (node) => interp2.eval(node);
@@ -20201,8 +20482,8 @@ WORKDIR ${workdir}
     });
     dockerfile += `CMD [${cmd2.map((c) => `"${c}"`).join(", ")}]
 `;
-    const outfile = path3.join(cwd, "Dockerfile");
-    fs2.writeFileSync(outfile, dockerfile, "utf-8");
+    const outfile = path4.join(cwd, "Dockerfile");
+    fs3.writeFileSync(outfile, dockerfile, "utf-8");
     return { generated: "Dockerfile", bytes: dockerfile.length };
   }
   if (op === "K8S-DEPLOYMENT" || op === "deployment") {
@@ -20270,8 +20551,8 @@ ${Object.entries(env2).length > 0 ? `        env:
 ${Object.entries(env2).map(([k, v]) => `        - name: ${k}
           value: "${v}"`).join("\n")}
 ` : ""}`;
-    const outfile = path3.join(cwd, `${name}-deployment.yaml`);
-    fs2.writeFileSync(outfile, yaml, "utf-8");
+    const outfile = path4.join(cwd, `${name}-deployment.yaml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
     return { generated: `${name}-deployment.yaml`, bytes: yaml.length };
   }
   if (op === "K8S-SERVICE" || op === "service") {
@@ -20321,8 +20602,8 @@ spec:
   selector:
     app: ${name}
 `;
-    const outfile = path3.join(cwd, `${name}-service.yaml`);
-    fs2.writeFileSync(outfile, yaml, "utf-8");
+    const outfile = path4.join(cwd, `${name}-service.yaml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
     return { generated: `${name}-service.yaml`, bytes: yaml.length };
   }
   if (op === "K8S-INGRESS" || op === "ingress") {
@@ -20380,8 +20661,8 @@ spec:
             port:
               number: ${servicePort}
 `;
-    const outfile = path3.join(cwd, `${name}-ingress.yaml`);
-    fs2.writeFileSync(outfile, yaml, "utf-8");
+    const outfile = path4.join(cwd, `${name}-ingress.yaml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
     return { generated: `${name}-ingress.yaml`, bytes: yaml.length };
   }
   if (op === "DOCKER-COMPOSE" || op === "docker-compose") {
@@ -20415,8 +20696,8 @@ spec:
 services:
 ${serviceLines}
 `;
-    const outfile = path3.join(cwd, "docker-compose.yml");
-    fs2.writeFileSync(outfile, yaml, "utf-8");
+    const outfile = path4.join(cwd, "docker-compose.yml");
+    fs3.writeFileSync(outfile, yaml, "utf-8");
     return { generated: "docker-compose.yml", bytes: yaml.length };
   }
   if (op === "GITHUB-ACTIONS" || op === "github-actions" || op === "ci") {
@@ -20469,10 +20750,10 @@ jobs:
     steps:
 ${stepsStr}
 `;
-    const workflowDir = path3.join(cwd, ".github", "workflows");
-    fs2.mkdirSync(workflowDir, { recursive: true });
-    const outfile = path3.join(workflowDir, `${name.toLowerCase().replace(/\\s+/g, "-")}.yml`);
-    fs2.writeFileSync(outfile, yaml, "utf-8");
+    const workflowDir = path4.join(cwd, ".github", "workflows");
+    fs3.mkdirSync(workflowDir, { recursive: true });
+    const outfile = path4.join(workflowDir, `${name.toLowerCase().replace(/\\s+/g, "-")}.yml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
     return { generated: outfile, bytes: yaml.length };
   }
   if (op === "AWS-S3" || op === "aws-s3") {
@@ -21536,8 +21817,8 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "use") {
     if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
-    const fs20 = require("fs");
-    const path18 = require("path");
+    const fs21 = require("fs");
+    const path19 = require("path");
     let loadedAny = false;
     for (const arg of expr2.args) {
       let name = null;
@@ -21546,15 +21827,15 @@ function evalSpecialForm(interp2, op, expr2) {
       if (!name) throwInvalidForm("use", "module name must be symbol or string", expr2.line);
       const homeDir = require("os").homedir();
       const candidates = [
-        path18.resolve(process.cwd(), "plugins", name + ".fl"),
-        path18.resolve(homeDir, ".fl", "plugins", name + ".fl"),
-        path18.resolve(process.cwd(), "self/stdlib", name + ".fl"),
-        path18.resolve(process.cwd(), name + ".fl"),
-        path18.resolve(process.cwd(), name)
+        path19.resolve(process.cwd(), "plugins", name + ".fl"),
+        path19.resolve(homeDir, ".fl", "plugins", name + ".fl"),
+        path19.resolve(process.cwd(), "self/stdlib", name + ".fl"),
+        path19.resolve(process.cwd(), name + ".fl"),
+        path19.resolve(process.cwd(), name)
       ];
       let absPath = null;
       for (const c of candidates) {
-        if (fs20.existsSync(c) && fs20.statSync(c).isFile()) {
+        if (fs21.existsSync(c) && fs21.statSync(c).isFile()) {
           absPath = c;
           break;
         }
@@ -21572,7 +21853,7 @@ function evalSpecialForm(interp2, op, expr2) {
       if (importedSet.has(absPath)) continue;
       importedSet.add(absPath);
       interp2.importedFiles = importedSet;
-      const src = fs20.readFileSync(absPath, "utf-8");
+      const src = fs21.readFileSync(absPath, "utf-8");
       const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
       const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
       interp2.interpret(parse3(lex2(src, absPath)));
@@ -21923,6 +22204,8 @@ function evalSpecialForm(interp2, op, expr2) {
       };
       if (value._call) funcDef._call = value._call;
       ctx.functions.set(name, funcDef);
+      ctx.variables.set("$" + name, value);
+      ctx.variables.set(name, value);
       if (ctx.typeChecker) {
         const paramTypes = value.params.map(() => ({ kind: "type", name: "any" }));
         ctx.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
@@ -23436,8 +23719,8 @@ function handleReasoningBlock(interp2, reasoningBlock) {
 }
 
 // src/eval-module-system.ts
-var fs3 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
 init_ast();
 init_errors();
 
@@ -23512,18 +23795,18 @@ function evalImportBlock(interp2, importBlock) {
     if (!isFile) {
       const baseDir = (() => {
         try {
-          return fs3.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path4.dirname(interp2.currentFilePath);
+          return fs4.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path5.dirname(interp2.currentFilePath);
         } catch {
           return interp2.currentFilePath;
         }
       })();
       const candidates = [
-        path4.resolve(baseDir, source + ".fl"),
-        path4.resolve(baseDir, source),
-        path4.resolve(process.cwd(), source + ".fl"),
-        path4.resolve(process.cwd(), source)
+        path5.resolve(baseDir, source + ".fl"),
+        path5.resolve(baseDir, source),
+        path5.resolve(process.cwd(), source + ".fl"),
+        path5.resolve(process.cwd(), source)
       ];
-      isFile = candidates.some((c) => fs3.existsSync(c));
+      isFile = candidates.some((c) => fs4.existsSync(c));
     }
     if (isFile) {
       interp2.evalImportFromFile(source, moduleName, selective, alias);
@@ -23571,23 +23854,23 @@ function evalImportBlock(interp2, importBlock) {
 function evalImportFromFile(interp2, relPath, prefix, selective, alias) {
   const baseDir = (() => {
     try {
-      return fs3.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path4.dirname(interp2.currentFilePath);
+      return fs4.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path5.dirname(interp2.currentFilePath);
     } catch {
       return interp2.currentFilePath;
     }
   })();
   const tryResolve = (candidate) => {
-    if (fs3.existsSync(candidate) && fs3.statSync(candidate).isFile()) return candidate;
-    if (!candidate.endsWith(".fl") && fs3.existsSync(candidate + ".fl")) return candidate + ".fl";
+    if (fs4.existsSync(candidate) && fs4.statSync(candidate).isFile()) return candidate;
+    if (!candidate.endsWith(".fl") && fs4.existsSync(candidate + ".fl")) return candidate + ".fl";
     return null;
   };
   const isRelative = relPath.startsWith("./") || relPath.startsWith("../") || relPath.startsWith("/");
   const candidates = [];
   if (isRelative) {
-    candidates.push(path4.resolve(baseDir, relPath));
+    candidates.push(path5.resolve(baseDir, relPath));
   } else {
-    candidates.push(path4.resolve(process.cwd(), relPath));
-    candidates.push(path4.resolve(baseDir, relPath));
+    candidates.push(path5.resolve(process.cwd(), relPath));
+    candidates.push(path5.resolve(baseDir, relPath));
   }
   let absPath = null;
   for (const c of candidates) {
@@ -23606,7 +23889,7 @@ function evalImportFromFile(interp2, relPath, prefix, selective, alias) {
       return;
     }
     interp2.importedFiles.add(absPath);
-    const src = fs3.readFileSync(absPath, "utf-8");
+    const src = fs4.readFileSync(absPath, "utf-8");
     const subInterp = new Interpreter();
     subInterp.currentFilePath = absPath;
     subInterp.importedFiles = interp2.importedFiles;
@@ -23669,14 +23952,14 @@ function evalOpenBlock(interp2, openBlock) {
 var import_crypto10 = require("crypto");
 
 // src/stdlib-file.ts
-var fs4 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
 function validateFilePath(filePath) {
   const base = process.env.FL_FILE_BASE;
   if (!base) return filePath;
-  const resolved = path5.resolve(filePath);
-  const resolvedBase = path5.resolve(base);
-  if (resolved !== resolvedBase && !resolved.startsWith(resolvedBase + path5.sep)) {
+  const resolved = path6.resolve(filePath);
+  const resolvedBase = path6.resolve(base);
+  if (resolved !== resolvedBase && !resolved.startsWith(resolvedBase + path6.sep)) {
     throw new Error(`Path traversal \uCC28\uB2E8: '${filePath}' (\uD5C8\uC6A9 \uAE30\uC900: FL_FILE_BASE=${resolvedBase})`);
   }
   return resolved;
@@ -23686,7 +23969,7 @@ function createFileModule() {
     // file_read filePath -> string (read file content)
     "file_read": (filePath) => {
       try {
-        return fs4.readFileSync(validateFilePath(filePath), "utf-8");
+        return fs5.readFileSync(validateFilePath(filePath), "utf-8");
       } catch (err4) {
         throw new Error(`file_read failed for '${filePath}': ${err4.message}`);
       }
@@ -23695,11 +23978,11 @@ function createFileModule() {
     "file_write": (filePath, content) => {
       try {
         filePath = validateFilePath(filePath);
-        const dir = path5.dirname(filePath);
-        if (dir !== "." && !fs4.existsSync(dir)) {
-          fs4.mkdirSync(dir, { recursive: true });
+        const dir = path6.dirname(filePath);
+        if (dir !== "." && !fs5.existsSync(dir)) {
+          fs5.mkdirSync(dir, { recursive: true });
         }
-        fs4.writeFileSync(filePath, content, "utf-8");
+        fs5.writeFileSync(filePath, content, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`file_write failed for '${filePath}': ${err4.message}`);
@@ -23707,14 +23990,14 @@ function createFileModule() {
     },
     // file_exists filePath -> boolean (check if file exists)
     "file_exists": (filePath) => {
-      return fs4.existsSync(filePath);
+      return fs5.existsSync(filePath);
     },
     // file_delete filePath -> boolean (delete file)
     "file_delete": (filePath) => {
       try {
         filePath = validateFilePath(filePath);
-        if (fs4.existsSync(filePath)) {
-          fs4.unlinkSync(filePath);
+        if (fs5.existsSync(filePath)) {
+          fs5.unlinkSync(filePath);
           return true;
         }
         return false;
@@ -23726,11 +24009,11 @@ function createFileModule() {
     "file_append": (filePath, content) => {
       try {
         filePath = validateFilePath(filePath);
-        const dir = path5.dirname(filePath);
-        if (dir !== "." && !fs4.existsSync(dir)) {
-          fs4.mkdirSync(dir, { recursive: true });
+        const dir = path6.dirname(filePath);
+        if (dir !== "." && !fs5.existsSync(dir)) {
+          fs5.mkdirSync(dir, { recursive: true });
         }
-        fs4.appendFileSync(filePath, content, "utf-8");
+        fs5.appendFileSync(filePath, content, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`file_append failed for '${filePath}': ${err4.message}`);
@@ -23739,11 +24022,11 @@ function createFileModule() {
     // file_copy src dest -> boolean (copy file)
     "file_copy": (src, dest) => {
       try {
-        const dir = path5.dirname(dest);
-        if (dir !== "." && !fs4.existsSync(dir)) {
-          fs4.mkdirSync(dir, { recursive: true });
+        const dir = path6.dirname(dest);
+        if (dir !== "." && !fs5.existsSync(dir)) {
+          fs5.mkdirSync(dir, { recursive: true });
         }
-        fs4.copyFileSync(src, dest);
+        fs5.copyFileSync(src, dest);
         return true;
       } catch (err4) {
         throw new Error(`file_copy failed from '${src}' to '${dest}': ${err4.message}`);
@@ -23752,8 +24035,8 @@ function createFileModule() {
     // dir_create dirPath -> boolean (create directory)
     "dir_create": (dirPath) => {
       try {
-        if (!fs4.existsSync(dirPath)) {
-          fs4.mkdirSync(dirPath, { recursive: true });
+        if (!fs5.existsSync(dirPath)) {
+          fs5.mkdirSync(dirPath, { recursive: true });
         }
         return true;
       } catch (err4) {
@@ -23763,10 +24046,10 @@ function createFileModule() {
     // dir_list dirPath -> [string] (list directory contents)
     "dir_list": (dirPath) => {
       try {
-        if (!fs4.existsSync(dirPath)) {
+        if (!fs5.existsSync(dirPath)) {
           throw new Error(`Directory not found: '${dirPath}'`);
         }
-        return fs4.readdirSync(dirPath);
+        return fs5.readdirSync(dirPath);
       } catch (err4) {
         throw new Error(`dir_list failed for '${dirPath}': ${err4.message}`);
       }
@@ -23774,8 +24057,8 @@ function createFileModule() {
     // dir_delete dirPath -> boolean (delete directory - must be empty)
     "dir_delete": (dirPath) => {
       try {
-        if (fs4.existsSync(dirPath)) {
-          fs4.rmdirSync(dirPath);
+        if (fs5.existsSync(dirPath)) {
+          fs5.rmdirSync(dirPath);
           return true;
         }
         return false;
@@ -23786,7 +24069,7 @@ function createFileModule() {
     // file_size filePath -> number (get file size in bytes)
     "file_size": (filePath) => {
       try {
-        const stats = fs4.statSync(filePath);
+        const stats = fs5.statSync(filePath);
         return stats.size;
       } catch (err4) {
         throw new Error(`file_size failed for '${filePath}': ${err4.message}`);
@@ -23795,8 +24078,8 @@ function createFileModule() {
     // file_is_file filePath -> boolean (check if path is a file)
     "file_is_file": (filePath) => {
       try {
-        if (!fs4.existsSync(filePath)) return false;
-        return fs4.statSync(filePath).isFile();
+        if (!fs5.existsSync(filePath)) return false;
+        return fs5.statSync(filePath).isFile();
       } catch (err4) {
         return false;
       }
@@ -23804,8 +24087,8 @@ function createFileModule() {
     // file_is_dir filePath -> boolean (check if path is a directory)
     "file_is_dir": (filePath) => {
       try {
-        if (!fs4.existsSync(filePath)) return false;
-        return fs4.statSync(filePath).isDirectory();
+        if (!fs5.existsSync(filePath)) return false;
+        return fs5.statSync(filePath).isDirectory();
       } catch (err4) {
         return false;
       }
@@ -23813,7 +24096,7 @@ function createFileModule() {
     // file_mtime filePath -> number (get modification time as timestamp)
     "file_mtime": (filePath) => {
       try {
-        const stats = fs4.statSync(filePath);
+        const stats = fs5.statSync(filePath);
         return stats.mtimeMs;
       } catch (err4) {
         throw new Error(`file_mtime failed for '${filePath}': ${err4.message}`);
@@ -23822,7 +24105,7 @@ function createFileModule() {
     // file_ctime filePath -> number (get creation time as timestamp)
     "file_ctime": (filePath) => {
       try {
-        const stats = fs4.statSync(filePath);
+        const stats = fs5.statSync(filePath);
         return stats.ctimeMs;
       } catch (err4) {
         throw new Error(`file_ctime failed for '${filePath}': ${err4.message}`);
@@ -23831,7 +24114,7 @@ function createFileModule() {
     // file_read_or filePath defaultVal -> string | any (파일 없거나 오류 시 기본값 반환)
     "file_read_or": (filePath, defaultVal = null) => {
       try {
-        return fs4.readFileSync(filePath, "utf-8");
+        return fs5.readFileSync(filePath, "utf-8");
       } catch {
         return defaultVal ?? null;
       }
@@ -23840,114 +24123,168 @@ function createFileModule() {
 }
 
 // src/stdlib-fd.ts
-var fs5 = __toESM(require("fs"));
+var fs6 = __toESM(require("fs"));
 var fdCache = /* @__PURE__ */ new Map();
 var nextFd = 1e3;
+function _fdGet(fd, op) {
+  const entry = fdCache.get(fd);
+  if (entry === void 0) throw new Error(op + ": invalid file descriptor " + fd);
+  return entry;
+}
 function createFdModule() {
   return {
-    // fd_open path mode -> number (fd, mode: r/w/a)
+    // fd_open path mode -> number (fd, mode: r/w/a/r+)
     "fd_open": (filePath, mode) => {
-      try {
-        let fsMode;
-        switch (mode) {
-          case "r":
-            fsMode = "r";
-            break;
-          case "w":
-            fsMode = "w";
-            break;
-          case "a":
-            fsMode = "a";
-            break;
-          default:
-            throw new Error(`Invalid mode: ${mode}. Use "r", "w", or "a"`);
-        }
-        const nativeFd = fs5.openSync(filePath, fsMode);
-        const syntheticFd = nextFd++;
-        fdCache.set(syntheticFd, nativeFd);
-        return syntheticFd;
-      } catch (err4) {
-        throw new Error(`fd_open failed for '${filePath}' (${mode}): ${err4.message}`);
-      }
+      const validModes = { r: "r", w: "w", a: "a", "r+": "r+" };
+      const fsMode = validModes[mode];
+      if (!fsMode) throw new Error(`fd_open: invalid mode "${mode}". Use r/w/a/r+`);
+      const nativeFd = fs6.openSync(filePath, fsMode);
+      const syntheticFd = nextFd++;
+      fdCache.set(syntheticFd, { nativeFd, position: 0 });
+      return syntheticFd;
     },
-    // fd_write fd data -> boolean (write data to file descriptor)
-    "fd_write": (fd, data) => {
-      try {
-        const nativeFd = fdCache.get(fd);
-        if (nativeFd === void 0) {
-          throw new Error(`Invalid file descriptor: ${fd}`);
-        }
-        fs5.writeSync(nativeFd, data, "utf-8");
-        return true;
-      } catch (err4) {
-        throw new Error(`fd_write failed on fd ${fd}: ${err4.message}`);
-      }
-    },
-    // fd_fsync fd -> boolean (flush file descriptor to disk)
-    "fd_fsync": (fd) => {
-      try {
-        const nativeFd = fdCache.get(fd);
-        if (nativeFd === void 0) {
-          throw new Error(`Invalid file descriptor: ${fd}`);
-        }
-        fs5.fsyncSync(nativeFd);
-        return true;
-      } catch (err4) {
-        throw new Error(`fd_fsync failed on fd ${fd}: ${err4.message}`);
-      }
-    },
-    // fd_close fd -> boolean (close file descriptor)
+    // fd_close fd -> boolean
     "fd_close": (fd) => {
-      try {
-        const nativeFd = fdCache.get(fd);
-        if (nativeFd === void 0) {
-          throw new Error(`Invalid file descriptor: ${fd}`);
-        }
-        fs5.closeSync(nativeFd);
-        fdCache.delete(fd);
-        return true;
-      } catch (err4) {
-        throw new Error(`fd_close failed on fd ${fd}: ${err4.message}`);
-      }
+      const entry = _fdGet(fd, "fd_close");
+      fs6.closeSync(entry.nativeFd);
+      fdCache.delete(fd);
+      return true;
     },
-    // fd_read fd bytes -> string (read bytes from file descriptor)
-    "fd_read": (fd, bytes) => {
-      try {
-        const nativeFd = fdCache.get(fd);
-        if (nativeFd === void 0) {
-          throw new Error(`Invalid file descriptor: ${fd}`);
-        }
-        const buf = Buffer.alloc(bytes);
-        const bytesRead = fs5.readSync(nativeFd, buf, 0, bytes);
-        return buf.toString("utf-8", 0, bytesRead);
-      } catch (err4) {
-        throw new Error(`fd_read failed on fd ${fd}: ${err4.message}`);
-      }
-    },
-    // fd_seek fd offset whence -> number (whence: 0/1/2)
+    // fd_seek fd offset whence -> number (new position; whence: 0=SET 1=CUR 2=END)
     "fd_seek": (fd, offset, whence) => {
-      try {
-        const nativeFd = fdCache.get(fd);
-        if (nativeFd === void 0) {
-          throw new Error(`Invalid file descriptor: ${fd}`);
-        }
-        const stats = fs5.fstatSync(nativeFd);
-        return stats.size;
-      } catch (err4) {
-        throw new Error(`fd_seek failed on fd ${fd}: ${err4.message}`);
+      const entry = _fdGet(fd, "fd_seek");
+      const size = fs6.fstatSync(entry.nativeFd).size;
+      switch (whence) {
+        case 0: entry.position = offset; break;
+        case 1: entry.position += offset; break;
+        case 2: entry.position = size + offset; break;
+        default: throw new Error(`fd_seek: unknown whence ${whence}`);
       }
+      if (entry.position < 0) entry.position = 0;
+      return entry.position;
+    },
+    // fd_tell fd -> number (current position)
+    "fd_tell": (fd) => {
+      return _fdGet(fd, "fd_tell").position;
+    },
+    // fd_size fd -> number (file size in bytes)
+    "fd_size": (fd) => {
+      const entry = _fdGet(fd, "fd_size");
+      return fs6.fstatSync(entry.nativeFd).size;
+    },
+    // fd_read fd bytes -> string (UTF-8, advances position)
+    "fd_read": (fd, bytes) => {
+      const entry = _fdGet(fd, "fd_read");
+      const buf = Buffer.alloc(bytes);
+      const bytesRead = fs6.readSync(entry.nativeFd, buf, 0, bytes, entry.position);
+      entry.position += bytesRead;
+      return buf.toString("utf-8", 0, bytesRead);
+    },
+    // fd_read_bytes fd bytes -> string (base64, advances position)
+    "fd_read_bytes": (fd, bytes) => {
+      const entry = _fdGet(fd, "fd_read_bytes");
+      const buf = Buffer.alloc(bytes);
+      const bytesRead = fs6.readSync(entry.nativeFd, buf, 0, bytes, entry.position);
+      entry.position += bytesRead;
+      return buf.toString("base64", 0, bytesRead);
+    },
+    // fd_write fd data -> boolean (UTF-8, advances position)
+    "fd_write": (fd, data) => {
+      const entry = _fdGet(fd, "fd_write");
+      const buf = Buffer.from(data, "utf-8");
+      const written = fs6.writeSync(entry.nativeFd, buf, 0, buf.length, entry.position);
+      entry.position += written;
+      return true;
+    },
+    // fd_write_bytes fd base64data -> number (binary via base64, advances position)
+    "fd_write_bytes": (fd, base64data) => {
+      const entry = _fdGet(fd, "fd_write_bytes");
+      const buf = Buffer.from(base64data, "base64");
+      const written = fs6.writeSync(entry.nativeFd, buf, 0, buf.length, entry.position);
+      entry.position += written;
+      return written;
+    },
+    // fd_truncate fd size -> boolean (truncate file at given byte offset)
+    "fd_truncate": (fd, size) => {
+      const entry = _fdGet(fd, "fd_truncate");
+      fs6.ftruncateSync(entry.nativeFd, size);
+      if (entry.position > size) entry.position = size;
+      return true;
+    },
+    // fd_fsync fd -> boolean (flush fd to disk)
+    "fd_fsync": (fd) => {
+      const entry = _fdGet(fd, "fd_fsync");
+      fs6.fsyncSync(entry.nativeFd);
+      return true;
     },
     // fd_flush -> boolean (flush all open fds)
     "fd_flush": () => {
-      try {
-        for (const nativeFd of fdCache.values()) {
-          fs5.fsyncSync(nativeFd);
-        }
-        return true;
-      } catch (err4) {
-        throw new Error(`fd_flush failed: ${err4.message}`);
+      for (const entry of fdCache.values()) {
+        fs6.fsyncSync(entry.nativeFd);
       }
+      return true;
     }
+  };
+}
+
+// src/stdlib-binary.ts
+var CRC32_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c;
+  }
+  return t;
+})();
+function _crc32buf(buf) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ buf[i]) & 0xFF];
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function createBinaryModule() {
+  return {
+    // buf_u32be n -> string (base64 of 4-byte big-endian uint32)
+    "buf_u32be": (n) => {
+      const b = Buffer.alloc(4);
+      b.writeUInt32BE(n >>> 0, 0);
+      return b.toString("base64");
+    },
+    // buf_u8 n -> string (base64 of 1 byte)
+    "buf_u8": (n) => {
+      const b = Buffer.alloc(1);
+      b[0] = n & 0xFF;
+      return b.toString("base64");
+    },
+    // buf_str s -> string (base64 of UTF-8 encoded string)
+    "buf_str": (s) => Buffer.from(s, "utf-8").toString("base64"),
+    // buf_concat list -> string (base64 of concatenated byte buffers)
+    "buf_concat": (list) => {
+      const parts = list.map(b64 => Buffer.from(b64, "base64"));
+      return Buffer.concat(parts).toString("base64");
+    },
+    // buf_len b64 -> number (byte count)
+    "buf_len": (b64) => Buffer.from(b64, "base64").length,
+    // buf_read_u32be b64 offset -> number (big-endian uint32 at byte offset)
+    "buf_read_u32be": (b64, offset) => Buffer.from(b64, "base64").readUInt32BE(offset) >>> 0,
+    // buf_read_u8 b64 offset -> number (uint8 at byte offset)
+    "buf_read_u8": (b64, offset) => Buffer.from(b64, "base64")[offset] & 0xFF,
+    // buf_read_str b64 offset len -> string (UTF-8 string from byte range)
+    "buf_read_str": (b64, offset, len) => Buffer.from(b64, "base64").toString("utf-8", offset, offset + len),
+    // buf_crc32 b64 -> number (IEEE 802.3 CRC32)
+    "buf_crc32": (b64) => _crc32buf(Buffer.from(b64, "base64")),
+    // buf_slice b64 offset len -> string (sub-buffer as base64)
+    "buf_slice": (b64, offset, len) => Buffer.from(b64, "base64").slice(offset, offset + len).toString("base64"),
+    // buf_from_bytes b64 -> string (identity alias)
+    "buf_from_bytes": (b64) => b64,
+    // buf_f64le n -> string (base64 of 8-byte float64 little-endian)
+    "buf_f64le": (n) => { const b = Buffer.allocUnsafe(8); b.writeDoubleLE(n, 0); return b.toString("base64"); },
+    // buf_read_f64le b64 offset -> number
+    "buf_read_f64le": (b64, offset) => Buffer.from(b64, "base64").readDoubleLE(offset),
+    // buf_u32le n -> string (base64 of 4-byte uint32 little-endian)
+    "buf_u32le": (n) => { const b = Buffer.allocUnsafe(4); b.writeUInt32LE(n >>> 0, 0); return b.toString("base64"); },
+    // buf_read_u32le b64 offset -> number
+    "buf_read_u32le": (b64, offset) => Buffer.from(b64, "base64").readUInt32LE(offset) >>> 0,
   };
 }
 
@@ -24661,8 +24998,8 @@ function createDataModule() {
   return {
     // ── JSON ──────────────────────────────────────────────────
     // json_get obj path -> any  (dot-path access: "user.name" or "items.0")
-    "json_get": (obj, path18) => {
-      const parts = path18.split(".");
+    "json_get": (obj, path19) => {
+      const parts = path19.split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -24671,7 +25008,7 @@ function createDataModule() {
       return cur ?? null;
     },
     // json_set obj path value -> object (immutable update, returns new obj)
-    "json_set": (obj, path18, value) => {
+    "json_set": (obj, path19, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const deepClone = (o) => {
         if (o instanceof Map) return new Map(o);
@@ -24686,7 +25023,7 @@ function createDataModule() {
         return o;
       };
       const clone = deepClone(parsed);
-      const parts = path18.split(".");
+      const parts = path19.split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -24871,8 +25208,8 @@ function createDataModule() {
       const y = typeof b === "string" ? JSON.parse(b) : b;
       return { ...x, ...y };
     },
-    "json-get": (obj, path18) => {
-      const parts = String(path18).split(".");
+    "json-get": (obj, path19) => {
+      const parts = String(path19).split(".");
       let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
       for (const p of parts) {
         if (cur === null || cur === void 0) return null;
@@ -24880,7 +25217,7 @@ function createDataModule() {
       }
       return cur ?? null;
     },
-    "json-set": (obj, path18, value) => {
+    "json-set": (obj, path19, value) => {
       const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
       const deepClone = (o) => {
         if (o instanceof Map) return new Map(o);
@@ -24895,7 +25232,7 @@ function createDataModule() {
         return o;
       };
       const clone = deepClone(parsed);
-      const parts = String(path18).split(".");
+      const parts = String(path19).split(".");
       let cur = clone;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i];
@@ -26918,13 +27255,13 @@ function createCryptoModule() {
 }
 
 // src/stdlib-checkpoint.ts
-var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs7 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 function saveCheckpoint(filePath, data) {
   try {
-    const dir = path6.dirname(filePath);
-    if (!fs6.existsSync(dir)) {
-      fs6.mkdirSync(dir, { recursive: true });
+    const dir = path7.dirname(filePath);
+    if (!fs7.existsSync(dir)) {
+      fs7.mkdirSync(dir, { recursive: true });
     }
     const toSerializable4 = (obj) => {
       if (obj instanceof Map) return Object.fromEntries(obj);
@@ -26938,7 +27275,7 @@ function saveCheckpoint(filePath, data) {
       }
       return obj;
     };
-    fs6.writeFileSync(filePath, JSON.stringify(toSerializable4(data), null, 2), "utf-8");
+    fs7.writeFileSync(filePath, JSON.stringify(toSerializable4(data), null, 2), "utf-8");
   } catch (err4) {
     console.error(`[Checkpoint] Failed to save: ${err4.message}`);
     throw err4;
@@ -26946,10 +27283,10 @@ function saveCheckpoint(filePath, data) {
 }
 function loadCheckpoint(filePath) {
   try {
-    if (!fs6.existsSync(filePath)) {
+    if (!fs7.existsSync(filePath)) {
       return null;
     }
-    const content = fs6.readFileSync(filePath, "utf-8");
+    const content = fs7.readFileSync(filePath, "utf-8");
     const data = JSON.parse(content);
     return data;
   } catch (err4) {
@@ -26959,8 +27296,8 @@ function loadCheckpoint(filePath) {
 }
 function deleteCheckpoint(filePath) {
   try {
-    if (fs6.existsSync(filePath)) {
-      fs6.unlinkSync(filePath);
+    if (fs7.existsSync(filePath)) {
+      fs7.unlinkSync(filePath);
     }
   } catch (err4) {
     console.error(`[Checkpoint] Failed to delete: ${err4.message}`);
@@ -27799,8 +28136,8 @@ function createResourceModule() {
       });
     },
     // res_disk_usage path -> {total_gb, used_gb, avail_gb, use_pct}
-    "res_disk_usage": (path18) => {
-      const line = run(`df -BG --output=size,used,avail,pcent "${path18}" 2>/dev/null | tail -1`);
+    "res_disk_usage": (path19) => {
+      const line = run(`df -BG --output=size,used,avail,pcent "${path19}" 2>/dev/null | tail -1`);
       if (!line) return { total_gb: 0, used_gb: 0, avail_gb: 0, use_pct: 0 };
       const [total, used, avail, pct] = line.trim().split(/\s+/);
       return {
@@ -28127,8 +28464,8 @@ function createResourceModule() {
 var http = __toESM(require("http"));
 var url = __toESM(require("url"));
 var crypto = __toESM(require("crypto"));
-var fs7 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var fs8 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
 var os2 = __toESM(require("os"));
 var __activeServer = { server: null };
 function createHttpServerModule(callFn2, callFunctionValue2) {
@@ -28149,13 +28486,13 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
     const counter = ++requestCounter;
     return `req_${timestamp}_${counter}`;
   }
-  function logAccess(method, path18, status, duration, requestId) {
+  function logAccess(method, path19, status, duration, requestId) {
     const icon = status >= 400 ? "\u274C" : "\u2705";
-    console.log(`${icon} [${requestId}] ${method} ${path18} ${status} ${duration}ms`);
+    console.log(`${icon} [${requestId}] ${method} ${path19} ${status} ${duration}ms`);
   }
-  function pathToRegex(path18) {
+  function pathToRegex(path19) {
     const params = [];
-    const pattern = path18.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
+    const pattern = path19.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
       params.push(param);
       return "([^\\/]+)";
     });
@@ -28169,7 +28506,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
     };
   }
   async function readBody(req) {
-    return new Promise((resolve8) => {
+    return new Promise((resolve9) => {
       const chunks = [];
       req.on("data", (chunk) => chunks.push(chunk));
       req.on("end", () => {
@@ -28177,14 +28514,14 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
         const ct = (req.headers["content-type"] || "").toString();
         if (ct.includes("application/json")) {
           try {
-            resolve8(JSON.parse(raw.toString()));
+            resolve9(JSON.parse(raw.toString()));
             return;
           } catch {
           }
         }
         if (ct.includes("multipart/form-data")) {
           try {
-            resolve8(parseMultipart(raw, ct));
+            resolve9(parseMultipart(raw, ct));
             return;
           } catch {
           }
@@ -28195,12 +28532,12 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
             new url.URLSearchParams(raw.toString()).forEach((v, k) => {
               params[k] = v;
             });
-            resolve8(params);
+            resolve9(params);
             return;
           } catch {
           }
         }
-        resolve8(raw.toString());
+        resolve9(raw.toString());
       });
     });
   }
@@ -28211,8 +28548,8 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
     const delimiter = Buffer.from("\r\n--" + boundary);
     const fields = {};
     const files = [];
-    const uploadDir = path7.join(os2.tmpdir(), "fl-uploads");
-    if (!fs7.existsSync(uploadDir)) fs7.mkdirSync(uploadDir, { recursive: true });
+    const uploadDir = path8.join(os2.tmpdir(), "fl-uploads");
+    if (!fs8.existsSync(uploadDir)) fs8.mkdirSync(uploadDir, { recursive: true });
     const start = Buffer.from("--" + boundary + "\r\n");
     let pos = raw.indexOf(start);
     if (pos < 0) return { fields, files };
@@ -28235,10 +28572,10 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
       if (fileName) {
         const ctMatch = headerStr.match(/Content-Type:\s*([^\r\n]+)/i);
         const mimetype = ctMatch ? ctMatch[1].trim() : "application/octet-stream";
-        const ext = path7.extname(fileName) || "";
+        const ext = path8.extname(fileName) || "";
         const savedName = crypto.randomBytes(8).toString("hex") + ext;
-        const savedPath = path7.join(uploadDir, savedName);
-        fs7.writeFileSync(savedPath, bodyBuf);
+        const savedPath = path8.join(uploadDir, savedName);
+        fs8.writeFileSync(savedPath, bodyBuf);
         const m = /* @__PURE__ */ new Map();
         m.set("fieldname", fieldName);
         m.set("originalname", fileName);
@@ -28302,11 +28639,11 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
       res.end(String(body ?? ""));
     }
   }
-  function createFlRequest(method, path18, query, headers, body, params, requestId) {
+  function createFlRequest(method, path19, query, headers, body, params, requestId) {
     return {
       __fl_request: true,
       method,
-      path: path18,
+      path: path19,
       query,
       headers,
       body: body || void 0,
@@ -28340,8 +28677,8 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
     // server_use path middlewareName — 경로 패턴 매칭 시 미들웨어 실행
     // handler가 null/undefined 반환 → 다음 미들웨어/라우트 진행
     // handler가 응답 객체 반환 → 즉시 응답 (라우트 실행 안 함)
-    "server_use": (path18, handlerName) => {
-      const [pattern] = pathToRegex(path18);
+    "server_use": (path19, handlerName) => {
+      const [pattern] = pathToRegex(path19);
       middlewares.push({ pattern, handler: handlerName });
       return null;
     },
@@ -28352,42 +28689,42 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
       return null;
     },
     // server_get path handlerName -> null
-    "server_get": (path18, handlerName) => {
-      const [pattern, params] = pathToRegex(path18);
-      routes.push({ method: "GET", path: path18, pattern, params, handler: handlerName });
+    "server_get": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "GET", path: path19, pattern, params, handler: handlerName });
       return null;
     },
     // server_post path handlerName -> null
-    "server_post": (path18, handlerName) => {
-      const [pattern, params] = pathToRegex(path18);
-      routes.push({ method: "POST", path: path18, pattern, params, handler: handlerName });
+    "server_post": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "POST", path: path19, pattern, params, handler: handlerName });
       return null;
     },
     // server_put path handlerName -> null
-    "server_put": (path18, handlerName) => {
-      const [pattern, params] = pathToRegex(path18);
-      routes.push({ method: "PUT", path: path18, pattern, params, handler: handlerName });
+    "server_put": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "PUT", path: path19, pattern, params, handler: handlerName });
       return null;
     },
     // server_patch path handlerName -> null
-    "server_patch": (path18, handlerName) => {
-      const [pattern, params] = pathToRegex(path18);
-      routes.push({ method: "PATCH", path: path18, pattern, params, handler: handlerName });
+    "server_patch": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "PATCH", path: path19, pattern, params, handler: handlerName });
       return null;
     },
     // server_delete path handlerName -> null
-    "server_delete": (path18, handlerName) => {
-      const [pattern, params] = pathToRegex(path18);
-      routes.push({ method: "DELETE", path: path18, pattern, params, handler: handlerName });
+    "server_delete": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "DELETE", path: path19, pattern, params, handler: handlerName });
       return null;
     },
     // route method path handler → 메서드 문자열로 등록
     // (route "GET"    "/api/x" handler-fn)
     // (route "POST"   "/api/x" handler-fn)
-    "route": (method, path18, handlerName) => {
+    "route": (method, path19, handlerName) => {
       const m = String(method).toUpperCase();
-      const [pattern, params] = pathToRegex(path18);
-      routes.push({ method: m, path: path18, pattern, params, handler: handlerName });
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: m, path: path19, pattern, params, handler: handlerName });
       return null;
     },
     // v12: 라우트 초기화 (hot reload 시 재등록 전 호출)
@@ -28420,21 +28757,21 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
         ".txt": "text/plain; charset=utf-8",
         ".pdf": "application/pdf"
       };
-      const absDir = path7.resolve(dir);
+      const absDir = path8.resolve(dir);
       const prefix = urlPrefix.endsWith("/") ? urlPrefix : urlPrefix + "/";
       const handler = (_req, res, reqPath) => {
         let rel = reqPath.startsWith(prefix) ? reqPath.slice(prefix.length - 1) : reqPath;
         if (rel === "" || rel === "/") rel = "/index.html";
-        const filePath = path7.join(absDir, rel);
+        const filePath = path8.join(absDir, rel);
         if (!filePath.startsWith(absDir)) {
           res.writeHead(403, { "Content-Type": "text/plain" });
           res.end("Forbidden");
           return true;
         }
-        if (!fs7.existsSync(filePath) || !fs7.statSync(filePath).isFile()) return false;
-        const ext = path7.extname(filePath).toLowerCase();
+        if (!fs8.existsSync(filePath) || !fs8.statSync(filePath).isFile()) return false;
+        const ext = path8.extname(filePath).toLowerCase();
         const mime = mimeMap[ext] || "application/octet-stream";
-        const content = fs7.readFileSync(filePath);
+        const content = fs8.readFileSync(filePath);
         res.writeHead(200, {
           "Content-Type": mime,
           "Content-Length": content.length,
@@ -28455,10 +28792,10 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
       return null;
     },
     // server_all path handler → 모든 메서드 등록 (catch-all)
-    "server_all": (path18, handlerName) => {
-      const [pattern, params] = pathToRegex(path18);
+    "server_all": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
       for (const m of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
-        routes.push({ method: m, path: path18, pattern, params, handler: handlerName });
+        routes.push({ method: m, path: path19, pattern, params, handler: handlerName });
       }
       return null;
     },
@@ -28481,7 +28818,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
         const cspNonce = crypto.randomBytes(16).toString("base64url");
         currentNonce = cspNonce;
         const method = req.method || "GET";
-        const { path: path18, query } = parseUrl(req.url || "/");
+        const { path: path19, query } = parseUrl(req.url || "/");
         const headers = req.headers;
         const body = await readBody(req);
         const allowedOrigins = process.env.FL_ALLOWED_ORIGINS;
@@ -28513,7 +28850,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
           res.end(JSON.stringify({ error: "Too Many Requests", retry_after: Math.ceil(rlWindowMs / 1e3) }));
           return;
         }
-        if (process.env.FL_DEV === "1" && path18 === "/__hot" && method === "GET") {
+        if (process.env.FL_DEV === "1" && path19 === "/__hot" && method === "GET") {
           res.writeHead(200, {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
@@ -28523,9 +28860,9 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
           res.write("retry: 400\n\n");
           return;
         }
-        const baseReq = createFlRequest(method, path18, query, headers, body, {}, requestId);
+        const baseReq = createFlRequest(method, path19, query, headers, body, {}, requestId);
         for (const mw of middlewares) {
-          if (!mw.pattern.exec(path18)) continue;
+          if (!mw.pattern.exec(path19)) continue;
           try {
             let mwResult;
             if (typeof mw.handler === "string") {
@@ -28541,7 +28878,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
               const mwBody = mwResult.__fl_response ? typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? "") : typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult);
               const mwCT = mwResult.contentType ?? "application/json";
               sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
-              logAccess(method, path18, mwStatus, Date.now() - requestStart, requestId);
+              logAccess(method, path19, mwStatus, Date.now() - requestStart, requestId);
               return;
             }
           } catch (mwErr) {
@@ -28552,7 +28889,7 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
         let matched = false;
         for (const route of routes) {
           if (route.method !== method) continue;
-          const match = route.pattern.exec(path18);
+          const match = route.pattern.exec(path19);
           if (!match) continue;
           matched = true;
           let status = 200;
@@ -28561,12 +28898,12 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
             for (let i = 0; i < route.params.length; i++) {
               params[route.params[i]] = match[i + 1];
             }
-            const flReq = createFlRequest(method, path18, query, headers, body, params, requestId);
+            const flReq = createFlRequest(method, path19, query, headers, body, params, requestId);
             let rawResult;
             if (typeof route.handler === "string") {
               rawResult = callFn2(route.handler, [flReq]);
             } else if (route.handler && route.handler.__fl_static_handler === true) {
-              const served = route.handler.fn(req, res, path18);
+              const served = route.handler.fn(req, res, path19);
               if (served) return;
               sendResponse(res, 404, { error: "Not found" });
               return;
@@ -28627,20 +28964,20 @@ function createHttpServerModule(callFn2, callFunctionValue2) {
               }
             }
             const duration = Date.now() - requestStart;
-            logAccess(method, path18, status, duration, requestId);
+            logAccess(method, path19, status, duration, requestId);
           } catch (err4) {
             const status2 = 500;
             sendResponse(res, status2, { error: err4.message });
             const duration = Date.now() - requestStart;
-            logAccess(method, path18, status2, duration, requestId);
+            logAccess(method, path19, status2, duration, requestId);
           }
           return;
         }
         if (!matched) {
           const status = 404;
-          sendResponse(res, status, { error: "Not Found", path: path18 });
+          sendResponse(res, status, { error: "Not Found", path: path19 });
           const duration = Date.now() - requestStart;
-          logAccess(method, path18, status, duration, requestId);
+          logAccess(method, path19, status, duration, requestId);
         }
       });
       server.on("upgrade", (req, socket, head2) => {
@@ -29225,7 +29562,7 @@ function getDatabaseSync() {
   return _DatabaseSync;
 }
 var KIMDB = process.env.KIMDB_URL || "http://localhost:40000";
-function kimdbReq(method, path18, body) {
+function kimdbReq(method, path19, body) {
   const toSerializable4 = (obj) => {
     if (obj instanceof Map) return Object.fromEntries(obj);
     if (Array.isArray(obj)) return obj.map(toSerializable4);
@@ -29238,7 +29575,7 @@ function kimdbReq(method, path18, body) {
     }
     return obj;
   };
-  const url2 = `${KIMDB}${path18}`;
+  const url2 = `${KIMDB}${path19}`;
   const args3 = ["-sf", "--max-time", "5"];
   if (method !== "GET") {
     args3.push("-X", method);
@@ -30315,17 +30652,17 @@ function createCacheModule() {
     // Phase F: wait_for_cache key timeoutMs intervalMs → Promise<value or null>
     // 캐시에 값이 생길 때까지 비동기 대기 (이벤트 루프 비블로킹)
     "wait_for_cache": (key, timeoutMs = 3e4, intervalMs = 50) => {
-      return new Promise((resolve8) => {
+      return new Promise((resolve9) => {
         const start = Date.now();
         const check = () => {
           const entry = _cache.get(key);
           if (entry && (!entry.expiresAt || Date.now() <= entry.expiresAt)) {
             _cache.delete(key);
-            resolve8(entry.value);
+            resolve9(entry.value);
             return;
           }
           if (Date.now() - start >= timeoutMs) {
-            resolve8(null);
+            resolve9(null);
             return;
           }
           setTimeout(check, intervalMs);
@@ -30413,8 +30750,8 @@ function createPubSubModule(callFn2) {
 }
 
 // src/stdlib-process.ts
-var fs8 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
+var fs9 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
 function createProcessModule() {
   let sigtermRegistered = false;
   const shutdownCallbacks = [];
@@ -30434,11 +30771,11 @@ function createProcessModule() {
   }
   return {
     "env_load": (envPath) => {
-      const filePath = envPath ? path8.resolve(envPath) : path8.resolve(process.cwd(), ".env");
+      const filePath = envPath ? path9.resolve(envPath) : path9.resolve(process.cwd(), ".env");
       const loaded2 = {};
       let content;
       try {
-        content = fs8.readFileSync(filePath, "utf-8");
+        content = fs9.readFileSync(filePath, "utf-8");
       } catch (err4) {
         if (err4.code === "ENOENT") return {};
         throw err4;
@@ -30508,9 +30845,9 @@ function createModuleSystem() {
   return {
     // module_load path -> {exports} | null
     // Load a module from file or registry
-    "module_load": (path18) => {
-      if (registry.has(path18)) {
-        return registry.get(path18);
+    "module_load": (path19) => {
+      if (registry.has(path19)) {
+        return registry.get(path19);
       }
       return null;
     },
@@ -30526,9 +30863,9 @@ function createModuleSystem() {
     },
     // module_require path -> {exports}
     // Require and return all exports from a module
-    "module_require": (path18) => {
-      if (registry.has(path18)) {
-        return registry.get(path18) || {};
+    "module_require": (path19) => {
+      if (registry.has(path19)) {
+        return registry.get(path19) || {};
       }
       return {};
     },
@@ -31444,8 +31781,8 @@ function createTotpModule() {
 }
 
 // src/stdlib-mail.ts
-var fs9 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs10 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
 var import_crypto8 = require("crypto");
 var tls = require("tls");
 function createMailModule() {
@@ -31453,11 +31790,11 @@ function createMailModule() {
     // mail_outbox_write dir to subject body -> string (파일 경로)
     "mail_outbox_write": (dir, to, subject, body) => {
       try {
-        fs9.mkdirSync(dir, { recursive: true });
+        fs10.mkdirSync(dir, { recursive: true });
       } catch {
       }
       const id = `${Date.now()}-${(0, import_crypto8.randomBytes)(6).toString("hex")}.json`;
-      const file = path9.join(dir, id);
+      const file = path10.join(dir, id);
       const payload = {
         id,
         to,
@@ -31466,16 +31803,16 @@ function createMailModule() {
         ts: (/* @__PURE__ */ new Date()).toISOString(),
         status: "queued"
       };
-      fs9.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+      fs10.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
       return file;
     },
     // mail_outbox_list dir -> array (JSON 배열, 큐된 메시지)
     "mail_outbox_list": (dir) => {
       try {
-        const files = fs9.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+        const files = fs10.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
         return files.map((f) => {
           try {
-            return JSON.parse(fs9.readFileSync(path9.join(dir, f), "utf8"));
+            return JSON.parse(fs10.readFileSync(path10.join(dir, f), "utf8"));
           } catch {
             return null;
           }
@@ -31487,7 +31824,7 @@ function createMailModule() {
     // mail_outbox_count dir -> number
     "mail_outbox_count": (dir) => {
       try {
-        return fs9.readdirSync(dir).filter((f) => f.endsWith(".json")).length;
+        return fs10.readdirSync(dir).filter((f) => f.endsWith(".json")).length;
       } catch {
         return 0;
       }
@@ -31498,7 +31835,7 @@ function createMailModule() {
     // 동기적 비동기 — Node tls 콜백 기반이지만 Promise 인터페이스로 노출.
     // 호출 측은 await 또는 then. FL의 async_call 헬퍼로 호출 가능.
     "smtp_send_tls": (host, port, user, pass, from, to, subject, body) => {
-      return new Promise((resolve8) => {
+      return new Promise((resolve9) => {
         const log2 = [];
         const socket = tls.connect({ host, port, servername: host }, () => {
         });
@@ -31515,7 +31852,7 @@ function createMailModule() {
             socket.end();
           } catch {
           }
-          resolve8({ ok: false, log: log2.join("\n"), error: msg });
+          resolve9({ ok: false, log: log2.join("\n"), error: msg });
         };
         socket.on("data", (chunk) => {
           buf += chunk.toString();
@@ -31585,7 +31922,7 @@ function createMailModule() {
                   stage = 9;
                   break;
                 case 9:
-                  resolve8({ ok: true, log: log2.join("\n") });
+                  resolve9({ ok: true, log: log2.join("\n") });
                   try {
                     socket.end();
                   } catch {
@@ -31605,7 +31942,7 @@ function createMailModule() {
     // mailgun_send api_key domain from to subject text -> {ok, id, error}
     // Mailgun REST API v3 사용 (npm 0, Node https만 사용)
     "mailgun_send": (api_key, domain, from, to, subject, text) => {
-      return new Promise((resolve8) => {
+      return new Promise((resolve9) => {
         try {
           const https = require("https");
           const querystring = require("querystring");
@@ -31636,19 +31973,19 @@ function createMailModule() {
               try {
                 const json = JSON.parse(data);
                 if (res.statusCode === 200) {
-                  resolve8({
+                  resolve9({
                     ok: true,
                     id: json.id,
                     message: "\uBA54\uC77C \uC804\uC1A1 \uC644\uB8CC"
                   });
                 } else {
-                  resolve8({
+                  resolve9({
                     ok: false,
                     error: json.message || "Mailgun API \uC624\uB958"
                   });
                 }
               } catch (e) {
-                resolve8({
+                resolve9({
                   ok: false,
                   error: `\uD30C\uC2F1 \uC2E4\uD328: ${e.message}`
                 });
@@ -31656,7 +31993,7 @@ function createMailModule() {
             });
           });
           req.on("error", (e) => {
-            resolve8({
+            resolve9({
               ok: false,
               error: `\uC694\uCCAD \uC2E4\uD328: ${e.message}`
             });
@@ -31664,7 +32001,7 @@ function createMailModule() {
           req.write(postData);
           req.end();
         } catch (e) {
-          resolve8({
+          resolve9({
             ok: false,
             error: `\uC608\uC678: ${e.message}`
           });
@@ -31911,7 +32248,7 @@ var cachedSock = null;
 function resolveSocket() {
   if (cachedSock) return cachedSock;
   if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
-  const fs20 = require("fs");
+  const fs21 = require("fs");
   const candidates = [
     "/data/data/com.termux/files/usr/tmp/mysqld.sock",
     "/var/run/mysqld/mysqld.sock",
@@ -31921,7 +32258,7 @@ function resolveSocket() {
   ];
   for (const s of candidates) {
     try {
-      if (fs20.existsSync(s)) return cachedSock = s;
+      if (fs21.existsSync(s)) return cachedSock = s;
     } catch {
     }
   }
@@ -31956,12 +32293,12 @@ var MARIADB_SEARCH_PATHS = [
 var resolvedMariadbBin = null;
 function resolveMariadBin() {
   if (resolvedMariadbBin) return resolvedMariadbBin;
-  const fs20 = require("fs");
-  const path18 = require("path");
+  const fs21 = require("fs");
+  const path19 = require("path");
   for (const dir of MARIADB_SEARCH_PATHS) {
-    const full = path18.join(dir, "mariadb");
+    const full = path19.join(dir, "mariadb");
     try {
-      if (fs20.existsSync(full)) return resolvedMariadbBin = full;
+      if (fs21.existsSync(full)) return resolvedMariadbBin = full;
     } catch {
     }
   }
@@ -32220,8 +32557,8 @@ function getSqliteDb(path) {
   }
   return _sqliteCache.get(path);
 }
-function sqliteQuery(path18, sql, params) {
-  const db = getSqliteDb(path18);
+function sqliteQuery(path19, sql, params) {
+  const db = getSqliteDb(path19);
   const rows = db.prepare(sql).all(...params);
   return rows.map((r) => {
     const m = /* @__PURE__ */ new Map();
@@ -32229,8 +32566,8 @@ function sqliteQuery(path18, sql, params) {
     return m;
   });
 }
-function sqliteExec(path18, sql, params) {
-  const db = getSqliteDb(path18);
+function sqliteExec(path19, sql, params) {
+  const db = getSqliteDb(path19);
   const result = db.prepare(sql).run(...params);
   const m = /* @__PURE__ */ new Map();
   m.set("affectedRows", result.changes ?? 0);
@@ -32519,9 +32856,9 @@ function createMariadbModule(callFn2) {
 
 // src/stdlib-mongodb.ts
 var import_child_process7 = require("child_process");
-var path10 = __toESM(require("path"));
+var path11 = __toESM(require("path"));
 function createMongodbModule() {
-  const helperPath = path10.join(__dirname, "_mongodb_helper.js");
+  const helperPath = path11.join(__dirname, "_mongodb_helper.js");
   function callHelper(req) {
     try {
       const toSerializable4 = (obj) => {
@@ -32678,11 +33015,11 @@ function createAsyncModule(callFn2) {
     // async_call fn_name args -> Promise
     // Call a function asynchronously and return a promise
     "async_call": (fnName, args3 = []) => {
-      return new FreeLangPromise((resolve8, reject) => {
+      return new FreeLangPromise((resolve9, reject) => {
         setImmediate(() => {
           try {
             const result = callFn2(fnName, args3);
-            resolve8(result);
+            resolve9(result);
           } catch (e) {
             reject(new Error(`async_call error: ${e.message}`));
           }
@@ -32704,9 +33041,9 @@ function createAsyncModule(callFn2) {
     // promise_all promises -> Promise
     // Wait for all promises to resolve
     "promise_all": (promises) => {
-      return new FreeLangPromise((resolve8, reject) => {
+      return new FreeLangPromise((resolve9, reject) => {
         if (!Array.isArray(promises) || promises.length === 0) {
-          resolve8([]);
+          resolve9([]);
           return;
         }
         const results = [];
@@ -32720,7 +33057,7 @@ function createAsyncModule(callFn2) {
           if (state === "resolved") {
             results[idx] = p.getValue();
             completed++;
-            if (completed === promises.length) resolve8(results);
+            if (completed === promises.length) resolve9(results);
           } else if (state === "rejected") {
             reject(p.getError() || new Error(`promise_all: promise ${idx} rejected`));
           } else {
@@ -32732,7 +33069,7 @@ function createAsyncModule(callFn2) {
     // promise_race promises -> Promise
     // Return first resolved promise
     "promise_race": (promises) => {
-      return new FreeLangPromise((resolve8, reject) => {
+      return new FreeLangPromise((resolve9, reject) => {
         if (!Array.isArray(promises) || promises.length === 0) {
           reject(new Error("promise_race: empty promise array"));
           return;
@@ -32745,7 +33082,7 @@ function createAsyncModule(callFn2) {
           }
           const state = p.getState();
           if (state === "resolved") {
-            resolve8(p.getValue());
+            resolve9(p.getValue());
             return;
           } else if (state === "rejected") {
             reject(p.getError() || new Error(`promise_race: promise ${i} rejected`));
@@ -32758,14 +33095,14 @@ function createAsyncModule(callFn2) {
     // promise_delay ms -> Promise
     // Create a promise that resolves after delay
     "promise_delay": (ms) => {
-      return new FreeLangPromise((resolve8) => {
-        setTimeout(() => resolve8(null), ms);
+      return new FreeLangPromise((resolve9) => {
+        setTimeout(() => resolve9(null), ms);
       });
     },
     // promise_timeout ms fn_name args -> Promise
     // Call function with timeout
     "promise_timeout": (ms, fnName, args3 = []) => {
-      return new FreeLangPromise((resolve8, reject) => {
+      return new FreeLangPromise((resolve9, reject) => {
         let done = false;
         const timeout = setTimeout(() => {
           if (!done) {
@@ -32777,7 +33114,7 @@ function createAsyncModule(callFn2) {
           const result = callFn2(fnName, args3);
           done = true;
           clearTimeout(timeout);
-          resolve8(result);
+          resolve9(result);
         } catch (e) {
           done = true;
           clearTimeout(timeout);
@@ -33156,8 +33493,8 @@ ${JSON.stringify(prompt.context)}` : "";
 }
 
 // src/stdlib-compile.ts
-var fs10 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var fs11 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
 init_lexer();
 init_parser();
 
@@ -34231,7 +34568,7 @@ function createCompileModule() {
     // Compile a single .fl file to JavaScript
     "fl_compile_file": (inputPath, outputPath) => {
       try {
-        const source = fs10.readFileSync(inputPath, "utf-8");
+        const source = fs11.readFileSync(inputPath, "utf-8");
         const tokens = lex(source);
         const ast = parse(tokens);
         const js = cg.generate(ast, {
@@ -34240,11 +34577,11 @@ function createCompileModule() {
           minify: false,
           target: "node"
         });
-        const dir = path11.dirname(outputPath);
-        if (dir !== "." && !fs10.existsSync(dir)) {
-          fs10.mkdirSync(dir, { recursive: true });
+        const dir = path12.dirname(outputPath);
+        if (dir !== "." && !fs11.existsSync(dir)) {
+          fs11.mkdirSync(dir, { recursive: true });
         }
-        fs10.writeFileSync(outputPath, js, "utf-8");
+        fs11.writeFileSync(outputPath, js, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`fl_compile_file failed for '${inputPath}': ${err4.message}`);
@@ -34254,16 +34591,16 @@ function createCompileModule() {
     // Compile all .fl files in a directory
     "fl_compile": (srcDir, distDir) => {
       try {
-        const absDir = path11.resolve(srcDir);
-        const absOut = path11.resolve(distDir);
-        const files = fs10.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path11.join(absDir, f));
+        const absDir = path12.resolve(srcDir);
+        const absOut = path12.resolve(distDir);
+        const files = fs11.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path12.join(absDir, f));
         let compiled = 0;
         let failed = 0;
         const errors = [];
         for (const file of files) {
-          const outFile = path11.join(absOut, path11.basename(file, ".fl") + ".js");
+          const outFile = path12.join(absOut, path12.basename(file, ".fl") + ".js");
           try {
-            const source = fs10.readFileSync(file, "utf-8");
+            const source = fs11.readFileSync(file, "utf-8");
             const tokens = lex(source);
             const ast = parse(tokens);
             const js = cg.generate(ast, {
@@ -34272,15 +34609,15 @@ function createCompileModule() {
               minify: false,
               target: "node"
             });
-            const dir = path11.dirname(outFile);
-            if (dir !== "." && !fs10.existsSync(dir)) {
-              fs10.mkdirSync(dir, { recursive: true });
+            const dir = path12.dirname(outFile);
+            if (dir !== "." && !fs11.existsSync(dir)) {
+              fs11.mkdirSync(dir, { recursive: true });
             }
-            fs10.writeFileSync(outFile, js, "utf-8");
+            fs11.writeFileSync(outFile, js, "utf-8");
             compiled++;
           } catch (err4) {
             failed++;
-            errors.push(`${path11.basename(file)}: ${err4.message}`);
+            errors.push(`${path12.basename(file)}: ${err4.message}`);
           }
         }
         return { compiled, failed, errors };
@@ -34926,13 +35263,13 @@ function createMiddlewareModule() {
 }
 
 // src/stdlib-table.ts
-var fs11 = __toESM(require("fs"));
+var fs12 = __toESM(require("fs"));
 function createTableModule() {
   return {
     // table_load_csv(path) → {headers, rows}
     "table_load_csv": (filePath) => {
       try {
-        const content = fs11.readFileSync(filePath, "utf-8");
+        const content = fs12.readFileSync(filePath, "utf-8");
         const lines = content.split("\n").filter((l) => l.trim());
         const headers = lines[0].split(",").map((h) => h.trim());
         const rows = lines.slice(1).map((line) => {
@@ -34952,7 +35289,7 @@ function createTableModule() {
     // table_load_json(path) → {headers, rows}
     "table_load_json": (filePath) => {
       try {
-        const content = fs11.readFileSync(filePath, "utf-8");
+        const content = fs12.readFileSync(filePath, "utf-8");
         const data = JSON.parse(content);
         if (!Array.isArray(data)) {
           throw new Error("JSON must be array of objects");
@@ -34972,7 +35309,7 @@ function createTableModule() {
             (row) => data.headers.map((h) => row[h] ?? "").join(",")
           )
         ].join("\n");
-        fs11.writeFileSync(filePath, csv, "utf-8");
+        fs12.writeFileSync(filePath, csv, "utf-8");
         return true;
       } catch (err4) {
         throw new Error(`table_save_csv failed: ${err4.message}`);
@@ -35689,15 +36026,15 @@ function requireModule(name, interp2) {
 }
 
 // src/stdlib-image.ts
-var fs12 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
+var fs13 = __toESM(require("fs"));
+var path13 = __toESM(require("path"));
 var os3 = __toESM(require("os"));
 var crypto3 = __toESM(require("crypto"));
 var import_child_process9 = require("child_process");
 function tmpPath(ext) {
-  const dir = path12.join(os3.tmpdir(), "fl-images");
-  if (!fs12.existsSync(dir)) fs12.mkdirSync(dir, { recursive: true });
-  return path12.join(dir, crypto3.randomBytes(8).toString("hex") + ext);
+  const dir = path13.join(os3.tmpdir(), "fl-images");
+  if (!fs13.existsSync(dir)) fs13.mkdirSync(dir, { recursive: true });
+  return path13.join(dir, crypto3.randomBytes(8).toString("hex") + ext);
 }
 function im(args3) {
   const r = (0, import_child_process9.spawnSync)("convert", args3, { timeout: 3e4 });
@@ -35720,7 +36057,7 @@ function identify(filePath) {
   }
   const out = r.stdout?.toString().trim() ?? "";
   const match = out.match(/^(\d+)x(\d+)\s+(\S+)\s+(.+)$/);
-  const stat = fs12.existsSync(filePath) ? fs12.statSync(filePath).size : 0;
+  const stat = fs13.existsSync(filePath) ? fs13.statSync(filePath).size : 0;
   m.set("width", match ? parseInt(match[1]) : 0);
   m.set("height", match ? parseInt(match[2]) : 0);
   m.set("format", match ? match[3].toLowerCase() : "unknown");
@@ -35737,7 +36074,7 @@ function createImageModule() {
     },
     // image_resize path width height → saved_path
     "image_resize": (filePath, width, height) => {
-      const ext = path12.extname(filePath) || ".jpg";
+      const ext = path13.extname(filePath) || ".jpg";
       const out = tmpPath(ext);
       im([filePath, "-resize", `${Math.floor(width)}x${Math.floor(height)}>`, out]);
       return out;
@@ -35758,7 +36095,7 @@ function createImageModule() {
     },
     // image_watermark path text → saved_path
     "image_watermark": (filePath, text) => {
-      const ext = path12.extname(filePath) || ".jpg";
+      const ext = path13.extname(filePath) || ".jpg";
       const out = tmpPath(ext);
       im([
         filePath,
@@ -35777,7 +36114,7 @@ function createImageModule() {
     },
     // image_crop path x y width height → saved_path
     "image_crop": (filePath, x, y, w, h) => {
-      const ext = path12.extname(filePath) || ".jpg";
+      const ext = path13.extname(filePath) || ".jpg";
       const out = tmpPath(ext);
       im([filePath, "-crop", `${Math.floor(w)}x${Math.floor(h)}+${Math.floor(x)}+${Math.floor(y)}`, "+repage", out]);
       return out;
@@ -37700,11 +38037,13 @@ function loadAllStdlib(interp2) {
   const fileModule = createFileModule();
   const fdModule = createFdModule();
   const bitsModule = createBitsModule();
+  const binaryModule = createBinaryModule();
   const errorModule = createErrorModule();
   const httpModule = createHttpModule();
   interp2.registerModule(fileModule);
   interp2.registerModule(fdModule);
   interp2.registerModule(bitsModule);
+  interp2.registerModule(binaryModule);
   interp2.registerModule(createTimerModule(interp2));
   interp2.registerModule(errorModule);
   interp2.registerModule(httpModule);
@@ -37826,12 +38165,12 @@ function loadAllStdlib(interp2) {
     // 상대경로: 현재 실행 파일 기준이 아닌 process.cwd() 기준
     // 이미 로드된 파일은 캐싱으로 중복 실행 방지 (importedFiles 공유)
     "fl_load": (filePath) => {
-      const fs20 = require("fs");
-      const path18 = require("path");
+      const fs21 = require("fs");
+      const path19 = require("path");
       const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
       const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
-      const resolved = path18.isAbsolute(filePath) ? filePath : path18.resolve(process.cwd(), filePath);
-      if (!fs20.existsSync(resolved)) {
+      const resolved = path19.isAbsolute(filePath) ? filePath : path19.resolve(process.cwd(), filePath);
+      if (!fs21.existsSync(resolved)) {
         console.error(`\u274C [fl_load] \uD30C\uC77C \uC5C6\uC74C: ${resolved}`);
         return false;
       }
@@ -37840,7 +38179,7 @@ function loadAllStdlib(interp2) {
       loadedFiles.add(resolved);
       interp2.importedFiles = loadedFiles;
       try {
-        const src = fs20.readFileSync(resolved, "utf-8");
+        const src = fs21.readFileSync(resolved, "utf-8");
         interp2.interpret(parse3(lex2(src)));
         return true;
       } catch (e) {
@@ -37852,18 +38191,18 @@ function loadAllStdlib(interp2) {
   });
   const _aliases = {
     // ── get-in / assoc-in / update-in (깊은 접근 + 업데이트) ─────────────────
-    "get-in": (m, path18) => {
+    "get-in": (m, path19) => {
       let cur = m;
-      for (const k of path18) {
+      for (const k of path19) {
         if (cur === null || cur === void 0) return null;
         cur = cur instanceof Map ? cur.get(k) ?? cur.get(String(k)) ?? null : cur?.[k] ?? null;
       }
       return cur ?? null;
     },
-    "assoc-in": (m, path18, val) => {
-      if (!path18 || path18.length === 0) return val;
-      const key = path18[0];
-      const rest = path18.slice(1);
+    "assoc-in": (m, path19, val) => {
+      if (!path19 || path19.length === 0) return val;
+      const key = path19[0];
+      const rest = path19.slice(1);
       const child = m instanceof Map ? m.get(key) ?? m.get(String(key)) : m?.[key];
       const updated = rest.length > 0 ? _aliases["assoc-in"](child ?? /* @__PURE__ */ new Map(), rest, val) : val;
       if (m instanceof Map) {
@@ -37873,8 +38212,8 @@ function loadAllStdlib(interp2) {
       }
       return Object.assign({}, m ?? {}, { [String(key)]: updated });
     },
-    "update-in": (m, path18, fn, ...args3) => {
-      const cur = _aliases["get-in"](m, path18);
+    "update-in": (m, path19, fn, ...args3) => {
+      const cur = _aliases["get-in"](m, path19);
       let newVal;
       if (typeof fn === "function") {
         newVal = fn(cur, ...args3);
@@ -37887,7 +38226,7 @@ function loadAllStdlib(interp2) {
       } else {
         newVal = cur;
       }
-      return _aliases["assoc-in"](m, path18, newVal);
+      return _aliases["assoc-in"](m, path19, newVal);
     },
     // ── format (sprintf 스타일) ──────────────────────────────────────────────
     // (format "%.2f" 3.14) → "3.14"  (format "%d items" 5) → "5 items"
@@ -39562,7 +39901,7 @@ function callAsyncFunctionValue(interp2, fn, args3) {
   if (fn.kind !== "async-function-value") {
     throw new Error(`Expected async-function-value, got ${fn.kind}`);
   }
-  return new FreeLangPromise((resolve8, reject) => {
+  return new FreeLangPromise((resolve9, reject) => {
     const savedStack = interp2.context.variables.saveStack();
     try {
       interp2.context.variables.fromSnapshot(fn.capturedEnv);
@@ -39571,9 +39910,9 @@ function callAsyncFunctionValue(interp2, fn, args3) {
       }
       const result = interp2.eval(fn.body);
       if (result instanceof FreeLangPromise) {
-        result.then((value) => resolve8(value)).catch((error) => reject(error));
+        result.then((value) => resolve9(value)).catch((error) => reject(error));
       } else {
-        resolve8(result);
+        resolve9(result);
       }
     } catch (error) {
       reject(error);
@@ -41023,9 +41362,9 @@ var Interpreter = class _Interpreter {
   // array util만 로드하고, Maybe/Result는 TS 내장 + ts-compat helper를 제공
   loadFlStdlib() {
     try {
-      const stdlibPath = path13.join(__dirname, "freelang-stdlib.fl");
-      if (!fs13.existsSync(stdlibPath)) return;
-      const src = fs13.readFileSync(stdlibPath, "utf-8");
+      const stdlibPath = path14.join(__dirname, "freelang-stdlib.fl");
+      if (!fs14.existsSync(stdlibPath)) return;
+      const src = fs14.readFileSync(stdlibPath, "utf-8");
       this.interpret(parse(lex(src)));
     } catch {
     }
@@ -41872,7 +42211,7 @@ var Interpreter = class _Interpreter {
   }
   handleRouteBlock(block) {
     const method = this.getFieldValue(block, "method", "GET");
-    const path18 = this.getFieldValue(block, "path", "/");
+    const path19 = this.getFieldValue(block, "path", "/");
     const handler = block.fields.get("handler");
     if (!handler) {
       throw new Error(`[ROUTE ${block.name}] Missing :handler`);
@@ -41880,7 +42219,7 @@ var Interpreter = class _Interpreter {
     this.context.routes.set(block.name, {
       name: block.name,
       method: method.toLowerCase(),
-      path: path18,
+      path: path19,
       handler
     });
   }
@@ -43582,8 +43921,8 @@ function formatTypeIssues(issues, filePath) {
 init_debugger();
 
 // src/hot-reload.ts
-var fs14 = __toESM(require("fs"));
-var path14 = __toESM(require("path"));
+var fs15 = __toESM(require("fs"));
+var path15 = __toESM(require("path"));
 init_lexer();
 init_parser();
 function createDebounce(ms) {
@@ -43613,7 +43952,7 @@ var FileWatcher = class {
     const onReload = opts?.onReload;
     const onError = opts?.onError;
     const debounced = createDebounce(debounceMs);
-    const basename4 = path14.basename(file);
+    const basename4 = path15.basename(file);
     const handleChange = () => {
       debounced(() => {
         if (clearConsole) {
@@ -43636,14 +43975,14 @@ var FileWatcher = class {
     let lastMtime = 0;
     let lastSize = -1;
     try {
-      const st = fs14.statSync(file);
+      const st = fs15.statSync(file);
       lastMtime = st.mtimeMs;
       lastSize = st.size;
     } catch (_e) {
     }
     const interval = setInterval(() => {
       try {
-        const st = fs14.statSync(file);
+        const st = fs15.statSync(file);
         if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
           lastMtime = st.mtimeMs;
           lastSize = st.size;
@@ -43674,7 +44013,7 @@ var FileWatcher = class {
     const regex = new RegExp(ext.replace(".", "\\.") + "$");
     let watcher = null;
     try {
-      watcher = fs14.watch(dir, (_event, filename) => {
+      watcher = fs15.watch(dir, (_event, filename) => {
         if (!filename) return;
         if (!regex.test(filename)) return;
         debounced(() => {
@@ -43682,7 +44021,7 @@ var FileWatcher = class {
             process.stdout.write("\x1B[2J\x1B[0f");
           }
           console.log(`\x1B[36m[RELOAD]\x1B[0m ${filename} changed`);
-          const fullPath = path14.join(dir, filename);
+          const fullPath = path15.join(dir, filename);
           if (onReload) {
             try {
               onReload(fullPath);
@@ -43724,10 +44063,10 @@ var FileWatcher = class {
   }
 };
 function runWithWatch(file, opts) {
-  const absPath = path14.resolve(file);
+  const absPath = path15.resolve(file);
   function executeFile() {
     try {
-      const source = fs14.readFileSync(absPath, "utf-8");
+      const source = fs15.readFileSync(absPath, "utf-8");
       const tokens = lex(source);
       const ast = parse(tokens);
       const interp2 = new Interpreter();
@@ -43749,7 +44088,7 @@ function runWithWatch(file, opts) {
       if (opts?.onError) {
         opts.onError(file, e);
       } else {
-        console.error(`\x1B[31m[ERROR]\x1B[0m ${path14.basename(absPath)}: ${e.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m ${path15.basename(absPath)}: ${e.message}`);
       }
     }
   }
@@ -43761,7 +44100,7 @@ function runWithWatch(file, opts) {
       executeFile();
     }
   };
-  console.log(`\x1B[2m  watching ${path14.basename(absPath)}...\x1B[0m`);
+  console.log(`\x1B[2m  watching ${path15.basename(absPath)}...\x1B[0m`);
   watcher.watch(absPath, mergedOpts);
 }
 
@@ -44013,7 +44352,7 @@ function toAnchor(name) {
 }
 
 // src/ci-runner.ts
-var fs15 = __toESM(require("fs"));
+var fs16 = __toESM(require("fs"));
 init_linter();
 var CIPipeline = class {
   constructor(opts = {}) {
@@ -44100,8 +44439,8 @@ function createFmtCheckStep(files) {
       }
       const needsFormat = [];
       for (const f of files) {
-        if (!fs15.existsSync(f)) continue;
-        const src = fs15.readFileSync(f, "utf-8");
+        if (!fs16.existsSync(f)) continue;
+        const src = fs16.readFileSync(f, "utf-8");
         try {
           const formatted = formatFL(src);
           if (src !== formatted) {
@@ -44135,8 +44474,8 @@ function createLintStep(files) {
       const linter = createDefaultLinter();
       const errors = [];
       for (const f of files) {
-        if (!fs15.existsSync(f)) continue;
-        const src = fs15.readFileSync(f, "utf-8");
+        if (!fs16.existsSync(f)) continue;
+        const src = fs16.readFileSync(f, "utf-8");
         const diags = linter.lint(src);
         const errs = diags.filter((d) => d.severity === "error");
         for (const e of errs) {
@@ -44179,8 +44518,8 @@ function createDefaultPipeline(files, opts = {}) {
 }
 
 // src/web/app-router.ts
-var fs16 = __toESM(require("fs"));
-var path15 = __toESM(require("path"));
+var fs17 = __toESM(require("fs"));
+var path16 = __toESM(require("path"));
 var AppRouter = class {
   // W4: not-found.fl 파일
   constructor(appDir = "app") {
@@ -44199,8 +44538,8 @@ var AppRouter = class {
    */
   scanNotFound(dir) {
     try {
-      const notFoundPath = path15.join(dir, "not-found.fl");
-      if (fs16.existsSync(notFoundPath)) {
+      const notFoundPath = path16.join(dir, "not-found.fl");
+      if (fs17.existsSync(notFoundPath)) {
         this.notFoundHandler = notFoundPath;
         console.log(`approuter.not-found file=${notFoundPath}`);
       }
@@ -44211,7 +44550,7 @@ var AppRouter = class {
    * 파일시스템 스캔 시작
    */
   scan() {
-    if (!fs16.existsSync(this.appDir)) {
+    if (!fs17.existsSync(this.appDir)) {
       console.log(`approuter.warn event=app_dir_missing path=${this.appDir}`);
       return;
     }
@@ -44230,9 +44569,9 @@ var AppRouter = class {
    */
   scanDirectory(dir, currentPath = "", phase = "page") {
     try {
-      const entries = fs16.readdirSync(dir, { withFileTypes: true });
+      const entries = fs17.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
-        const fullPath = path15.join(dir, entry.name);
+        const fullPath = path16.join(dir, entry.name);
         const nextPath = currentPath === "" ? "/" + entry.name : currentPath + "/" + entry.name;
         if (entry.isDirectory()) {
           const isRouteGroup = entry.name.startsWith("(") && entry.name.endsWith(")");
@@ -44380,7 +44719,7 @@ var AppRouter = class {
 };
 
 // src/web/fl-executor.ts
-var fs17 = __toESM(require("fs"));
+var fs18 = __toESM(require("fs"));
 var crypto4 = __toESM(require("crypto"));
 init_lexer();
 init_parser();
@@ -44414,7 +44753,7 @@ var FLExecutor = class {
     if (cached && now - cached.timestamp < this.cacheTimeout) {
       return cached.ast;
     }
-    const code = fs17.readFileSync(filePath, "utf-8");
+    const code = fs18.readFileSync(filePath, "utf-8");
     const tokens = lex(code);
     const ast = parse(tokens);
     this.cache.set(filePath, { ast, timestamp: now });
@@ -44445,7 +44784,7 @@ var FLExecutor = class {
    */
   async executePage(filePath, context) {
     try {
-      if (!fs17.existsSync(filePath)) {
+      if (!fs18.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -44495,7 +44834,7 @@ var FLExecutor = class {
    */
   async executeRoute(filePath, context) {
     try {
-      if (!fs17.existsSync(filePath)) {
+      if (!fs18.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -44836,8 +45175,8 @@ var FLExecutor = class {
 var fl_executor_default = FLExecutor;
 
 // src/web/page-renderer.ts
-var fs18 = __toESM(require("fs"));
-var path16 = __toESM(require("path"));
+var fs19 = __toESM(require("fs"));
+var path17 = __toESM(require("path"));
 var PageRenderer = class {
   constructor(executor, buildOutputDir) {
     this.ssrCache = /* @__PURE__ */ new Map();
@@ -44916,13 +45255,13 @@ var PageRenderer = class {
    */
   async renderSSG(context) {
     const cacheKey = this.getCacheKey(context.filePath, context.params);
-    const outputPath = path16.join(
+    const outputPath = path17.join(
       this.buildOutputDir,
       cacheKey.replace(/\//g, "_") + ".html"
     );
-    if (fs18.existsSync(outputPath)) {
-      const html = fs18.readFileSync(outputPath, "utf-8");
-      const stat = fs18.statSync(outputPath);
+    if (fs19.existsSync(outputPath)) {
+      const html = fs19.readFileSync(outputPath, "utf-8");
+      const stat = fs19.statSync(outputPath);
       return {
         html,
         timestamp: stat.mtime.getTime(),
@@ -44931,10 +45270,10 @@ var PageRenderer = class {
       };
     }
     const result = await this.renderSSR(context);
-    if (!fs18.existsSync(this.buildOutputDir)) {
-      fs18.mkdirSync(this.buildOutputDir, { recursive: true });
+    if (!fs19.existsSync(this.buildOutputDir)) {
+      fs19.mkdirSync(this.buildOutputDir, { recursive: true });
     }
-    fs18.writeFileSync(outputPath, result.html, "utf-8");
+    fs19.writeFileSync(outputPath, result.html, "utf-8");
     return result;
   }
   /**
@@ -45198,7 +45537,7 @@ var WebServer = class {
     this.server = http2.createServer(async (req, res) => {
       await this.handleRequest(req, res);
     });
-    return new Promise((resolve8) => {
+    return new Promise((resolve9) => {
       this.server.listen(this.config.port, () => {
         const port = this.config.port;
         const routes = this.router.getRoutes();
@@ -45207,7 +45546,7 @@ var WebServer = class {
         for (const route of routes) {
           console.log(`server.route path=${route.path} file=${route.filePath}`);
         }
-        resolve8(msg);
+        resolve9(msg);
       });
     });
   }
@@ -45472,7 +45811,7 @@ function mapJsError(msg) {
   return msg;
 }
 function formatError(err4, source, filePath, callStack) {
-  const fileName = filePath ? path17.basename(filePath) : "<stdin>";
+  const fileName = filePath ? path18.basename(filePath) : "<stdin>";
   const lines = [];
   if (err4 instanceof ParserError) {
     lines.push(`
@@ -45518,7 +45857,7 @@ function checkSource(source, filePath) {
   try {
     const tokens = lex(source);
     parse(tokens);
-    const fileName = filePath ? path17.basename(filePath) : "<stdin>";
+    const fileName = filePath ? path18.basename(filePath) : "<stdin>";
     console.log(`\x1B[32m\u2713\x1B[0m  ${fileName}  \uBB38\uBC95 \uC774\uC0C1 \uC5C6\uC74C`);
     return true;
   } catch (err4) {
@@ -45531,26 +45870,26 @@ function flPidFile(absPath) {
   return `/tmp/fl_${safe}.pid`;
 }
 function cmdRun(filePath, watch2, extraArgs = []) {
-  const absPath = path17.resolve(filePath);
+  const absPath = path18.resolve(filePath);
   const vmBench = extraArgs.includes("--vm-bench");
-  if (!fs19.existsSync(absPath)) {
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   const pidFile = flPidFile(absPath);
   try {
-    fs19.writeFileSync(pidFile, `${process.pid}
+    fs20.writeFileSync(pidFile, `${process.pid}
 ${absPath}`);
   } catch {
   }
   process.on("exit", () => {
     try {
-      fs19.unlinkSync(pidFile);
+      fs20.unlinkSync(pidFile);
     } catch {
     }
   });
   function execute() {
-    const source = fs19.readFileSync(absPath, "utf-8");
+    const source = fs20.readFileSync(absPath, "utf-8");
     let ctx;
     try {
       const tokens = lex(source);
@@ -45581,7 +45920,7 @@ ${absPath}`);
   if (vmBench) {
     console.log("\n\x1B[36m[vm-bench] \uC131\uB2A5 \uCE21\uC815 \uC2DC\uC791...\x1B[0m");
     const ITERATIONS = 100;
-    const source = fs19.readFileSync(absPath, "utf-8");
+    const source = fs20.readFileSync(absPath, "utf-8");
     const t0 = performance.now();
     for (let i = 0; i < ITERATIONS; i++) {
       delete process.env.FL_VM;
@@ -45630,19 +45969,19 @@ ${absPath}`);
     if (!watch2) return;
   }
   if (!watch2 && !vmBench && !process.env.FL_NO_HINT) {
-    const isServerFile = fs19.readFileSync(absPath, "utf-8").includes("server_start");
+    const isServerFile = fs20.readFileSync(absPath, "utf-8").includes("server_start");
     if (isServerFile) {
-      process.stderr.write(`\x1B[2m\u{1F4A1}  \uAC1C\uBC1C \uC911\uC5D0\uB294: freelang watch ${path17.basename(absPath)}\x1B[0m
+      process.stderr.write(`\x1B[2m\u{1F4A1}  \uAC1C\uBC1C \uC911\uC5D0\uB294: freelang watch ${path18.basename(absPath)}\x1B[0m
 `);
     }
   }
   execute();
   if (watch2) {
-    console.log(`\x1B[2m  watching ${path17.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
+    console.log(`\x1B[2m  watching ${path18.basename(absPath)}... (dev mode: browser auto-reload enabled)\x1B[0m`);
     let lastMtime = 0;
     let lastSize = -1;
     try {
-      const st = fs19.statSync(absPath);
+      const st = fs20.statSync(absPath);
       lastMtime = st.mtimeMs;
       lastSize = st.size;
     } catch (_e) {
@@ -45650,7 +45989,7 @@ ${absPath}`);
     let debounce = null;
     setInterval(() => {
       try {
-        const st = fs19.statSync(absPath);
+        const st = fs20.statSync(absPath);
         if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
           lastMtime = st.mtimeMs;
           lastSize = st.size;
@@ -45667,14 +46006,14 @@ ${absPath}`);
   }
 }
 function cmdProps(filePath, extraArgs) {
-  const absPath = path17.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path18.resolve(filePath);
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   const samplesIdx = extraArgs.indexOf("--samples");
   const samplesOverride = samplesIdx >= 0 ? parseInt(extraArgs[samplesIdx + 1], 10) : void 0;
-  const source = fs19.readFileSync(absPath, "utf-8");
+  const source = fs20.readFileSync(absPath, "utf-8");
   try {
     const tokens = lex(source);
     const ast = parse(tokens);
@@ -45684,11 +46023,11 @@ function cmdProps(filePath, extraArgs) {
   } catch (err4) {
   }
   if (propRegistry.size === 0) {
-    console.log(`\x1B[33m[props]\x1B[0m  ${path17.basename(absPath)} \u2014 defprop \uC5C6\uC74C`);
+    console.log(`\x1B[33m[props]\x1B[0m  ${path18.basename(absPath)} \u2014 defprop \uC5C6\uC74C`);
     console.log(`\x1B[2m  \uD301: (defprop my-prop {:fn "add" :args [:int :int] :check (fn [$a $b] (= (add $a $b) (add $b $a)))})\x1B[0m`);
     return;
   }
-  console.log(`\x1B[36m[props]\x1B[0m  ${path17.basename(absPath)} \u2014 ${propRegistry.size}\uAC1C property \uC2E4\uD589
+  console.log(`\x1B[36m[props]\x1B[0m  ${path18.basename(absPath)} \u2014 ${propRegistry.size}\uAC1C property \uC2E4\uD589
 `);
   let interp2;
   try {
@@ -45741,12 +46080,12 @@ function cmdProps(filePath, extraArgs) {
   if (exitCode) process.exit(exitCode);
 }
 function cmdCheck(filePath) {
-  const absPath = path17.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path18.resolve(filePath);
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const source = fs19.readFileSync(absPath, "utf-8");
+  const source = fs20.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
   const { metaMissing, effectsWarn } = checkDefnMeta(source, absPath);
@@ -45754,7 +46093,7 @@ function cmdCheck(filePath) {
   if (metaMissing.length > 0) {
     hasWarnings = true;
     process.stderr.write(`
-\x1B[33m[meta-check]\x1B[0m  ${path17.basename(absPath)} \u2014 ${metaMissing.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
+\x1B[33m[meta-check]\x1B[0m  ${path18.basename(absPath)} \u2014 ${metaMissing.length}\uAC1C \uD568\uC218\uC5D0 \uBA54\uD0C0 \uC5C6\uC74C
 `);
     for (const w of metaMissing) {
       process.stderr.write(`  \x1B[33m\u26A0\x1B[0m  line ${w.line}: \x1B[1m${w.name}\x1B[0m \u2014 :context/:returns \uC5C6\uC74C
@@ -45768,7 +46107,7 @@ function cmdCheck(filePath) {
   if (pureErrors.length > 0) {
     hasWarnings = true;
     process.stderr.write(`
-\x1B[31m[pure-violation]\x1B[0m  ${path17.basename(absPath)} \u2014 ${pureErrors.length}\uAC1C ^pure \uD568\uC218\uC5D0\uC11C side effect \uBC1C\uACAC
+\x1B[31m[pure-violation]\x1B[0m  ${path18.basename(absPath)} \u2014 ${pureErrors.length}\uAC1C ^pure \uD568\uC218\uC5D0\uC11C side effect \uBC1C\uACAC
 `);
     for (const w of pureErrors) {
       const hint = w.undeclared.map((e) => `:${e}`).join(" ");
@@ -45781,7 +46120,7 @@ function cmdCheck(filePath) {
   if (effectsOnly.length > 0) {
     hasWarnings = true;
     process.stderr.write(`
-\x1B[33m[effects-check]\x1B[0m  ${path17.basename(absPath)} \u2014 ${effectsOnly.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
+\x1B[33m[effects-check]\x1B[0m  ${path18.basename(absPath)} \u2014 ${effectsOnly.length}\uAC1C \uD568\uC218\uC5D0 \uBBF8\uC120\uC5B8 effect
 `);
     for (const w of effectsOnly) {
       const hint = w.undeclared.map((e) => `:${e}`).join(" ");
@@ -45795,7 +46134,7 @@ function cmdCheck(filePath) {
     process.stderr.write(formatTypeIssues([...typeErrors, ...typeWarns], absPath) + "\n\n");
     if (typeErrors.length > 0) process.exit(1);
   } else if (fnCount > 0) {
-    console.log(`\x1B[36m[type-check]\x1B[0m  ${path17.basename(absPath)}  \uD0C0\uC785 \uC774\uC0C1 \uC5C6\uC74C (\uD568\uC218 ${fnCount}\uAC1C \uBD84\uC11D)`);
+    console.log(`\x1B[36m[type-check]\x1B[0m  ${path18.basename(absPath)}  \uD0C0\uC785 \uC774\uC0C1 \uC5C6\uC74C (\uD568\uC218 ${fnCount}\uAC1C \uBD84\uC11D)`);
   }
 }
 function checkDefnMeta(source, filePath) {
@@ -45883,13 +46222,13 @@ function cmdCodegen(args3) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: codegen <file.fl>`);
     process.exit(1);
   }
-  const absInput = path17.resolve(inputFile);
-  if (!fs19.existsSync(absInput)) {
+  const absInput = path18.resolve(inputFile);
+  if (!fs20.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs19.readFileSync(absInput, "utf-8");
+    const source = fs20.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -45906,7 +46245,7 @@ function cmdCodegen(args3) {
       }
     }
   } catch (err4) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs19.readFileSync(absInput, "utf-8"), absInput)}`);
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs20.readFileSync(absInput, "utf-8"), absInput)}`);
     process.exit(1);
   }
 }
@@ -45920,13 +46259,13 @@ function cmdCompile(args3) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> [-o <out.js>]`);
     process.exit(1);
   }
-  const absInput = path17.resolve(inputFile);
-  if (!fs19.existsSync(absInput)) {
+  const absInput = path18.resolve(inputFile);
+  if (!fs20.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs19.readFileSync(absInput, "utf-8");
+    const source = fs20.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -45937,18 +46276,18 @@ function cmdCompile(args3) {
       target: "node"
     });
     if (outputFile) {
-      const absOutput = path17.resolve(outputFile);
-      const dir = path17.dirname(absOutput);
-      if (dir !== "." && !fs19.existsSync(dir)) {
-        fs19.mkdirSync(dir, { recursive: true });
+      const absOutput = path18.resolve(outputFile);
+      const dir = path18.dirname(absOutput);
+      if (dir !== "." && !fs20.existsSync(dir)) {
+        fs20.mkdirSync(dir, { recursive: true });
       }
-      fs19.writeFileSync(absOutput, js, "utf-8");
-      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path17.basename(inputFile)} \u2192 ${outputFile}`);
+      fs20.writeFileSync(absOutput, js, "utf-8");
+      console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path18.basename(inputFile)} \u2192 ${outputFile}`);
     } else {
       process.stdout.write(js);
     }
   } catch (err4) {
-    console.error(formatError(err4, fs19.readFileSync(absInput, "utf-8"), absInput));
+    console.error(formatError(err4, fs20.readFileSync(absInput, "utf-8"), absInput));
     process.exit(1);
   }
 }
@@ -45958,8 +46297,8 @@ function cmdRepl() {
   const historyPath = (() => {
     try {
       const os4 = require("os");
-      const path18 = require("path");
-      return path18.join(os4.homedir(), ".fl_history");
+      const path19 = require("path");
+      return path19.join(os4.homedir(), ".fl_history");
     } catch {
       return null;
     }
@@ -45967,9 +46306,9 @@ function cmdRepl() {
   let initialHistory = [];
   if (historyPath) {
     try {
-      const fs20 = require("fs");
-      if (fs20.existsSync(historyPath)) {
-        initialHistory = fs20.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
+      const fs21 = require("fs");
+      if (fs21.existsSync(historyPath)) {
+        initialHistory = fs21.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
       }
     } catch {
     }
@@ -46152,8 +46491,8 @@ function cmdRepl() {
     }
     if (historyPath && source) {
       try {
-        const fs20 = require("fs");
-        fs20.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
+        const fs21 = require("fs");
+        fs21.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
       } catch {
       }
     }
@@ -46243,32 +46582,32 @@ function cmdFmt(args3) {
   }
   let needsChange = false;
   for (const filePath of filePaths) {
-    const absPath = path17.resolve(filePath);
-    if (!fs19.existsSync(absPath)) {
+    const absPath = path18.resolve(filePath);
+    if (!fs20.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
       process.exit(1);
     }
-    const src = fs19.readFileSync(absPath, "utf-8");
+    const src = fs20.readFileSync(absPath, "utf-8");
     let formatted;
     try {
       formatted = formatFL(src);
     } catch (err4) {
-      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path17.basename(absPath)}: ${err4.message}`);
+      console.error(`\x1B[31m\uD3EC\uB9F7 \uC624\uB958\x1B[0m  ${path18.basename(absPath)}: ${err4.message}`);
       process.exit(1);
     }
     if (checkMode) {
       if (src !== formatted) {
-        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path17.basename(absPath)}`);
+        console.log(`\x1B[33m\uBCC0\uACBD \uD544\uC694\x1B[0m  ${path18.basename(absPath)}`);
         needsChange = true;
       } else {
-        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path17.basename(absPath)}`);
+        console.log(`\x1B[32m\uC774\uBBF8 \uD3EC\uB9F7\uB428\x1B[0m  ${path18.basename(absPath)}`);
       }
     } else {
       if (src !== formatted) {
-        fs19.writeFileSync(absPath, formatted, "utf-8");
-        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path17.basename(absPath)}`);
+        fs20.writeFileSync(absPath, formatted, "utf-8");
+        console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path18.basename(absPath)}`);
       } else {
-        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path17.basename(absPath)}`);
+        console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path18.basename(absPath)}`);
       }
     }
   }
@@ -46277,8 +46616,8 @@ function cmdFmt(args3) {
   }
 }
 function cmdDebug(filePath, stepMode) {
-  const absPath = path17.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path18.resolve(filePath);
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
@@ -46286,11 +46625,11 @@ function cmdDebug(filePath, stepMode) {
   session.enabled = true;
   session.stepMode = stepMode;
   setGlobalDebugSession(session);
-  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path17.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
+  console.log(`\x1B[35m[FreeLang Debugger]\x1B[0m  ${path18.basename(absPath)}${stepMode ? "  (step mode)" : ""}`);
   console.log(`\x1B[2m  (break!) \uC704\uCE58\uC5D0\uC11C \uC911\uB2E8\uC810 \uBC1C\uC0DD\x1B[0m`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   try {
-    const source = fs19.readFileSync(absPath, "utf-8");
+    const source = fs20.readFileSync(absPath, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const interp2 = new Interpreter();
@@ -46316,14 +46655,14 @@ async function cmdCi(ciArgs) {
   const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
   let targetFiles;
   if (filePaths.length > 0) {
-    targetFiles = filePaths.map((f) => path17.resolve(f)).filter((f) => fs19.existsSync(f));
+    targetFiles = filePaths.map((f) => path18.resolve(f)).filter((f) => fs20.existsSync(f));
     if (targetFiles.length === 0) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC9C0\uC815\uD55C \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
   } else {
     const cwd2 = process.cwd();
-    targetFiles = fs19.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path17.join(cwd2, f));
+    targetFiles = fs20.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path18.join(cwd2, f));
   }
   console.log(`\x1B[36m[FreeLang CI]\x1B[0m  \uD30C\uC77C ${targetFiles.length}\uAC1C  fail-fast=${!noFailFast}`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
@@ -46348,27 +46687,27 @@ function cmdDoc(docArgs) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  --dir \uB4A4\uC5D0 \uB514\uB809\uD1A0\uB9AC \uACBD\uB85C\uB97C \uC9C0\uC815\uD558\uC138\uC694`);
       process.exit(1);
     }
-    const absDir = path17.resolve(dirPath);
-    if (!fs19.existsSync(absDir) || !fs19.statSync(absDir).isDirectory()) {
+    const absDir = path18.resolve(dirPath);
+    if (!fs20.existsSync(absDir) || !fs20.statSync(absDir).isDirectory()) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       process.exit(1);
     }
-    const flFiles = fs19.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path17.join(absDir, f));
+    const flFiles = fs20.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path18.join(absDir, f));
     if (flFiles.length === 0) {
       console.error(`\x1B[33m\uACBD\uACE0\x1B[0m  .fl \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       return;
     }
     const allEntries = [];
     for (const filePath2 of flFiles) {
-      const src2 = fs19.readFileSync(filePath2, "utf-8");
+      const src2 = fs20.readFileSync(filePath2, "utf-8");
       allEntries.push(...extractDocs(src2));
     }
-    const title2 = path17.basename(absDir) + " API \uBB38\uC11C";
+    const title2 = path18.basename(absDir) + " API \uBB38\uC11C";
     const md2 = renderMarkdown(allEntries, title2);
     const outIdx2 = docArgs.indexOf("-o");
     if (outIdx2 !== -1 && docArgs[outIdx2 + 1]) {
-      const outPath = path17.resolve(docArgs[outIdx2 + 1]);
-      fs19.writeFileSync(outPath, md2, "utf-8");
+      const outPath = path18.resolve(docArgs[outIdx2 + 1]);
+      fs20.writeFileSync(outPath, md2, "utf-8");
       console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${allEntries.length}\uAC1C \uD56D\uBAA9)`);
     } else {
       process.stdout.write(md2);
@@ -46381,19 +46720,19 @@ function cmdDoc(docArgs) {
     process.exit(1);
   }
   const filePath = filePaths[0];
-  const absPath = path17.resolve(filePath);
-  if (!fs19.existsSync(absPath)) {
+  const absPath = path18.resolve(filePath);
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const src = fs19.readFileSync(absPath, "utf-8");
+  const src = fs20.readFileSync(absPath, "utf-8");
   const entries = extractDocs(src);
-  const title = path17.basename(absPath, ".fl") + " API \uBB38\uC11C";
+  const title = path18.basename(absPath, ".fl") + " API \uBB38\uC11C";
   const md = renderMarkdown(entries, title);
   const outIdx = docArgs.indexOf("-o");
   if (outIdx !== -1 && docArgs[outIdx + 1]) {
-    const outPath = path17.resolve(docArgs[outIdx + 1]);
-    fs19.writeFileSync(outPath, md, "utf-8");
+    const outPath = path18.resolve(docArgs[outIdx + 1]);
+    fs20.writeFileSync(outPath, md, "utf-8");
     console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${entries.length}\uAC1C \uD56D\uBAA9)`);
   } else {
     process.stdout.write(md);
@@ -46404,11 +46743,11 @@ function cmdBuild(buildArgs2) {
   const isStatic = buildArgs2.includes("--static");
   if (isStatic) {
     let expandDynamicParams = function(dir, paramName) {
-      const paramsFile = path17.join(dir, "generate-static-params.fl");
-      if (!fs19.existsSync(paramsFile)) return [];
+      const paramsFile = path18.join(dir, "generate-static-params.fl");
+      if (!fs20.existsSync(paramsFile)) return [];
       try {
-        const cwdBootstrap2 = path17.resolve(process.cwd(), "bootstrap.js");
-        const bs = fs19.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path17.resolve(__dirname, "bootstrap.js");
+        const cwdBootstrap2 = path18.resolve(process.cwd(), "bootstrap.js");
+        const bs = fs20.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path18.resolve(__dirname, "bootstrap.js");
         const { execSync: execSync2 } = require("child_process");
         const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
         const m = out.match(/\[[\s\S]*\]/);
@@ -46420,20 +46759,20 @@ function cmdBuild(buildArgs2) {
         return [];
       }
     }, walk = function(dir, routeBase) {
-      const entries = fs19.readdirSync(dir, { withFileTypes: true });
+      const entries = fs20.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
-        const full = path17.join(dir, e.name);
+        const full = path18.join(dir, e.name);
         if (e.isDirectory()) {
           if (e.name.startsWith("[") && e.name.endsWith("]")) {
             const paramName = e.name.slice(1, -1);
             const params = expandDynamicParams(full, paramName);
-            const pageFile = path17.join(full, "page.fl");
+            const pageFile = path18.join(full, "page.fl");
             if (params.length === 0) {
-              console.log(`build.skip reason=dynamic_no_params path=/${path17.relative(absApp, full)} param=${paramName}`);
+              console.log(`build.skip reason=dynamic_no_params path=/${path18.relative(absApp, full)} param=${paramName}`);
               continue;
             }
-            if (!fs19.existsSync(pageFile)) {
-              console.log(`build.skip reason=dynamic_no_page path=/${path17.relative(absApp, full)}`);
+            if (!fs20.existsSync(pageFile)) {
+              console.log(`build.skip reason=dynamic_no_page path=/${path18.relative(absApp, full)}`);
               continue;
             }
             for (const p of params) {
@@ -46456,18 +46795,18 @@ function cmdBuild(buildArgs2) {
     const appDir = appIdx !== -1 ? buildArgs2[appIdx + 1] : "app";
     const outDir = outIdx !== -1 ? buildArgs2[outIdx + 1] : "dist";
     const port = portIdx !== -1 ? parseInt(buildArgs2[portIdx + 1], 10) : 43099;
-    const absApp = path17.resolve(appDir);
-    const absOut = path17.resolve(outDir);
-    if (!fs19.existsSync(absApp)) {
+    const absApp = path18.resolve(appDir);
+    const absOut = path18.resolve(outDir);
+    if (!fs20.existsSync(absApp)) {
       console.error(`build.error event=app_not_found path=${appDir}`);
       process.exit(1);
     }
     console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
-    fs19.mkdirSync(absOut, { recursive: true });
+    fs20.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
-    const notFoundFile = path17.join(absApp, "not-found.fl");
-    if (fs19.existsSync(notFoundFile)) {
+    const notFoundFile = path18.join(absApp, "not-found.fl");
+    if (fs20.existsSync(notFoundFile)) {
       pages.push({ filePath: notFoundFile, route: "/__404__" });
     }
     if (pages.length === 0) {
@@ -46476,8 +46815,8 @@ function cmdBuild(buildArgs2) {
     }
     const { spawn } = require("child_process");
     const http3 = require("http");
-    const cwdBootstrap = path17.resolve(process.cwd(), "bootstrap.js");
-    const bootstrap = fs19.existsSync(cwdBootstrap) ? cwdBootstrap : path17.resolve(__dirname, "bootstrap.js");
+    const cwdBootstrap = path18.resolve(process.cwd(), "bootstrap.js");
+    const bootstrap = fs20.existsSync(cwdBootstrap) ? cwdBootstrap : path18.resolve(__dirname, "bootstrap.js");
     const serveProc = spawn(
       "node",
       [bootstrap, "serve", "--app", absApp, "--port", String(port)],
@@ -46485,18 +46824,18 @@ function cmdBuild(buildArgs2) {
     );
     const waitForServer = async () => {
       for (let i = 0; i < 30; i++) {
-        const ready = await new Promise((resolve8) => {
+        const ready = await new Promise((resolve9) => {
           const req = http3.get(
             { host: "localhost", port, path: "/", timeout: 500 },
             (res) => {
               res.destroy();
-              resolve8(true);
+              resolve9(true);
             }
           );
-          req.on("error", () => resolve8(false));
+          req.on("error", () => resolve9(false));
           req.on("timeout", () => {
             req.destroy();
-            resolve8(false);
+            resolve9(false);
           });
         });
         if (ready) return true;
@@ -46504,7 +46843,7 @@ function cmdBuild(buildArgs2) {
       }
       return false;
     };
-    const fetchRoute = (route) => new Promise((resolve8, reject) => {
+    const fetchRoute = (route) => new Promise((resolve9, reject) => {
       const req = http3.get(
         { host: "localhost", port, path: route, timeout: 5e3 },
         (res) => {
@@ -46516,7 +46855,7 @@ function cmdBuild(buildArgs2) {
             if (res.statusCode && res.statusCode >= 400) {
               reject(new Error(`HTTP ${res.statusCode}`));
             } else {
-              resolve8(buf);
+              resolve9(buf);
             }
           });
         }
@@ -46568,10 +46907,10 @@ function cmdBuild(buildArgs2) {
           if (isUseful(out)) html = out;
         }
         if (html) {
-          const outPath = p.route === "/__404__" ? path17.join(absOut, "404.html") : path17.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-          fs19.mkdirSync(path17.dirname(outPath), { recursive: true });
-          fs19.writeFileSync(outPath, html);
-          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path17.relative(process.cwd(), outPath)} bytes=${html.length}`);
+          const outPath = p.route === "/__404__" ? path18.join(absOut, "404.html") : path18.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
+          fs20.mkdirSync(path18.dirname(outPath), { recursive: true });
+          fs20.writeFileSync(outPath, html);
+          console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path18.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
           console.log(`build.page route=${p.route} ok=false`);
@@ -46601,20 +46940,20 @@ function cmdBuild(buildArgs2) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  app \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: fl build --oci <app.fl> --tag <tag>`);
       process.exit(1);
     }
-    const absPath = path17.resolve(appFile);
-    if (!fs19.existsSync(absPath)) {
+    const absPath = path18.resolve(appFile);
+    if (!fs20.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appFile}`);
       process.exit(1);
     }
-    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path17.basename(appFile)} \u2192 ${tag}`);
-    const ociScriptPath = path17.resolve(__dirname, "../vpm/v9-oci.fl");
-    if (!fs19.existsSync(ociScriptPath)) {
+    console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path18.basename(appFile)} \u2192 ${tag}`);
+    const ociScriptPath = path18.resolve(__dirname, "../vpm/v9-oci.fl");
+    if (!fs20.existsSync(ociScriptPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  v9-oci.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
-      const cmd2 = registry ? `node ${path17.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path17.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
+      const cmd2 = registry ? `node ${path18.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag} ${registry}` : `node ${path18.resolve(__dirname, "../src/cli.js")} run ${ociScriptPath} build ${appFile} ${tag}`;
       console.log(`\x1B[2m  Command: ${cmd2}\x1B[0m`);
       execSync2(cmd2, { stdio: "inherit" });
       console.log(`\x1B[32m[OK]\x1B[0m  OCI \uBE4C\uB4DC \uC644\uB8CC: ${tag}`);
@@ -46641,15 +46980,15 @@ function cmdRegistry(registryArgs) {
     }
     console.log(`\x1B[36m[Registry]\x1B[0m  v9 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (\uD3EC\uD2B8 ${port})`);
     console.log(`\x1B[36m[Registry]\x1B[0m  http://localhost:${port}/`);
-    const registryPath = path17.resolve(__dirname, "../vpm/registry-server.fl");
-    if (!fs19.existsSync(registryPath)) {
+    const registryPath = path18.resolve(__dirname, "../vpm/registry-server.fl");
+    if (!fs20.existsSync(registryPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  registry-server.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${registryPath}`);
       process.exit(1);
     }
     const { execSync: execSync2 } = require("child_process");
     try {
       process.env.REGISTRY_PORT = String(port);
-      execSync2(`node ${path17.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
+      execSync2(`node ${path18.resolve(__dirname, "../src/cli.js")} run ${registryPath}`, {
         stdio: "inherit",
         env: { ...process.env, REGISTRY_PORT: String(port) }
       });
@@ -46700,19 +47039,19 @@ function cmdInstall(args3) {
     process.exit(1);
   }
   const homeDir = require("os").homedir();
-  const pluginsDir = path17.resolve(homeDir, ".fl", "plugins");
-  if (!fs19.existsSync(pluginsDir)) {
-    fs19.mkdirSync(pluginsDir, { recursive: true });
+  const pluginsDir = path18.resolve(homeDir, ".fl", "plugins");
+  if (!fs20.existsSync(pluginsDir)) {
+    fs20.mkdirSync(pluginsDir, { recursive: true });
     console.log(`\x1B[36m[Y5]\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uB514\uB809\uD1A0\uB9AC \uC0DD\uC131: ${pluginsDir}`);
   }
-  const localPath = path17.resolve(process.cwd(), "plugins", pluginName + ".fl");
-  const stdlibPath = path17.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
-  const installedPath = path17.resolve(pluginsDir, pluginName + ".fl");
+  const localPath = path18.resolve(process.cwd(), "plugins", pluginName + ".fl");
+  const stdlibPath = path18.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
+  const installedPath = path18.resolve(pluginsDir, pluginName + ".fl");
   let sourceFile = null;
-  if (fs19.existsSync(localPath)) {
+  if (fs20.existsSync(localPath)) {
     sourceFile = localPath;
     console.log(`\x1B[36m[Y5]\x1B[0m  \uB85C\uCEEC \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${localPath}`);
-  } else if (fs19.existsSync(stdlibPath)) {
+  } else if (fs20.existsSync(stdlibPath)) {
     sourceFile = stdlibPath;
     console.log(`\x1B[36m[Y5]\x1B[0m  \uB0B4\uC7A5 stdlib \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${stdlibPath}`);
   } else {
@@ -46723,8 +47062,8 @@ function cmdInstall(args3) {
     process.exit(1);
   }
   try {
-    const content = fs19.readFileSync(sourceFile, "utf-8");
-    fs19.writeFileSync(installedPath, content, "utf-8");
+    const content = fs20.readFileSync(sourceFile, "utf-8");
+    fs20.writeFileSync(installedPath, content, "utf-8");
     console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC124\uCE58 \uC644\uB8CC: ${installedPath}`);
     console.log(`\x1B[2m  \uC0AC\uC6A9: (use ${pluginName})\x1B[0m`);
   } catch (err4) {
@@ -46738,11 +47077,11 @@ function cmdPublish(args3) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: publish <plugin-file.fl>`);
     process.exit(1);
   }
-  if (!fs19.existsSync(filePath)) {
+  if (!fs20.existsSync(filePath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const content = fs19.readFileSync(filePath, "utf-8");
+  const content = fs20.readFileSync(filePath, "utf-8");
   const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
   const versionMatch = content.match(/^;; version:\s*(.+)$/m);
   if (!nameMatch) {
@@ -46757,13 +47096,13 @@ function cmdPublish(args3) {
   console.log(`\x1B[36m[Y5]\x1B[0m  \uBC30\uD3EC \uC911: ${pluginName} (v${version})`);
   try {
     const { execSync: execSync2 } = require("child_process");
-    const tmpDir = path17.resolve("/tmp", `fl-publish-${Date.now()}`);
-    fs19.mkdirSync(tmpDir, { recursive: true });
+    const tmpDir = path18.resolve("/tmp", `fl-publish-${Date.now()}`);
+    fs20.mkdirSync(tmpDir, { recursive: true });
     execSync2("git clone https://gogs.dclub.kr/kim/fl-plugins.git .", {
       cwd: tmpDir,
       stdio: "pipe"
     });
-    fs19.copyFileSync(filePath, path17.resolve(tmpDir, `${pluginName}.fl`));
+    fs20.copyFileSync(filePath, path18.resolve(tmpDir, `${pluginName}.fl`));
     execSync2(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: "pipe" });
     execSync2(
       `git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`,
@@ -46772,7 +47111,7 @@ function cmdPublish(args3) {
     execSync2("git push origin master", { cwd: tmpDir, stdio: "pipe" });
     console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 '${pluginName}' \uAC8C\uC2DC \uC644\uB8CC`);
     console.log(`\x1B[2m  \uC800\uC7A5\uC18C: https://gogs.dclub.kr/kim/fl-plugins\x1B[0m`);
-    fs19.rmSync(tmpDir, { recursive: true, force: true });
+    fs20.rmSync(tmpDir, { recursive: true, force: true });
   } catch (err4) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uBC30\uD3EC \uC2E4\uD328: ${err4.message}`);
     process.exit(1);
@@ -46805,11 +47144,11 @@ function cmdServe(args3) {
       port = parseInt(process.env.PORT, 10);
     } else {
       try {
-        const fs20 = require("fs");
-        const path18 = require("path");
-        const configPath = path18.join(process.cwd(), "fl.config.json");
-        if (fs20.existsSync(configPath)) {
-          const cfg = JSON.parse(fs20.readFileSync(configPath, "utf-8"));
+        const fs21 = require("fs");
+        const path19 = require("path");
+        const configPath = path19.join(process.cwd(), "fl.config.json");
+        if (fs21.existsSync(configPath)) {
+          const cfg = JSON.parse(fs21.readFileSync(configPath, "utf-8"));
           if (cfg.port) port = cfg.port;
         }
       } catch (_e) {
@@ -47118,12 +47457,12 @@ switch (cmd) {
       process.exit(1);
     }
     const noClear = args2.includes("--no-clear");
-    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path17.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
+    console.log(`\x1B[36m[Watch Mode]\x1B[0m  ${path18.basename(filePath)} \u2014 \uBCC0\uACBD \uAC10\uC9C0 \uC2DC \uC790\uB3D9 \uC7AC\uC2E4\uD589`);
     runWithWatch(filePath, {
       clearConsole: !noClear,
       debounceMs: 300,
       onError: (file, err4) => {
-        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path17.basename(file)}: ${err4.message}`);
+        console.error(`\x1B[31m[ERROR]\x1B[0m  ${path18.basename(file)}: ${err4.message}`);
       }
     });
     break;
@@ -47173,7 +47512,7 @@ switch (cmd) {
     const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
     const topN = parseInt(args2[1] ?? "20", 10);
     try {
-      const raw = fs19.readFileSync(logPath, "utf-8").trim();
+      const raw = fs20.readFileSync(logPath, "utf-8").trim();
       if (!raw) {
         console.log("(\uAE30\uB85D\uB41C \uC5D0\uB7EC \uC5C6\uC74C)");
         break;
@@ -47208,7 +47547,7 @@ switch (cmd) {
   case "errors-clear": {
     const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
     try {
-      fs19.unlinkSync(logPath);
+      fs20.unlinkSync(logPath);
       console.log(`\u2713 \uB85C\uADF8 \uC0AD\uC81C: ${logPath}`);
     } catch {
       console.log("(\uB85C\uADF8 \uC5C6\uC74C)");
@@ -47218,7 +47557,7 @@ switch (cmd) {
   case "stop": {
     const target = args2[1];
     if (!target) {
-      const pidFiles = fs19.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
+      const pidFiles = fs20.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
       if (pidFiles.length === 0) {
         console.log("(\uC2E4\uD589 \uC911\uC778 fl \uD504\uB85C\uC138\uC2A4 \uC5C6\uC74C)");
         break;
@@ -47226,17 +47565,17 @@ switch (cmd) {
       let killed = 0;
       for (const pf of pidFiles) {
         try {
-          const content = fs19.readFileSync(`/tmp/${pf}`, "utf-8").trim();
+          const content = fs20.readFileSync(`/tmp/${pf}`, "utf-8").trim();
           const [pidStr, filePath] = content.split("\n");
           const pid = parseInt(pidStr, 10);
           process.kill(pid, "SIGTERM");
-          fs19.unlinkSync(`/tmp/${pf}`);
+          fs20.unlinkSync(`/tmp/${pf}`);
           console.log(`\u2713 \uC885\uB8CC: PID ${pid}  ${filePath ?? pf}`);
           killed++;
         } catch (e) {
           if (e.code === "ESRCH") {
             try {
-              fs19.unlinkSync(`/tmp/${pf}`);
+              fs20.unlinkSync(`/tmp/${pf}`);
             } catch {
             }
             console.log(`\u2713 \uC774\uBBF8 \uC885\uB8CC\uB428: ${pf}`);
@@ -47248,14 +47587,14 @@ switch (cmd) {
       console.log(`
 \uCD1D ${killed}\uAC1C \uC885\uB8CC`);
     } else {
-      const absTarget = path17.resolve(target);
+      const absTarget = path18.resolve(target);
       const pidFile = flPidFile(absTarget);
       try {
-        const content = fs19.readFileSync(pidFile, "utf-8").trim();
+        const content = fs20.readFileSync(pidFile, "utf-8").trim();
         const pid = parseInt(content.split("\n")[0], 10);
         process.kill(pid, "SIGTERM");
         try {
-          fs19.unlinkSync(pidFile);
+          fs20.unlinkSync(pidFile);
         } catch {
         }
         console.log(`\u2713 \uC885\uB8CC: ${target}  (PID ${pid})`);
@@ -47263,7 +47602,7 @@ switch (cmd) {
         if (e.code === "ENOENT") console.log(`(PID \uD30C\uC77C \uC5C6\uC74C \u2014 ${target} \uC774 \uC2E4\uD589 \uC911\uC774\uC9C0 \uC54A\uAC70\uB098 \uC774\uBBF8 \uC885\uB8CC\uB428)`);
         else if (e.code === "ESRCH") {
           try {
-            fs19.unlinkSync(pidFile);
+            fs20.unlinkSync(pidFile);
           } catch {
           }
           console.log(`(\uC774\uBBF8 \uC885\uB8CC\uB428)`);
@@ -47273,7 +47612,7 @@ switch (cmd) {
     break;
   }
   case "ps": {
-    const pidFiles = fs19.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
+    const pidFiles = fs20.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
     if (pidFiles.length === 0) {
       console.log("(\uC2E4\uD589 \uC911\uC778 fl \uD504\uB85C\uC138\uC2A4 \uC5C6\uC74C)");
       break;
@@ -47281,7 +47620,7 @@ switch (cmd) {
     console.log("\n\uC2E4\uD589 \uC911\uC778 FreeLang \uD504\uB85C\uC138\uC2A4:\n");
     for (const pf of pidFiles) {
       try {
-        const content = fs19.readFileSync(`/tmp/${pf}`, "utf-8").trim();
+        const content = fs20.readFileSync(`/tmp/${pf}`, "utf-8").trim();
         const [pidStr, filePath] = content.split("\n");
         const pid = parseInt(pidStr, 10);
         process.kill(pid, 0);
@@ -47290,7 +47629,7 @@ switch (cmd) {
       } catch (e) {
         if (e.code === "ESRCH") {
           try {
-            fs19.unlinkSync(`/tmp/${pf}`);
+            fs20.unlinkSync(`/tmp/${pf}`);
           } catch {
           }
         }

@@ -100,6 +100,15 @@ FRICTION {
     impact: low
     workaround: "(get m 'a') 명시적 접근"
   }
+
+  p12-no-binary-file-io: {
+    what: "바이너리 파일 I/O 없음 — file-read/write가 utf-8 텍스트 전용"
+    example: "file-seek, file-open-fd, file-write-bytes, file-read-bytes 함수 없음"
+    impact: high
+    need: "링 버퍼 시계열 엔진 같은 시스템 레벨 프로젝트 구현 불가"
+    workaround: "JSON 텍스트 또는 SQLite로 우회 (진짜 바이너리 아님)"
+    fix-target: "stdlib에 file-open, file-seek, file-read-bytes, file-write-bytes, file-close 추가"
+  }
 }
 
 CONSTRAINT {
