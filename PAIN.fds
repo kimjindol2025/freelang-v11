@@ -103,11 +103,18 @@ FRICTION {
 
   p12-no-binary-file-io: {
     what: "바이너리 파일 I/O 없음 — file-read/write가 utf-8 텍스트 전용"
-    example: "file-seek, file-open-fd, file-write-bytes, file-read-bytes 함수 없음"
+    status: resolved
+    resolved-by: "stdlib-fd.ts (fd-open/seek/read-bytes/write-bytes/close) + stdlib-binary.ts (buf-f64le 등) 이미 구현"
     impact: high
-    need: "링 버퍼 시계열 엔진 같은 시스템 레벨 프로젝트 구현 불가"
-    workaround: "JSON 텍스트 또는 SQLite로 우회 (진짜 바이너리 아님)"
-    fix-target: "stdlib에 file-open, file-seek, file-read-bytes, file-write-bytes, file-close 추가"
+  }
+
+  p13-define-redefine-warning: {
+    what: "(define x ...) 를 같은 스코프에서 반복하면 재정의 경고 발생"
+    example: "(define store (metric-write store ...)) → ⚠️ store 이미 정의됨"
+    impact: medium
+    need: "불변 패턴 강제로 인해 함수 반환값으로 상태 갱신 시 매번 경고"
+    workaround: "atom + swap! 패턴 사용"
+    fix-target: "FL_V12 모드에서 atom 강제, v11 경고 억제 옵션 또는 let 재바인딩 지원"
   }
 }
 
