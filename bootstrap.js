@@ -15264,7 +15264,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
           sock.destroy();
           return;
         }
-        const _rrConnId = `conn_${++_rrSeq}`;
+        const _rrConnId = `conn_${_rrPort}_${++_rrSeq}`;
         _rrEntry.sockets.add(sock);
         globalThis.__flConnSocks[_rrConnId] = sock;
         const _rrEnq = (evArgs) => {
