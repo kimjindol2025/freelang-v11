@@ -1822,88 +1822,33 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
 
     // (tcp-outbound host port "handler") → upstream-id (즉시 반환, 연결은 비동기)
-    // IO Worker Thread 기반. fl-yield로 이벤트 드레인 필요.
+    // __ensureIoWorker() 기반 (YIELD-SEMANTICS.fds INV-3, INV-4 준수).
     //   handler("connect", upstreamId, "")         — 연결 성공
-    //   handler("data",    upstreamId, chunk)       — 응답 수신
+    //   handler("data",    upstreamId, hexChunk)    — 응답 수신 (hex string)
     //   handler("close",   upstreamId, "")          — 종료
     //   handler("error",   upstreamId, message)     — 연결 실패
     case "tcp-outbound": {
       const _obHost = String(args[0] ?? "localhost");
       const _obPort = Number(args[1] ?? 80);
       const _obHandler = String(args[2] ?? "");
-
-      // IO Worker 초기화 (최초 tcp-outbound 호출 시)
-      if (!(globalThis as any).__flIoWorker) {
-        const { Worker: _IoW } = require("worker_threads");
-        const _ioCtrlBuf = new SharedArrayBuffer(12);   // Int32 × 3
-        const _ioDataBuf = new SharedArrayBuffer(8 * 1024 * 1024);  // 8MB
-        Atomics.store(new Int32Array(_ioCtrlBuf), 0, 0);
-        Atomics.store(new Int32Array(_ioCtrlBuf), 1, 0);
-        Atomics.store(new Int32Array(_ioCtrlBuf), 2, 0);
-        const _ioCode = `
-const{workerData,parentPort}=require('worker_threads');
-const net=require('net');
-const ctrl=new Int32Array(workerData.ctrlBuf);
-const dataBuf=Buffer.from(workerData.dataBuf);
-const BUFSZ=dataBuf.length;
-const ups=new Map();
-function lock(){while(Atomics.compareExchange(ctrl,2,0,1)!==0){}}
-function unlock(){Atomics.store(ctrl,2,0);}
-function push(handler,args){
-  const s=JSON.stringify({handler,args});
-  const b=Buffer.from(s,'utf8');
-  lock();
-  let wp=Atomics.load(ctrl,0);
-  if(wp+4+b.length>BUFSZ){wp=0;}
-  dataBuf.writeUInt32LE(b.length,wp);
-  b.copy(dataBuf,wp+4);
-  Atomics.store(ctrl,0,wp+4+b.length);
-  unlock();
-  Atomics.store(ctrl,1,1);
-  Atomics.notify(ctrl,1,1);
-}
-parentPort.on('message',msg=>{
-  if(msg.cmd==='connect'){
-    const{id,host,port,handler}=msg;
-    const s=net.createConnection({host,port});
-    ups.set(id,s);
-    s.on('connect',()=>push(handler,['connect',id,'']));
-    s.on('data',c=>push(handler,['data',id,c.toString('binary')]));
-    s.on('close',()=>{ups.delete(id);push(handler,['close',id,'']);});
-    s.on('error',e=>{ups.delete(id);push(handler,['error',id,String(e.message||'connect failed')]);});
-  }else if(msg.cmd==='write'){
-    const s=ups.get(msg.id);
-    if(s&&!s.destroyed)try{s.write(Buffer.from(msg.data,'binary'));}catch(e){}
-  }else if(msg.cmd==='drop'){
-    const s=ups.get(msg.id);
-    if(s){try{s.destroy();}catch(e){}ups.delete(msg.id);}
-  }
-});
-`;
-        const _ioWorker = new _IoW(_ioCode, { eval: true, workerData: { ctrlBuf: _ioCtrlBuf, dataBuf: _ioDataBuf } });
-        _ioWorker.unref();  // 모든 소켓이 닫히면 프로세스가 자연 종료되도록
-        _ioWorker.on("error", () => { (globalThis as any).__flIoWorker = null; });
-        (globalThis as any).__flIoWorker = _ioWorker;
-        (globalThis as any).__flIoCtrl = new Int32Array(_ioCtrlBuf);
-        (globalThis as any).__flIoDataBuf = _ioDataBuf;
-        (globalThis as any).__flIoUpstreams = new Set<string>();
-        (globalThis as any).__flIoUpstreamSeq = 0;
+      __ensureIoWorker();
+      if (!(globalThis as any).__ioUpstreams) {
+        (globalThis as any).__ioUpstreams = new Set<string>();
+        (globalThis as any).__ioUpstreamSeq = 0;
       }
-
-      const _upId = `upstream_${++(globalThis as any).__flIoUpstreamSeq}`;
-      (globalThis as any).__flIoUpstreams.add(_upId);
-      (globalThis as any).__flIoWorker.postMessage({ cmd: "connect", id: _upId, host: _obHost, port: _obPort, handler: _obHandler });
+      const _upId = `upstream_${++(globalThis as any).__ioUpstreamSeq}`;
+      (globalThis as any).__ioUpstreams.add(_upId);
+      (globalThis as any).__ioWorker.postMessage({ cmd: "tcp-outbound", id: _upId, host: _obHost, port: _obPort, handler: _obHandler });
       return _upId;
     }
 
     // (tcp-write conn-id data) → "ok" | "error" | "not-found"
-    // 인바운드(__flConnSocks), IO Worker 아웃바운드(__flIoUpstreams), 구형 아웃바운드(__flUpstreams)
+    // IO Worker 아웃바운드(__ioUpstreams), 인바운드(__flConnSocks), 구형(__flUpstreams)
     case "tcp-write": {
       const _twId = String(args[0] ?? "");
       const _twData = String(args[1] ?? "");
-      // IO Worker 관리 upstream — postMessage로 위임
-      if ((globalThis as any).__flIoUpstreams?.has(_twId)) {
-        (globalThis as any).__flIoWorker?.postMessage({ cmd: "write", id: _twId, data: _twData });
+      if ((globalThis as any).__ioUpstreams?.has(_twId)) {
+        (globalThis as any).__ioWorker?.postMessage({ cmd: "tcp-write", id: _twId, hex: Buffer.from(_twData, "binary").toString("hex") });
         return "ok";
       }
       const _twSock = (globalThis as any).__flConnSocks?.[_twId]
@@ -1920,13 +1865,11 @@ parentPort.on('message',msg=>{
     }
 
     // (tcp-drop conn-id) → "ok" | "not-found"
-    // 인바운드 또는 아웃바운드 연결 강제 종료
     case "tcp-drop": {
       const _tdId = String(args[0] ?? "");
-      // IO Worker 관리 upstream
-      if ((globalThis as any).__flIoUpstreams?.has(_tdId)) {
-        (globalThis as any).__flIoUpstreams.delete(_tdId);
-        (globalThis as any).__flIoWorker?.postMessage({ cmd: "drop", id: _tdId });
+      if ((globalThis as any).__ioUpstreams?.has(_tdId)) {
+        (globalThis as any).__ioUpstreams.delete(_tdId);
+        (globalThis as any).__ioWorker?.postMessage({ cmd: "tcp-drop", id: _tdId });
         return "ok";
       }
       const _tdIn = (globalThis as any).__flConnSocks?.[_tdId];
@@ -1974,54 +1917,55 @@ parentPort.on('message',msg=>{
       return "ok";
     }
 
-    // ── IO Worker (fl-yield / tcp-outbound async) ──────────────────────
-    // IO Worker: Worker Thread에서 tcp-outbound I/O를 처리.
-    // 이벤트는 SharedArrayBuffer ring buffer를 통해 메인 스레드로 전달.
-    // SAB ctrl layout (Int32Array × 3):
-    //   ctrl[0]: writePos — Worker가 증가, Main이 드레인 후 0으로 리셋
-    //   ctrl[1]: notify   — Worker가 1로 set, Main이 wait 후 0으로 클리어
-    //   ctrl[2]: mutex    — 0=free, 1=locked (CAS spin-lock)
-    // dataBuf: 8MB — 각 이벤트는 [4B length][JSON bytes]
+    // ── fl-yield — Scheduler Tick (YIELD-SEMANTICS.fds Scheduler Tick Model) ──
+    // SAB ctrl layout (YIELD-SPEC 4-slot):
+    //   ctrl[0]=writePos, ctrl[1]=readPos, ctrl[2]=notify(Atomics.wait), ctrl[3]=reserved
+    // Tick sequence: Atomics.wait(ctrl,2,0,ms) → drain readPos~writePos → callFnVal
 
     // (fl-yield [timeout-ms]) → number (처리된 이벤트 수)
-    // IO Worker 이벤트를 메인 스레드에서 드레인. tcp-outbound 응답 수신에 사용.
     case "fl-yield": {
       const _fyMs = Math.max(0, Number(args[0] ?? 1));
-      const _fyCtrl = (globalThis as any).__flIoCtrl as Int32Array | undefined;
-      if (!_fyCtrl) return 0;  // IO Worker 미초기화 — 즉시 반환
 
-      // Worker 이벤트 대기 (최대 _fyMs ms)
-      Atomics.wait(_fyCtrl, 1, 0, _fyMs);
-      Atomics.store(_fyCtrl, 1, 0);  // notify 클리어
+      // IO Worker가 없으면 즉시 반환 (INV-1: 무해한 no-op)
+      if (!(globalThis as any).__ioWorker) return 0;
 
-      // spin-lock 획득
-      while (Atomics.compareExchange(_fyCtrl, 2, 0, 1) !== 0) {}
+      const _fyCtrl = new Int32Array((globalThis as any).__ioCtrlBuf as SharedArrayBuffer);
+      const _fyBuf  = Buffer.from((globalThis as any).__ioDataBuf as SharedArrayBuffer);
 
-      const _fyWp = Atomics.load(_fyCtrl, 0);
-      const _fyEvents: Array<{handler: string; args: any[]}> = [];
+      // Scheduler Tick Step 1: Worker 신호 대기 (최대 ms)
+      Atomics.wait(_fyCtrl, IO_SLOT_NOTIFY, 0, _fyMs);
+      Atomics.store(_fyCtrl, IO_SLOT_NOTIFY, 0); // notify 클리어
 
-      if (_fyWp > 0) {
-        const _fyBuf = Buffer.from((globalThis as any).__flIoDataBuf as SharedArrayBuffer);
-        let _fyPos = 0;
-        while (_fyPos < _fyWp) {
-          const _fyLen = _fyBuf.readUInt32LE(_fyPos);
-          if (_fyLen === 0 || _fyPos + 4 + _fyLen > _fyWp) break;
-          try {
-            _fyEvents.push(JSON.parse(_fyBuf.toString('utf8', _fyPos + 4, _fyPos + 4 + _fyLen)));
-          } catch {}
-          _fyPos += 4 + _fyLen;
-        }
-        Atomics.store(_fyCtrl, 0, 0);  // writePos 리셋 (버퍼 비움)
+      // Scheduler Tick Step 2: ring buffer drain (readPos → writePos)
+      const _fyEvents: Array<{ev: string; id: string; handler: string; hex?: string; msg?: string}> = [];
+      let _fyRp = Atomics.load(_fyCtrl, IO_SLOT_READ);
+      const _fyWp = Atomics.load(_fyCtrl, IO_SLOT_WRITE);
+
+      while (_fyRp !== _fyWp) {
+        const _fyLen = _fyBuf.readUInt32LE(_fyRp);
+        if (_fyLen === 0xFFFFFFFF) { _fyRp = 0; continue; } // wrap sentinel
+        if (_fyLen === 0 || _fyRp + 4 + _fyLen > IO_DATA_SIZE) break;
+        try {
+          _fyEvents.push(JSON.parse(_fyBuf.toString("utf8", _fyRp + 4, _fyRp + 4 + _fyLen)));
+        } catch {}
+        _fyRp += 4 + _fyLen;
+        if (_fyRp >= IO_DATA_SIZE) _fyRp = 0;
       }
+      Atomics.store(_fyCtrl, IO_SLOT_READ, _fyRp); // readPos 전진
 
-      // spin-lock 해제
-      Atomics.store(_fyCtrl, 2, 0);
-
-      // 이벤트 처리 (lock 밖에서 callFnVal)
+      // Scheduler Tick Step 3: callback dispatch
       let _fyCnt = 0;
       for (const _fyEv of _fyEvents) {
-        try { callFnVal(_fyEv.handler, _fyEv.args); _fyCnt++; }
-        catch (e: any) {
+        const _fyEvType = _fyEv.ev;
+        const _fyHandler = _fyEv.handler;
+        if (!_fyHandler) continue;
+        // data 이벤트: hex → binary string 변환 (기존 코드 호환)
+        const _fyData = _fyEvType === "data" ? Buffer.from(_fyEv.hex ?? "", "hex").toString("binary")
+                      : _fyEv.msg ?? "";
+        try {
+          callFnVal(_fyHandler, [_fyEvType, _fyEv.id, _fyData]);
+          _fyCnt++;
+        } catch (e: any) {
           if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
           (globalThis as any).__flErrorQueue.push(["io-err","recoverable","handler",String(e.message ?? e)]);
         }
