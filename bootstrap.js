@@ -15305,38 +15305,37 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const _obHost = String(args3[0] ?? "localhost");
       const _obPort = Number(args3[1] ?? 80);
       const _obHandler = String(args3[2] ?? "");
-      if (!globalThis.__flUpstreams) globalThis.__flUpstreams = {};
-      if (!globalThis.__flUpstreamSeq) globalThis.__flUpstreamSeq = 0;
-      const _upId = `upstream_${++globalThis.__flUpstreamSeq}`;
-      const _obNet = require("net");
-      const _obSock = _obNet.createConnection({ host: _obHost, port: _obPort });
-      globalThis.__flUpstreams[_upId] = _obSock;
-      const _obEnq = (evArgs) => {
-        try {
-          callFnVal(_obHandler, evArgs);
-        } catch (e) {
-          if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
-          globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e.message ?? e)]);
-        }
-      };
-      _obSock.on("connect", () => _obEnq(["connect", _upId, ""]));
-      _obSock.on("data", (chunk) => _obEnq(["data", _upId, chunk.toString("binary")]));
-      const _obOnEnd = () => {
-        delete globalThis.__flUpstreams[_upId];
-        _obEnq(["close", _upId, ""]);
-      };
-      _obSock.on("close", _obOnEnd);
-      _obSock.on("error", (e) => {
-        delete globalThis.__flUpstreams[_upId];
-        _obEnq(["error", _upId, String(e.message ?? "connect failed")]);
-      });
+      // IO Worker 초기화 (최초 tcp-outbound 호출 시)
+      if (!globalThis.__flIoWorker) {
+        const { Worker: _IoW } = require("worker_threads");
+        const _ioCtrlBuf = new SharedArrayBuffer(12);
+        const _ioDataBuf = new SharedArrayBuffer(8 * 1024 * 1024);
+        Atomics.store(new Int32Array(_ioCtrlBuf), 0, 0);
+        Atomics.store(new Int32Array(_ioCtrlBuf), 1, 0);
+        Atomics.store(new Int32Array(_ioCtrlBuf), 2, 0);
+        const _ioCode = `const{workerData,parentPort}=require('worker_threads');const net=require('net');const ctrl=new Int32Array(workerData.ctrlBuf);const dataBuf=Buffer.from(workerData.dataBuf);const BUFSZ=dataBuf.length;const ups=new Map();function lock(){while(Atomics.compareExchange(ctrl,2,0,1)!==0){}}function unlock(){Atomics.store(ctrl,2,0);}function push(handler,args){const s=JSON.stringify({handler,args});const b=Buffer.from(s,'utf8');lock();let wp=Atomics.load(ctrl,0);if(wp+4+b.length>BUFSZ){wp=0;}dataBuf.writeUInt32LE(b.length,wp);b.copy(dataBuf,wp+4);Atomics.store(ctrl,0,wp+4+b.length);unlock();Atomics.store(ctrl,1,1);Atomics.notify(ctrl,1,1);}parentPort.on('message',msg=>{if(msg.cmd==='connect'){const{id,host,port,handler}=msg;const s=net.createConnection({host,port});ups.set(id,s);s.on('connect',()=>push(handler,['connect',id,'']));s.on('data',c=>push(handler,['data',id,c.toString('binary')]));s.on('close',()=>{ups.delete(id);push(handler,['close',id,'']);});s.on('error',e=>{ups.delete(id);push(handler,['error',id,String(e.message||'connect failed')]);});}else if(msg.cmd==='write'){const s=ups.get(msg.id);if(s&&!s.destroyed)try{s.write(Buffer.from(msg.data,'binary'));}catch(e){}}else if(msg.cmd==='drop'){const s=ups.get(msg.id);if(s){try{s.destroy();}catch(e){}ups.delete(msg.id);}}});`;
+        const _ioWorker = new _IoW(_ioCode, { eval: true, workerData: { ctrlBuf: _ioCtrlBuf, dataBuf: _ioDataBuf } });
+        _ioWorker.on("error", () => { globalThis.__flIoWorker = null; });
+        globalThis.__flIoWorker = _ioWorker;
+        globalThis.__flIoCtrl = new Int32Array(_ioCtrlBuf);
+        globalThis.__flIoDataBuf = _ioDataBuf;
+        globalThis.__flIoUpstreams = new Set();
+        globalThis.__flIoUpstreamSeq = 0;
+      }
+      const _upId = `upstream_${++globalThis.__flIoUpstreamSeq}`;
+      globalThis.__flIoUpstreams.add(_upId);
+      globalThis.__flIoWorker.postMessage({ cmd: "connect", id: _upId, host: _obHost, port: _obPort, handler: _obHandler });
       return _upId;
     }
     // (tcp-write conn-id data) → "ok" | "error" | "not-found"
-    // 인바운드(__flConnSocks) 또는 아웃바운드(__flUpstreams) 연결에 raw 전송
+    // IO Worker upstream, 인바운드(__flConnSocks), 구형 아웃바운드(__flUpstreams)
     case "tcp-write": {
       const _twId = String(args3[0] ?? "");
       const _twData = String(args3[1] ?? "");
+      if (globalThis.__flIoUpstreams?.has(_twId)) {
+        globalThis.__flIoWorker?.postMessage({ cmd: "write", id: _twId, data: _twData });
+        return "ok";
+      }
       const _twSock = globalThis.__flConnSocks?.[_twId] ?? globalThis.__flUpstreams?.[_twId];
       if (!_twSock || _twSock.destroyed) return "not-found";
       try {
@@ -15352,21 +15351,20 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // 인바운드 또는 아웃바운드 연결 강제 종료
     case "tcp-drop": {
       const _tdId = String(args3[0] ?? "");
+      if (globalThis.__flIoUpstreams?.has(_tdId)) {
+        globalThis.__flIoUpstreams.delete(_tdId);
+        globalThis.__flIoWorker?.postMessage({ cmd: "drop", id: _tdId });
+        return "ok";
+      }
       const _tdIn = globalThis.__flConnSocks?.[_tdId];
       if (_tdIn) {
-        try {
-          _tdIn.destroy();
-        } catch {
-        }
+        try { _tdIn.destroy(); } catch {}
         delete globalThis.__flConnSocks[_tdId];
         return "ok";
       }
       const _tdOut = globalThis.__flUpstreams?.[_tdId];
       if (_tdOut) {
-        try {
-          _tdOut.destroy();
-        } catch {
-        }
+        try { _tdOut.destroy(); } catch {}
         delete globalThis.__flUpstreams[_tdId];
         return "ok";
       }
@@ -15399,6 +15397,39 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       clearInterval(_ciHandle);
       delete globalThis.__flIntervals[_ciId];
       return "ok";
+    }
+    // (fl-yield [timeout-ms]) → number
+    // IO Worker 이벤트를 메인 스레드에서 드레인. tcp-outbound 응답 수신에 사용.
+    case "fl-yield": {
+      const _fyMs = Math.max(0, Number(args3[0] ?? 1));
+      const _fyCtrl = globalThis.__flIoCtrl;
+      if (!_fyCtrl) return 0;
+      Atomics.wait(_fyCtrl, 1, 0, _fyMs);
+      Atomics.store(_fyCtrl, 1, 0);
+      while (Atomics.compareExchange(_fyCtrl, 2, 0, 1) !== 0) {}
+      const _fyWp = Atomics.load(_fyCtrl, 0);
+      const _fyEvents = [];
+      if (_fyWp > 0) {
+        const _fyBuf = Buffer.from(globalThis.__flIoDataBuf);
+        let _fyPos = 0;
+        while (_fyPos < _fyWp) {
+          const _fyLen = _fyBuf.readUInt32LE(_fyPos);
+          if (_fyLen === 0 || _fyPos + 4 + _fyLen > _fyWp) break;
+          try { _fyEvents.push(JSON.parse(_fyBuf.toString("utf8", _fyPos + 4, _fyPos + 4 + _fyLen))); } catch {}
+          _fyPos += 4 + _fyLen;
+        }
+        Atomics.store(_fyCtrl, 0, 0);
+      }
+      Atomics.store(_fyCtrl, 2, 0);
+      let _fyCnt = 0;
+      for (const _fyEv of _fyEvents) {
+        try { callFnVal(_fyEv.handler, _fyEv.args); _fyCnt++; }
+        catch (e) {
+          if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+          globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e?.message ?? e)]);
+        }
+      }
+      return _fyCnt;
     }
     // Arithmetic
     case "+": {
