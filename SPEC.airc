@@ -1,0 +1,102 @@
+{
+  "$": "airc-spec",
+  "version": "1.0.0",
+  "project": "freelang-v11",
+  "date": "2026-05-19",
+  "cmd": "python3 -c \"import json; d=json.load(open('SPEC.airc')); print('what:', d['identity']['what']); print('hot:', d['hot'])\"",
+
+  "identity": {
+    "what": "AI 에이전트가 안정적으로 실행할 수 있는 결정론적 DSL",
+    "why": "AI가 생성한 코드가 세션마다 다르게 동작하는 문제를 없애기 위해",
+    "for": "AI 에이전트 (Claude). 인간은 감독자",
+    "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
+  },
+
+  "hot": "task-001",
+
+  "constitution": {
+    "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
+    "2": "identity는 잠긴다. 변경은 사용자 협의 필수. Claude 단독 변경 금지",
+    "3": "hot이 가리키는 task가 지금 당장 해야 할 일이다",
+    "4": "오류·실수도 nodes에 기록한다. 성공만 기록하지 않는다",
+    "5": "노드는 삭제하지 않는다. void 처리만 허용",
+    "6": "why 없는 lock·decision 등록 불가"
+  },
+
+  "nodes": {
+
+    "task-001": {
+      "t": "task",
+      "v": "SPEC.airc 현행화 — 현재 진행 중인 작업 hot으로 설정",
+      "entry": ["SPEC.airc"],
+      "check": ["python3 -c \"import json; json.load(open('SPEC.airc')); print('OK')\""],
+      "verified": true,
+      "next": []
+    },
+
+    "dec-001": {
+      "t": "decision",
+      "v": "외부 npm 패키지 0개. Node.js 내장 모듈만 허용",
+      "why": ["의존성이 생기면 버전 충돌·보안 취약점이 AI 코드에 전파된다", "결정론적 실행을 보장하려면 런타임이 고정되어야 한다"],
+      "lock": true
+    },
+
+    "dec-002": {
+      "t": "decision",
+      "v": "단일 파서·단일 문법. 복수 구현 공존 금지",
+      "why": ["파서가 둘이면 동작 불일치가 생긴다", "AI가 어느 파서 기준으로 코드를 써야 하는지 알 수 없다"],
+      "lock": true
+    },
+
+    "dec-003": {
+      "t": "decision",
+      "v": "컴파일러 결함에 스펙을 맞추는 우회 금지. 결함은 런타임에서 고친다",
+      "why": ["우회책이 쌓이면 언어 정의가 오염된다", "AI가 우회책을 정상 패턴으로 학습한다"],
+      "lock": true
+    },
+
+    "dec-004": {
+      "t": "decision",
+      "v": "bootstrap.js가 단일 진입점. 직접 편집 금지, src/ TS에서 esbuild로 생성",
+      "why": ["bootstrap.js를 직접 수정하면 다음 빌드에서 덮어씌워진다"],
+      "lock": true
+    },
+
+    "err-001": {
+      "t": "error",
+      "v": "server_req_header/get 반환값 null이 (= $v nil)로 false 평가됨",
+      "cause": "nil과 null이 내부적으로 다른 타입으로 처리됨",
+      "fix": "4중 검사 헬퍼 표준화 — null·nil·빈문자열·false 모두 처리",
+      "repeat_risk": "high"
+    },
+
+    "err-002": {
+      "t": "error",
+      "v": "update extra-args + define+fn 조합에서 변수 저장 오류",
+      "cause": "런타임 버그 (2026-05-19 수정 완료)",
+      "fix": "해당 패턴 workaround 불필요. 런타임에서 수정됨",
+      "repeat_risk": "low"
+    }
+
+  },
+
+  "lock": [
+    {"rule": "외부 npm 0개", "why": "결정론적 실행 보장"},
+    {"rule": "복수 파서 공존 금지", "why": "언어 정의 단일성"},
+    {"rule": "컴파일러 결함 우회 금지", "why": "스펙 오염 방지"},
+    {"rule": "bootstrap.js 직접 편집 금지", "why": "빌드 산출물이므로 덮어씌워짐"}
+  ],
+
+  "graveyard": [
+    {"idea": "외부 npm 패키지 허용", "why": "의존성 지옥 + 결정론 파괴", "final": true},
+    {"idea": "복수 파서 공존", "why": "동작 불일치 발생. AI가 어느 기준으로 코드를 써야 할지 모름", "final": true}
+  ],
+
+  "handoff": {
+    "step1": "cmd 실행 → identity·hot 확인",
+    "step2": "graveyard 확인 → 이미 버린 방향인지 체크",
+    "step3": "hot 노드 실행",
+    "step4": "오류 발생 시 error 노드로 기록",
+    "step5": "identity 변경 필요 시 사용자에게 먼저 물어라"
+  }
+}
