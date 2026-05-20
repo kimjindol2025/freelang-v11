@@ -93,15 +93,35 @@ type EffectFrame = {
 - 함수 종료 시: `stack.pop()` (try/finally)
 - 호출 직전 검사: 아래 5절 참조
 
-### 4-C. unrestricted frame 의미 (D3 확장)
+### 4-C. unrestricted frame 의미 (lock — rollout safety 핵심)
 
 ```
-current.allowed === null   ⇒  검사 skip (legacy compat)
-current.allowed === Set([])      ⇒  pure 컨텍스트. effect builtin 호출 모두 위반.
-current.allowed === Set([:io])   ⇒  :io ⊆ allowed 인 호출만 허용.
+current.allowed === null   ⇒  unrestricted compatibility frame
+                              "allow all" — 모든 effect 호출 허용 (검사 skip)
+current.allowed === Set([])      ⇒  enforced frame, pure context.
+                                    어떤 effect builtin 호출도 위반.
+current.allowed === Set([:io])   ⇒  enforced frame.
+                                    target_effects ⊆ allowed 만 허용.
 ```
 
-> 이 룰은 future effect inheritance / lexical scoping 확장 시에도 ambiguity가 없도록 명시.
+**lock 의미**:
+
+- `null` ↔ Set 의 의미 분리는 더 이상 변경하지 않는다. 이 의미가 흔들리면 self-host bootstrap·1018+ 회귀가 한 줄로 깨진다.
+- future inheritance / lexical scoping 확장 시에도 `null` 은 영원히 "허용" 의미. enforced 동작은 반드시 explicit Set 으로만.
+
+### 4-D. metadata parse failure → legacy fallback (lock)
+
+함수 메타에서 `:effects` 를 추출할 때, 파싱 실패·예상치 못한 타입·미지정 effect tag 등이 발생하면:
+
+- **throw 금지**
+- 해당 함수를 **메타 부재**로 처리 (`allowed = null`, legacy unrestricted)
+- stderr 에 `[effect-meta]` 경고 한 줄만 (EFFECT_STACK_TRACE=1 일 때만)
+
+**이유**:
+
+- 초기 rollout 단계에서 metadata strictness 는 bootstrap destabilizer 가 된다.
+- AI 생성 메타에 오탈자·미정의 태그가 끼어도 본 프로그램 실행은 막지 않아야 한다.
+- strict 모드는 future 단계 (별도 lock 부여 시).
 
 ---
 

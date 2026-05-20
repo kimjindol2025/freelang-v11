@@ -13,6 +13,12 @@ import { vmFunctionRegistry } from "./vm-eligible"; // Phase 3-E
 import { VM } from "./vm"; // Phase 3-E
 import { ReturnSignal, isReturnSignal } from "./return-signal";
 import { checkBudget, hasBudget } from "./runtime-budget";
+import {
+  pushFrame as _pushEffectFrame,
+  popFrame as _popEffectFrame,
+  enforceCall as _enforceEffect,
+  resolveFnAllowed as _resolveFnAllowed,
+} from "./effect-enforcer";
 
 const _callVM = new VM(); // Phase 3-E
 
@@ -131,46 +137,75 @@ function bindParam(interp: InterpreterLike, param: any, value: any): void {
 }
 
 export function callUserFunction(interp: InterpreterLike, name: string, args: any[]): any {
-  // TCO 모드 활성화 시 trampoline으로 라우팅
+  // TCO 모드 활성화 시 trampoline으로 라우팅 (frame 관리는 TCO 측 — C4-2)
   if (interp.tcoMode) {
     return callUserFunctionTCO(interp, name, args);
   }
 
+  // === C4-1: effect gate (VM mode 분기 전에) ===
+  // caller frame 이 이 호출을 허용하는가 검사 → 위반 시 즉시 throw.
+  // 통과 시 새 frame push. finally 에서 정확히 한 번 pop.
+  const _effBase = name.replace(/\[.*$/, "");
+  _enforceEffect(_effBase);
+
   // Phase 3-E: VM 함수 호출
   if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
+    const _vmAllowed = _resolveFnAllowed(_effBase);
+    _pushEffectFrame(_effBase, _vmAllowed);
+    let _vmOk = false;
+    let _vmResult: any;
     try {
-      const vmFunc = vmFunctionRegistry.get(name)!;
-      const initialVars = new Map<string, any>();
+      try {
+        const vmFunc = vmFunctionRegistry.get(name)!;
+        const initialVars = new Map<string, any>();
 
-      // closure가 있으면 사용, 없으면 현재 변수 스냅샷
-      if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
-        for (const [k, v] of vmFunc._closure) {
-          initialVars.set(k, v);
+        // closure가 있으면 사용, 없으면 현재 변수 스냅샷
+        if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
+          for (const [k, v] of vmFunc._closure) {
+            initialVars.set(k, v);
+          }
+        } else {
+          const snapshot = interp.context.variables.snapshot();
+          for (const [k, v] of snapshot) {
+            initialVars.set(k, v);
+          }
         }
-      } else {
-        const snapshot = interp.context.variables.snapshot();
-        for (const [k, v] of snapshot) {
-          initialVars.set(k, v);
+
+        // 모든 VM 함수를 변수로 포함 (재귀 호출 지원)
+        for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
+          initialVars.set("$" + vmName, vmFuncObj);
+          initialVars.set(vmName, vmFuncObj); // op 위치에서 직접 참조
         }
-      }
 
-      // 모든 VM 함수를 변수로 포함 (재귀 호출 지원)
-      for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
-        initialVars.set("$" + vmName, vmFuncObj);
-        initialVars.set(vmName, vmFuncObj); // op 위치에서 직접 참조
-      }
+        // 파라미터 바인딩: fnValue.params는 $ 없는 형태 (fn의 params 정규화 참고)
+        for (let i = 0; i < vmFunc._params.length; i++) {
+          initialVars.set(vmFunc._params[i], args[i] ?? null);
+        }
 
-      // 파라미터 바인딩: fnValue.params는 $ 없는 형태 (fn의 params 정규화 참고)
-      for (let i = 0; i < vmFunc._params.length; i++) {
-        initialVars.set(vmFunc._params[i], args[i] ?? null);
+        _vmResult = _callVM.run(vmFunc._chunk, initialVars);
+        _vmOk = true;
+      } catch {
+        // fallback to interpreter path — frame은 finally 에서 pop, interpreter path에서 다시 push
       }
-
-      return _callVM.run(vmFunc._chunk, initialVars);
-    } catch {
-      // fallback to interpreter path
+    } finally {
+      _popEffectFrame();
     }
+    if (_vmOk) return _vmResult;
   }
 
+  // === interpreter path frame (VM fallback 또는 VM 미사용 시) ===
+  const _interpAllowed = _resolveFnAllowed(_effBase);
+  _pushEffectFrame(_effBase, _interpAllowed);
+  try {
+    return _callUserFunctionInterpPath(interp, name, args);
+  } finally {
+    _popEffectFrame();
+  }
+}
+
+// C4-1: interpreter path 본체를 별도 함수로 분리 (frame 관리 깔끔화).
+// 기존 callUserFunction 의 line 174~ 본문을 그대로 옮긴 것.
+function _callUserFunctionInterpPath(interp: InterpreterLike, name: string, args: any[]): any {
   let baseName = name;
   let typeArgs: TypeAnnotation[] | null = null;
 
@@ -407,16 +442,31 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
 }
 
 export function callFunctionValue(interp: InterpreterLike, fn: any, args: any[]): any {
-  // TCO 모드 활성화 시 trampoline으로 라우팅
+  // TCO 모드 활성화 시 trampoline으로 라우팅 (frame 관리는 TCO 측 — C4-2)
   if (interp.tcoMode) {
     return callFunctionValueTCO(interp, fn, args);
   }
 
-  // comp/compose가 반환한 _call 핸들
+  // comp/compose가 반환한 _call 핸들 — 합성 함수는 내부에서 일반 호출로 분해되므로
+  // 여기서는 frame push 하지 않음 (내부 일반 호출이 자체 frame 생성). C4-3 bypass audit 항목.
   if (fn._call) return fn._call(...args);
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
   }
+
+  // === C4-1: effect gate ===
+  const _effName = (fn.name as string) ?? "<anonymous>";
+  _enforceEffect(_effName);
+  const _allowed = _resolveFnAllowed(_effName);
+  _pushEffectFrame(_effName, _allowed);
+  try {
+    return _callFunctionValueBody(interp, fn, args);
+  } finally {
+    _popEffectFrame();
+  }
+}
+
+function _callFunctionValueBody(interp: InterpreterLike, fn: any, args: any[]): any {
   // 기본값 적용
   if (fn.paramDefaults) {
     while (args.length < fn.params.length) {

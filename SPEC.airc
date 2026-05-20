@@ -59,13 +59,22 @@
       ],
       "order_rationale": "registry가 흔들리면 enforcer 시그니처도 흔들린다. runtime-events 확장은 실제 violation 데이터가 나온 뒤 schema 확정.",
       "commits": [
-        "C1: docs (현재)",
-        "C2: types + registry (단계 1+2)",
-        "C3: enforcer 엔진 (단계 3) — EFFECT_STACK_TRACE=1 디버그 플래그 포함",
-        "C4: single gate hooks (단계 4+5)",
-        "C5: runtime-events 연동 (단계 6)",
-        "C6: T1~T5 + 1018 회귀 + unauthorized builtin matrix test (단계 7+8)",
-        "C7: bootstrap SHA + 블로그/Gogs (단계 9+10)"
+        "C1: docs",
+        "C2: types + registry",
+        "C3: enforcer 엔진 + EFFECT_STACK_TRACE",
+        "C4-1: callUserFunction + callFunctionValue + finally invariant (sync core)",
+        "C4-2: TCO/Raw 4종 (callUserFunctionTCO/callFunctionValueTCO/Raw 2종)",
+        "C4-3: callAsyncFunctionValue + callFunction dispatch + final bypass audit",
+        "C5: runtime-events effect-violation 연동",
+        "C6: T1~T5 + 1129 회귀 + unauthorized builtin matrix",
+        "C7: bootstrap SHA + 블로그/Gogs",
+        "C8 (후속): EFFECT_CATALOG ↔ BUILTIN_EFFECTS taxonomy normalization"
+      ],
+      "split_rationale": "리서치(C4 직전)에서 진입점이 4개가 아닌 8개임을 발견. async/TCO/raw/native fast-path가 한 변곡점에 묶이면 regression provenance가 흐려진다. 의미론 경계(sync일반/trampoline/async-dispatch)로 3분할.",
+      "priority_invariants": [
+        "1. stack leak impossible (push/pop pairing)",
+        "2. enforcement correctness",
+        "3. taxonomy consistency (C8 후속)"
       ],
       "branch": "feature/effect-enforcement",
       "branch_policy": "C1부터 feature/effect-enforcement에서 진행. C7 후 squash 없이 merge.",

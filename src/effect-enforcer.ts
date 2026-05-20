@@ -19,8 +19,65 @@ import {
   EffectFrame,
   EffectSpan,
   EffectViolation,
+  EFFECT_TAGS,
 } from "./effect-types";
 import { lookupBuiltinEffects } from "./builtin-effects";
+import { fnMetaRegistry } from "./eval-special-forms";
+
+const _validTags: ReadonlySet<string> = new Set(EFFECT_TAGS);
+
+/**
+ * 메타에서 추출된 string[] 을 EffectTag Set 으로 변환.
+ *
+ * design §4-D (lock): parse failure → throw 금지, null 반환 (legacy fallback).
+ * 초기 rollout 에서 metadata strictness 는 bootstrap destabilizer.
+ */
+function parseEffectTags(
+  raw: readonly string[] | undefined
+): ReadonlySet<EffectTag> | null {
+  if (!raw) return null;
+  if (!Array.isArray(raw)) return null;
+  const out = new Set<EffectTag>();
+  for (const r of raw) {
+    if (typeof r !== "string") return null;
+    const s = r.startsWith(":") ? r.slice(1) : r;
+    if (!_validTags.has(s)) return null;
+    out.add(s as EffectTag);
+  }
+  return Object.freeze(out) as ReadonlySet<EffectTag>;
+}
+
+/**
+ * 함수 진입 시 frame 의 allowed set 결정.
+ *   메타 부재         → null (legacy unrestricted, design §4-C)
+ *   메타 있고 parse OK → ReadonlySet<EffectTag>
+ *   메타 있으나 parse 실패 → null (legacy fallback, design §4-D)
+ */
+export function resolveFnAllowed(
+  name: string
+): ReadonlySet<EffectTag> | null {
+  const meta = fnMetaRegistry.get(name);
+  if (!meta || meta.effects === undefined) return null;
+  return parseEffectTags(meta.effects);
+}
+
+/**
+ * 호출 대상 effect 조회 (enforceCall 내부용).
+ * builtin registry 우선, 없으면 user fn meta.
+ *
+ *   undefined  registry/메타 모두 없음 → unknown (skip)
+ *   null       explicit-legacy or parse fail → skip
+ *   Set        typed → enforce
+ */
+function resolveCalleeEffects(
+  name: string
+): ReadonlySet<EffectTag> | null | undefined {
+  const b = lookupBuiltinEffects(name);
+  if (b !== undefined) return b;
+  const meta = fnMetaRegistry.get(name);
+  if (!meta || meta.effects === undefined) return undefined;
+  return parseEffectTags(meta.effects);
+}
 
 const TRACE = process.env.EFFECT_STACK_TRACE === "1";
 const TRACE_PREFIX = "[effect-stack]";
@@ -106,7 +163,7 @@ export function enforceCall(
   let effects: ReadonlySet<EffectTag> | null | undefined;
   if (typeof callee === "string") {
     calleeName = callee;
-    effects = lookupBuiltinEffects(callee);
+    effects = resolveCalleeEffects(callee);
   } else {
     calleeName = callee.name;
     effects = callee.effects;
