@@ -530,7 +530,14 @@ export function callAsyncFunctionValue(interp: InterpreterLike, fn: any, args: a
   if (fn.kind !== "async-function-value") {
     throw new Error(`Expected async-function-value, got ${fn.kind}`);
   }
+  // C4-3: async 는 event boundary — sync 진입 시점만 frame 유지.
+  // Promise.then continuation 에서는 절대 frame 재구성 금지 (phantom frame 방지).
+  //   sync entry:   push + try { eval } finally { pop }
+  //   async cont.:  result.then(...) — frame 손대지 않음
+  const _effName = (fn.name as string) ?? "<anonymous>";
   return new FreeLangPromise((resolve, reject) => {
+    _enforceEffect(_effName);
+    _pushEffectFrame(_effName, _resolveFnAllowed(_effName));
     const savedStack = interp.context.variables.saveStack();
     try {
       interp.context.variables.fromSnapshot(fn.capturedEnv);
@@ -539,6 +546,7 @@ export function callAsyncFunctionValue(interp: InterpreterLike, fn: any, args: a
       }
       const result = interp.eval(fn.body);
       if (result instanceof FreeLangPromise) {
+        // continuation: caller stack 과 분리. frame 추가 push/pop 금지.
         result.then((value) => resolve(value)).catch((error) => reject(error));
       } else {
         resolve(result);
@@ -547,12 +555,17 @@ export function callAsyncFunctionValue(interp: InterpreterLike, fn: any, args: a
       reject(error as Error);
     } finally {
       interp.context.variables.restoreStack(savedStack);
+      _popEffectFrame();
     }
   });
 }
 
 export function callFunction(interp: InterpreterLike, fn: any, args: any[]): any {
   if (fn.kind === "builtin-function") {
+    // C4-3: builtin dispatch — frame 생성 없이 enforce 만 (caller frame 기준 검사).
+    // builtin 은 native call 로 즉시 종료, callUserFunction 경로를 타지 않으므로 여기서 한 번 enforce.
+    const _bname = (fn.name as string) ?? "<builtin>";
+    _enforceEffect(_bname);
     return fn.fn(args.map((arg: any) => interp.eval(arg)));
   } else if (fn.kind === "function-value") {
     return callFunctionValue(interp, fn, args);

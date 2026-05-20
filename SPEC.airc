@@ -152,6 +152,41 @@
       "lock": true
     },
 
+    "dec-008": {
+      "t": "decision",
+      "v": "async 는 event boundary — sync 진입 시점만 frame 유지. Promise.then continuation 에서는 frame 재구성 금지",
+      "why": [
+        "async continuation 은 caller stack 과 분리된 logical chain",
+        "Promise 안에서 frame 재구성하면 phantom frame 생성·event duplication·trace 왜곡",
+        "stack model 은 sync 한정, async 는 chain metadata 로만 추적 (future)"
+      ],
+      "lock": true
+    },
+
+    "audit-c4-final": {
+      "t": "audit",
+      "v": "C4 final bypass audit — single gate invariant 완전성 검증",
+      "checks": [
+        "1. 모든 entry path enforceCall 통과 — 8개 진입점 + fast paths 전부 hook 완료 (C4-1/C4-2/C4-3)",
+        "2. async 단일 sync boundary 만 frame — callAsyncFunctionValue 의 Promise.then 안 frame 손대지 않음",
+        "3. builtin dispatch frame 변경 없음 — callFunction.builtin-function 은 enforce 만, push/pop 없음",
+        "4. interpreter wrapper 우회 없음 — callUserFunctionRaw/callFunctionValueRaw/callAsyncFunctionValue wrapper 는 export 함수 호출만, 우회 경로 없음"
+      ],
+      "entry_points_hooked": [
+        "callUserFunction (sync user fn, C4-1)",
+        "callFunctionValue (sync function-value, C4-1)",
+        "callUserFunctionTCO (trampoline user, C4-2)",
+        "callFunctionValueTCO (trampoline function-value, C4-2)",
+        "callUserFunctionRaw (tco.ts raw, C4-2)",
+        "callFunctionValueRaw (tco.ts raw, C4-2)",
+        "callAsyncFunctionValue (async sync entry only, C4-3)",
+        "callFunction (dispatch, builtin-function kind enforce, C4-3)"
+      ],
+      "result": "PASS",
+      "verified_by": "1184+ jest tests (1175 base + 9 audit unit) + C4-1/2/3 unit suites 27 cases",
+      "date": "2026-05-20"
+    },
+
     "err-001": {
       "t": "error",
       "v": "server_req_header/get 반환값 null이 (= $v nil)로 false 평가됨",
