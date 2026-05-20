@@ -5,7 +5,9 @@ import { createHash, createHmac } from "crypto";         // Node.js crypto (stat
 import { createFileModule } from "./stdlib-file";        // Phase 10: File I/O
 import { createFdModule } from "./stdlib-fd";            // Phase 11.5: File Descriptor (NEW)
 import { createBitsModule } from "./stdlib-bits";        // Phase 11.6: Bitwise Operations (NEW)
+import { createBinaryModule } from "./stdlib-binary";    // Phase 11.7: Binary Buffer + CRC32 (NEW)
 import { createTimerModule } from "./stdlib-timer";      // Phase 11.7: Timer (NEW)
+import { cron_schedule, cron_cancel, cron_list, cron_clear } from "./stdlib-cron"; // v11.7.0: Cron
 import { createErrorModule } from "./stdlib-error";      // Phase 11: Error handling
 import { createHttpModule } from "./stdlib-http";        // Phase 12: HTTP Client
 import { createShellModule } from "./stdlib-shell";      // Phase 12: Shell execution
@@ -61,13 +63,25 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   const fileModule = createFileModule();
   const fdModule = createFdModule();
   const bitsModule = createBitsModule();
+  const binaryModule = createBinaryModule();
   const errorModule = createErrorModule();
   const httpModule = createHttpModule();
 
   interp.registerModule(fileModule);
   interp.registerModule(fdModule);
   interp.registerModule(bitsModule);
+  interp.registerModule(binaryModule);
   interp.registerModule(createTimerModule(interp)); // Pass interp for callback invocation
+  interp.registerModule({                           // v11.7.0: Cron scheduler
+    "cron-schedule": (expr: string, cb: any) => cron_schedule(expr, () => interp.callFunctionValue(cb, [])),
+    "cron_schedule": (expr: string, cb: any) => cron_schedule(expr, () => interp.callFunctionValue(cb, [])),
+    "cron-cancel":   (id: string) => cron_cancel(id),
+    "cron_cancel":   (id: string) => cron_cancel(id),
+    "cron-list":     () => cron_list(),
+    "cron_list":     () => cron_list(),
+    "cron-clear":    () => cron_clear(),
+    "cron_clear":    () => cron_clear(),
+  });
   interp.registerModule(errorModule);
   interp.registerModule(httpModule);
   const shellModule = createShellModule();
@@ -385,7 +399,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
     "str_repeat_n": (s: string, n: number) => _aliases["str-repeat-n"](s, n),
     "nth-last": (arr: any[], n: number): any => {
       const a = Array.isArray(arr) ? arr : [];
-      const idx = a.length - (Math.max(0, n) + 1);
+      const idx = a.length - Math.max(1, n); // 1-인덱스: (nth-last arr 1) = 마지막
       return idx >= 0 ? a[idx] : null;
     },
     "nth_last": (arr: any[], n: number) => _aliases["nth-last"](arr, n),

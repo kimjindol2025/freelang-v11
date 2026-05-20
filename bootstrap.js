@@ -38725,7 +38725,7 @@ function loadAllStdlib(interp2) {
     "str_repeat_n": (s, n) => _aliases["str-repeat-n"](s, n),
     "nth-last": (arr, n) => {
       const a = Array.isArray(arr) ? arr : [];
-      const idx = a.length - (Math.max(0, n) + 1);
+      const idx = a.length - Math.max(1, n);
       return idx >= 0 ? a[idx] : null;
     },
     "nth_last": (arr, n) => _aliases["nth-last"](arr, n),
@@ -39121,7 +39121,58 @@ function loadAllStdlib(interp2) {
     "hash-sha256": (v) => (0, import_crypto10.createHash)("sha256").update(v, "utf8").digest("hex"),
     "hmac-sha256": (key, msg) => (0, import_crypto10.createHmac)("sha256", key).update(msg, "utf8").digest("hex"),
     "hash_md5": (v) => (0, import_crypto10.createHash)("md5").update(v, "utf8").digest("hex"),
-    "hash-md5": (v) => (0, import_crypto10.createHash)("md5").update(v, "utf8").digest("hex")
+    "hash-md5": (v) => (0, import_crypto10.createHash)("md5").update(v, "utf8").digest("hex"),
+    // ── cron-schedule (v11.7.0) ────────────────────────────────
+    ...(() => {
+      const _cronJobs = new Map();
+      let _cronInterval = null;
+      function _pf(f, mn, mx) {
+        if (f === "*") return null;
+        const vals = [];
+        for (const part of f.split(",")) {
+          if (part.includes("/")) {
+            const [range, stepStr] = part.split("/");
+            const step = parseInt(stepStr, 10) || 1;
+            const [lo, hi] = range === "*" ? [mn, mx] : range.split("-").map(Number);
+            for (let i = (lo ?? mn); i <= (hi ?? mx); i += step) if (i >= mn && i <= mx) vals.push(i);
+          } else if (part.includes("-")) {
+            const [a2, b2] = part.split("-").map(Number);
+            for (let i = a2; i <= b2; i++) if (i >= mn && i <= mx) vals.push(i);
+          } else { const n2 = parseInt(part, 10); if (n2 >= mn && n2 <= mx) vals.push(n2); }
+        }
+        return [...new Set(vals)].sort((a2, b2) => a2 - b2);
+      }
+      function _mc(expr, now) {
+        const fs = expr.trim().split(/\s+/);
+        if (fs.length < 5) return false;
+        const [mf, hf, df, mof, dowf] = fs.slice(fs.length - 5);
+        const min = _pf(mf, 0, 59), hr = _pf(hf, 0, 23), dy = _pf(df, 1, 31), mo = _pf(mof, 1, 12), dow = _pf(dowf, 0, 6);
+        const m = now.getMinutes(), h = now.getHours(), d = now.getDate(), mo2 = now.getMonth() + 1, dw = now.getDay();
+        if (min && !min.includes(m)) return false;
+        if (hr && !hr.includes(h)) return false;
+        if (mo && !mo.includes(mo2)) return false;
+        const dc = dy !== null, dwc = dow !== null;
+        if (dc && dwc) { if (!dy.includes(d) && !dow.includes(dw)) return false; }
+        else if (dc && !dy.includes(d)) return false;
+        else if (dwc && !dow.includes(dw)) return false;
+        return true;
+      }
+      function _start() {
+        if (_cronInterval) return;
+        _cronInterval = setInterval(() => {
+          const now = new Date();
+          for (const job of _cronJobs.values()) { try { if (_mc(job.expr, now)) Promise.resolve().then(() => job.cb()).catch(() => {}); } catch (e2) {} }
+        }, 60000);
+      }
+      return {
+        "cron-schedule": (expr, cb) => { const id = "cron-" + Date.now() + "-" + Math.random().toString(36).slice(2,8); _cronJobs.set(id, {expr: String(expr), cb}); _start(); return id; },
+        "cron_schedule": (expr, cb) => _aliases["cron-schedule"](expr, cb),
+        "cron-cancel": (id) => { const ok = _cronJobs.delete(String(id)); if (_cronJobs.size === 0 && _cronInterval) { clearInterval(_cronInterval); _cronInterval = null; } return ok; },
+        "cron_cancel": (id) => _aliases["cron-cancel"](id),
+        "cron-list": () => Array.from(_cronJobs.values()).map(j => ({id: j.id ?? "", expression: j.expr, created_at: new Date().toISOString()})),
+        "cron_list": () => _aliases["cron-list"]()
+      };
+    })()
   };
   const _authAliases = {
     "bcrypt-hash": "auth_hash_password",
