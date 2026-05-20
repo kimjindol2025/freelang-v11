@@ -593,11 +593,21 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
   const prevTcoMode = (interp as any).tcoMode;
   (interp as any).tcoMode = true;
 
+  // C4-2 (B): push/pop per iteration — semantic boundary marker.
+  // frame identity 가 iteration 마다 swap 되어야 effect chain trace 정확.
+  let _haveFrame = false;
   try {
     for (let i = 0; i < 2_000_000; i++) {
       let baseName = currentName;
       const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
       if (bracketMatch) baseName = bracketMatch[1];
+
+      // C4-2: 이전 iteration frame 정리 후 새 frame.
+      // 첫 iteration 은 pop 없이 push.
+      if (_haveFrame) _popEffectFrame();
+      _enforceEffect(baseName);
+      _pushEffectFrame(baseName, _resolveFnAllowed(baseName));
+      _haveFrame = true;
 
       let func = interp.context.functions.get(baseName);
       // kebab ↔ snake 양방향 조회
@@ -689,6 +699,7 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
     }
     throw new Error(`TCO: 최대 반복(2,000,000) 초과 — '${currentName}'에서 무한 재귀 가능성`);
   } finally {
+    if (_haveFrame) _popEffectFrame();
     (interp as any).tcoMode = prevTcoMode;
   }
 }
@@ -700,6 +711,8 @@ export function callFunctionValueTCO(interp: InterpreterLike, fn: any, args: any
   const prevTcoMode = (interp as any).tcoMode;
   (interp as any).tcoMode = true;  // ← eval 중에 TailCall 토큰 생성 가능
 
+  // C4-2 (B): push/pop per iteration — currentFn 이 swap 될 때마다 frame 갱신.
+  let _haveFrame = false;
   try {
     let currentFn = fn;
     let currentArgs = args;
@@ -708,6 +721,14 @@ export function callFunctionValueTCO(interp: InterpreterLike, fn: any, args: any
       if (currentFn.kind !== "function-value") {
         throw new Error(`Expected function-value, got ${currentFn.kind}`);
       }
+
+      // C4-2: frame swap (anonymous fn 은 <anonymous> 로 push, allowed=null = legacy)
+      const _effName = (currentFn.name as string) ?? "<anonymous>";
+      if (_haveFrame) _popEffectFrame();
+      _enforceEffect(_effName);
+      _pushEffectFrame(_effName, _resolveFnAllowed(_effName));
+      _haveFrame = true;
+
       const savedStack = interp.context.variables.saveStack();
       let result: any;
       try {
@@ -722,17 +743,20 @@ export function callFunctionValueTCO(interp: InterpreterLike, fn: any, args: any
 
       if (isTailCall(result)) {
         if (typeof result.fn === "string") {
+          // TCO 위임: 현재 frame 정리하고 새 진입 (callUserFunctionTCO 가 자체 frame 관리)
+          if (_haveFrame) { _popEffectFrame(); _haveFrame = false; }
           return callUserFunctionTCO(interp, result.fn, result.args);
         } else {
           currentFn = result.fn;
           currentArgs = result.args;
-          continue;
+          continue;  // 다음 iteration 의 pop+push 로 frame 갱신
         }
       }
       return result;
     }
     throw new Error("TCO: 최대 반복(1,000,000) 초과 — function-value에서 무한 재귀 가능성");
   } finally {
+    if (_haveFrame) _popEffectFrame();
     (interp as any).tcoMode = prevTcoMode;  // ← 복구
   }
 }
@@ -743,32 +767,41 @@ export function callFunctionValueTCO(interp: InterpreterLike, fn: any, args: any
 export function callUserFunctionRaw(interp: InterpreterLike, name: string, args: any[]): any {
   const func = interp.context.functions.get(name);
   if (!func) throw new FunctionNotFoundError(name, interp.currentFilePath, interp.currentLine > 0 ? interp.currentLine : undefined);
-  if (typeof func.body === "function") return (func.body as Function)(...args);
 
-  let result: any;
-  if (func.capturedEnv) {
-    const savedStack = interp.context.variables.saveStack();
-    try {
-      interp.context.variables.fromSnapshot(func.capturedEnv);
-      for (let i = 0; i < func.params.length; i++) {
-        interp.context.variables.set(func.params[i], args[i]);
+  // C4-2: Raw 경로는 단일 호출 — 일반 frame 패턴 (enforce → push → try/finally → pop)
+  const _effBase = name.replace(/\[.*$/, "");
+  _enforceEffect(_effBase);
+  _pushEffectFrame(_effBase, _resolveFnAllowed(_effBase));
+  try {
+    if (typeof func.body === "function") return (func.body as Function)(...args);
+
+    let result: any;
+    if (func.capturedEnv) {
+      const savedStack = interp.context.variables.saveStack();
+      try {
+        interp.context.variables.fromSnapshot(func.capturedEnv);
+        for (let i = 0; i < func.params.length; i++) {
+          interp.context.variables.set(func.params[i], args[i]);
+        }
+        result = interp.eval(func.body);
+      } finally {
+        interp.context.variables.restoreStack(savedStack);
       }
-      result = interp.eval(func.body);
-    } finally {
-      interp.context.variables.restoreStack(savedStack);
-    }
-  } else {
-    interp.context.variables.push();
-    try {
-      for (let i = 0; i < func.params.length; i++) {
-        interp.context.variables.set(func.params[i], args[i]);
+    } else {
+      interp.context.variables.push();
+      try {
+        for (let i = 0; i < func.params.length; i++) {
+          interp.context.variables.set(func.params[i], args[i]);
+        }
+        result = interp.eval(func.body);
+      } finally {
+        interp.context.variables.pop();
       }
-      result = interp.eval(func.body);
-    } finally {
-      interp.context.variables.pop();
     }
+    return result;
+  } finally {
+    _popEffectFrame();
   }
-  return result;
 }
 
 /**
@@ -776,14 +809,23 @@ export function callUserFunctionRaw(interp: InterpreterLike, name: string, args:
  */
 export function callFunctionValueRaw(interp: InterpreterLike, fn: any, args: any[]): any {
   if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
-  const savedStack = interp.context.variables.saveStack();
+
+  // C4-2: Raw 경로는 단일 호출 — 일반 frame 패턴
+  const _effName = (fn.name as string) ?? "<anonymous>";
+  _enforceEffect(_effName);
+  _pushEffectFrame(_effName, _resolveFnAllowed(_effName));
   try {
-    interp.context.variables.fromSnapshot(fn.capturedEnv);
-    for (let i = 0; i < fn.params.length; i++) {
-      interp.context.variables.set(fn.params[i], args[i]);
+    const savedStack = interp.context.variables.saveStack();
+    try {
+      interp.context.variables.fromSnapshot(fn.capturedEnv);
+      for (let i = 0; i < fn.params.length; i++) {
+        interp.context.variables.set(fn.params[i], args[i]);
+      }
+      return interp.eval(fn.body);
+    } finally {
+      interp.context.variables.restoreStack(savedStack);
     }
-    return interp.eval(fn.body);
   } finally {
-    interp.context.variables.restoreStack(savedStack);
+    _popEffectFrame();
   }
 }
