@@ -792,7 +792,8 @@ static void emit_program(void) {
         E("}\n\n");
     }
     /* main */
-    E("int main(void) {\n");
+    E("int main(int argc, char** argv) {\n");
+    E("    fl_init_argv(argc, argv);\n");
     for (int i = 0; i < nnodes; i++) {
         N* n = nodes[i];
         if (!n || n->k != NL || n->nc < 1) continue;
@@ -852,16 +853,28 @@ int main(int argc, char** argv) {
     fclose(out);
 
     /* compile */
-    char cmd[4096];
+    char cmd[8192];
     snprintf(cmd, sizeof(cmd),
-        "gcc -I%s %s %s/runtime.c -o %s -lm",
-        runtime_dir, cfile, runtime_dir, binf);
+        "gcc -I%s %s %s/core.c %s/collection.c %s/math.c %s/json.c %s/io.c %s/process.c %s/error.c -o %s -lm",
+        runtime_dir, cfile,
+        runtime_dir, runtime_dir, runtime_dir, runtime_dir,
+        runtime_dir, runtime_dir, runtime_dir,
+        binf);
     int rc = system(cmd);
     remove(cfile);
     if (rc != 0) { fputs("error: compilation failed\n", stderr); return 1; }
 
-    /* run */
-    rc = system(binf);
+    /* run — forward remaining argv to compiled binary */
+    {
+        char run_cmd[8192];
+        snprintf(run_cmd, sizeof(run_cmd), "\"%s\"", binf);
+        for (int i = 2; i < argc; i++) {
+            strncat(run_cmd, " \"", sizeof(run_cmd) - strlen(run_cmd) - 1);
+            strncat(run_cmd, argv[i], sizeof(run_cmd) - strlen(run_cmd) - 1);
+            strncat(run_cmd, "\"", sizeof(run_cmd) - strlen(run_cmd) - 1);
+        }
+        rc = system(run_cmd);
+    }
     remove(binf);
     return rc;
 }
