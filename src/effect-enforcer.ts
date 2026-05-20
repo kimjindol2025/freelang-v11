@@ -23,6 +23,7 @@ import {
 } from "./effect-types";
 import { lookupBuiltinEffects } from "./builtin-effects";
 import { fnMetaRegistry } from "./eval-special-forms";
+import { recordEvent } from "./runtime-events";
 
 const _validTags: ReadonlySet<string> = new Set(EFFECT_TAGS);
 
@@ -180,13 +181,37 @@ export function enforceCall(
 
   for (const e of effects) {
     if (!cur.allowed.has(e)) {
+      const allowedArr = Array.from(cur.allowed);
+      const chainArr = getChainNames();
       const violation = new EffectViolation({
         fn: calleeName,
         target_effect: e,
-        allowed: Array.from(cur.allowed),
-        chain: getChainNames(),
+        allowed: allowedArr,
+        chain: chainArr,
         span,
       });
+
+      // C5: emit runtime event (fire-and-forget — record 실패해도 throw 진행)
+      // label=calleeName / expr=:target_effect 로 fingerprint 차별화
+      // (동일 violation 반복은 collapse, 다른 violation 은 별도 이벤트)
+      try {
+        recordEvent({
+          type: "effect-violation",
+          timestamp: Date.now(),
+          message: violation.message,
+          label: calleeName,
+          expr: ":" + e,
+          fn: calleeName,
+          target_effect: e,
+          allowed: allowedArr,
+          chain: chainArr,
+          file: span?.file,
+          line: span?.line,
+        });
+      } catch {
+        // fire-and-forget — record 실패는 본 enforcement 막지 않음
+      }
+
       trace(
         "violation",
         calleeName,

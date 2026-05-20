@@ -15,7 +15,7 @@ const SEVERITY_RANK: Record<EventSeverity, number> = {
 };
 
 export interface RuntimeEvent {
-  type: "debug" | "trace" | "assert-fail" | "runtime-error" | "contract-violation" | "mode-change" | "governance-action" | "budget-exceeded" | "watchdog-alert" | "context-aborted";
+  type: "debug" | "trace" | "assert-fail" | "runtime-error" | "contract-violation" | "mode-change" | "governance-action" | "budget-exceeded" | "watchdog-alert" | "context-aborted" | "effect-violation";
   severity: EventSeverity;
   eventId: number;
   traceId?: string;
@@ -32,6 +32,11 @@ export interface RuntimeEvent {
   contractName?: string;
   collapsed?: boolean;
   count?: number;
+  // C5: effect-violation fields (design §8-B)
+  fn?: string;
+  target_effect?: string;
+  allowed?: readonly string[];
+  chain?: readonly string[];
 }
 
 export const DEFAULT_SEVERITY: Record<RuntimeEvent["type"], EventSeverity> = {
@@ -45,6 +50,7 @@ export const DEFAULT_SEVERITY: Record<RuntimeEvent["type"], EventSeverity> = {
   "budget-exceeded":    "error",
   "watchdog-alert":     "warn",
   "context-aborted":    "warn",
+  "effect-violation":   "error",
 };
 
 const MAX_EVENTS = 1000;
