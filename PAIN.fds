@@ -152,6 +152,46 @@ FRICTION {
     workaround: "atom + swap! 패턴 사용"
     fix-target: "FL_V12 모드에서 atom 강제, v11 경고 억제 옵션 또는 let 재바인딩 지원"
   }
+
+  p18-tcp-server-raw-same-process-no-listen: {
+    what: "tcp-server-raw 호출 후 600ms fl-yield 했음에도 동일 프로세스 tcp-outbound가 ECONNREFUSED"
+    example: "(tcp-server-raw 19999 'srv-h') + (fl-yield 100) + (tcp-outbound '127.0.0.1' 19999 'cli-h') → cli-h가 'error','close' 수신, srv-h는 발화 0회"
+    impact: high
+    cause: "tcp-server-raw가 메인 스레드 net.createServer().listen() 사용 (eval-builtins.ts:1819). fl-yield의 Atomics.wait가 메인 스레드를 점유하면 libuv accept 콜백 발화 불가. YIELD-SEMANTICS 명시: 'tcp-server-raw도 YIELD-2 Worker 통합' — 실구현 미반영"
+    workaround: "테스트·검증 시 echo·RPC 서버를 외부 Node.js 프로세스로 분리"
+    fix-target: "tcp-server-raw 구현을 IO Worker 기반으로 이전 (현재 tcp-outbound가 사용하는 __ensureIoWorker 패턴). accept/data/close 이벤트도 ring buffer 경유 → fl-yield drain. eval-builtins.ts 1779~1822 재작성"
+    found: "YIELD-3 검증 #2"
+  }
+
+  p19-io-worker-process-hang: {
+    what: "tcp-outbound·rpc-client-call 사용 후 메인 코드 종료해도 process가 자연 종료되지 않음 (EXIT=124 timeout kill)"
+    example: "tests/yield3-2-echo.fl, yield3-3-rpc.fl 모두 [PASS] 출력 후에도 process 살아있음"
+    impact: medium
+    cause: "035e9a6c 'IO Worker unref()' 패치 후에도 ring buffer Atomics.wait·setInterval 등의 잔존 핸들 가능성"
+    workaround: "외부 timeout으로 강제 종료, CI에서는 child process timeout 설정"
+    fix-target: "IO Worker 종료 경로 점검: (1) tcp-drop 후 worker가 모든 socket close하는지, (2) ring buffer notify 슬롯 Atomics.wait 해제 호출, (3) keepalive setInterval unref 일관성"
+    found: "YIELD-3 검증 #2·#3"
+  }
+
+  p20-bootstrap-shebang-duplicate: {
+    what: "bootstrap.js 첫 줄 '#!/usr/bin/env node'가 외부 자동화에 의해 주기적으로 한 줄 더 prepend → SyntaxError"
+    example: "head -2 bootstrap.js → '#!/usr/bin/env node' 두 줄. 두 번째 # 토큰에서 파싱 실패"
+    impact: medium
+    cause: "외부 백그라운드 에이전트(미식별)가 산출물에 shebang 자동 추가 → 이미 있어도 중복 prepend"
+    workaround: "git checkout bootstrap.js 로 복원. 빌드/실행 직전 head -2 확인"
+    fix-target: "원인 에이전트 식별 후 중복 검사 추가. 빌드 산출물 보호(chmod a-w) 검토"
+    found: "YIELD-3 검증 중 2회 재발"
+  }
+
+  p21-rate-limiter-test-broken-by-design: {
+    what: "src/__tests__/rate-limiter.test.ts 6/7 FAIL — server.close is not a function, status 404"
+    example: "expect(status1).toBe(200) 받는 값 404. afterEach의 server.close() → TypeError"
+    impact: medium
+    cause: "**회귀 아님 — 작성 시점부터 broken**. d3b2432b(2026-05-04) 도입 시점에도 server_start 시그니처는 (portOrConfig)→string. 테스트는 (port, handler)→http.Server를 가정. 두 번째 인자(handler) 무시 → 라우트 미등록 → 404. 반환값 string에 .close() 호출 → TypeError"
+    workaround: "테스트를 격리하거나 server-get/post로 라우트 등록 후 server-start만 호출하는 패턴으로 재작성"
+    fix-target: "두 가지 정식 해결안: (1) 테스트를 실제 시그니처에 맞게 재작성: route 미리 등록 → server_start(port) 호출 → __activeServer.server.close() 사용. (2) server_start 시그니처를 http.Server 반환으로 변경 — 대규모 변경, AKL 등 의존 코드 다수 영향. (1) 권장"
+    found: "YIELD-3 npm run test:fast 1151/1157 — git log 추적 결과 d3b2432b 작성 시점부터 broken"
+  }
 }
 
 CONSTRAINT {

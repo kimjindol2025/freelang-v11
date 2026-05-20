@@ -76,6 +76,50 @@
       "cause": "런타임 버그 (2026-05-19 수정 완료)",
       "fix": "해당 패턴 workaround 불필요. 런타임에서 수정됨",
       "repeat_risk": "low"
+    },
+
+    "err-003": {
+      "t": "error",
+      "v": "tcp-server-raw 동일 프로세스에서 listen 미발화 — outbound가 ECONNREFUSED",
+      "cause": "IO Worker로 listen 명령 전달 후 net.createServer().listen() 호출이 실제로 일어나지 않거나 fl-yield와 별도 시점에 일어남",
+      "fix": "조사 필요. 외부 Node.js 서버로 우회 검증 가능. PAIN p18 참조",
+      "repeat_risk": "high",
+      "found": "YIELD-3 검증 #2 (2026-05-20)"
+    },
+
+    "err-004": {
+      "t": "error",
+      "v": "tcp-outbound·rpc-client-call 사용 후 process 자연 종료 안 됨 (EXIT=124)",
+      "cause": "035e9a6c IO Worker unref 패치에도 ring buffer Atomics.wait·setInterval 잔존",
+      "fix": "조사 필요. CI에서는 외부 timeout 사용. PAIN p19 참조",
+      "repeat_risk": "high",
+      "found": "YIELD-3 검증 #2·#3"
+    },
+
+    "err-005": {
+      "t": "error",
+      "v": "bootstrap.js shebang 자동 중복 prepend → SyntaxError",
+      "cause": "외부 백그라운드 에이전트(미식별)가 빌드 산출물에 shebang 자동 추가, 이미 있어도 중복",
+      "fix": "git checkout bootstrap.js 로 복원. 빌드/실행 전 head -2 확인. PAIN p20 참조",
+      "repeat_risk": "high",
+      "found": "YIELD-3 검증 중 2회 재발"
+    },
+
+    "err-006": {
+      "t": "error",
+      "v": "rate-limiter test 6/7 FAIL (server.close is not a function / status 404)",
+      "cause": "회귀 아님 — d3b2432b 도입 시점부터 broken. server_start (portOrConfig)→string 시그니처와 테스트의 (port, handler)→http.Server 가정 불일치",
+      "fix": "테스트를 실제 시그니처에 맞게 재작성 권장 (route 미리 등록 + __activeServer.server.close()). PAIN p21 참조",
+      "repeat_risk": "low",
+      "found": "YIELD-3 git log 추적"
+    },
+
+    "task-yield-3-done": {
+      "t": "decision",
+      "v": "YIELD-3 빌드+단위 검증 4/5 PASS — fl-yield·tcp-outbound·rpc-client-call·negative test 모두 동작",
+      "evidence": "tests/yield3-1-basic.fl tests/yield3-2-echo.fl tests/yield3-3-rpc.fl tests/yield3-4-negative.fl",
+      "remaining": "INV-1/INV-4/INV-5 충족, 부수 이슈 err-003~err-006는 별도 추적",
+      "date": "2026-05-20"
     }
 
   },

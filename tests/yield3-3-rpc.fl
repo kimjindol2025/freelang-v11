@@ -1,0 +1,15 @@
+;; YIELD-3 검증 #3: RPC call → fl-yield 루프로 응답(또는 timeout) 수신
+;; 무응답 stub(:30390) → 300ms timeout 발화 여부 확인 (fl-yield 동작 증명)
+(println "step-1 start")
+(define t0 (now-ms))
+(define outcome
+  (try
+    (do (rpc-client-call "127.0.0.1" 30390 1 "[]" 300) "ok")
+    (catch e (str "err:" (get e "message")))))
+(define elapsed (- (now-ms) t0))
+(println (str "step-2 outcome=" outcome " elapsed_ms=" elapsed))
+
+(if (and (>= elapsed 200) (<= elapsed 1000)
+         (str-includes outcome "timeout"))
+  (println "[PASS] #3 rpc timeout fired via fl-yield within window")
+  (println (str "[FAIL] #3 outcome=" outcome " elapsed=" elapsed)))

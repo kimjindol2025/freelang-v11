@@ -1,0 +1,8 @@
+(println "step-1 before tcp-outbound")
+(defn h [t u d] nil)
+(define up (tcp-outbound "127.0.0.1" 1 "h"))
+(println (str "step-2 up-id=" up))
+(fl-yield 50)
+(println "step-3 after fl-yield")
+(tcp-drop up)
+(println "step-4 after tcp-drop")
