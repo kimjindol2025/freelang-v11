@@ -115,15 +115,27 @@ current = stack.top()
 
 if current.allowed === null:
     pass                              // legacy frame, skip
-elif target_effects is null:
-    pass                              // callee가 legacy, skip
+elif target_effects === undefined:
+    pass                              // builtin absent — registry miss (legacy compat)
+elif target_effects === null:
+    pass                              // explicit-legacy untyped builtin (등록은 됐으나 분류 미정)
 elif target_effects ⊆ current.allowed:
     pass
 else:
     throw EffectViolation(...)
 ```
 
-> "callee가 legacy" 케이스는 보수적 허용. enforce를 점진 확장하기 위한 escape hatch. 추후 strict 모드에서 deny로 바꿀 수 있음.
+### 5-A. 3상태 의미론 (확정)
+
+| 값 | 의미 | enforce 동작 |
+|----|------|-------------|
+| `undefined` | builtin **absent** — registry에 entry 없음 (사용자 함수 or 미등록 builtin) | skip (legacy compat) |
+| `null` | **explicit-legacy** — 등록은 됐으나 분류 보류 | skip (legacy compat) |
+| `Set<EffectTag>` | **typed** builtin | subset 검사 후 위반 시 throw |
+
+→ future strict 모드에서는 `undefined` (= registry miss) 만 warn으로 승격 가능. `null` 은 명시적 escape hatch로 영구 보존.
+
+> "callee가 legacy" 케이스는 보수적 허용. enforce를 점진 확장하기 위한 escape hatch.
 
 ---
 
@@ -209,14 +221,23 @@ export const BUILTIN_EFFECTS = new Map<string, Set<EffectTag>>([
 ]);
 ```
 
-### 7-A. 등록 누락 시 동작
+### 7-A. 3상태 등록 (§5-A와 일치)
 
-미등록 builtin은 `null` (legacy 호환). enforce는 명시 등록된 것만.
+- **미등록** (`Map.get` → `undefined`) — registry miss, legacy compat skip
+- **명시적 `null` 등록** — typed로 올리지 못한 builtin을 의식적으로 escape하는 정식 표기
+- **`ReadonlySet<EffectTag>` 등록** — typed, enforce 대상
 
-### 7-B. 등록 정책
+### 7-B. 불변성 (freeze)
+
+- `BUILTIN_EFFECTS` 는 `ReadonlyMap` 으로 export
+- 각 Set은 생성 후 `Object.freeze` 적용 + `ReadonlySet<EffectTag>` 타입
+- runtime mutation 방지 (snapshot test deterministic)
+
+### 7-C. 등록 정책
 
 - 신규 builtin 추가 시 BUILTIN_EFFECTS 등록 의무화 (CI lint 후보).
-- "등록 안 함 = 묵시적 pure" 로 오해할 수 있으나, 현 단계에서는 의도된 보수적 fallback.
+- typed로 분류 어려운 경우 명시적 `null` 등록 후 사유 주석.
+- 등록 누락(= `undefined`) 은 enforce 대상이 아니나, future strict 모드에서 warn 후보.
 
 ---
 
