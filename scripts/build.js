@@ -63,9 +63,8 @@ const NODE_EXTERNALS = [
   "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
 ];
 
-function buildBootstrap() {
-  const esbuild = require("esbuild");
-  return esbuild.build({
+function bootstrapOpts() {
+  return {
     absWorkingDir: REPO,
     entryPoints: ["src/cli.ts"],
     bundle: true,
@@ -76,17 +75,28 @@ function buildBootstrap() {
     minify: false,
     external: NODE_EXTERNALS,
     logLevel: "info",
-  }).then(() => {
+  };
+}
+
+function buildBootstrap() {
+  const esbuild = require("esbuild");
+  return esbuild.build(bootstrapOpts()).then(() => {
     const size = fs.statSync(path.join(REPO, "bootstrap.js")).size;
     console.log(`bootstrap=built size=${Math.round(size / 1024)}KB`);
+  });
+}
+
+function watchBootstrap() {
+  const esbuild = require("esbuild");
+  return esbuild.context(bootstrapOpts()).then((ctx) => ctx.watch()).then(() => {
+    console.log("bootstrap=watching (Ctrl+C to stop)");
   });
 }
 
 // Node.js 빌드
 let nodeBuild;
 if (isWatch) {
-  console.error("[build] --watch 는 BP-4 에서 활성화 예정 (현재는 단발 build 만 지원)");
-  process.exit(2);
+  nodeBuild = watchBootstrap();
 } else {
   nodeBuild = buildBootstrap();
 }
