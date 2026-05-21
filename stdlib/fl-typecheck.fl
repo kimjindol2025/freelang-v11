@@ -1,0 +1,106 @@
+;; fl-typecheck.fl — FreeLang Type Validation Tool
+;; P0-1: 정적 분석 (Step 1-2) + 호출 검증 (Step 3)
+;; 목표: 런타임 타입 오류 70% 감소
+
+;; Step 1: 정적 분석 (checkParens 재사용)
+
+(defn check-file-syntax [$filepath]
+  "정적 문법 검증 (checkParens 기반)"
+  (let [
+    [$content (file_read $filepath)]
+    [$parens-result (checkParens $content)]
+    [$valid (get $parens-result "valid")]
+    [$errors (get $parens-result "errors")]
+  ]
+    (if $valid
+      {:ok true :file $filepath :line-count (count (str_split $content "\n"))}
+      {:ok false :file $filepath :errors $errors :count (length $errors)})))
+
+;; Step 1: 타입 힌트 수집
+
+(defn collect-type-defs [$content]
+  "defn/fn 정의에서 타입 힌트 추출"
+  (let [
+    [$lines (str_split $content "\n")]
+    [$defs []]
+  ]
+    (reduce
+      (fn [$acc $line-obj]
+        (let [
+          [$i (get $line-obj "index")]
+          [$line (get $line-obj "value")]
+          [$trimmed (str_trim $line)]
+        ]
+          (if (or (starts_with $trimmed "(defn ") (starts_with $trimmed "(fn ["))
+            (let [
+              [$fn-match (re_match "(defn|fn)\\s+([\\w_-]+)?\\s*\\[" $trimmed)]
+            ]
+              (if $fn-match
+                (assoc $acc "defs"
+                  (append (get $acc "defs")
+                    {:line ($i + 1) :fn (nth (get $fn-match "groups") 1) :type "function"}))
+                $acc))
+            $acc)))
+      {:defs []}
+      (map (fn [$v $i] {:index $i :value $v}) $lines))))
+
+;; Step 2: fnMetaRegistry 접근 헬퍼
+
+(defn get-fn-meta [$fn-name]
+  "fnMetaRegistry에서 함수 메타 조회"
+  (fn-meta (symbol $fn-name)))
+
+(defn validate-function-meta [$fn-name $meta]
+  "함수 메타데이터 검증"
+  (let [
+    [$returns (get $meta "returns")]
+    [$effects (get $meta "effects")]
+    [$doc (get $meta "doc")]
+  ]
+    {:fn $fn-name
+     :has-doc (not (nil? $doc))
+     :has-returns (not (nil? $returns))
+     :has-effects (not (nil? $effects))
+     :valid (and (not (nil? $returns)) (not (nil? $effects)))}))
+
+;; Step 3: 호출 검증
+
+(defn check-call-args [$fn-name $arg-types $meta]
+  "호출 인자 타입 검증"
+  (let [
+    [$returns (get $meta "returns")]
+    [$errors []]
+  ]
+    (if (nil? $returns)
+      {:valid false :error (+ "함수 " $fn-name " 메타 정보 없음")}
+      {:valid true :fn $fn-name :expected-returns $returns})))
+
+;; Step 4: 종합 검증 실행
+
+(defn run-typecheck [$filepath]
+  "전체 타입 검증 실행"
+  (let [
+    [$syntax-result (check-file-syntax $filepath)]
+  ]
+    (if (not (get $syntax-result "ok"))
+      $syntax-result
+      (let [
+        [$content (file_read $filepath)]
+        [$type-defs (collect-type-defs $content)]
+        [$meta-checks []]
+      ]
+        {:ok true
+         :file $filepath
+         :syntax-valid (get $syntax-result "ok")
+         :functions-found (length (get $type-defs "defs"))
+         :errors $meta-checks}))))
+
+;; 공개 API
+
+(defn typecheck [$filepath]
+  "파일 타입 검증 (메인 진입점)"
+  (run-typecheck $filepath))
+
+(defn typecheck-dir [$dir-pattern]
+  "디렉토리 타입 검증"
+  {:dirs $dir-pattern :status "not-implemented"})

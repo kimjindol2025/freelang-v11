@@ -24951,6 +24951,22 @@ function createHttpModule() {
         ...result.error && { error: result.error }
       };
     },
+    // http_get_bearer_json url token -> {:status 200 :data {...}}
+    "http_get_bearer_json": (url2, token) => {
+      const result = nodeHttpRequest(
+        url2,
+        "GET",
+        { "Authorization": `Bearer ${token}` }
+      );
+      if (result.error) {
+        return { status: 0, data: null, error: result.error };
+      }
+      try {
+        return { status: result.status, data: JSON.parse(result.body) };
+      } catch (err) {
+        return { status: result.status, data: null, error: err.message };
+      }
+    },
     // http_put url body -> {:status 200 :body "..."}
     "http_put": (url2, body) => {
       const result = nodeHttpRequest(
@@ -24979,6 +24995,25 @@ function createHttpModule() {
         ...result.error && { error: result.error }
       };
     },
+    // http_patch_json url data -> {:status 200 :data {...}}
+    "http_patch_json": (url2, data) => {
+      const body = JSON.stringify(data);
+      const result = nodeHttpRequest(
+        url2,
+        "PATCH",
+        { "Content-Type": "application/json" },
+        body
+      );
+      try {
+        return {
+          status: result.status,
+          data: result.body ? JSON.parse(result.body) : null,
+          ...result.error && { error: result.error }
+        };
+      } catch (err) {
+        return { status: result.status, data: null, error: err.message };
+      }
+    },
     // http_delete url -> {:status 200 :body "..."}
     "http_delete": (url2) => {
       const result = nodeHttpRequest(url2, "DELETE");
@@ -24987,6 +25022,18 @@ function createHttpModule() {
         body: result.body,
         ...result.error && { error: result.error }
       };
+    },
+    // http_delete_json url -> {:status 200 :data {...}}
+    "http_delete_json": (url2) => {
+      const result = nodeHttpRequest(url2, "DELETE");
+      if (result.error) {
+        return { status: 0, data: null, error: result.error };
+      }
+      try {
+        return { status: result.status, data: result.body ? JSON.parse(result.body) : null };
+      } catch (err) {
+        return { status: result.status, data: null, error: err.message };
+      }
     },
     // http_head url -> {:status 200 :body ""}
     "http_head": (url2) => {

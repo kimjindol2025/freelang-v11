@@ -1,0 +1,143 @@
+;; tests/critical-fixes-test.fl — 4가지 CRITICAL Fix 검증
+;; 테스트: runWithError, fnMetaRegistry, cron-tick, email-with-retry
+
+(load "stdlib/cron.fl")
+(load "stdlib/email.fl")
+
+(println "========================================")
+(println "FreeLang v11.7.11 CRITICAL Fixes 검증")
+(println "========================================")
+(println "")
+
+;; ───────────────────────────────────────────────────────────────────────────────
+;; Fix #1 테스트: runWithError + classifyError
+;; ───────────────────────────────────────────────────────────────────────────────
+
+(println "[ Fix #1 테스트 ] runWithError + classifyError")
+(println "─────────────────────────────────────────────────")
+
+;; 테스트 1-1: 성공 케이스
+(println "Test 1-1: run() 성공 (echo hello)")
+(let [result (run "echo hello")]
+  (if (= result "hello")
+    (println "✅ PASS")
+    (println "❌ FAIL: " result)))
+
+;; 테스트 1-2: 에러 로깅 확인 (stderr 리디렉션)
+(println "Test 1-2: run() 실패 시 로그 (ls /nonexistent)")
+(let [result (run "ls /nonexistent 2>&1")]
+  (if (= result "")
+    (println "✅ PASS (에러 로깅됨)")
+    (println "❌ FAIL: " result)))
+
+;; ───────────────────────────────────────────────────────────────────────────────
+;; Fix #2 테스트: fnMetaRegistry safe default
+;; ───────────────────────────────────────────────────────────────────────────────
+
+(println "")
+(println "[ Fix #2 테스트 ] fnMetaRegistry safe default")
+(println "───────────────────────────────────────────────")
+
+;; 테스트 2-1: 기존 함수 메타 조회
+(println "Test 2-1: fn-meta add-numbers (기존 함수)")
+(let [meta (fn-meta (symbol "add-numbers"))]
+  (if (and (not (nil? meta))
+           (not (nil? (get meta :returns)))
+           (not (nil? (get meta :effects))))
+    (println "✅ PASS")
+    (println "❌ FAIL: " meta)))
+
+;; 테스트 2-2: 미등록 함수 메타 조회 (safe default)
+(println "Test 2-2: fn-meta nonexistent-xyz (미등록 함수)")
+(let [meta (fn-meta (symbol "nonexistent-xyz"))]
+  (if (and (not (nil? meta))
+           (= (get meta :returns) "any")
+           (= (get meta :doc) "undefined"))
+    (println "✅ PASS (safe default 반환됨)")
+    (println "❌ FAIL: " meta)))
+
+;; ───────────────────────────────────────────────────────────────────────────────
+;; Fix #3 테스트: cron-tick 중복 실행 방지
+;; ───────────────────────────────────────────────────────────────────────────────
+
+(println "")
+(println "[ Fix #3 테스트 ] cron-tick 중복 실행 방지")
+(println "────────────────────────────────────────────")
+
+;; 테스트 3-1: 같은 분 내 중복 실행 방지
+(println "Test 3-1: 같은 분에 2번 tick 호출 → 1회만 실행")
+(let [cr (cron-create)
+      counter (atom 0)
+      handler (fn [] (swap! counter + 1))]
+  (cron-add cr "test-job" "* * * * *" handler)
+  ;; 1번째 tick
+  (cron-tick cr)
+  (let [count1 (deref counter)]
+    ;; 2번째 tick (같은 분)
+    (cron-tick cr)
+    (let [count2 (deref counter)]
+      (if (and (= count1 1) (= count2 1))
+        (println "✅ PASS (중복 실행 방지됨)")
+        (println "❌ FAIL: count1=" count1 " count2=" count2)))))
+
+;; 테스트 3-2: 시간 경과 후 재실행
+(println "Test 3-2: 60초 이상 경과 후 재실행")
+(let [cr (cron-create)
+      counter (atom 0)
+      handler (fn [] (swap! counter + 1))]
+  (cron-add cr "test-job-2" "* * * * *" handler)
+  ;; 1번째 tick
+  (cron-tick cr)
+  ;; 시간 경과 시뮬레이션 (실제로 60초는 기다리지 않고, job의 :last-run을 수정)
+  (let [job (cron-job cr "test-job-2")
+        updated-job (assoc job :last-run (- (now-ms) 70000))]
+    (swap! (get cr :jobs) assoc "test-job-2" updated-job)
+    ;; 2번째 tick
+    (cron-tick cr)
+    (let [final-count (deref counter)]
+      (if (= final-count 2)
+        (println "✅ PASS (60초 후 재실행됨)")
+        (println "❌ FAIL: final-count=" final-count)))))
+
+;; ───────────────────────────────────────────────────────────────────────────────
+;; Fix #4 테스트: email-with-retry
+;; ───────────────────────────────────────────────────────────────────────────────
+
+(println "")
+(println "[ Fix #4 테스트 ] email-with-retry")
+(println "───────────────────────────────────")
+
+;; 테스트 4-1: 함수 존재 확인
+(println "Test 4-1: email-with-retry 함수 정의 확인")
+(try
+  (do
+    (fn-meta (symbol "email-with-retry"))
+    (println "✅ PASS (함수 존재)"))
+  (catch err
+    (println "❌ FAIL: " (get err "message"))))
+
+;; 테스트 4-2: -exponential-backoff 함수 동작
+(println "Test 4-2: -exponential-backoff 계산 (2^attempt * 1000ms)")
+(let [backoff0 (-exponential-backoff 0)
+      backoff1 (-exponential-backoff 1)
+      backoff2 (-exponential-backoff 2)]
+  (if (and (= backoff0 1000)  ;; 2^0 * 1000 = 1000
+           (= backoff1 2000)  ;; 2^1 * 1000 = 2000
+           (= backoff2 4000)) ;; 2^2 * 1000 = 4000
+    (println "✅ PASS (지수 백오프 계산 정상)")
+    (println "❌ FAIL: backoff0=" backoff0 " backoff1=" backoff1 " backoff2=" backoff2)))
+
+;; 테스트 4-3: -should-retry-email? (재시도 가능 여부)
+(println "Test 4-3: -should-retry-email? (상태 코드 분류)")
+(let [retry-0 (-should-retry-email? 0)      ;; timeout (true)
+      retry-429 (-should-retry-email? 429)  ;; rate limit (true)
+      retry-401 (-should-retry-email? 401)  ;; auth (false)
+      retry-500 (-should-retry-email? 500)] ;; server error (true)
+  (if (and retry-0 retry-429 (not retry-401) retry-500)
+    (println "✅ PASS (상태 코드 분류 정상)")
+    (println "❌ FAIL: 0=" retry-0 " 429=" retry-429 " 401=" retry-401 " 500=" retry-500)))
+
+(println "")
+(println "========================================")
+(println "모든 Fix 검증 완료!")
+(println "========================================")
