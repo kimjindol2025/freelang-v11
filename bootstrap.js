@@ -2792,7 +2792,7 @@ var init_errors = __esm({
 // src/_stdlib-signatures.json
 var require_stdlib_signatures = __commonJS({
   "src/_stdlib-signatures.json"(exports2, module2) {
-    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "binary", name: "buf_u32be", params: "n", returns: "string (base64 of 4-byte big-endian uint32)" }, { module: "binary", name: "buf_u8", params: "n", returns: "string (base64 of 1 byte)" }, { module: "binary", name: "buf_str", params: "s", returns: "string (base64 of UTF-8 encoded string)" }, { module: "binary", name: "buf_concat", params: "list", returns: "string (base64 of concatenated byte buffers)" }, { module: "binary", name: "buf_len", params: "b64", returns: "number (byte count)" }, { module: "binary", name: "buf_read_u32be", params: "b64 offset", returns: "number (big-endian uint32 at byte offset)" }, { module: "binary", name: "buf_read_u8", params: "b64 offset", returns: "number (uint8 at byte offset)" }, { module: "binary", name: "buf_read_str", params: "b64 offset len", returns: "string (UTF-8 string from byte range)" }, { module: "binary", name: "buf_crc32", params: "b64", returns: "number (IEEE 802.3 CRC32 of all bytes)" }, { module: "binary", name: "buf_slice", params: "b64 offset len", returns: "string (sub-buffer as base64)" }, { module: "binary", name: "buf_from_bytes", params: "b64", returns: "string (alias: identity, for clarity in code)" }, { module: "binary", name: "buf_f64le", params: "n", returns: "string (base64 of 8-byte float64 little-endian)" }, { module: "binary", name: "buf_read_f64le", params: "b64 offset", returns: "number (float64 LE at byte offset)" }, { module: "binary", name: "buf_u32le", params: "n", returns: "string (base64 of 4-byte uint32 little-endian)" }, { module: "binary", name: "buf_read_u32le", params: "b64 offset", returns: "number (uint32 LE at byte offset)" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "capture-error", name: "capture_error_args", params: "fn args context?", returns: "{ok, result, error?}" }, { module: "capture-error", name: "error_log", params: "", returns: "[{message, name, stack, timestamp, context?}, ...]" }, { module: "capture-error", name: "error_log_clear", params: "", returns: "count cleared" }, { module: "capture-error", name: "error_log_last", params: "n?", returns: "last n errors (default 10)" }, { module: "capture-error", name: "error_count", params: "", returns: "number of captured errors" }, { module: "capture-error", name: "make_error", params: "message name? code?", returns: "plain object" }, { module: "capture-error", name: "error_message", params: "err", returns: "string" }, { module: "capture-error", name: "error_stack", params: "err", returns: "[string]" }, { module: "capture-error", name: "retry", params: "fn attempts delay_ms?", returns: "{ok, result, attempts_used, error?}" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "frequencies", params: "arr", returns: "{value: count}  (count occurrences of each value)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "csv-parse", params: "text [delimiter]", returns: "[[string]] (quoted fields \uC644\uC804 \uC9C0\uC6D0)" }, { module: "data", name: "csv-parse-map", params: "text [delimiter]", returns: "[{header: val}] (\uD5E4\uB354 \uD3EC\uD568 \uD30C\uC2F1)" }, { module: "data", name: "csv-stringify", params: "rows [delimiter]", returns: "string" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "data", name: "empty?", params: "x", returns: "boolean (\uBC30\uC5F4/\uBB38\uC790\uC5F4/\uAC1D\uCCB4/nil \uBAA8\uB450 \uC9C0\uC6D0)" }, { module: "data", name: "array-empty?", params: "x", returns: "boolean (\uBC30\uC5F4\uB9CC \uD655\uC778)" }, { module: "data", name: "str_replace_in", params: "s old new", returns: "string (replaceAll, \uC778\uC790 \uC21C\uC11C: s \uBA3C\uC800)" }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: '""' }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: 'fd  (modes: "r" "w" "a" "r+")' }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean" }, { module: "fd", name: "fd_tell", params: "fd", returns: "number (current position)" }, { module: "fd", name: "fd_size", params: "fd", returns: "number (file size in bytes)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (UTF-8, advances position)" }, { module: "fd", name: "fd_read_bytes", params: "fd bytes", returns: "string (base64-encoded binary, advances position)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (UTF-8, advances position)" }, { module: "fd", name: "fd_write_bytes", params: "fd base64data", returns: "number (bytes written, binary via base64)" }, { module: "fd", name: "fd_truncate", params: "fd size", returns: "boolean (truncate file at given byte offset)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush fd to disk)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "file", name: "file_read_or", params: "filePath defaultVal", returns: "string | any (\uD30C\uC77C \uC5C6\uAC70\uB098 \uC624\uB958 \uC2DC \uAE30\uBCF8\uAC12 \uBC18\uD658)" }, { module: "http-macro", name: "http_get_json", params: "url headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_post_json", params: "url body headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_ok?", params: "result", returns: "boolean" }, { module: "http-macro", name: "http_body", params: "result", returns: "parsed body or null" }, { module: "http-macro", name: "http_status", params: "result", returns: "number" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_static", params: "dir [urlPrefix]", returns: 'null  \uC815\uC801 \uD30C\uC77C \uC11C\uBE59 (server-static "public" "/")' }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_csp_nonce", params: "", returns: "string (\uD604\uC7AC \uC694\uCCAD\uC758 CSP nonce \u2014 <script nonce=...> \uB4F1\uC5D0 \uC0AC\uC6A9)" }, { module: "http-server", name: "server_set_cookie", params: "name value opts", returns: "cookie string (HttpOnly+Secure+SameSite \uC790\uB3D9)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_files", params: "req", returns: "array of multipart files" }, { module: "http-server", name: "server_req_fields", params: "req", returns: "map of multipart text fields" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_post_bearer", params: "url body token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_retry_post", params: "url body token retries", returns: '{:status 200 :body "..."}' }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "http", name: "http-post-data", params: "url data", returns: "parsed JSON data | nil  (#12 \uD574\uACB0)" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "optional", name: "require_optional", params: "modName", returns: "true/false (\uC124\uCE58 \uC5EC\uBD80)" }, { module: "optional", name: "optional_call", params: "modName fnPath args", returns: "result or throws" }, { module: "optional", name: "optional_has?", params: "modName", returns: "boolean" }, { module: "optional", name: "optional_version", params: "modName", returns: "string or nil" }, { module: "perf", name: "profile_fn", params: "fn count", returns: "PerfResult" }, { module: "perf", name: "trace_expr", params: "fn label", returns: "TraceResult" }, { module: "perf", name: "perf_stats", params: "", returns: "PerfStats" }, { module: "perf", name: "now_ms", params: "", returns: "number" }, { module: "perf", name: "elapsed_ms", params: "start", returns: "number" }, { module: "perf", name: "bench", params: "fn iterations", returns: "{ms, ops_per_sec}" }, { module: "perf", name: "time_fn", params: "fn args...", returns: "{result, ms}" }, { module: "process", name: "shell_exec_stdout", params: "cmd cwd?", returns: "string | null (stdout\uB9CC \uBC18\uD658, \uC2E4\uD328 \uC2DC null)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "rest-crud", name: "route_info", params: "basePath", returns: "{base, param_name, supported_ops: [...]}" }, { module: "rest-crud", name: "path_param", params: "req paramName", returns: "string or nil" }, { module: "rest-crud", name: "rest_response", params: "status body", returns: "Map" }, { module: "rest-crud", name: "rest_ok", params: "body", returns: "Map (200)" }, { module: "rest-crud", name: "rest_created", params: "body", returns: "Map (201)" }, { module: "rest-crud", name: "rest_not_found", params: "msg", returns: "Map (404)" }, { module: "rest-crud", name: "rest_error", params: "status msg", returns: "Map" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_safe", params: "program args", returns: "string (\uC778\uC790 \uBC30\uC5F4 \uBC29\uC2DD \u2014 \uC0AC\uC6A9\uC790 \uC785\uB825 \uC548\uC804 \uC2E4\uD589, sh -c \uBBF8\uC0AC\uC6A9)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string | null (\uD658\uACBD\uBCC0\uC218 \uC5C6\uC73C\uBA74 null)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "verify", name: "check_parens", params: "code", returns: "VerifyResult" }, { module: "verify", name: "verify_code", params: "code", returns: "{valid, error_count, first_error}" }, { module: "verify", name: "fix_parens", params: "code", returns: "\uC790\uB3D9 \uC218\uC815\uB41C \uCF54\uB4DC (or original if already valid)" }, { module: "verify", name: "count_parens", params: "code", returns: "{open, close, balanced}" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
+    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "binary", name: "buf_u32be", params: "n", returns: "string (base64 of 4-byte big-endian uint32)" }, { module: "binary", name: "buf_u8", params: "n", returns: "string (base64 of 1 byte)" }, { module: "binary", name: "buf_str", params: "s", returns: "string (base64 of UTF-8 encoded string)" }, { module: "binary", name: "buf_concat", params: "list", returns: "string (base64 of concatenated byte buffers)" }, { module: "binary", name: "buf_len", params: "b64", returns: "number (byte count)" }, { module: "binary", name: "buf_read_u32be", params: "b64 offset", returns: "number (big-endian uint32 at byte offset)" }, { module: "binary", name: "buf_read_u8", params: "b64 offset", returns: "number (uint8 at byte offset)" }, { module: "binary", name: "buf_read_str", params: "b64 offset len", returns: "string (UTF-8 string from byte range)" }, { module: "binary", name: "buf_crc32", params: "b64", returns: "number (IEEE 802.3 CRC32 of all bytes)" }, { module: "binary", name: "buf_slice", params: "b64 offset len", returns: "string (sub-buffer as base64)" }, { module: "binary", name: "buf_from_bytes", params: "b64", returns: "string (alias: identity, for clarity in code)" }, { module: "binary", name: "buf_f64le", params: "n", returns: "string (base64 of 8-byte float64 little-endian)" }, { module: "binary", name: "buf_read_f64le", params: "b64 offset", returns: "number (float64 LE at byte offset)" }, { module: "binary", name: "buf_u32le", params: "n", returns: "string (base64 of 4-byte uint32 little-endian)" }, { module: "binary", name: "buf_read_u32le", params: "b64 offset", returns: "number (uint32 LE at byte offset)" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "capture-error", name: "capture_error_args", params: "fn args context?", returns: "{ok, result, error?}" }, { module: "capture-error", name: "error_log", params: "", returns: "[{message, name, stack, timestamp, context?}, ...]" }, { module: "capture-error", name: "error_log_clear", params: "", returns: "count cleared" }, { module: "capture-error", name: "error_log_last", params: "n?", returns: "last n errors (default 10)" }, { module: "capture-error", name: "error_count", params: "", returns: "number of captured errors" }, { module: "capture-error", name: "make_error", params: "message name? code?", returns: "plain object" }, { module: "capture-error", name: "error_message", params: "err", returns: "string" }, { module: "capture-error", name: "error_stack", params: "err", returns: "[string]" }, { module: "capture-error", name: "retry", params: "fn attempts delay_ms?", returns: "{ok, result, attempts_used, error?}" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "frequencies", params: "arr", returns: "{value: count}  (count occurrences of each value)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "csv-parse", params: "text [delimiter]", returns: "[[string]] (quoted fields \uC644\uC804 \uC9C0\uC6D0)" }, { module: "data", name: "csv-parse-map", params: "text [delimiter]", returns: "[{header: val}] (\uD5E4\uB354 \uD3EC\uD568 \uD30C\uC2F1)" }, { module: "data", name: "csv-stringify", params: "rows [delimiter]", returns: "string" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "data", name: "empty?", params: "x", returns: "boolean (\uBC30\uC5F4/\uBB38\uC790\uC5F4/\uAC1D\uCCB4/nil \uBAA8\uB450 \uC9C0\uC6D0)" }, { module: "data", name: "array-empty?", params: "x", returns: "boolean (\uBC30\uC5F4\uB9CC \uD655\uC778)" }, { module: "data", name: "str_replace_in", params: "s old new", returns: "string (replaceAll, \uC778\uC790 \uC21C\uC11C: s \uBA3C\uC800)" }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: '""' }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "file", name: "file_read_or", params: "filePath defaultVal", returns: "string | any (\uD30C\uC77C \uC5C6\uAC70\uB098 \uC624\uB958 \uC2DC \uAE30\uBCF8\uAC12 \uBC18\uD658)" }, { module: "http-macro", name: "http_get_json", params: "url headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_post_json", params: "url body headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_ok?", params: "result", returns: "boolean" }, { module: "http-macro", name: "http_body", params: "result", returns: "parsed body or null" }, { module: "http-macro", name: "http_status", params: "result", returns: "number" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_static", params: "dir [urlPrefix]", returns: 'null  \uC815\uC801 \uD30C\uC77C \uC11C\uBE59 (server-static "public" "/")' }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_csp_nonce", params: "", returns: "string (\uD604\uC7AC \uC694\uCCAD\uC758 CSP nonce \u2014 <script nonce=...> \uB4F1\uC5D0 \uC0AC\uC6A9)" }, { module: "http-server", name: "server_set_cookie", params: "name value opts", returns: "cookie string (HttpOnly+Secure+SameSite \uC790\uB3D9)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_files", params: "req", returns: "array of multipart files" }, { module: "http-server", name: "server_req_fields", params: "req", returns: "map of multipart text fields" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_post_bearer", params: "url body token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_retry_post", params: "url body token retries", returns: '{:status 200 :body "..."}' }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "http", name: "http-post-data", params: "url data", returns: "parsed JSON data | nil  (#12 \uD574\uACB0)" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "optional", name: "require_optional", params: "modName", returns: "true/false (\uC124\uCE58 \uC5EC\uBD80)" }, { module: "optional", name: "optional_call", params: "modName fnPath args", returns: "result or throws" }, { module: "optional", name: "optional_has?", params: "modName", returns: "boolean" }, { module: "optional", name: "optional_version", params: "modName", returns: "string or nil" }, { module: "perf", name: "profile_fn", params: "fn count", returns: "PerfResult" }, { module: "perf", name: "trace_expr", params: "fn label", returns: "TraceResult" }, { module: "perf", name: "perf_stats", params: "", returns: "PerfStats" }, { module: "perf", name: "now_ms", params: "", returns: "number" }, { module: "perf", name: "elapsed_ms", params: "start", returns: "number" }, { module: "perf", name: "bench", params: "fn iterations", returns: "{ms, ops_per_sec}" }, { module: "perf", name: "time_fn", params: "fn args...", returns: "{result, ms}" }, { module: "process", name: "shell_exec_stdout", params: "cmd cwd?", returns: "string | null (stdout\uB9CC \uBC18\uD658, \uC2E4\uD328 \uC2DC null)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "rest-crud", name: "route_info", params: "basePath", returns: "{base, param_name, supported_ops: [...]}" }, { module: "rest-crud", name: "path_param", params: "req paramName", returns: "string or nil" }, { module: "rest-crud", name: "rest_response", params: "status body", returns: "Map" }, { module: "rest-crud", name: "rest_ok", params: "body", returns: "Map (200)" }, { module: "rest-crud", name: "rest_created", params: "body", returns: "Map (201)" }, { module: "rest-crud", name: "rest_not_found", params: "msg", returns: "Map (404)" }, { module: "rest-crud", name: "rest_error", params: "status msg", returns: "Map" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_safe", params: "program args", returns: "string (\uC778\uC790 \uBC30\uC5F4 \uBC29\uC2DD \u2014 \uC0AC\uC6A9\uC790 \uC785\uB825 \uC548\uC804 \uC2E4\uD589, sh -c \uBBF8\uC0AC\uC6A9)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string | null (\uD658\uACBD\uBCC0\uC218 \uC5C6\uC73C\uBA74 null)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "verify", name: "check_parens", params: "code", returns: "VerifyResult" }, { module: "verify", name: "verify_code", params: "code", returns: "{valid, error_count, first_error}" }, { module: "verify", name: "fix_parens", params: "code", returns: "\uC790\uB3D9 \uC218\uC815\uB41C \uCF54\uB4DC (or original if already valid)" }, { module: "verify", name: "count_parens", params: "code", returns: "{open, close, balanced}" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
   }
 });
 
@@ -5084,6 +5084,3017 @@ function rejectedPromise(error) {
 // src/eval-builtins.ts
 init_errors();
 
+// src/effect-types.ts
+var EFFECT_TAGS = Object.freeze([
+  "pure",
+  "io",
+  "net",
+  "process",
+  "time",
+  "random"
+]);
+var EffectViolation = class _EffectViolation extends Error {
+  constructor(args3) {
+    super(_EffectViolation.formatMessage(args3));
+    this.name = "EffectViolation";
+    this.fn = args3.fn;
+    this.target_effect = args3.target_effect;
+    this.allowed = args3.allowed;
+    this.chain = args3.chain;
+    this.span = args3.span;
+  }
+  static formatMessage(args3) {
+    const ctxLabel = args3.allowed.length === 0 ? "pure" : `[:${args3.allowed.join(" :")}]`;
+    const spanStr = args3.span ? `${args3.span.file}:${args3.span.line}:${args3.span.col}` : "<unknown>";
+    const chainLines = args3.chain.length === 0 ? ["    <empty>"] : args3.chain.map((n) => `    \u2192 ${n}`);
+    return [
+      `EffectViolation:`,
+      `  ${ctxLabel} context cannot call :${args3.target_effect} function '${args3.fn}'`,
+      ``,
+      `  effect-chain:`,
+      ...chainLines,
+      ``,
+      `  allowed: [${args3.allowed.map((e) => ":" + e).join(" ")}]`,
+      `  required: :${args3.target_effect}`,
+      `  span: ${spanStr}`
+    ].join("\n");
+  }
+};
+
+// src/builtin-effects.ts
+function tagged(...tags) {
+  return Object.freeze(new Set(tags));
+}
+var _entries = [
+  // :io — 파일·콘솔·DB
+  ["file-write", tagged("io")],
+  ["file-read", tagged("io")],
+  ["file-append", tagged("io")],
+  ["file-delete", tagged("io")],
+  ["file-append-line", tagged("io")],
+  ["file-exists", tagged("io")],
+  ["db-exec", tagged("io")],
+  ["db-query", tagged("io")],
+  ["db-transaction", tagged("io")],
+  ["println", tagged("io")],
+  ["print", tagged("io")],
+  // :net
+  ["http-get", tagged("net")],
+  ["http-post", tagged("net")],
+  ["ws-send", tagged("net")],
+  ["server-start", tagged("net")],
+  // :process
+  ["shell-exec", tagged("process")],
+  ["process-spawn", tagged("process")],
+  // :time
+  ["now", tagged("time")],
+  ["now-ms", tagged("time")],
+  ["sleep", tagged("time")],
+  // :random
+  ["rand", tagged("random")],
+  ["rand-int", tagged("random")],
+  ["uuid", tagged("random")]
+];
+var _map = new Map(_entries);
+function lookupBuiltinEffects(name) {
+  return _map.get(name);
+}
+
+// src/eval-special-forms.ts
+init_ast();
+
+// src/tco.ts
+var TAIL_CALL = /* @__PURE__ */ Symbol("TAIL_CALL");
+function tailCall(fn, args3) {
+  return { [TAIL_CALL]: true, fn, args: args3 };
+}
+function isTailCall(v) {
+  return v !== null && typeof v === "object" && v[TAIL_CALL] === true;
+}
+
+// src/runtime-governance.ts
+var _mode = "normal";
+var _traceEnabled = true;
+var _debugEnabled = true;
+var _frozenContracts = /* @__PURE__ */ new Set();
+var _escalationCounts = /* @__PURE__ */ new Map();
+var _throttledContracts = /* @__PURE__ */ new Set();
+function getRuntimeMode() {
+  return _mode;
+}
+function isTraceEnabled() {
+  return _traceEnabled;
+}
+function isDebugEnabled() {
+  return _debugEnabled;
+}
+function isContractFrozen(name) {
+  return _frozenContracts.has(name);
+}
+function setRuntimeMode(newMode) {
+  _mode = newMode;
+  if (newMode === "panic") {
+    _traceEnabled = false;
+    _debugEnabled = false;
+  } else if (newMode === "protected") {
+    _traceEnabled = false;
+  } else if (newMode === "normal") {
+    _traceEnabled = true;
+    _debugEnabled = true;
+    _frozenContracts.clear();
+    _throttledContracts.clear();
+    _escalationCounts.clear();
+  }
+}
+function autoTransitionMode(healthScore, recentBurstCount) {
+  if (_mode === "panic") return;
+  if (healthScore < 0.5 || recentBurstCount >= 3) {
+    if (_mode !== "protected") setRuntimeMode("protected");
+  } else if (healthScore < 0.7) {
+    if (_mode === "normal") _mode = "degraded";
+  } else if (healthScore >= 0.9 && _mode === "degraded") {
+    setRuntimeMode("normal");
+  }
+}
+function applyGovernanceAction(action, contractName) {
+  switch (action) {
+    case "disable-trace":
+      _traceEnabled = false;
+      break;
+    case "drop-debug":
+      _debugEnabled = false;
+      break;
+    case "freeze-contract":
+      _frozenContracts.add(contractName);
+      break;
+    case "panic":
+      setRuntimeMode("panic");
+      break;
+    case "clear-events":
+      _clearEventsRequested = true;
+      break;
+  }
+}
+var _clearEventsRequested = false;
+function incrementEscalation(contractName) {
+  const n = (_escalationCounts.get(contractName) ?? 0) + 1;
+  _escalationCounts.set(contractName, n);
+  return n;
+}
+function recoverRuntime() {
+  setRuntimeMode("normal");
+  _frozenContracts.clear();
+  _throttledContracts.clear();
+  _escalationCounts.clear();
+  _clearEventsRequested = false;
+}
+function getRuntimePolicy() {
+  return {
+    "mode": _mode,
+    "trace-enabled": _traceEnabled,
+    "debug-enabled": _debugEnabled,
+    "collapse-enabled": true,
+    "active-contracts": -1,
+    // eval-builtins.ts에서 채움
+    "frozen-contracts": [..._frozenContracts],
+    "throttled-contracts": [..._throttledContracts]
+  };
+}
+
+// src/runtime-contracts.ts
+var _contracts = /* @__PURE__ */ new Map();
+var _throttleMap = /* @__PURE__ */ new Map();
+function defineContract(name, def) {
+  _contracts.set(name, { name, ...def });
+}
+function getContracts() {
+  return [..._contracts.values()];
+}
+function clearContracts() {
+  _contracts.clear();
+  _throttleMap.clear();
+}
+function checkContracts(buf, newEvent) {
+  const out = [];
+  const now = newEvent.timestamp;
+  for (const [name, c] of _contracts) {
+    if (isContractFrozen(name)) continue;
+    if (c.eventType !== "any" && c.eventType !== newEvent.type) continue;
+    if (c.errorKind && newEvent.errorKind !== c.errorKind) continue;
+    const windowStart = now - c.windowMs;
+    let matchCount = 0;
+    for (let i = buf.length - 1; i >= 0; i--) {
+      const e = buf[i];
+      if (e.timestamp < windowStart) break;
+      if (c.eventType !== "any" && e.type !== c.eventType) continue;
+      if (c.errorKind && e.errorKind !== c.errorKind) continue;
+      matchCount += e.count ?? 1;
+    }
+    if (matchCount < c.threshold) continue;
+    const lastFire = _throttleMap.get(name) ?? 0;
+    if (now - lastFire < Math.max(c.windowMs, 500)) continue;
+    _throttleMap.set(name, now);
+    const escalationCount = incrementEscalation(name);
+    const effectiveAction = c.escalationAction && c.escalationAt && escalationCount >= c.escalationAt ? c.escalationAction : c.action;
+    const sev = effectiveAction === "error" || effectiveAction === "panic" ? "error" : effectiveAction === "collapse" || effectiveAction === "disable-trace" ? "warn" : effectiveAction === "throttle" || effectiveAction === "drop-debug" ? "info" : effectiveAction === "freeze-contract" ? "warn" : "warn";
+    const governanceActions = ["disable-trace", "drop-debug", "freeze-contract", "clear-events", "panic"];
+    if (governanceActions.includes(effectiveAction)) {
+      applyGovernanceAction(effectiveAction, name);
+    }
+    out.push({
+      type: "contract-violation",
+      severity: sev,
+      contractName: name,
+      timestamp: now,
+      message: `Contract "${name}": ${matchCount} \xD7 ${c.eventType} in ${c.windowMs}ms (threshold ${c.threshold}, action: ${effectiveAction}${escalationCount > 1 ? `, escalation: ${escalationCount}` : ""})`,
+      value: { contractName: name, matchCount, threshold: c.threshold, action: effectiveAction, escalationLevel: escalationCount }
+    });
+  }
+  return out;
+}
+defineContract("auto:trace-explosion", {
+  eventType: "trace",
+  threshold: 50,
+  windowMs: 1e3,
+  action: "collapse"
+});
+defineContract("auto:assert-storm", {
+  eventType: "assert-fail",
+  threshold: 5,
+  windowMs: 5e3,
+  action: "warn"
+});
+defineContract("auto:error-burst", {
+  eventType: "runtime-error",
+  threshold: 5,
+  windowMs: 5e3,
+  action: "error"
+});
+defineContract("auto:trace-disable", {
+  eventType: "trace",
+  threshold: 200,
+  windowMs: 1e3,
+  action: "disable-trace"
+});
+defineContract("auto:panic-cascade", {
+  eventType: "runtime-error",
+  threshold: 10,
+  windowMs: 5e3,
+  action: "panic"
+});
+
+// src/runtime-budget.ts
+var BudgetExceededError = class extends Error {
+  constructor(kind, limit, actual, contextId) {
+    super(`Budget exceeded: ${kind} (limit=${limit}, actual=${actual})`);
+    this.kind = kind;
+    this.limit = limit;
+    this.actual = actual;
+    this.contextId = contextId;
+    this.name = "BudgetExceededError";
+  }
+};
+var _stack = [];
+var _budgetViolationCount = 0;
+function pushBudget(opts) {
+  _stack.push({ ...opts });
+}
+function popBudget() {
+  _stack.pop();
+}
+function hasBudget() {
+  return _stack.length > 0;
+}
+function getCurrentBudget() {
+  return _stack.length > 0 ? _stack[_stack.length - 1] : null;
+}
+function checkBudget(currentMs, currentEvents, currentRecursion) {
+  const b = getCurrentBudget();
+  if (!b) return;
+  if (b.maxMs !== void 0) {
+    const elapsed = currentMs - b.startMs;
+    if (elapsed > b.maxMs) {
+      _budgetViolationCount++;
+      throw new BudgetExceededError("max-ms", b.maxMs, elapsed, b.contextId);
+    }
+  }
+  if (b.maxEvents !== void 0) {
+    const used = currentEvents - b.startEvents;
+    if (used > b.maxEvents) {
+      _budgetViolationCount++;
+      throw new BudgetExceededError("max-events", b.maxEvents, used, b.contextId);
+    }
+  }
+  if (b.maxRecursion !== void 0) {
+    const depth = currentRecursion - b.startRecursion;
+    if (depth > b.maxRecursion) {
+      _budgetViolationCount++;
+      throw new BudgetExceededError("max-recursion", b.maxRecursion, depth, b.contextId);
+    }
+  }
+}
+function getBudgetViolationCount() {
+  return _budgetViolationCount;
+}
+function resetBudget() {
+  _stack.length = 0;
+  _budgetViolationCount = 0;
+}
+
+// src/runtime-watchdog.ts
+var STALL_THRESHOLD_MS = 1e4;
+var TRACE_STORM_RATE = 500;
+var _lastActivityMs = Date.now();
+var _lastEventCount = 0;
+var _alertCount = 0;
+var _alerts = [];
+function recordActivity(eventCount) {
+  const now = Date.now();
+  const elapsed = now - _lastActivityMs;
+  let alert = null;
+  const rate = elapsed > 0 ? (eventCount - _lastEventCount) / elapsed * 1e3 : 0;
+  if (rate > TRACE_STORM_RATE && elapsed < 1e3) {
+    alert = { kind: "trace-storm", elapsedMs: elapsed, eventCount };
+  }
+  _lastActivityMs = now;
+  _lastEventCount = eventCount;
+  if (alert) {
+    _alertCount++;
+    _alerts.push(alert);
+    if (_alerts.length > 20) _alerts.shift();
+  }
+  return alert;
+}
+function checkStall(eventCount) {
+  const now = Date.now();
+  const elapsed = now - _lastActivityMs;
+  if (elapsed > STALL_THRESHOLD_MS && eventCount === _lastEventCount) {
+    const alert = { kind: "stalled-execution", elapsedMs: elapsed, eventCount };
+    _alertCount++;
+    _alerts.push(alert);
+    if (_alerts.length > 20) _alerts.shift();
+    _lastActivityMs = now;
+    return alert;
+  }
+  return null;
+}
+function getWatchdogAlerts() {
+  return _alertCount;
+}
+function getRecentAlerts() {
+  return _alerts.slice();
+}
+function resetWatchdog() {
+  _lastActivityMs = Date.now();
+  _lastEventCount = 0;
+  _alertCount = 0;
+  _alerts.length = 0;
+}
+
+// src/runtime-events.ts
+var SEVERITY_RANK = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+  fatal: 4
+};
+var DEFAULT_SEVERITY = {
+  "debug": "debug",
+  "trace": "info",
+  "assert-fail": "error",
+  "runtime-error": "fatal",
+  "contract-violation": "warn",
+  "mode-change": "info",
+  "governance-action": "warn",
+  "budget-exceeded": "error",
+  "watchdog-alert": "warn",
+  "context-aborted": "warn",
+  "effect-violation": "error"
+};
+var MAX_EVENTS = 1e3;
+var _buf = [];
+var _eventIdCounter = 0;
+var _traceCounter = 0;
+var _minSeverity = null;
+function getNextEventId() {
+  return ++_eventIdCounter;
+}
+function newTraceId() {
+  return `trace-${++_traceCounter}`;
+}
+function setRuntimeFilter(minSev) {
+  _minSeverity = minSev;
+}
+function getRuntimeFilter() {
+  return _minSeverity;
+}
+function clearRuntimeFilter() {
+  _minSeverity = null;
+}
+function shouldRecord(sev) {
+  return _minSeverity === null || SEVERITY_RANK[sev] >= SEVERITY_RANK[_minSeverity];
+}
+function fingerprint(ev) {
+  return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}|${ev.contractName ?? ""}`;
+}
+function recordEvent(ev) {
+  if (ev.type === "trace" && !isTraceEnabled()) return;
+  if (ev.type === "debug" && !isDebugEnabled()) return;
+  if (ev.type !== "budget-exceeded" && ev.type !== "watchdog-alert" && ev.type !== "context-aborted") {
+    if (hasBudget()) {
+      checkBudget(Date.now(), _buf.length, 0);
+    }
+    recordActivity(_buf.length);
+  }
+  const sev = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
+  if (!shouldRecord(sev)) return;
+  const eventId = getNextEventId();
+  const full = { ...ev, severity: sev, eventId };
+  if (_buf.length > 0) {
+    const last = _buf[_buf.length - 1];
+    if (fingerprint(last) === fingerprint(full)) {
+      last.count = (last.count ?? 1) + 1;
+      last.collapsed = true;
+      last.timestamp = full.timestamp;
+      last.eventId = eventId;
+      return;
+    }
+  }
+  full.count = 1;
+  _buf.push(full);
+  if (_buf.length > MAX_EVENTS) _buf.shift();
+  if (full.type !== "contract-violation") {
+    const violations = checkContracts(_buf, full);
+    for (const vev of violations) {
+      const vid = getNextEventId();
+      const vfull = {
+        ...vev,
+        severity: vev.severity ?? "warn",
+        eventId: vid,
+        count: 1
+      };
+      _buf.push(vfull);
+      if (_buf.length > MAX_EVENTS) _buf.shift();
+    }
+  }
+}
+function getEvents() {
+  return _buf.slice();
+}
+function clearEvents() {
+  _buf.length = 0;
+}
+
+// src/runtime-context.ts
+var _contexts = /* @__PURE__ */ new Map();
+var _contextStack = [];
+var _abortedIds = /* @__PURE__ */ new Set();
+var _counter = 0;
+function nextContextId() {
+  return `ctx-${++_counter}`;
+}
+function pushContext(id) {
+  const ctxId = id ?? nextContextId();
+  _contexts.set(ctxId, { id: ctxId, startMs: Date.now(), active: true, aborted: false });
+  _contextStack.push(ctxId);
+  return ctxId;
+}
+function popContext() {
+  const id = _contextStack.pop();
+  if (id) {
+    const ctx = _contexts.get(id);
+    if (ctx) ctx.active = false;
+  }
+  return id ?? null;
+}
+function getCurrentContextId() {
+  return _contextStack.length > 0 ? _contextStack[_contextStack.length - 1] : null;
+}
+function abortContext(id) {
+  _abortedIds.add(id);
+  const ctx = _contexts.get(id);
+  if (ctx) {
+    ctx.aborted = true;
+    ctx.active = false;
+    return true;
+  }
+  return false;
+}
+function getActiveContexts() {
+  const now = Date.now();
+  return _contextStack.map((id) => _contexts.get(id)).filter((c) => !!c && c.active && !c.aborted).map((c) => ({ id: c.id, startMs: c.startMs, elapsedMs: now - c.startMs }));
+}
+function resetContexts() {
+  _contexts.clear();
+  _contextStack.length = 0;
+  _abortedIds.clear();
+  _counter = 0;
+}
+
+// src/result-type.ts
+function ok(value) {
+  return { _tag: "Ok", value };
+}
+function err(code, message, opts) {
+  return {
+    _tag: "Err",
+    code,
+    message,
+    category: opts?.category ?? "runtime-error" /* RUNTIME_ERROR */,
+    context: opts?.context,
+    hint: opts?.hint,
+    recoverable: opts?.recoverable ?? false
+  };
+}
+function isOk(r) {
+  return r._tag === "Ok";
+}
+function isErr(r) {
+  return r._tag === "Err";
+}
+function unwrap(r) {
+  if (isOk(r)) return r.value;
+  throw new Error(`[FreeLang Result] unwrap failed: [${r.code}] ${r.message}`);
+}
+function unwrapOr(r, defaultValue) {
+  if (isOk(r)) return r.value;
+  return defaultValue;
+}
+function mapOk(r, fn) {
+  if (isOk(r)) return ok(fn(r.value));
+  return r;
+}
+function mapErr(r, fn) {
+  if (isErr(r)) return fn(r);
+  return r;
+}
+function flatMap(r, fn) {
+  if (isOk(r)) return fn(r.value);
+  return r;
+}
+function recover(r, fn) {
+  if (isOk(r)) return r.value;
+  return fn(r);
+}
+function fromThrown(e, code = "UNKNOWN") {
+  if (typeof e === "string") {
+    return err(code, e);
+  }
+  if (e instanceof Error) {
+    const msg = e.message.toLowerCase();
+    let category = "runtime-error" /* RUNTIME_ERROR */;
+    if (msg.includes("not found") || msg.includes("undefined") || msg.includes("cannot find")) {
+      category = "not-found" /* NOT_FOUND */;
+    } else if (msg.includes("type") || msg.includes("is not a")) {
+      category = "type-error" /* TYPE_ERROR */;
+    } else if (msg.includes("arity") || msg.includes("argument")) {
+      category = "arity-error" /* ARITY */;
+    } else if (msg.includes("timeout")) {
+      category = "timeout" /* TIMEOUT */;
+    } else if (msg.includes("enoent") || msg.includes("eacces") || msg.includes("file")) {
+      category = "io-error" /* IO */;
+    }
+    return err(code, e.message, { category, recoverable: false });
+  }
+  return err(code, String(e));
+}
+
+// src/return-signal.ts
+var ReturnSignal = class {
+  constructor(value) {
+    this.value = value;
+  }
+};
+function isReturnSignal(e) {
+  return e instanceof ReturnSignal;
+}
+
+// src/compiler.ts
+var BytecodeCompiler = class {
+  compile(node) {
+    const chunk = {
+      instructions: [],
+      constants: [],
+      name: "main"
+    };
+    this.compileExpr(node, chunk);
+    this.emit(chunk, 25 /* HALT */);
+    return chunk;
+  }
+  compileExpr(node, chunk) {
+    switch (node.kind) {
+      case "literal":
+        this.compileLiteral(node, chunk);
+        break;
+      case "variable":
+        this.compileVariable(node, chunk);
+        break;
+      case "sexpr":
+        this.compileSExpr(node, chunk);
+        break;
+      case "block":
+        this.compileBlock(node, chunk);
+        break;
+      default:
+        this.emit(chunk, 25 /* HALT */);
+        break;
+    }
+  }
+  compileLiteral(node, chunk) {
+    if (node.type === "symbol" && typeof node.value === "string") {
+      const bareName = node.value;
+      if (bareName !== "true" && bareName !== "false" && bareName !== "null") {
+        this.emit(chunk, 1 /* PUSH_VAR */, "$" + bareName);
+        return;
+      }
+    }
+    const idx = this.addConst(chunk, node.value);
+    this.emit(chunk, 0 /* PUSH_CONST */, idx);
+  }
+  compileVariable(node, chunk) {
+    this.emit(chunk, 1 /* PUSH_VAR */, node.name);
+  }
+  compileSExpr(node, chunk) {
+    const op = node.op;
+    switch (op) {
+      case "if":
+        this.compileIf(node, chunk);
+        return;
+      case "define":
+        this.compileDefine(node, chunk);
+        return;
+      case "do":
+        this.compileDo(node, chunk);
+        return;
+      case "list":
+        this.compileList(node, chunk);
+        return;
+      case "not":
+        if (node.args.length >= 1) {
+          this.compileExpr(node.args[0], chunk);
+          this.emit(chunk, 22 /* NOT */);
+        }
+        return;
+      case "and":
+        this.compileAnd(node, chunk);
+        return;
+      case "or":
+        this.compileOr(node, chunk);
+        return;
+      case "get":
+      case ".":
+        if (node.args.length >= 2) {
+          this.compileExpr(node.args[0], chunk);
+          const field = node.args[1];
+          if (field.kind === "literal") {
+            this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
+          } else {
+            this.emit(chunk, 25 /* HALT */);
+          }
+        }
+        return;
+    }
+    const binaryOps = {
+      "+": 9 /* ADD */,
+      "-": 10 /* SUB */,
+      "*": 11 /* MUL */,
+      "/": 12 /* DIV */,
+      "%": 13 /* MOD */,
+      "mod": 13 /* MOD */,
+      "==": 14 /* EQ */,
+      "=": 14 /* EQ */,
+      "!=": 19 /* NEQ */,
+      "<": 15 /* LT */,
+      ">": 16 /* GT */,
+      "<=": 17 /* LE */,
+      ">=": 18 /* GE */
+    };
+    if (binaryOps[op] !== void 0) {
+      if (node.args.length >= 2) {
+        this.compileExpr(node.args[0], chunk);
+        this.compileExpr(node.args[1], chunk);
+        this.emit(chunk, binaryOps[op]);
+      } else if (node.args.length === 1) {
+        if (op === "-") {
+          const zeroIdx = this.addConst(chunk, 0);
+          this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
+          this.compileExpr(node.args[0], chunk);
+          this.emit(chunk, 10 /* SUB */);
+        } else {
+          this.compileExpr(node.args[0], chunk);
+        }
+      }
+      return;
+    }
+    this.emit(chunk, 25 /* HALT */);
+  }
+  compileIf(node, chunk) {
+    if (node.args.length < 2) {
+      this.emit(chunk, 25 /* HALT */);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    const jumpIfFalseIdx = chunk.instructions.length;
+    this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
+    this.compileExpr(node.args[1], chunk);
+    const jumpIdx = chunk.instructions.length;
+    this.emit(chunk, 5 /* JUMP */, 0);
+    const elseStart = chunk.instructions.length;
+    chunk.instructions[jumpIfFalseIdx].arg = elseStart;
+    if (node.args.length >= 3) {
+      this.compileExpr(node.args[2], chunk);
+    } else {
+      const nullIdx = this.addConst(chunk, null);
+      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+    }
+    const end = chunk.instructions.length;
+    chunk.instructions[jumpIdx].arg = end;
+  }
+  compileDefine(node, chunk) {
+    if (node.args.length < 2) {
+      this.emit(chunk, 25 /* HALT */);
+      return;
+    }
+    const varNode = node.args[0];
+    const valNode = node.args[1];
+    this.compileExpr(valNode, chunk);
+    const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
+    this.emit(chunk, 2 /* SET_VAR */, name);
+    const nullIdx = this.addConst(chunk, null);
+    this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+  }
+  compileDo(node, chunk) {
+    if (node.args.length === 0) {
+      const nullIdx = this.addConst(chunk, null);
+      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+      return;
+    }
+    for (let i = 0; i < node.args.length; i++) {
+      this.compileExpr(node.args[i], chunk);
+      if (i < node.args.length - 1) {
+        this.emit(chunk, 7 /* POP */);
+      }
+    }
+  }
+  compileList(node, chunk) {
+    for (const arg of node.args) {
+      this.compileExpr(arg, chunk);
+    }
+    this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
+  }
+  compileAnd(node, chunk) {
+    if (node.args.length === 0) {
+      const idx = this.addConst(chunk, true);
+      this.emit(chunk, 0 /* PUSH_CONST */, idx);
+      return;
+    }
+    if (node.args.length === 1) {
+      this.compileExpr(node.args[0], chunk);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    this.compileExpr(node.args[1], chunk);
+    this.emit(chunk, 20 /* AND */);
+  }
+  compileOr(node, chunk) {
+    if (node.args.length === 0) {
+      const idx = this.addConst(chunk, false);
+      this.emit(chunk, 0 /* PUSH_CONST */, idx);
+      return;
+    }
+    if (node.args.length === 1) {
+      this.compileExpr(node.args[0], chunk);
+      return;
+    }
+    this.compileExpr(node.args[0], chunk);
+    this.compileExpr(node.args[1], chunk);
+    this.emit(chunk, 21 /* OR */);
+  }
+  compileBlock(node, chunk) {
+    this.emit(chunk, 25 /* HALT */);
+  }
+  addConst(chunk, value) {
+    chunk.constants.push(value);
+    return chunk.constants.length - 1;
+  }
+  emit(chunk, op, arg) {
+    const instr = { op };
+    if (arg !== void 0) instr.arg = arg;
+    chunk.instructions.push(instr);
+  }
+};
+
+// src/vm-eligible.ts
+var vmFunctionRegistry = /* @__PURE__ */ new Map();
+function registerVMFunction(name, vmFunc) {
+  if (vmFunc) {
+    vmFunctionRegistry.set(name, vmFunc);
+  }
+}
+var VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
+  // 산술
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "mod",
+  // 비교
+  "=",
+  "==",
+  "!=",
+  "<",
+  ">",
+  "<=",
+  ">=",
+  // 논리
+  "and",
+  "or",
+  "not",
+  // 제어
+  "if",
+  "do",
+  // 데이터
+  "list",
+  "get",
+  ".",
+  // 정의
+  "define"
+]);
+function isVMEligible(node) {
+  if (!node || typeof node !== "object") {
+    return false;
+  }
+  const kind = node.kind;
+  switch (kind) {
+    case "literal":
+      return true;
+    case "variable":
+      return true;
+    case "sexpr": {
+      const sexpr = node;
+      if (!sexpr || !sexpr.op) {
+        return false;
+      }
+      if (!VM_SUPPORTED_OPS.has(sexpr.op)) {
+        return false;
+      }
+      if (!sexpr.args || !Array.isArray(sexpr.args)) {
+        return false;
+      }
+      return sexpr.args.every((arg) => isVMEligible(arg));
+    }
+    case "keyword":
+      return false;
+    case "block":
+      return false;
+    case "pattern-match":
+    case "try-block":
+    case "throw":
+    default:
+      return false;
+  }
+}
+
+// src/eval-special-forms.ts
+init_errors();
+
+// src/stdlib-property.ts
+var propRegistry = /* @__PURE__ */ new Map();
+var RAND_STRINGS = "abcdefghijklmnopqrstuvwxyz0123456789 _-";
+function genValue(type) {
+  const t = type.replace(/^:/, "").toLowerCase();
+  switch (t) {
+    case "int":
+    case "integer":
+      return Math.floor(Math.random() * 2001) - 1e3;
+    case "pos-int":
+    case "positive-int":
+      return Math.floor(Math.random() * 1e3) + 1;
+    case "neg-int":
+    case "negative-int":
+      return -(Math.floor(Math.random() * 1e3) + 1);
+    case "nat":
+    case "natural":
+      return Math.floor(Math.random() * 1e3);
+    case "float":
+    case "double":
+      return Math.random() * 2e3 - 1e3;
+    case "number":
+      return Math.random() < 0.5 ? Math.floor(Math.random() * 2001) - 1e3 : Math.random() * 2e3 - 1e3;
+    case "string":
+    case "str": {
+      const len = Math.floor(Math.random() * 20);
+      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
+    }
+    case "nonempty-string":
+    case "ne-string": {
+      const len = Math.floor(Math.random() * 19) + 1;
+      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
+    }
+    case "bool":
+    case "boolean":
+      return Math.random() < 0.5;
+    case "list":
+    case "array": {
+      const len = Math.floor(Math.random() * 10);
+      return Array.from({ length: len }, () => genValue("int"));
+    }
+    case "any":
+    default: {
+      const pick = Math.floor(Math.random() * 4);
+      if (pick === 0) return genValue("int");
+      if (pick === 1) return genValue("string");
+      if (pick === 2) return genValue("bool");
+      return null;
+    }
+  }
+}
+function generateSample(argTypes) {
+  return argTypes.map((t) => genValue(t));
+}
+function runProp(prop, callFn2, callCheck) {
+  const start = Date.now();
+  let passed = 0;
+  let failed = 0;
+  let firstFailure = null;
+  for (let i = 0; i < prop.samples; i++) {
+    const args3 = generateSample(prop.args);
+    try {
+      const result = callFn2(prop.fn, args3);
+      let checkArgs;
+      try {
+        const fnParams = prop.check?.params ?? [];
+        checkArgs = fnParams.length === args3.length + 1 ? [...args3, result] : args3;
+      } catch {
+        checkArgs = [...args3, result];
+      }
+      const ok2 = callCheck(prop.check, checkArgs);
+      if (ok2 || ok2 === null) {
+        passed++;
+      } else {
+        failed++;
+        if (!firstFailure) firstFailure = { args: args3, result };
+      }
+    } catch (err4) {
+      failed++;
+      if (!firstFailure) firstFailure = { args: args3, result: null, error: err4?.message ?? String(err4) };
+    }
+    if (failed > 0 && firstFailure) break;
+  }
+  return {
+    name: prop.name,
+    fn: prop.fn,
+    samples: prop.samples,
+    passed,
+    failed,
+    firstFailure,
+    durationMs: Date.now() - start
+  };
+}
+
+// src/eval-special-forms.ts
+function checkBudgetInLoop() {
+  if (hasBudget()) checkBudget(Date.now(), 0, 0);
+}
+var _vmCompiler = new BytecodeCompiler();
+var fnMetaRegistry = /* @__PURE__ */ new Map();
+var META_KEYS = /* @__PURE__ */ new Set(["doc", "returns", "context", "effects", "examples", "property"]);
+function extractMapMeta(mapNode) {
+  if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
+  const fields = mapNode.fields;
+  if (!fields || !(fields instanceof Map)) return null;
+  if (!META_KEYS.has([...fields.keys()].find((k) => META_KEYS.has(k)) ?? "")) return null;
+  const meta = {};
+  const strVal = (n) => n?.kind === "literal" ? String(n.value) : void 0;
+  if (fields.has("doc")) meta.doc = strVal(fields.get("doc"));
+  if (fields.has("returns")) meta.returns = strVal(fields.get("returns"));
+  if (fields.has("context")) meta.context = strVal(fields.get("context"));
+  if (fields.has("examples")) meta.examples = strVal(fields.get("examples"));
+  if (fields.has("effects")) {
+    const eNode = fields.get("effects");
+    if (eNode?.kind === "block" && eNode?.type === "Array") {
+      const items = eNode.fields?.get("items");
+      if (Array.isArray(items)) meta.effects = items.map((it) => strVal(it) ?? "?");
+    }
+  }
+  if (fields.has("property")) meta.property = fields.get("property");
+  return meta;
+}
+function inferType2(value) {
+  if (typeof value === "number") return { kind: "type", name: "number" };
+  if (typeof value === "string") return { kind: "type", name: "string" };
+  if (typeof value === "boolean") return { kind: "type", name: "boolean" };
+  if (value === null) return { kind: "type", name: "nil" };
+  if (Array.isArray(value)) return { kind: "type", name: "list" };
+  if (value && typeof value === "object") {
+    if (value["_isVMFunc"] || value.params) return { kind: "type", name: "function" };
+    return { kind: "type", name: "map" };
+  }
+  return void 0;
+}
+var EFFECT_CATALOG = /* @__PURE__ */ new Map([
+  // HTTP 클라이언트
+  ["http_get", "http"],
+  ["http-get", "http"],
+  ["http_post", "http"],
+  ["http-post", "http"],
+  ["http_put", "http"],
+  ["http-put", "http"],
+  ["http_delete", "http"],
+  ["http-delete", "http"],
+  ["http_patch", "http"],
+  ["http-patch", "http"],
+  ["http_get_bearer", "http"],
+  ["http_post_bearer", "http"],
+  ["http_post_json", "http"],
+  ["http_get_json", "http"],
+  // WebSocket — dec-011: L0=http, L1=net (alias 흡수)
+  ["ws_send", "http"],
+  ["ws-send", "http"],
+  // 파일 I/O
+  ["file_read", "file-read"],
+  ["file-read", "file-read"],
+  ["file_write", "file-write"],
+  ["file-write", "file-write"],
+  ["file_append", "file-write"],
+  ["file-append", "file-write"],
+  ["file_delete", "file-write"],
+  ["file-delete", "file-write"],
+  ["file_exists", "file-read"],
+  ["file-exists", "file-read"],
+  ["file_list", "file-read"],
+  ["file_append_line", "file-write"],
+  ["file-append-line", "file-write"],
+  // DB
+  ["db_query", "db-read"],
+  ["db-query", "db-read"],
+  ["db_execute", "db-write"],
+  ["db-execute", "db-write"],
+  ["db_insert", "db-write"],
+  ["db-insert", "db-write"],
+  ["db_update", "db-write"],
+  ["db-update", "db-write"],
+  ["db_delete", "db-write"],
+  ["db-delete", "db-write"],
+  ["db_transaction", "db-write"],
+  ["db-transaction", "db-write"],
+  ["db_exec", "db-write"],
+  ["db-exec", "db-write"],
+  // alias of db-execute
+  // Shell
+  ["shell_exec", "shell"],
+  ["shell-exec", "shell"],
+  ["shell_exec_result", "shell"],
+  ["shell-exec-result", "shell"],
+  ["shell_run", "shell"],
+  ["process_spawn", "shell"],
+  ["process-spawn", "shell"],
+  // I/O (stdout)
+  ["println", "io"],
+  ["print", "io"],
+  ["log/info", "io"],
+  ["log/warn", "io"],
+  ["log/error", "io"],
+  // 시간/랜덤 (non-determinism)
+  ["now", "time"],
+  ["timestamp", "time"],
+  ["now_ms", "time"],
+  ["now-ms", "time"],
+  ["sleep", "time"],
+  ["random", "random"],
+  ["rand-int", "random"],
+  ["rand", "random"],
+  // alias of random
+  ["uuid", "random"],
+  // HTTP 서버 시작
+  ["server_start", "server"],
+  ["server-start", "server"]
+]);
+function collectBodyEffects(node, found) {
+  if (!node) return;
+  if (node.kind === "sexpr") {
+    const op = node.op ?? "";
+    const eff = EFFECT_CATALOG.get(op);
+    if (eff) found.add(eff);
+    if (Array.isArray(node.args)) node.args.forEach((a) => collectBodyEffects(a, found));
+  } else if (node.kind === "block") {
+    if (node.fields instanceof Map) node.fields.forEach((v) => collectBodyEffects(v, found));
+  } else if (node.kind === "literal" || node.kind === "variable") {
+  }
+}
+function checkEffects(fnName, declaredEffects, bodyNode, line, isPure) {
+  const found = /* @__PURE__ */ new Set();
+  collectBodyEffects(bodyNode, found);
+  const pure = isPure || declaredEffects.length === 0;
+  const declaredSet = new Set(declaredEffects.map((e) => e.startsWith(":") ? e.slice(1) : e));
+  const undeclared = [];
+  for (const eff of found) {
+    if (!declaredSet.has(eff)) undeclared.push(eff);
+  }
+  if (undeclared.length > 0) {
+    const hint = undeclared.map((e) => `:${e}`).join(" ");
+    if (pure) {
+      throw new FLRuntimeError(
+        ErrorCodes.PURE_VIOLATION,
+        `${fnName}: ^pure \uD568\uC218\uC5D0\uC11C side effect \uAC10\uC9C0 \u2014 ${hint}`,
+        { fn: fnName, expected: "no side effects", got: hint },
+        void 0,
+        line
+      );
+    }
+    process.stderr.write(
+      `\x1B[33m[effects]\x1B[0m  \x1B[1m${fnName}\x1B[0m${line ? ` (line ${line})` : ""}  \uC120\uC5B8 \uC548 \uB41C effect: \x1B[33m${hint}\x1B[0m  \u2192 :effects \uC5D0 \uCD94\uAC00 \uD544\uC694
+`
+    );
+  }
+}
+function throwArgCount(fn, expected, got, line) {
+  throw new FLRuntimeError(
+    ErrorCodes.ARG_COUNT,
+    `${fn}: expects ${expected} args, got ${got}`,
+    { fn, expected, got: String(got) },
+    void 0,
+    line
+  );
+}
+function throwInvalidForm(fn, msg, line) {
+  throw new FLRuntimeError(
+    ErrorCodes.INVALID_FORM,
+    `${fn}: ${msg}`,
+    { fn },
+    void 0,
+    line
+  );
+}
+function throwFnNotFound(fnName, line) {
+  throw new FLRuntimeError(
+    ErrorCodes.FN_NOT_FOUND,
+    `Function not found: ${fnName}`,
+    { fn: fnName },
+    void 0,
+    line
+  );
+}
+function evalSpecialForm(interp2, op, expr2) {
+  const ev = (node) => interp2.eval(node);
+  const callUser = (name, a) => interp2.callUserFunction(name, a);
+  const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
+  const callAsyncFnVal = (fn, a) => interp2.callAsyncFunctionValue(fn, a);
+  const callFn2 = (fn, a) => interp2.callFunction(fn, a);
+  const ctx = interp2.context;
+  if (op === "trace") {
+    if (expr2.args.length === 0) return null;
+    const traceId2 = newTraceId();
+    const traceStart = Date.now();
+    const traceVal = ev(expr2.args[0]);
+    const traceElapsed = Date.now() - traceStart;
+    let traceExprText = "?";
+    try {
+      traceExprText = ctx.macroExpander.astToString(expr2.args[0]);
+    } catch {
+    }
+    const traceDisplay = interp2.toDisplayString ? interp2.toDisplayString(traceVal) : String(traceVal);
+    process.stderr.write(
+      `[TRACE]
+  expr:    ${traceExprText}
+  value:   ${traceDisplay}
+  elapsed: ${traceElapsed}ms
+`
+    );
+    recordEvent({
+      type: "trace",
+      traceId: traceId2,
+      timestamp: Date.now(),
+      file: interp2.currentFilePath,
+      line: expr2.line,
+      expr: traceExprText,
+      value: traceVal,
+      elapsedMs: traceElapsed
+    });
+    return traceVal;
+  }
+  if (op === "with-trace") {
+    if (expr2.args.length === 0) return null;
+    const _wtNodeStr = (n) => {
+      if (!n) return null;
+      if (n.kind === "keyword") return String(n.name);
+      if (n.kind === "literal" && (n.type === "string" || n.type === "symbol")) return String(n.value);
+      return null;
+    };
+    let wtSeverity;
+    let wtArgIdx = 0;
+    if (expr2.args.length >= 3) {
+      const keyStr = _wtNodeStr(expr2.args[0]);
+      if (keyStr === "severity") {
+        const sevStr = _wtNodeStr(expr2.args[1]) ?? "";
+        if (["debug", "info", "warn", "error", "fatal"].includes(sevStr)) {
+          wtSeverity = sevStr;
+          wtArgIdx = 2;
+        }
+      }
+    }
+    const wtBodyArg = expr2.args[wtArgIdx];
+    if (!wtBodyArg) return null;
+    const wtTraceId = newTraceId();
+    const prevLen = getEvents().length;
+    const wtStart = Date.now();
+    const wtVal = ev(wtBodyArg);
+    const wtElapsed = Date.now() - wtStart;
+    let wtExpr = "?";
+    try {
+      wtExpr = ctx.macroExpander.astToString(wtBodyArg);
+    } catch {
+    }
+    const childCount = getEvents().length - prevLen;
+    const wtDisplay = interp2.toDisplayString ? interp2.toDisplayString(wtVal) : String(wtVal);
+    recordEvent({
+      type: "trace",
+      traceId: wtTraceId,
+      timestamp: Date.now(),
+      severity: wtSeverity,
+      expr: `(with-trace ${wtExpr})`,
+      value: wtVal,
+      elapsedMs: wtElapsed
+    });
+    process.stderr.write(
+      `[with-trace] ${wtExpr}
+  value:   ${wtDisplay}
+  elapsed: ${wtElapsed}ms  events: ${childCount}
+`
+    );
+    return wtVal;
+  }
+  if (op === "defcontract") {
+    if (expr2.args.length < 2) throw new Error("defcontract requires name and config map");
+    const nameArg = expr2.args[0];
+    const contractName = nameArg.kind === "variable" ? String(nameArg.name).replace(/^\$/, "") : nameArg.kind === "literal" ? String(nameArg.value) : String(nameArg);
+    const configVal = ev(expr2.args[1]) ?? {};
+    const cfgGet = (k) => configVal[k] ?? configVal[":" + k] ?? null;
+    const cfgStr = (k) => {
+      const v = cfgGet(k);
+      return v != null ? String(v).replace(/^:/, "") : void 0;
+    };
+    const cfgNum = (k) => {
+      const v = cfgGet(k);
+      return v != null ? Number(v) : void 0;
+    };
+    const eventType = cfgStr("event-type") ?? "any";
+    const threshold = cfgNum("threshold") ?? 3;
+    const windowMs = cfgNum("window-ms") ?? 5e3;
+    const action = cfgStr("action") ?? "warn";
+    const errorKind = cfgStr("error-kind");
+    defineContract(contractName, {
+      eventType,
+      threshold,
+      windowMs,
+      action,
+      ...errorKind ? { errorKind } : {}
+    });
+    return contractName;
+  }
+  if (op === "with-budget") {
+    if (expr2.args.length < 2) throw new Error("with-budget requires budget-map and body");
+    const budgetMap = ev(expr2.args[0]) ?? {};
+    const bodyNode = expr2.args[1];
+    const cfgNum = (k) => {
+      const v = budgetMap[k] ?? budgetMap[":" + k];
+      return v != null ? Number(v) : void 0;
+    };
+    const maxMs = cfgNum("max-ms");
+    const maxEvents = cfgNum("max-events");
+    const maxRecursion = cfgNum("max-recursion");
+    const startMs = Date.now();
+    const startEvents = getEvents().length;
+    const startRecursion = interp2.callDepth ?? 0;
+    const ctxId = pushContext();
+    pushBudget({ maxMs, maxEvents, maxRecursion, startMs, startEvents, startRecursion, contextId: ctxId });
+    try {
+      const result = ev(bodyNode);
+      popBudget();
+      popContext();
+      return result;
+    } catch (e) {
+      popBudget();
+      popContext();
+      if (e instanceof BudgetExceededError) {
+        const actual = e.kind === "max-ms" ? Date.now() - startMs : e.kind === "max-events" ? getEvents().length - startEvents : interp2.callDepth - startRecursion;
+        recordEvent({
+          type: "budget-exceeded",
+          timestamp: Date.now(),
+          message: `Budget exceeded: ${e.kind} (limit=${e.limit}, actual=${actual})`,
+          label: e.kind,
+          value: { "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId }
+        });
+        return { "type": "budget-exceeded", "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId };
+      }
+      throw e;
+    }
+  }
+  if (op === "use") {
+    if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
+    const fs21 = require("fs");
+    const path19 = require("path");
+    let loadedAny = false;
+    for (const arg of expr2.args) {
+      let name = null;
+      if (arg.kind === "literal") name = String(arg.value);
+      else if (arg.kind === "variable") name = String(arg.name).replace(/^\$/, "");
+      if (!name) throwInvalidForm("use", "module name must be symbol or string", expr2.line);
+      const homeDir = require("os").homedir();
+      const candidates = [
+        path19.resolve(process.cwd(), "plugins", name + ".fl"),
+        path19.resolve(homeDir, ".fl", "plugins", name + ".fl"),
+        path19.resolve(process.cwd(), "self/stdlib", name + ".fl"),
+        path19.resolve(process.cwd(), name + ".fl"),
+        path19.resolve(process.cwd(), name)
+      ];
+      let absPath = null;
+      for (const c of candidates) {
+        if (fs21.existsSync(c) && fs21.statSync(c).isFile()) {
+          absPath = c;
+          break;
+        }
+      }
+      if (!absPath) {
+        throw new FLRuntimeError(
+          ErrorCodes.RUNTIME,
+          `(use ${name}): module not found. Tried: ${candidates.join(", ")}`,
+          { fn: "use", varName: name },
+          void 0,
+          expr2.line
+        );
+      }
+      const importedSet = interp2.importedFiles ?? /* @__PURE__ */ new Set();
+      if (importedSet.has(absPath)) continue;
+      importedSet.add(absPath);
+      interp2.importedFiles = importedSet;
+      const src = fs21.readFileSync(absPath, "utf-8");
+      const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+      const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+      interp2.interpret(parse3(lex2(src, absPath)));
+      loadedAny = true;
+    }
+    return loadedAny;
+  }
+  if (op === "fn") {
+    if (expr2.args.length < 2) throwArgCount("fn", ">=2", expr2.args.length, expr2.line);
+    const paramsNode = expr2.args[0];
+    const params = [];
+    const paramDefaults = [];
+    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+      const items = paramsNode.fields.get("items");
+      if (Array.isArray(items)) {
+        const _pAnns = [];
+        let _ii = 0;
+        while (_ii < items.length) {
+          const item = items[_ii];
+          if (item.kind === "literal" && item.type === "symbol" && String(item.value).startsWith("^")) {
+            _ii++;
+            continue;
+          }
+          if (item.kind === "block" && item.type === "Map") {
+            params.push(item);
+            paramDefaults.push(void 0);
+            _pAnns.push(null);
+            _ii++;
+            continue;
+          }
+          if (item.kind === "block" && item.type === "Array") {
+            const inner = item.fields?.get("items") ?? [];
+            if (inner.length >= 2) {
+              const nameNode = inner[0];
+              const n = nameNode.kind === "variable" ? nameNode.name : nameNode.kind === "literal" ? String(nameNode.value) : "";
+              params.push(n.startsWith("$") ? n.slice(1) : n);
+              paramDefaults.push(inner[1]);
+              _pAnns.push(null);
+            }
+            _ii++;
+            continue;
+          }
+          let _pname = null;
+          if (item.kind === "variable") {
+            const n = item.name;
+            _pname = n.startsWith("$") ? n.slice(1) : n;
+          } else if (item.kind === "literal" && item.type === "symbol") {
+            const v = item.value;
+            _pname = v.startsWith("$") ? v.slice(1) : v;
+          }
+          if (_pname !== null) {
+            params.push(_pname);
+            paramDefaults.push(void 0);
+            const _nx = items[_ii + 1];
+            const _nxType = _nx?.kind === "keyword" ? _nx.name : _nx?.kind === "literal" && _nx?.type === "string" ? String(_nx.value) : _nx?.kind === "literal" && _nx?.type === "symbol" ? String(_nx.value) : null;
+            if (_nxType && /^(int|float|number|string|bool|boolean|any|list|array|map|fn|function|nil)$/.test(_nxType)) {
+              _pAnns.push(_nxType);
+              _ii += 2;
+              continue;
+            }
+            _pAnns.push(null);
+          }
+          _ii++;
+        }
+        if (_pAnns.some((a) => a !== null)) {
+          paramsNode.__pAnns = _pAnns;
+        }
+      }
+    } else if (paramsNode.kind === "sexpr") {
+      throwInvalidForm(
+        "fn",
+        `\uD30C\uB77C\uBBF8\uD130 \uBAA9\uB85D\uC740 \uB300\uAD04\uD638 [ ]\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
+  \uC798\uBABB\uB41C \uC608: (fn (x y) ...)
+  \uC62C\uBC14\uB978 \uC608: (fn [$x $y] ...)`,
+        expr2
+      );
+    } else {
+      throwInvalidForm(
+        "fn",
+        `\uD30C\uB77C\uBBF8\uD130\uB294 [\uBCC0\uC2181 \uBCC0\uC2182 ...] \uD615\uD0DC\uC5EC\uC57C \uD569\uB2C8\uB2E4.`,
+        expr2
+      );
+    }
+    const body = expr2.args.length === 2 ? expr2.args[1] : { kind: "sexpr", op: "do", args: expr2.args.slice(1) };
+    const hasDefaults = paramDefaults.some((d) => d !== void 0);
+    const _fnPAnns = paramsNode.__pAnns;
+    return {
+      kind: "function-value",
+      params,
+      ...hasDefaults && { paramDefaults },
+      ..._fnPAnns && { paramAnnotations: _fnPAnns },
+      body,
+      capturedEnv: ctx.variables.snapshot(),
+      name: void 0
+    };
+  }
+  if (op === "defn" || op === "defun") {
+    if (expr2.args.length < 3) throwArgCount("defn", ">=3", expr2.args.length, expr2.line);
+    let argIdx = 0;
+    let isPureHint = false;
+    if (expr2.args[argIdx]?.kind === "literal" && String(expr2.args[argIdx].value).startsWith("^")) {
+      const hint = String(expr2.args[argIdx].value);
+      if (hint === "^pure") isPureHint = true;
+      argIdx++;
+    }
+    const nameNode = expr2.args[argIdx++];
+    let name;
+    if (nameNode.kind === "variable") name = nameNode.name;
+    else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value;
+    else throwInvalidForm("defn", "first argument must be a symbol (function name)", expr2.line);
+    const paramsNode = expr2.args[argIdx];
+    let bodyArgs = expr2.args.slice(argIdx + 1);
+    let _defnRetAnn = null;
+    if (bodyArgs.length >= 2) {
+      const _arrow = bodyArgs[0];
+      if (_arrow?.kind === "literal" && _arrow?.type === "symbol" && _arrow?.value === "->") {
+        const _rt = bodyArgs[1];
+        const _rtn = _rt?.kind === "keyword" ? _rt.name : _rt?.kind === "literal" && (_rt?.type === "symbol" || _rt?.type === "string") ? String(_rt.value) : null;
+        if (_rtn) {
+          _defnRetAnn = _rtn;
+          bodyArgs = bodyArgs.slice(2);
+        }
+      }
+    }
+    let registeredMeta = null;
+    if (bodyArgs.length > 1) {
+      const meta = extractMapMeta(bodyArgs[0]);
+      if (meta) {
+        meta.line = expr2.line;
+        fnMetaRegistry.set(name, meta);
+        registeredMeta = meta;
+        bodyArgs = bodyArgs.slice(1);
+      }
+    }
+    const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
+    if (isPureHint) {
+      checkEffects(name, [], body, expr2.line, true);
+      if (!registeredMeta) {
+        registeredMeta = { line: expr2.line, effects: [] };
+        fnMetaRegistry.set(name, registeredMeta);
+      } else if (!registeredMeta.effects) {
+        registeredMeta.effects = [];
+      }
+    } else if (registeredMeta?.effects !== void 0) {
+      checkEffects(name, registeredMeta.effects, body, expr2.line);
+    }
+    const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
+    const fnValue = interp2.evalSExpr(fnExpr);
+    fnValue.name = name;
+    if (_defnRetAnn) fnValue.returnAnnotation = _defnRetAnn;
+    try {
+      const funcChunk = _vmCompiler.compileFunctionBody(fnValue.params, fnValue.body, name);
+      const vmFuncObj = {
+        _isVMFunc: true,
+        _chunk: funcChunk,
+        _params: fnValue.params,
+        _closure: fnValue.capturedEnv ? [...fnValue.capturedEnv.entries()] : []
+      };
+      registerVMFunction(name, vmFuncObj);
+    } catch {
+      registerVMFunction(name);
+    }
+    const funcDef = {
+      name,
+      params: fnValue.params,
+      body: fnValue.body,
+      capturedEnv: fnValue.capturedEnv
+    };
+    if (fnValue.paramDefaults) funcDef.paramDefaults = fnValue.paramDefaults;
+    if (fnValue.paramAnnotations) funcDef.paramAnnotations = fnValue.paramAnnotations;
+    if (fnValue.returnAnnotation) funcDef.returnAnnotation = fnValue.returnAnnotation;
+    ctx.functions.set(name, funcDef);
+    if (registeredMeta?.property) {
+      try {
+        const propNode = registeredMeta.property;
+        if (propNode?.kind === "block" && propNode?.type === "Map") {
+          const pf = propNode.fields;
+          const argsNode = pf.get("args");
+          let argTypes = [];
+          if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+            const items = argsNode.fields?.get("items");
+            if (Array.isArray(items)) argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+          }
+          const checkNode = pf.get("check");
+          const checkFn = checkNode ? ev(checkNode) : null;
+          const samplesNode = pf.get("samples");
+          const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
+          propRegistry.set(`prop-${name}`, {
+            name: `prop-${name}`,
+            fn: name,
+            args: argTypes,
+            check: checkFn,
+            samples,
+            line: expr2.line
+          });
+        }
+      } catch {
+      }
+    }
+    ctx.variables.set("$" + name, fnValue);
+    ctx.variables.set(name, fnValue);
+    return fnValue;
+  }
+  if (op === "defprop") {
+    if (expr2.args.length < 2) throwArgCount("defprop", ">=2", expr2.args.length, expr2.line);
+    const nameNode = expr2.args[0];
+    const propName = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "prop-" + Date.now();
+    const specNode = expr2.args[1];
+    if (specNode?.kind !== "block" || specNode?.type !== "Map") {
+      throw new FLRuntimeError(
+        ErrorCodes.INVALID_FORM,
+        `defprop: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uB9F5\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 {:fn :args :check}`,
+        {},
+        void 0,
+        expr2.line
+      );
+    }
+    const fields = specNode.fields;
+    const fnNode = fields.get("fn");
+    const fnName = fnNode?.kind === "literal" ? String(fnNode.value) : "";
+    const argsNode = fields.get("args");
+    let argTypes = [];
+    if (argsNode?.kind === "block" && argsNode?.type === "Array") {
+      const items = argsNode.fields?.get("items");
+      if (Array.isArray(items)) {
+        argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
+      }
+    }
+    const checkNode = fields.get("check");
+    const checkFn = checkNode ? ev(checkNode) : null;
+    const samplesNode = fields.get("samples");
+    const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
+    const prop = {
+      name: propName,
+      fn: fnName,
+      args: argTypes,
+      check: checkFn,
+      samples,
+      line: expr2.line
+    };
+    propRegistry.set(propName, prop);
+    return prop;
+  }
+  if (op === "async") {
+    if (expr2.args.length < 3) throwArgCount("async", ">=3", expr2.args.length, expr2.line);
+    const nameNode = expr2.args[0];
+    const name = nameNode.name || "async-fn";
+    const paramsNode = expr2.args[1];
+    const params = [];
+    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+      const items = paramsNode.fields.get("items");
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (item.kind === "variable") params.push(item.name);
+        }
+      }
+    } else if (paramsNode.kind === "sexpr") {
+      throwInvalidForm(
+        "async",
+        `\uD30C\uB77C\uBBF8\uD130 \uBAA9\uB85D\uC740 \uB300\uAD04\uD638 [ ]\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
+  \uC798\uBABB\uB41C \uC608: (async myFn (x) ...)
+  \uC62C\uBC14\uB978 \uC608: (async myFn [$x] ...)`,
+        expr2
+      );
+    } else {
+      throwInvalidForm(
+        "async",
+        `\uD30C\uB77C\uBBF8\uD130\uB294 [\uBCC0\uC2181 \uBCC0\uC2182 ...] \uD615\uD0DC\uC5EC\uC57C \uD569\uB2C8\uB2E4.`,
+        expr2
+      );
+    }
+    return {
+      kind: "async-function-value",
+      name,
+      params,
+      body: expr2.args[2],
+      capturedEnv: ctx.variables.snapshot()
+    };
+  }
+  if (op === "set!") {
+    if (expr2.args.length < 2) throwArgCount("set!", ">=2", expr2.args.length, expr2.line);
+    const varHint = expr2.args[0]?.name ?? expr2.args[0]?.value ?? "x";
+    if (process.env.FL_V12 === "1") {
+      throw new FLRuntimeError(
+        ErrorCodes.INVALID_FORM,
+        `[v12] set!\uC740 \uC81C\uAC70\uB410\uC2B5\uB2C8\uB2E4 (line ${expr2.line ?? "?"}). atom\uC744 \uC0AC\uC6A9\uD558\uC138\uC694:
+  (define ${varHint} (atom \uCD08\uAE30\uAC12)) \u2192 (swap! ${varHint} (fn [v] \uC0C8\uAC12)) \uB610\uB294 (reset! ${varHint} \uC0C8\uAC12)`,
+        { fn: "set!" },
+        void 0,
+        expr2.line
+      );
+    }
+    console.warn(`\u26A0\uFE0F  [FreeLang] set! is deprecated (line ${expr2.line ?? "?"}). \uC804\uC5ED \uBCC0\uC218 \uC218\uC815\uC740 \uD074\uB85C\uC800\uC5D0 \uC804\uD30C\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. atom \uAD8C\uC7A5: (define x (atom 0)) (swap! x + 1)`);
+    const nameNode = expr2.args[0];
+    if (nameNode.kind === "sexpr" && nameNode.op === "get") {
+      const getArgs = nameNode.args;
+      const obj = ev(getArgs[0]);
+      const key = ev(getArgs[1]);
+      const value2 = ev(expr2.args[1]);
+      if (obj !== null && typeof obj === "object") {
+        const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key);
+        obj[k] = value2;
+      }
+      return ev(expr2.args[1]);
+    }
+    let name;
+    if (nameNode.kind === "variable") {
+      name = "$" + nameNode.name;
+    } else if (nameNode.kind === "literal") {
+      name = "$" + nameNode.value;
+    } else {
+      throwInvalidForm("set!", "first argument must be a symbol", expr2.line);
+    }
+    const value = ev(expr2.args[1]);
+    if (!ctx.variables.mutate(name, value)) ctx.variables.set(name, value);
+    return value;
+  }
+  if (op === "define") {
+    if (expr2.args.length < 2) throwArgCount("define", ">=2", expr2.args.length, expr2.line);
+    const nameNode = expr2.args[0];
+    let name;
+    if (nameNode.kind === "literal") {
+      name = nameNode.value;
+    } else if (nameNode.kind === "variable") {
+      name = nameNode.name;
+    } else {
+      throwInvalidForm("define", "first argument must be a symbol or string", expr2.line);
+    }
+    if (expr2.args.length >= 3) {
+      const paramsNode = expr2.args[1];
+      const bodyNode = expr2.args.length === 3 ? expr2.args[2] : { kind: "sexpr", op: "do", args: expr2.args.slice(2) };
+      const items = paramsNode.kind === "block" && paramsNode.type === "Array" ? paramsNode.fields.get("items") || [] : paramsNode.kind === "array" ? paramsNode.items || [] : [];
+      const params = items.map((item) => {
+        if (item.kind === "variable") return item.name.startsWith("$") ? item.name : "$" + item.name;
+        if (item.kind === "literal") return "$" + item.value;
+        return "$" + (item.name || item.value || "?");
+      });
+      ctx.functions.set(name, { name, params, body: bodyNode });
+      return null;
+    }
+    const value = ev(expr2.args[1]);
+    if (value !== null && value !== void 0 && value.kind === "function-value") {
+      const funcDef = {
+        name,
+        params: value.params,
+        body: value.body,
+        capturedEnv: value.capturedEnv
+      };
+      if (value._call) funcDef._call = value._call;
+      ctx.functions.set(name, funcDef);
+      ctx.variables.set("$" + name, value);
+      ctx.variables.set(name, value);
+      if (ctx.typeChecker) {
+        const paramTypes = value.params.map(() => ({ kind: "type", name: "any" }));
+        ctx.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
+      }
+      return value;
+    } else {
+      const meta = {
+        file: expr2.file,
+        line: expr2.line || nameNode.line,
+        col: nameNode.col,
+        type: inferType2(value)
+      };
+      if (ctx.variables.has("$" + name)) {
+        if (process.env.FL_V12 === "1") {
+          throw new FLRuntimeError(
+            ErrorCodes.INVALID_FORM,
+            `[v12] '${name}'\uC740(\uB294) \uC774\uBBF8 \uC815\uC758\uB410\uC2B5\uB2C8\uB2E4 (line ${expr2.line ?? "?"}). \uAC00\uBCC0 \uAC12\uC740 atom\uC744 \uC0AC\uC6A9\uD558\uC138\uC694:
+  (define ${name} (atom \uCD08\uAE30\uAC12)) \u2192 (swap! ${name} (fn [v] \uC0C8\uAC12))`,
+            { fn: "define", varName: name },
+            void 0,
+            expr2.line
+          );
+        }
+        console.warn(`\u26A0\uFE0F  [FreeLang] '${name}'\uC740(\uB294) \uC774\uBBF8 \uC815\uC758\uB410\uC2B5\uB2C8\uB2E4 (line ${expr2.line ?? "?"}). \uAC00\uBCC0 \uAC12\uC740 atom\uC744 \uC0AC\uC6A9\uD558\uC138\uC694: (define ${name} (atom ${JSON.stringify(value)})) \u2192 (swap! ${name} (fn [v] \uC0C8\uAC12))`);
+      }
+      ctx.variables.set("$" + name, value, meta);
+      return value;
+    }
+  }
+  if (op === "func-ref") {
+    if (expr2.args.length < 1) throwArgCount("func-ref", ">=1", expr2.args.length, expr2.line);
+    const funcName = expr2.args[0].name || String(expr2.args[0]);
+    const func = ctx.functions.get(funcName);
+    if (!func) throwFnNotFound(funcName, expr2.line);
+    return {
+      kind: "function-value",
+      params: func.params,
+      body: func.body,
+      capturedEnv: ctx.variables.snapshot(),
+      name: funcName
+    };
+  }
+  if (op === "call") {
+    if (expr2.args.length < 1) throwArgCount("call", ">=1", expr2.args.length, expr2.line);
+    const fn = ev(expr2.args[0]);
+    const evaluatedArgs = expr2.args.slice(1).map((a) => ev(a));
+    if (fn.kind === "builtin-function") return fn.fn(evaluatedArgs);
+    if (fn.kind === "function-value") return callFnVal(fn, evaluatedArgs);
+    if (fn.kind === "async-function-value") return callAsyncFnVal(fn, evaluatedArgs);
+    if (typeof fn === "string") return callUser(fn, evaluatedArgs);
+    throw new Error(`call expects function-value, got ${fn.kind || typeof fn}`);
+  }
+  if (op === "compose" || op === "comp") {
+    if (expr2.args.length < 1) throw new Error(`${op} requires at least 1 function`);
+    const handles = expr2.args.map((arg) => {
+      const fk = arg.kind;
+      if (fk === "variable") return { type: "name", name: arg.name };
+      if (fk === "literal" && arg.type === "symbol") return { type: "name", name: String(arg.value) };
+      return { type: "val", val: ev(arg) };
+    });
+    const compFn = { kind: "function-value", name: `(${op})`, params: ["__x__"], body: null, env: null };
+    compFn._call = (x) => {
+      let result = x;
+      for (let i = handles.length - 1; i >= 0; i--) {
+        const handle = handles[i];
+        if (handle.type === "val") {
+          result = interp2.callFunctionValue(handle.val, [result]);
+        } else {
+          result = interp2.callUserFunction(handle.name, [result]);
+        }
+      }
+      return result;
+    };
+    return compFn;
+  }
+  if (op === "pipe") {
+    if (expr2.args.length < 2) throw new Error(`pipe requires at least a value and one function`);
+    let pipeValue = ev(expr2.args[0]);
+    for (let i = 1; i < expr2.args.length; i++) {
+      const fnArg = expr2.args[i];
+      let pipeResult;
+      if (fnArg.kind === "literal" && fnArg.type === "symbol") {
+        const fnName = fnArg.value;
+        if (ctx.functions.has(fnName)) pipeResult = callUser(fnName, [pipeValue]);
+        else throw new Error(`Unknown function: ${fnName}`);
+      } else if (fnArg.kind === "variable") {
+        const fnName = fnArg.name;
+        if (ctx.functions.has(fnName)) pipeResult = callUser(fnName, [pipeValue]);
+        else if (ctx.variables.has(fnName)) pipeResult = callFn2(ctx.variables.get(fnName), [pipeValue]);
+        else throw new Error(`Unknown function or variable: ${fnName}`);
+      } else {
+        const fn = ev(fnArg);
+        pipeResult = callFn2(fn, [pipeValue]);
+      }
+      pipeValue = pipeResult;
+    }
+    return pipeValue;
+  }
+  if (op === "->") {
+    if (expr2.args.length < 2) throw new Error(`-> requires at least a value and one step`);
+    const TMP_VAR = "__thread_first_tmp__";
+    let val = ev(expr2.args[0]);
+    for (let i = 1; i < expr2.args.length; i++) {
+      const form = expr2.args[i];
+      const fk = form.kind;
+      if (fk === "sexpr") {
+        const sform = form;
+        ctx.variables.set(TMP_VAR, val);
+        const tmpVar = { kind: "variable", name: TMP_VAR };
+        const newSexpr = { kind: "sexpr", op: sform.op, args: [tmpVar, ...sform.args] };
+        val = ev(newSexpr);
+        ctx.variables.delete(TMP_VAR);
+      } else if (fk === "variable") {
+        const fnName = form.name;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else if (ctx.variables.has(fnName)) val = callFn2(ctx.variables.get(fnName), [val]);
+        else throw new Error(`->: unknown function or variable: ${fnName}`);
+      } else if (fk === "literal" && form.type === "symbol") {
+        const fnName = form.value;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else throw new Error(`->: unknown function: ${fnName}`);
+      } else {
+        const fn = ev(form);
+        val = callFn2(fn, [val]);
+      }
+    }
+    return val;
+  }
+  if (op === "->>") {
+    if (expr2.args.length < 2) throw new Error(`->> requires at least a value and one step`);
+    const TMP_VAR = "__thread_last_tmp__";
+    let val = ev(expr2.args[0]);
+    for (let i = 1; i < expr2.args.length; i++) {
+      const form = expr2.args[i];
+      const fk = form.kind;
+      if (fk === "sexpr") {
+        const sform = form;
+        ctx.variables.set(TMP_VAR, val);
+        const tmpVar = { kind: "variable", name: TMP_VAR };
+        const newSexpr = { kind: "sexpr", op: sform.op, args: [...sform.args, tmpVar] };
+        val = ev(newSexpr);
+        ctx.variables.delete(TMP_VAR);
+      } else if (fk === "variable") {
+        const fnName = form.name;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else if (ctx.variables.has(fnName)) val = callFn2(ctx.variables.get(fnName), [val]);
+        else throw new Error(`->>: unknown function or variable: ${fnName}`);
+      } else if (fk === "literal" && form.type === "symbol") {
+        const fnName = form.value;
+        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
+        else throw new Error(`->>: unknown function: ${fnName}`);
+      } else {
+        const fn = ev(form);
+        val = callFn2(fn, [val]);
+      }
+    }
+    return val;
+  }
+  if (op === "?.") {
+    if (expr2.args.length < 1) return null;
+    let val = ev(expr2.args[0]);
+    for (let i = 1; i < expr2.args.length; i++) {
+      if (val === null || val === void 0) return null;
+      const keyArg = expr2.args[i];
+      let key;
+      if (keyArg.kind === "literal") {
+        key = keyArg.value;
+      } else {
+        key = ev(keyArg);
+      }
+      if (typeof key === "string" && key.startsWith(":")) key = key.slice(1);
+      val = val instanceof Map ? val.get(key) ?? val.get(":" + key) ?? null : val?.[String(key)] ?? null;
+    }
+    return val ?? null;
+  }
+  if (op === "as->") {
+    if (expr2.args.length < 3) throw new Error(`as-> requires: (as-> val $name form ...)`);
+    const bindArg = expr2.args[1];
+    let bindName;
+    if (bindArg.kind === "variable") {
+      bindName = bindArg.name;
+    } else if (bindArg.kind === "literal") {
+      bindName = "$" + String(bindArg.value);
+    } else {
+      throw new Error(`as->: second arg must be a binding name like $v`);
+    }
+    let val = ev(expr2.args[0]);
+    ctx.variables.push();
+    try {
+      for (let i = 2; i < expr2.args.length; i++) {
+        ctx.variables.set(bindName, val);
+        val = ev(expr2.args[i]);
+      }
+    } finally {
+      ctx.variables.pop();
+    }
+    return val;
+  }
+  if (op === "??") {
+    if (expr2.args.length < 2) throw new Error(`?? requires at least 2 arguments`);
+    for (let i = 0; i < expr2.args.length; i++) {
+      const val = ev(expr2.args[i]);
+      if (val !== null && val !== void 0) return val;
+    }
+    return null;
+  }
+  if (op === "|>") {
+    if (expr2.args.length < 2) throw new Error(`|> requires at least a value and one function`);
+    let pipeVal = ev(expr2.args[0]);
+    for (let i = 1; i < expr2.args.length; i++) {
+      const step = expr2.args[i];
+      const fk = step.kind;
+      if (fk === "sexpr") {
+        const s = step;
+        const tmpVar = `__pipe_${i}__`;
+        ctx.variables.set(tmpVar, pipeVal);
+        const injectedArg = { kind: "variable", name: tmpVar };
+        const newSExpr = { kind: "sexpr", op: s.op, args: [...s.args, injectedArg], line: s.line };
+        try {
+          pipeVal = ev(newSExpr);
+        } finally {
+          ctx.variables.delete(tmpVar);
+        }
+      } else if (fk === "variable") {
+        const fnName = step.name;
+        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
+        else if (ctx.variables.has(fnName)) pipeVal = callFn2(ctx.variables.get(fnName), [pipeVal]);
+      } else if (fk === "literal" && step.type === "symbol") {
+        const fnName = String(step.value);
+        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
+        else if (ctx.variables.has(fnName)) pipeVal = callFn2(ctx.variables.get(fnName), [pipeVal]);
+      } else {
+        const fn = ev(step);
+        pipeVal = callFn2(fn, [pipeVal]);
+      }
+    }
+    return pipeVal;
+  }
+  if (op === "let") {
+    return evalLet(interp2, expr2.args);
+  }
+  if (op === "if-let" || op === "when-let") {
+    if (expr2.args.length < 2) throwArgCount(op, ">=2", expr2.args.length, expr2.line);
+    const bindingsNode = expr2.args[0];
+    const outerItems = bindingsNode.kind === "block" && bindingsNode.type === "Array" ? bindingsNode.fields?.get("items") ?? [] : [];
+    if (outerItems.length < 1) throwInvalidForm(op, "binding \uD615\uD0DC\uAC00 [$x expr] \uC774\uC5B4\uC57C \uD568", expr2.line);
+    let pairItems;
+    const firstItem = outerItems[0];
+    if (firstItem.kind === "variable" || firstItem.kind === "literal") {
+      pairItems = outerItems;
+    } else {
+      pairItems = firstItem.kind === "block" && firstItem.type === "Array" ? firstItem.fields?.get("items") ?? [] : [];
+    }
+    if (pairItems.length < 2) throwInvalidForm(op, "[$x expr] \uD615\uD0DC\uAC00 \uC798\uBABB\uB428", expr2.line);
+    const varName = pairItems[0].kind === "variable" ? pairItems[0].name : pairItems[0].kind === "literal" ? String(pairItems[0].value) : "";
+    const value = ev(pairItems[1]);
+    const truthy2 = value !== null && value !== void 0 && value !== false;
+    if (truthy2) {
+      interp2.context.variables.push();
+      try {
+        const meta = {
+          line: pairItems[0].line,
+          col: pairItems[0].col,
+          type: inferType2(value)
+        };
+        interp2.context.variables.set(varName, value, meta);
+        if (op === "if-let") {
+          return ev(expr2.args[1]);
+        } else {
+          let result = null;
+          for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
+          return result;
+        }
+      } finally {
+        interp2.context.variables.pop();
+      }
+    } else {
+      if (op === "if-let" && expr2.args.length >= 3) return ev(expr2.args[2]);
+      return null;
+    }
+  }
+  if (op === "when") {
+    if (expr2.args.length < 2) throwArgCount("when", ">=2", expr2.args.length, expr2.line);
+    const c = ev(expr2.args[0]);
+    if (c !== null && c !== void 0 && c !== false) {
+      let result = null;
+      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
+      return result;
+    }
+    return null;
+  }
+  if (op === "unless") {
+    if (expr2.args.length < 2) throwArgCount("unless", ">=2", expr2.args.length, expr2.line);
+    const c = ev(expr2.args[0]);
+    if (c === null || c === void 0 || c === false) {
+      let result = null;
+      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
+      return result;
+    }
+    return null;
+  }
+  if (op === "set") {
+    if (expr2.args.length !== 2) throwArgCount("set", "exactly 2", expr2.args.length, expr2.line);
+    const varNode = expr2.args[0];
+    let varName;
+    if (varNode.kind === "variable") varName = varNode.name;
+    else if (varNode.kind === "literal" && varNode.type === "symbol") varName = "$" + varNode.value;
+    else throwInvalidForm("set", "first argument must be a variable", expr2.line);
+    const newValue = ev(expr2.args[1]);
+    if (!ctx.variables.mutate(varName, newValue)) throw new Error(`set: variable ${varName} not found in scope`);
+    return newValue;
+  }
+  if (op === "if") {
+    const condition = ev(expr2.args[0]);
+    const branch = condition ? expr2.args[1] : expr2.args[2] || null;
+    if (branch === null) return null;
+    if (interp2.tcoMode && branch !== null) {
+      const b = branch;
+      if (b.kind === "sexpr") {
+        const bop = b.op;
+        const ctx2 = interp2.context;
+        if (typeof bop === "string" && ctx2.functions.has(bop)) {
+          const tailArgs = b.args.map((a) => ev(a));
+          return tailCall(bop, tailArgs);
+        }
+      }
+    }
+    return ev(branch);
+  }
+  if (op === "cond") {
+    return evalCond(interp2, expr2.args);
+  }
+  if (op === "do" || op === "begin" || op === "progn") {
+    if (expr2.args.length >= 2) {
+      const first2 = ev(expr2.args[0]);
+      const isCallable = typeof first2 === "function" || first2?.kind === "function-value" || first2?.kind === "async-function-value" || first2?.kind === "closure";
+      if (isCallable) {
+        const callArgs = expr2.args.slice(1).map((a) => ev(a));
+        if (typeof first2 === "function") return first2(...callArgs);
+        if (first2?.kind === "function-value" || first2?.kind === "async-function-value") return interp2.callFunctionValue(first2, callArgs);
+        if (first2?.kind === "closure") {
+          const params = first2.params || [];
+          ctx.variables.push();
+          try {
+            if (first2["closure-env"]) {
+              for (const [k, v] of Object.entries(first2["closure-env"].vars || {})) ctx.variables.set(k, v);
+            }
+            for (let i = 0; i < params.length; i++) ctx.variables.set(params[i], callArgs[i] ?? null);
+            let result3 = null;
+            for (const node of first2.body || []) result3 = ev(node);
+            return result3;
+          } finally {
+            ctx.variables.pop();
+          }
+        }
+      }
+      let result2 = first2;
+      for (const arg of expr2.args.slice(1)) {
+        if (isBlock(arg) && isControlBlock(arg)) {
+          interp2.evalBlock(arg);
+          result2 = null;
+          continue;
+        }
+        result2 = ev(arg);
+      }
+      return result2;
+    }
+    let result = null;
+    for (const arg of expr2.args) {
+      if (isBlock(arg) && isControlBlock(arg)) {
+        interp2.evalBlock(arg);
+        result = null;
+        continue;
+      }
+      result = ev(arg);
+    }
+    return result;
+  }
+  if (op === "loop") {
+    const bindingsNode = expr2.args[0];
+    const bodyNodes = expr2.args.slice(1);
+    const bindingItems = bindingsNode.kind === "array" ? bindingsNode.items || [] : bindingsNode.kind === "block" && bindingsNode.type === "Array" ? bindingsNode.fields?.get?.("items") || [] : [];
+    const isModernSyntax = bindingItems.length === 3 && bindingItems[0].kind === "sexpr";
+    if (isModernSyntax) {
+      const initExpr = bindingItems[0];
+      const condExpr = bindingItems[1];
+      const updateExpr = bindingItems[2];
+      const varName = initExpr.op || "$i";
+      const initVal = ev(initExpr.args[0]);
+      ctx.variables.push();
+      ctx.variables.set(varName, initVal);
+      let result2 = null;
+      try {
+        while (true) {
+          const condVal = ev(condExpr);
+          const isTruthy = condVal !== null && condVal !== void 0 && condVal !== false;
+          if (!isTruthy) break;
+          for (const bodyNode of bodyNodes) {
+            result2 = ev(bodyNode);
+          }
+          const newVal = ev(updateExpr);
+          ctx.variables.set(varName, newVal);
+        }
+        return result2;
+      } finally {
+        ctx.variables.pop();
+      }
+    }
+    const loopVars = [];
+    const loopInits = [];
+    for (let i = 0; i < bindingItems.length; i += 2) {
+      const varNode = bindingItems[i];
+      const valNode = bindingItems[i + 1];
+      const varName = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : String(varNode.name || varNode.value);
+      loopVars.push(varName);
+      loopInits.push(ev(valNode));
+    }
+    ctx.variables.push();
+    for (let i = 0; i < loopVars.length; i++) {
+      ctx.variables.set(loopVars[i], loopInits[i]);
+    }
+    let result = null;
+    const maxIter = 1e5;
+    let iter = 0;
+    try {
+      while (iter++ < maxIter) {
+        if (iter % 1e3 === 0) checkBudgetInLoop();
+        let recurred = false;
+        for (const bodyNode of bodyNodes) {
+          result = ev(bodyNode);
+          if (result && typeof result === "object" && result.__FL_RECUR__) {
+            const newVals = result.__args;
+            for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
+              ctx.variables.set(loopVars[i], newVals[i]);
+            }
+            recurred = true;
+            break;
+          }
+        }
+        if (!recurred) break;
+      }
+    } finally {
+      ctx.variables.pop();
+    }
+    return result;
+  }
+  if (op === "recur") {
+    const newVals = expr2.args.map((a) => ev(a));
+    return { __FL_RECUR__: true, __args: newVals };
+  }
+  if (op === "while") {
+    let result = null;
+    while (ev(expr2.args[0])) {
+      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
+    }
+    return result;
+  }
+  if (op === "when-not") {
+    if (expr2.args.length < 2) return null;
+    const c = ev(expr2.args[0]);
+    if (c === null || c === void 0 || c === false) {
+      let result = null;
+      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
+      return result;
+    }
+    return null;
+  }
+  if (op === "dotimes") {
+    const bindingNode = expr2.args[0];
+    const items = bindingNode?.kind === "array" ? bindingNode.items || [] : bindingNode?.fields?.get?.("items") || [];
+    if (items.length < 2) return null;
+    const bindName = items[0]?.name || items[0]?.value || "";
+    const n = Number(ev(items[1]));
+    for (let i = 0; i < n; i++) {
+      interp2.context.variables.push();
+      try {
+        interp2.context.variables.set(bindName, i);
+        for (let j = 1; j < expr2.args.length; j++) ev(expr2.args[j]);
+      } finally {
+        interp2.context.variables.pop();
+      }
+    }
+    return null;
+  }
+  if (op === "doseq") {
+    const bindingNode = expr2.args[0];
+    const items = bindingNode?.kind === "array" ? bindingNode.items || [] : bindingNode?.fields?.get?.("items") || [];
+    if (items.length < 2) return null;
+    const bindName = items[0]?.name || items[0]?.value || String(items[0]?.value ?? "");
+    const coll = ev(items[1]);
+    if (!Array.isArray(coll)) return null;
+    for (const item of coll) {
+      interp2.context.variables.push();
+      try {
+        interp2.context.variables.set(bindName, item);
+        for (let i = 1; i < expr2.args.length; i++) ev(expr2.args[i]);
+      } finally {
+        interp2.context.variables.pop();
+      }
+    }
+    return null;
+  }
+  if (op === "case") {
+    if (expr2.args.length === 0) return null;
+    const testVal = ev(expr2.args[0]);
+    let i = 1;
+    while (i < expr2.args.length - 1) {
+      const matchVal = ev(expr2.args[i]);
+      if (testVal === matchVal) return ev(expr2.args[i + 1]);
+      i += 2;
+    }
+    if (i === expr2.args.length - 1) return ev(expr2.args[i]);
+    return null;
+  }
+  if (op === "for") {
+    const bindingNode = expr2.args[0];
+    const items = bindingNode?.kind === "array" ? bindingNode.items || [] : bindingNode?.fields?.get?.("items") || [];
+    if (items.length < 2) return [];
+    const bindName = items[0]?.name || items[0]?.value || "";
+    const coll = ev(items[1]);
+    if (!Array.isArray(coll)) return [];
+    let whenFn = null;
+    for (let wi = 2; wi < items.length - 1; wi++) {
+      const kw = items[wi]?.value || items[wi]?.name || "";
+      if (kw === ":when" || kw === "when") {
+        whenFn = items[wi + 1];
+        break;
+      }
+    }
+    const result = [];
+    for (const item of coll) {
+      interp2.context.variables.push();
+      try {
+        interp2.context.variables.set(bindName, item);
+        if (whenFn) {
+          const pass = ev(whenFn);
+          if (!pass && pass !== 0) {
+            continue;
+          }
+        }
+        let val = null;
+        for (let bi = 1; bi < expr2.args.length; bi++) val = ev(expr2.args[bi]);
+        result.push(val);
+      } finally {
+        interp2.context.variables.pop();
+      }
+    }
+    return result;
+  }
+  if (op === "and") {
+    let result = true;
+    for (const arg of expr2.args) {
+      result = ev(arg);
+      if (!result) return result;
+    }
+    return result;
+  }
+  if (op === "or") {
+    let last = null;
+    for (const arg of expr2.args) {
+      last = ev(arg);
+      if (last !== null && last !== void 0 && last !== false) return last;
+    }
+    return last;
+  }
+  if (op === "map" && expr2.args.length === 3) {
+    const arr = ev(expr2.args[0]);
+    const paramNode = expr2.args[1];
+    const bodyNode = expr2.args[2];
+    const items = paramNode.kind === "block" && paramNode.type === "Array" ? paramNode.fields.get?.("items") || [] : paramNode.kind === "array" ? paramNode.items || [] : [];
+    const paramNames = items.map((item) => {
+      if (item.kind === "variable") return item.name;
+      if (item.kind === "literal") return "$" + item.value;
+      return "$" + (item.name || item.value || "_");
+    });
+    if (Array.isArray(arr) && paramNames.length > 0) {
+      return arr.map((elem) => {
+        ctx.variables.push();
+        ctx.variables.set(paramNames[0], elem);
+        try {
+          return ev(bodyNode);
+        } finally {
+          ctx.variables.pop();
+        }
+      });
+    }
+    return void 0;
+  }
+  if (op === "deftest" || op === "describe" || op === "it") {
+    const ctx2 = interp2.context;
+    if (!ctx2._testResults) ctx2._testResults = { passed: 0, failed: 0, errors: [] };
+    const name = expr2.args.length > 0 ? String(ev(expr2.args[0])) : "(anonymous)";
+    const bodies = expr2.args.slice(1);
+    try {
+      for (const b of bodies) ev(b);
+      ctx2._testResults.passed++;
+      process.stdout.write(`  \u2713 ${name}
+`);
+    } catch (e) {
+      ctx2._testResults.failed++;
+      const msg = e?.message ?? String(e);
+      ctx2._testResults.errors.push(`  \u2717 ${name}: ${msg}`);
+      process.stdout.write(`  \u2717 ${name}: ${msg}
+`);
+    }
+    return null;
+  }
+  if (op === "is") {
+    const val = expr2.args.length > 0 ? ev(expr2.args[0]) : false;
+    const msg = expr2.args.length > 1 ? String(ev(expr2.args[1])) : `Expected truthy, got: ${JSON.stringify(val)}`;
+    if (!val) throw new Error(msg);
+    return val;
+  }
+  if (op === "is=") {
+    if (expr2.args.length < 2) throwArgCount("is=", "2", expr2.args.length, expr2.line);
+    const expected = ev(expr2.args[0]);
+    const actual = ev(expr2.args[1]);
+    const eq = JSON.stringify(expected) === JSON.stringify(actual);
+    if (!eq) throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    return actual;
+  }
+  if (op === "run-tests") {
+    const ctx2 = interp2.context;
+    const r = ctx2._testResults ?? { passed: 0, failed: 0, errors: [] };
+    const total = r.passed + r.failed;
+    process.stdout.write(`
+Test Results: ${r.passed}/${total} passed`);
+    if (r.failed > 0) process.stdout.write(` (${r.failed} FAILED)`);
+    process.stdout.write("\n");
+    ctx2._testResults = { passed: 0, failed: 0, errors: [] };
+    return { passed: r.passed, failed: r.failed, total };
+  }
+  if (op === "test-summary") {
+    const ctx2 = interp2.context;
+    const r = ctx2._testResults ?? { passed: 0, failed: 0, errors: [] };
+    return /* @__PURE__ */ new Map([["passed", r.passed], ["failed", r.failed], ["total", r.passed + r.failed], ["errors", r.errors]]);
+  }
+  if (op === "import") {
+    if (expr2.args.length < 1) throwArgCount("import", "1", expr2.args.length, expr2.line);
+    const filePath = String(ev(expr2.args[0]));
+    const useExpr = { ...expr2, op: "use", args: expr2.args };
+    return interp2.evalSpecialForm("use", useExpr);
+  }
+  if (op === "migrate") {
+    if (expr2.args.length < 2) throwArgCount("migrate", "2", expr2.args.length, expr2.line);
+    const db = ev(expr2.args[0]);
+    const steps = ev(expr2.args[1]);
+    if (!Array.isArray(steps)) throw new Error("migrate: second arg must be [[version sql] ...] array");
+    const ctx2 = interp2.context;
+    if (db === null || db === void 0) {
+      if (!ctx2._migrate_applied) ctx2._migrate_applied = /* @__PURE__ */ new Set();
+      const applied2 = ctx2._migrate_applied;
+      let count3 = 0;
+      for (const step of steps) {
+        const pair = Array.isArray(step) ? step : [step];
+        const version = String(pair[0]);
+        if (applied2.has(version)) continue;
+        applied2.add(version);
+        count3++;
+        process.stdout.write(`  [migrate] applied: ${version}
+`);
+      }
+      if (count3 === 0) process.stdout.write("  [migrate] up to date\n");
+      return { applied: count3, total: steps.length };
+    }
+    const execFn = interp2.context.functions.get("mariadb_exec") ?? interp2.context.functions.get("mariadb-exec");
+    const queryFn = interp2.context.functions.get("mariadb_query") ?? interp2.context.functions.get("mariadb-query");
+    if (!execFn || !queryFn) throw new Error("migrate: mariadb functions not loaded");
+    const exec = (sql, params = []) => callFn2(execFn.body ?? execFn, [db, sql, params]);
+    const query = (sql, params = []) => callFn2(queryFn.body ?? queryFn, [db, sql, params]);
+    exec(`CREATE TABLE IF NOT EXISTS _migrations (
+      version VARCHAR(255) PRIMARY KEY,
+      applied_at BIGINT NOT NULL
+    )`);
+    const rows = query("SELECT version FROM _migrations");
+    const applied = new Set((rows ?? []).map((r) => String(r.version ?? r[0] ?? "")));
+    let count2 = 0;
+    for (const step of steps) {
+      const pair = Array.isArray(step) ? step : [step];
+      const version = String(pair[0]);
+      const sql = String(pair[1] ?? "");
+      if (applied.has(version)) continue;
+      exec(sql);
+      exec("INSERT INTO _migrations (version, applied_at) VALUES (?, ?)", [version, Date.now()]);
+      count2++;
+      process.stdout.write(`  [migrate] applied: ${version}
+`);
+    }
+    if (count2 === 0) process.stdout.write("  [migrate] up to date\n");
+    return { applied: count2, total: steps.length };
+  }
+  if (op === "memoize") {
+    if (expr2.args.length < 1) throwArgCount("memoize", "1", expr2.args.length, expr2.line);
+    const fn = ev(expr2.args[0]);
+    const cache = /* @__PURE__ */ new Map();
+    return (...args3) => {
+      const key = JSON.stringify(args3);
+      if (cache.has(key)) return cache.get(key);
+      const result = callFn2(fn, args3);
+      cache.set(key, result);
+      return result;
+    };
+  }
+  if (op === "partial") {
+    if (expr2.args.length < 1) throwArgCount("partial", ">=1", expr2.args.length, expr2.line);
+    const fn = ev(expr2.args[0]);
+    const partialArgs = expr2.args.slice(1).map(ev);
+    return (...rest) => {
+      const allArgs = [...partialArgs, ...rest];
+      if (typeof fn === "function") return fn(...allArgs);
+      return callFn2(fn, allArgs);
+    };
+  }
+  if (op === "group-by" || op === "group_by") {
+    if (expr2.args.length < 2) throwArgCount("group-by", "2", expr2.args.length, expr2.line);
+    const keyFn = ev(expr2.args[0]);
+    const coll = ev(expr2.args[1]);
+    if (!Array.isArray(coll)) return /* @__PURE__ */ new Map();
+    const getKey = (item) => {
+      if (typeof keyFn === "string") {
+        const k = keyFn.startsWith(":") ? keyFn.slice(1) : keyFn;
+        if (item instanceof Map) return item.get(keyFn) ?? item.get(k) ?? null;
+        return item?.[k] ?? item?.[keyFn] ?? null;
+      }
+      if (typeof keyFn === "function") return keyFn(item);
+      return callFn2(keyFn, [item]);
+    };
+    const result = /* @__PURE__ */ new Map();
+    for (const item of coll) {
+      const key = getKey(item);
+      if (!result.has(key)) result.set(key, []);
+      result.get(key).push(item);
+    }
+    return result;
+  }
+  if (op === "return") {
+    const val = expr2.args.length > 0 ? ev(expr2.args[0]) : null;
+    throw new ReturnSignal(val);
+  }
+  if (op === "map-vals" || op === "map_vals" || op === "map-keys" || op === "map_keys") {
+    const isKey = op === "map-keys" || op === "map_keys";
+    if (expr2.args.length === 1) {
+      const m = ev(expr2.args[0]);
+      if (m instanceof Map) return isKey ? [...m.keys()] : [...m.values()];
+      if (m && typeof m === "object" && !Array.isArray(m)) return isKey ? Object.keys(m) : Object.values(m);
+      return [];
+    }
+    if (expr2.args.length === 2) {
+      const fn = ev(expr2.args[0]);
+      const m = ev(expr2.args[1]);
+      const applyFn = (fn2, arg) => callFn2(fn2, [arg]);
+      if (m instanceof Map) {
+        const out = /* @__PURE__ */ new Map();
+        for (const [k, v] of m.entries())
+          out.set(isKey ? applyFn(fn, k) : k, isKey ? v : applyFn(fn, v));
+        return out;
+      }
+      if (m && typeof m === "object" && !Array.isArray(m)) {
+        const out = {};
+        for (const [k, v] of Object.entries(m))
+          out[isKey ? String(applyFn(fn, k)) : k] = isKey ? v : applyFn(fn, v);
+        return out;
+      }
+      return m;
+    }
+  }
+  if (op === "defstruct") {
+    if (expr2.args.length < 2) {
+      throw new Error(`defstruct requires a name and a field vector`);
+    }
+    const nameNode = expr2.args[0];
+    const structName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
+    if (!structName) throw new Error(`defstruct: struct name is required`);
+    const fieldsNode = expr2.args[1];
+    const fields = [];
+    if (fieldsNode.kind === "block" && fieldsNode.type === "Array") {
+      const items = fieldsNode.fields.get("items");
+      if (Array.isArray(items)) {
+        const isSimpleForm = (() => {
+          if (items.length % 2 !== 0) return true;
+          const TYPE_KW = /* @__PURE__ */ new Set(["int", "float", "number", "string", "bool", "boolean", "any", "list", "array", "map", "fn", "function"]);
+          for (let i = 1; i < items.length; i += 2) {
+            const it = items[i];
+            const v = it?.kind === "keyword" ? it.name : it?.kind === "variable" ? it.name : it?.value;
+            if (TYPE_KW.has(String(v))) return false;
+          }
+          return true;
+        })();
+        if (isSimpleForm) {
+          for (const item of items) {
+            const it = item;
+            const fieldName = it.kind === "keyword" ? it.name : it.kind === "variable" ? it.name : it.kind === "literal" ? String(it.value) : "";
+            if (fieldName) fields.push({ name: fieldName, type: "any" });
+          }
+        } else {
+          for (let i = 0; i < items.length; i += 2) {
+            const nameItem = items[i];
+            const typeItem = items[i + 1];
+            const fieldName = nameItem.kind === "keyword" ? nameItem.name : nameItem.kind === "variable" ? nameItem.name : nameItem.kind === "literal" ? String(nameItem.value) : "";
+            const fieldType = typeItem === void 0 ? "any" : typeItem.kind === "keyword" ? typeItem.name : typeItem.kind === "variable" ? typeItem.name : typeItem.kind === "literal" ? String(typeItem.value) : "any";
+            if (fieldName) fields.push({ name: fieldName, type: fieldType });
+          }
+        }
+      }
+    }
+    const registry = ctx.structs;
+    registry.define({ name: structName, fields });
+    const ctor = registry.makeConstructor(structName);
+    ctx.functions.set(structName, {
+      name: structName,
+      params: fields.map((f) => f.name),
+      body: { kind: "literal", type: "null", value: null },
+      capturedEnv: /* @__PURE__ */ new Map([["__struct_ctor__", ctor]])
+    });
+    ctx[`__native_${structName}`] = ctor;
+    const pred = registry.makePredicate(structName);
+    ctx[`__native_${structName}?`] = pred;
+    for (const field of fields) {
+      const accessorName = `${structName}.${field.name}`;
+      const acc = registry.makeAccessor(structName, field.name);
+      ctx[`__native_${accessorName}`] = acc;
+    }
+    return null;
+  }
+  if (op === "defmacro") {
+    if (expr2.args.length < 3) throw new Error(`defmacro requires name, params, and body`);
+    const nameNode = expr2.args[0];
+    const macroName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
+    const paramsNode = expr2.args[1];
+    const params = [];
+    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+      const items = paramsNode.fields.get("items");
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
+          else if (item.kind === "literal") params.push("$" + item.value);
+        }
+      }
+    }
+    const body = expr2.args[2];
+    ctx.macroExpander.define(macroName, params, body);
+    return null;
+  }
+  if (op === "macroexpand") {
+    if (expr2.args.length < 1) throw new Error(`macroexpand requires 1 argument`);
+    const form = expr2.args[0];
+    const expanded = ctx.macroExpander.expand(form);
+    return ctx.macroExpander.astToString(expanded);
+  }
+  if (op === "defprotocol") {
+    if (expr2.args.length < 1) throw new Error(`defprotocol requires a name`);
+    const nameNode = expr2.args[0];
+    const protoName = nameNode.kind === "variable" ? nameNode.name : nameNode.kind === "literal" ? String(nameNode.value) : String(nameNode.name ?? nameNode.value ?? "");
+    const methods = [];
+    for (let i = 1; i < expr2.args.length; i++) {
+      const sigNode = expr2.args[i];
+      if (sigNode.kind !== "block" || sigNode.type !== "Array") continue;
+      const items = sigNode.fields.get("items");
+      if (!Array.isArray(items) || items.length < 1) continue;
+      const methodNameNode = items[0];
+      const methodName = methodNameNode.kind === "variable" ? methodNameNode.name : methodNameNode.kind === "literal" ? String(methodNameNode.value) : String(methodNameNode.name ?? methodNameNode.value ?? "");
+      const params = [];
+      if (items.length > 1) {
+        const paramsNode = items[1];
+        if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+          const pItems = paramsNode.fields.get("items");
+          if (Array.isArray(pItems)) {
+            for (const p of pItems) {
+              if (p.kind === "variable") params.push(p.name);
+              else if (p.kind === "literal") params.push("$" + p.value);
+            }
+          }
+        }
+      }
+      let returnType;
+      if (items.length > 2) {
+        const rtNode = items[2];
+        if (rtNode.kind === "keyword") returnType = rtNode.name;
+        else if (rtNode.kind === "literal") returnType = String(rtNode.value);
+      }
+      methods.push({ name: methodName, params, returnType });
+    }
+    ctx.protocols.defineProtocol({ name: protoName, methods });
+    return null;
+  }
+  if (op === "impl") {
+    if (expr2.args.length < 3) throw new Error(`impl requires protocol name, type name, and at least one method`);
+    const protoNameNode = expr2.args[0];
+    const protoName = protoNameNode.kind === "variable" ? protoNameNode.name : protoNameNode.kind === "literal" ? String(protoNameNode.value) : String(protoNameNode.name ?? protoNameNode.value ?? "");
+    const typeNameNode = expr2.args[1];
+    const typeName = typeNameNode.kind === "variable" ? typeNameNode.name : typeNameNode.kind === "literal" ? String(typeNameNode.value) : String(typeNameNode.name ?? typeNameNode.value ?? "");
+    const implMethods = /* @__PURE__ */ new Map();
+    for (let i = 2; i < expr2.args.length; i++) {
+      const implNode = expr2.args[i];
+      if (implNode.kind !== "block" || implNode.type !== "Array") continue;
+      const items = implNode.fields.get("items");
+      if (!Array.isArray(items) || items.length < 3) continue;
+      const methodNameNode = items[0];
+      const methodName = methodNameNode.kind === "variable" ? methodNameNode.name : methodNameNode.kind === "literal" ? String(methodNameNode.value) : String(methodNameNode.name ?? methodNameNode.value ?? "");
+      const params = [];
+      const paramsNode = items[1];
+      if (paramsNode.kind === "block" && paramsNode.type === "Array") {
+        const pItems = paramsNode.fields.get("items");
+        if (Array.isArray(pItems)) {
+          for (const p of pItems) {
+            if (p.kind === "variable") params.push(p.name);
+            else if (p.kind === "literal") params.push("$" + p.value);
+          }
+        }
+      }
+      const body = items[2];
+      implMethods.set(methodName, { params, body });
+    }
+    ctx.protocols.defineImpl({ protocolName: protoName, typeName, methods: implMethods });
+    return null;
+  }
+  if (op === "parallel") {
+    if (expr2.args.length === 0) return [];
+    const results = [];
+    for (const arg of expr2.args) {
+      let val = ev(arg);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try {
+          val = val.getValue();
+        } catch {
+          val = null;
+        }
+      }
+      results.push(val);
+    }
+    return results;
+  }
+  if (op === "race") {
+    if (expr2.args.length === 0) return null;
+    let firstResult = void 0;
+    for (const arg of expr2.args) {
+      let val = ev(arg);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try {
+          val = val.getValue();
+        } catch {
+          val = null;
+        }
+      }
+      if (firstResult === void 0) firstResult = val;
+      if (val !== null && val !== void 0) return val;
+    }
+    return firstResult ?? null;
+  }
+  if (op === "with-timeout") {
+    if (expr2.args.length < 2) return null;
+    try {
+      let val = ev(expr2.args[1]);
+      if (val && typeof val === "object" && typeof val.getValue === "function") {
+        try {
+          val = val.getValue();
+        } catch {
+          val = null;
+        }
+      }
+      return val;
+    } catch {
+      return null;
+    }
+  }
+  if (op === "fl-try") {
+    if (expr2.args.length < 1) throw new Error(`fl-try requires at least 1 argument`);
+    const bodyNode = expr2.args[0];
+    const FL_TRY_KEYS = /* @__PURE__ */ new Set([
+      "on-err",
+      "on-type-error",
+      "on-not-found",
+      "on-io",
+      "on-arity",
+      "on-ai",
+      "on-timeout",
+      "on-runtime",
+      "default"
+    ]);
+    const handlers = /* @__PURE__ */ new Map();
+    let i = 1;
+    while (i < expr2.args.length) {
+      const keyNode = expr2.args[i];
+      let key = null;
+      if (keyNode.kind === "keyword") {
+        const v = String(keyNode.name ?? keyNode.value ?? "");
+        if (FL_TRY_KEYS.has(v)) key = v;
+      } else if (keyNode.kind === "literal" && keyNode.type === "string") {
+        const v = keyNode.value.startsWith(":") ? keyNode.value.slice(1) : keyNode.value;
+        if (FL_TRY_KEYS.has(v)) key = v;
+      }
+      if (key !== null && i + 1 < expr2.args.length) {
+        handlers.set(key, ev(expr2.args[i + 1]));
+        i += 2;
+      } else {
+        i++;
+      }
+    }
+    let result;
+    try {
+      const val = ev(bodyNode);
+      if (val && typeof val === "object" && (val._tag === "Ok" || val._tag === "Err")) {
+        result = val;
+      } else {
+        result = ok(val);
+      }
+    } catch (e) {
+      const flErr = fromThrown(e);
+      result = flErr;
+    }
+    if (isErr(result)) {
+      const e = result;
+      const categoryHandlerMap = {
+        "on-type-error": "type-error" /* TYPE_ERROR */,
+        "on-not-found": "not-found" /* NOT_FOUND */,
+        "on-io": "io-error" /* IO */,
+        "on-arity": "arity-error" /* ARITY */,
+        "on-ai": "ai-error" /* AI */,
+        "on-timeout": "timeout" /* TIMEOUT */
+      };
+      let handled = false;
+      for (const [handlerKey, category] of Object.entries(categoryHandlerMap)) {
+        if (handlers.has(handlerKey) && e.category === category) {
+          const fn = handlers.get(handlerKey);
+          const handlerResult = callFnVal(fn, [e]);
+          return handlerResult;
+        }
+      }
+      if (!handled && handlers.has("on-err")) {
+        const fn = handlers.get("on-err");
+        return callFnVal(fn, [e]);
+      }
+      if (!handled && handlers.has("default")) {
+        const fn = handlers.get("default");
+        return callFnVal(fn, [e]);
+      }
+      return result;
+    }
+    return result;
+  }
+  throw new Error(`evalSpecialForm: unknown op "${op}"`);
+}
+function evalLet(interp2, args3) {
+  if (args3.length < 2) throw new Error(`let requires at least 2 arguments`);
+  const bindings = args3[0];
+  const ctx = interp2.context;
+  const ev = (node) => interp2.eval(node);
+  const toVarName = (node) => {
+    if (node?.kind === "variable") {
+      const n = node.name;
+      return n.startsWith("$") ? n : "$" + n;
+    }
+    if (node?.kind === "literal" && node.type === "symbol") {
+      const v = node.value;
+      return v.startsWith("$") ? v : "$" + v;
+    }
+    throw new Error(`Invalid binding variable: expected symbol or variable, got ${node?.kind}`);
+  };
+  ctx.variables.push();
+  if (bindings.kind === "block" && bindings.type === "Array") {
+    const items = bindings.fields.get("items");
+    if (Array.isArray(items) && items.length > 0) {
+      const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
+      if (isNested) {
+        for (let i = 0; i < items.length; i += 2) {
+          if (!(items[i]?.kind === "block" && items[i]?.type === "Array")) {
+            ctx.variables.pop();
+            throw new Error(`let: 2\uCC28\uC6D0 \uBC14\uC778\uB529\uC5D0\uC11C \uC6D0\uC18C ${i}\uAC00 \uBC30\uC5F4\uC774 \uC544\uB2D8`);
+          }
+        }
+      } else {
+      }
+      if (isNested) {
+        for (const item of items) {
+          if (item.kind === "block" && item.type === "Array") {
+            const bindingItems = item.fields.get("items");
+            if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
+              const varName = toVarName(bindingItems[0]);
+              const value = ev(bindingItems[1]);
+              const meta = {
+                line: bindingItems[0].line,
+                col: bindingItems[0].col,
+                type: inferType2(value)
+              };
+              ctx.variables.set(varName, value, meta);
+            }
+          }
+        }
+      } else {
+        if (items.length % 2 !== 0) {
+          ctx.variables.pop();
+          throw new Error(`let: expected even number of binding items, got ${items.length}`);
+        }
+        for (let i = 0; i < items.length; i += 2) {
+          const pattern = items[i];
+          if (pattern?.kind === "block" && pattern?.type === "Map") {
+            const mapFields = pattern.fields;
+            const keysField = mapFields?.get("keys");
+            if (keysField?.kind === "block" && keysField?.type === "Array") {
+              const sourceMap = ev(items[i + 1]);
+              const keyItems = keysField.fields.get("items") ?? [];
+              for (const keyNode of keyItems) {
+                const rawName = keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value : keyNode?.kind === "variable" ? keyNode.name.replace(/^\$/, "") : null;
+                if (rawName !== null) {
+                  const varName2 = rawName.startsWith("$") ? rawName : "$" + rawName;
+                  const value2 = sourceMap !== null && typeof sourceMap === "object" ? sourceMap[rawName] ?? null : null;
+                  ctx.variables.set(varName2, value2, {
+                    line: keyNode.line,
+                    col: keyNode.col,
+                    type: inferType2(value2)
+                  });
+                }
+              }
+            }
+            continue;
+          }
+          const varName = toVarName(pattern);
+          const value = ev(items[i + 1]);
+          const meta = {
+            line: items[i].line,
+            col: items[i].col,
+            type: inferType2(value)
+          };
+          ctx.variables.set(varName, value, meta);
+        }
+      }
+    }
+  }
+  let result = null;
+  try {
+    for (let bodyIdx = 1; bodyIdx < args3.length; bodyIdx++) {
+      result = ev(args3[bodyIdx]);
+    }
+  } finally {
+    ctx.variables.pop();
+  }
+  return result;
+}
+function evalCond(interp2, args3) {
+  const ev = (node) => interp2.eval(node);
+  const firstArg = args3[0];
+  const isBracketed = firstArg?.kind === "block" && firstArg?.type === "Array" || firstArg?.kind === "sexpr" && firstArg?.op === "do";
+  if (args3.length >= 2 && !isBracketed) {
+    let i = 0;
+    while (i < args3.length - 1) {
+      const testArg = args3[i];
+      const isElse = testArg?.kind === "variable" && (testArg?.name === "else" || testArg?.name === ":else" || testArg?.name === "$else");
+      const test = isElse ? true : ev(testArg);
+      if (test !== null && test !== void 0 && test !== false) {
+        return ev(args3[i + 1]);
+      }
+      i += 2;
+    }
+    if (i < args3.length) return ev(args3[i]);
+    return null;
+  }
+  for (const arg of args3) {
+    let testNode = null;
+    let bodyNodes = [];
+    if (arg.kind === "block" && arg.type === "Array") {
+      const items = arg.fields.get("items");
+      if (Array.isArray(items) && items.length >= 2) {
+        const firstItem = items[0];
+        const isElse = firstItem?.kind === "variable" && (firstItem?.name === "else" || firstItem?.name === ":else" || firstItem?.name === "$else");
+        testNode = isElse ? { kind: "literal", type: "boolean", value: true } : firstItem;
+        bodyNodes = items.slice(1);
+      }
+    } else if (arg.kind === "sexpr" && arg.op === "do" && arg.args.length >= 2) {
+      testNode = arg.args[0];
+      bodyNodes = arg.args.slice(1);
+    } else if (arg.kind === "sexpr" && arg.args.length >= 1) {
+      const s = arg;
+      testNode = { kind: "literal", type: "boolean", value: s.op === "true" ? true : s.op === "false" ? false : s.op === "else" ? true : void 0 };
+      if (testNode.value === void 0) {
+        testNode = { kind: "variable", name: s.op.startsWith("$") ? s.op : "$" + s.op };
+      }
+      bodyNodes = s.args;
+    }
+    if (testNode && bodyNodes.length >= 1) {
+      const test = ev(testNode);
+      if (test) {
+        let result = null;
+        for (const b of bodyNodes) result = ev(b);
+        return result;
+      }
+    }
+  }
+  return null;
+}
+
+// src/effect-enforcer.ts
+var _validTags = new Set(EFFECT_TAGS);
+function parseEffectTags(raw) {
+  if (!raw) return null;
+  if (!Array.isArray(raw)) return null;
+  const out = /* @__PURE__ */ new Set();
+  for (const r of raw) {
+    if (typeof r !== "string") return null;
+    const s = r.startsWith(":") ? r.slice(1) : r;
+    if (!_validTags.has(s)) return null;
+    out.add(s);
+  }
+  return Object.freeze(out);
+}
+function resolveFnAllowed(name) {
+  const meta = fnMetaRegistry.get(name);
+  if (!meta || meta.effects === void 0) return null;
+  return parseEffectTags(meta.effects);
+}
+function resolveCalleeEffects(name) {
+  const b = lookupBuiltinEffects(name);
+  if (b !== void 0) return b;
+  const meta = fnMetaRegistry.get(name);
+  if (!meta || meta.effects === void 0) return void 0;
+  return parseEffectTags(meta.effects);
+}
+var TRACE = process.env.EFFECT_STACK_TRACE === "1";
+var TRACE_PREFIX = "[effect-stack]";
+var _stack2 = [];
+function trace(...parts) {
+  if (!TRACE) return;
+  console.error(TRACE_PREFIX, ...parts);
+}
+function pushFrame(fnName, allowed, span) {
+  const frame = Object.freeze({ fnName, allowed, span });
+  _stack2.push(frame);
+  trace(
+    "push",
+    fnName,
+    "depth=" + _stack2.length,
+    "allowed=",
+    allowed === null ? "null" : "[" + [...allowed].join(",") + "]"
+  );
+}
+function popFrame() {
+  if (_stack2.length === 0) {
+    throw new Error(
+      "[effect-stack] popFrame underflow \u2014 stack already empty (push/pop pairing \uAE68\uC9D0)"
+    );
+  }
+  const frame = _stack2.pop();
+  trace("pop", frame.fnName, "depth=" + _stack2.length);
+}
+function getChainNames() {
+  return _stack2.map((f) => f.fnName);
+}
+function enforceCall(callee, span) {
+  const cur = _stack2[_stack2.length - 1];
+  if (cur === void 0) {
+    trace("skip", "no-frame");
+    return;
+  }
+  if (cur.allowed === null) {
+    trace("skip", "legacy-frame", cur.fnName);
+    return;
+  }
+  let calleeName;
+  let effects;
+  if (typeof callee === "string") {
+    calleeName = callee;
+    effects = resolveCalleeEffects(callee);
+  } else {
+    calleeName = callee.name;
+    effects = callee.effects;
+  }
+  if (effects === void 0) {
+    trace("skip", "unknown-builtin", calleeName);
+    return;
+  }
+  if (effects === null) {
+    trace("skip", "explicit-legacy", calleeName);
+    return;
+  }
+  for (const e of effects) {
+    if (!cur.allowed.has(e)) {
+      const allowedArr = Array.from(cur.allowed);
+      const chainArr = getChainNames();
+      const violation = new EffectViolation({
+        fn: calleeName,
+        target_effect: e,
+        allowed: allowedArr,
+        chain: chainArr,
+        span
+      });
+      try {
+        recordEvent({
+          type: "effect-violation",
+          timestamp: Date.now(),
+          message: violation.message,
+          label: calleeName,
+          expr: ":" + e,
+          fn: calleeName,
+          target_effect: e,
+          allowed: allowedArr,
+          chain: chainArr,
+          file: span?.file,
+          line: span?.line
+        });
+      } catch {
+      }
+      trace(
+        "violation",
+        calleeName,
+        "target=:" + e,
+        "allowed=[" + [...cur.allowed].join(",") + "]"
+      );
+      throw violation;
+    }
+  }
+  trace("ok", calleeName);
+}
+
 // src/lazy-seq.ts
 var LAZY_SEQ = /* @__PURE__ */ Symbol("LAZY_SEQ");
 function lazySeq(head2, tail) {
@@ -5227,74 +8238,6 @@ var ContextManager = class {
     return { used, max, percent, count: this.window.entries.length };
   }
 };
-
-// src/result-type.ts
-function ok(value) {
-  return { _tag: "Ok", value };
-}
-function err(code, message, opts) {
-  return {
-    _tag: "Err",
-    code,
-    message,
-    category: opts?.category ?? "runtime-error" /* RUNTIME_ERROR */,
-    context: opts?.context,
-    hint: opts?.hint,
-    recoverable: opts?.recoverable ?? false
-  };
-}
-function isOk(r) {
-  return r._tag === "Ok";
-}
-function isErr(r) {
-  return r._tag === "Err";
-}
-function unwrap(r) {
-  if (isOk(r)) return r.value;
-  throw new Error(`[FreeLang Result] unwrap failed: [${r.code}] ${r.message}`);
-}
-function unwrapOr(r, defaultValue) {
-  if (isOk(r)) return r.value;
-  return defaultValue;
-}
-function mapOk(r, fn) {
-  if (isOk(r)) return ok(fn(r.value));
-  return r;
-}
-function mapErr(r, fn) {
-  if (isErr(r)) return fn(r);
-  return r;
-}
-function flatMap(r, fn) {
-  if (isOk(r)) return fn(r.value);
-  return r;
-}
-function recover(r, fn) {
-  if (isOk(r)) return r.value;
-  return fn(r);
-}
-function fromThrown(e, code = "UNKNOWN") {
-  if (typeof e === "string") {
-    return err(code, e);
-  }
-  if (e instanceof Error) {
-    const msg = e.message.toLowerCase();
-    let category = "runtime-error" /* RUNTIME_ERROR */;
-    if (msg.includes("not found") || msg.includes("undefined") || msg.includes("cannot find")) {
-      category = "not-found" /* NOT_FOUND */;
-    } else if (msg.includes("type") || msg.includes("is not a")) {
-      category = "type-error" /* TYPE_ERROR */;
-    } else if (msg.includes("arity") || msg.includes("argument")) {
-      category = "arity-error" /* ARITY */;
-    } else if (msg.includes("timeout")) {
-      category = "timeout" /* TIMEOUT */;
-    } else if (msg.includes("enoent") || msg.includes("eacces") || msg.includes("file")) {
-      category = "io-error" /* IO */;
-    }
-    return err(code, e.message, { category, recoverable: false });
-  }
-  return err(code, String(e));
-}
 
 // src/error-system.ts
 var AIErrorSystem = class {
@@ -6121,9 +9064,9 @@ var traceRegistry = /* @__PURE__ */ new Map();
 var traceCounter = 0;
 function createTrace(label) {
   const id = `trace-${++traceCounter}`;
-  const trace = new ReasoningTrace(label);
-  traceRegistry.set(id, trace);
-  return { id, trace };
+  const trace2 = new ReasoningTrace(label);
+  traceRegistry.set(id, trace2);
+  return { id, trace: trace2 };
 }
 function getTrace(id) {
   return traceRegistry.get(id) ?? null;
@@ -13084,425 +16027,6 @@ function evalWorldModel141(op, args3) {
 init_lexer();
 init_parser();
 
-// src/runtime-governance.ts
-var _mode = "normal";
-var _traceEnabled = true;
-var _debugEnabled = true;
-var _frozenContracts = /* @__PURE__ */ new Set();
-var _escalationCounts = /* @__PURE__ */ new Map();
-var _throttledContracts = /* @__PURE__ */ new Set();
-function getRuntimeMode() {
-  return _mode;
-}
-function isTraceEnabled() {
-  return _traceEnabled;
-}
-function isDebugEnabled() {
-  return _debugEnabled;
-}
-function isContractFrozen(name) {
-  return _frozenContracts.has(name);
-}
-function setRuntimeMode(newMode) {
-  _mode = newMode;
-  if (newMode === "panic") {
-    _traceEnabled = false;
-    _debugEnabled = false;
-  } else if (newMode === "protected") {
-    _traceEnabled = false;
-  } else if (newMode === "normal") {
-    _traceEnabled = true;
-    _debugEnabled = true;
-    _frozenContracts.clear();
-    _throttledContracts.clear();
-    _escalationCounts.clear();
-  }
-}
-function autoTransitionMode(healthScore, recentBurstCount) {
-  if (_mode === "panic") return;
-  if (healthScore < 0.5 || recentBurstCount >= 3) {
-    if (_mode !== "protected") setRuntimeMode("protected");
-  } else if (healthScore < 0.7) {
-    if (_mode === "normal") _mode = "degraded";
-  } else if (healthScore >= 0.9 && _mode === "degraded") {
-    setRuntimeMode("normal");
-  }
-}
-function applyGovernanceAction(action, contractName) {
-  switch (action) {
-    case "disable-trace":
-      _traceEnabled = false;
-      break;
-    case "drop-debug":
-      _debugEnabled = false;
-      break;
-    case "freeze-contract":
-      _frozenContracts.add(contractName);
-      break;
-    case "panic":
-      setRuntimeMode("panic");
-      break;
-    case "clear-events":
-      _clearEventsRequested = true;
-      break;
-  }
-}
-var _clearEventsRequested = false;
-function incrementEscalation(contractName) {
-  const n = (_escalationCounts.get(contractName) ?? 0) + 1;
-  _escalationCounts.set(contractName, n);
-  return n;
-}
-function recoverRuntime() {
-  setRuntimeMode("normal");
-  _frozenContracts.clear();
-  _throttledContracts.clear();
-  _escalationCounts.clear();
-  _clearEventsRequested = false;
-}
-function getRuntimePolicy() {
-  return {
-    "mode": _mode,
-    "trace-enabled": _traceEnabled,
-    "debug-enabled": _debugEnabled,
-    "collapse-enabled": true,
-    "active-contracts": -1,
-    // eval-builtins.ts에서 채움
-    "frozen-contracts": [..._frozenContracts],
-    "throttled-contracts": [..._throttledContracts]
-  };
-}
-
-// src/runtime-contracts.ts
-var _contracts = /* @__PURE__ */ new Map();
-var _throttleMap = /* @__PURE__ */ new Map();
-function defineContract(name, def) {
-  _contracts.set(name, { name, ...def });
-}
-function getContracts() {
-  return [..._contracts.values()];
-}
-function clearContracts() {
-  _contracts.clear();
-  _throttleMap.clear();
-}
-function checkContracts(buf, newEvent) {
-  const out = [];
-  const now = newEvent.timestamp;
-  for (const [name, c] of _contracts) {
-    if (isContractFrozen(name)) continue;
-    if (c.eventType !== "any" && c.eventType !== newEvent.type) continue;
-    if (c.errorKind && newEvent.errorKind !== c.errorKind) continue;
-    const windowStart = now - c.windowMs;
-    let matchCount = 0;
-    for (let i = buf.length - 1; i >= 0; i--) {
-      const e = buf[i];
-      if (e.timestamp < windowStart) break;
-      if (c.eventType !== "any" && e.type !== c.eventType) continue;
-      if (c.errorKind && e.errorKind !== c.errorKind) continue;
-      matchCount += e.count ?? 1;
-    }
-    if (matchCount < c.threshold) continue;
-    const lastFire = _throttleMap.get(name) ?? 0;
-    if (now - lastFire < Math.max(c.windowMs, 500)) continue;
-    _throttleMap.set(name, now);
-    const escalationCount = incrementEscalation(name);
-    const effectiveAction = c.escalationAction && c.escalationAt && escalationCount >= c.escalationAt ? c.escalationAction : c.action;
-    const sev = effectiveAction === "error" || effectiveAction === "panic" ? "error" : effectiveAction === "collapse" || effectiveAction === "disable-trace" ? "warn" : effectiveAction === "throttle" || effectiveAction === "drop-debug" ? "info" : effectiveAction === "freeze-contract" ? "warn" : "warn";
-    const governanceActions = ["disable-trace", "drop-debug", "freeze-contract", "clear-events", "panic"];
-    if (governanceActions.includes(effectiveAction)) {
-      applyGovernanceAction(effectiveAction, name);
-    }
-    out.push({
-      type: "contract-violation",
-      severity: sev,
-      contractName: name,
-      timestamp: now,
-      message: `Contract "${name}": ${matchCount} \xD7 ${c.eventType} in ${c.windowMs}ms (threshold ${c.threshold}, action: ${effectiveAction}${escalationCount > 1 ? `, escalation: ${escalationCount}` : ""})`,
-      value: { contractName: name, matchCount, threshold: c.threshold, action: effectiveAction, escalationLevel: escalationCount }
-    });
-  }
-  return out;
-}
-defineContract("auto:trace-explosion", {
-  eventType: "trace",
-  threshold: 50,
-  windowMs: 1e3,
-  action: "collapse"
-});
-defineContract("auto:assert-storm", {
-  eventType: "assert-fail",
-  threshold: 5,
-  windowMs: 5e3,
-  action: "warn"
-});
-defineContract("auto:error-burst", {
-  eventType: "runtime-error",
-  threshold: 5,
-  windowMs: 5e3,
-  action: "error"
-});
-defineContract("auto:trace-disable", {
-  eventType: "trace",
-  threshold: 200,
-  windowMs: 1e3,
-  action: "disable-trace"
-});
-defineContract("auto:panic-cascade", {
-  eventType: "runtime-error",
-  threshold: 10,
-  windowMs: 5e3,
-  action: "panic"
-});
-
-// src/runtime-budget.ts
-var BudgetExceededError = class extends Error {
-  constructor(kind, limit, actual, contextId) {
-    super(`Budget exceeded: ${kind} (limit=${limit}, actual=${actual})`);
-    this.kind = kind;
-    this.limit = limit;
-    this.actual = actual;
-    this.contextId = contextId;
-    this.name = "BudgetExceededError";
-  }
-};
-var _stack = [];
-var _budgetViolationCount = 0;
-function pushBudget(opts) {
-  _stack.push({ ...opts });
-}
-function popBudget() {
-  _stack.pop();
-}
-function hasBudget() {
-  return _stack.length > 0;
-}
-function getCurrentBudget() {
-  return _stack.length > 0 ? _stack[_stack.length - 1] : null;
-}
-function checkBudget(currentMs, currentEvents, currentRecursion) {
-  const b = getCurrentBudget();
-  if (!b) return;
-  if (b.maxMs !== void 0) {
-    const elapsed = currentMs - b.startMs;
-    if (elapsed > b.maxMs) {
-      _budgetViolationCount++;
-      throw new BudgetExceededError("max-ms", b.maxMs, elapsed, b.contextId);
-    }
-  }
-  if (b.maxEvents !== void 0) {
-    const used = currentEvents - b.startEvents;
-    if (used > b.maxEvents) {
-      _budgetViolationCount++;
-      throw new BudgetExceededError("max-events", b.maxEvents, used, b.contextId);
-    }
-  }
-  if (b.maxRecursion !== void 0) {
-    const depth = currentRecursion - b.startRecursion;
-    if (depth > b.maxRecursion) {
-      _budgetViolationCount++;
-      throw new BudgetExceededError("max-recursion", b.maxRecursion, depth, b.contextId);
-    }
-  }
-}
-function getBudgetViolationCount() {
-  return _budgetViolationCount;
-}
-function resetBudget() {
-  _stack.length = 0;
-  _budgetViolationCount = 0;
-}
-
-// src/runtime-watchdog.ts
-var STALL_THRESHOLD_MS = 1e4;
-var TRACE_STORM_RATE = 500;
-var _lastActivityMs = Date.now();
-var _lastEventCount = 0;
-var _alertCount = 0;
-var _alerts = [];
-function recordActivity(eventCount) {
-  const now = Date.now();
-  const elapsed = now - _lastActivityMs;
-  let alert = null;
-  const rate = elapsed > 0 ? (eventCount - _lastEventCount) / elapsed * 1e3 : 0;
-  if (rate > TRACE_STORM_RATE && elapsed < 1e3) {
-    alert = { kind: "trace-storm", elapsedMs: elapsed, eventCount };
-  }
-  _lastActivityMs = now;
-  _lastEventCount = eventCount;
-  if (alert) {
-    _alertCount++;
-    _alerts.push(alert);
-    if (_alerts.length > 20) _alerts.shift();
-  }
-  return alert;
-}
-function checkStall(eventCount) {
-  const now = Date.now();
-  const elapsed = now - _lastActivityMs;
-  if (elapsed > STALL_THRESHOLD_MS && eventCount === _lastEventCount) {
-    const alert = { kind: "stalled-execution", elapsedMs: elapsed, eventCount };
-    _alertCount++;
-    _alerts.push(alert);
-    if (_alerts.length > 20) _alerts.shift();
-    _lastActivityMs = now;
-    return alert;
-  }
-  return null;
-}
-function getWatchdogAlerts() {
-  return _alertCount;
-}
-function getRecentAlerts() {
-  return _alerts.slice();
-}
-function resetWatchdog() {
-  _lastActivityMs = Date.now();
-  _lastEventCount = 0;
-  _alertCount = 0;
-  _alerts.length = 0;
-}
-
-// src/runtime-events.ts
-var SEVERITY_RANK = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-  fatal: 4
-};
-var DEFAULT_SEVERITY = {
-  "debug": "debug",
-  "trace": "info",
-  "assert-fail": "error",
-  "runtime-error": "fatal",
-  "contract-violation": "warn",
-  "mode-change": "info",
-  "governance-action": "warn",
-  "budget-exceeded": "error",
-  "watchdog-alert": "warn",
-  "context-aborted": "warn"
-};
-var MAX_EVENTS = 1e3;
-var _buf = [];
-var _eventIdCounter = 0;
-var _traceCounter = 0;
-var _minSeverity = null;
-function getNextEventId() {
-  return ++_eventIdCounter;
-}
-function newTraceId() {
-  return `trace-${++_traceCounter}`;
-}
-function setRuntimeFilter(minSev) {
-  _minSeverity = minSev;
-}
-function getRuntimeFilter() {
-  return _minSeverity;
-}
-function clearRuntimeFilter() {
-  _minSeverity = null;
-}
-function shouldRecord(sev) {
-  return _minSeverity === null || SEVERITY_RANK[sev] >= SEVERITY_RANK[_minSeverity];
-}
-function fingerprint(ev) {
-  return `${ev.type}|${ev.expr ?? ""}|${ev.file ?? ""}|${ev.line ?? ""}|${ev.label ?? ""}|${ev.contractName ?? ""}`;
-}
-function recordEvent(ev) {
-  if (ev.type === "trace" && !isTraceEnabled()) return;
-  if (ev.type === "debug" && !isDebugEnabled()) return;
-  if (ev.type !== "budget-exceeded" && ev.type !== "watchdog-alert" && ev.type !== "context-aborted") {
-    if (hasBudget()) {
-      checkBudget(Date.now(), _buf.length, 0);
-    }
-    recordActivity(_buf.length);
-  }
-  const sev = ev.severity ?? DEFAULT_SEVERITY[ev.type] ?? "info";
-  if (!shouldRecord(sev)) return;
-  const eventId = getNextEventId();
-  const full = { ...ev, severity: sev, eventId };
-  if (_buf.length > 0) {
-    const last = _buf[_buf.length - 1];
-    if (fingerprint(last) === fingerprint(full)) {
-      last.count = (last.count ?? 1) + 1;
-      last.collapsed = true;
-      last.timestamp = full.timestamp;
-      last.eventId = eventId;
-      return;
-    }
-  }
-  full.count = 1;
-  _buf.push(full);
-  if (_buf.length > MAX_EVENTS) _buf.shift();
-  if (full.type !== "contract-violation") {
-    const violations = checkContracts(_buf, full);
-    for (const vev of violations) {
-      const vid = getNextEventId();
-      const vfull = {
-        ...vev,
-        severity: vev.severity ?? "warn",
-        eventId: vid,
-        count: 1
-      };
-      _buf.push(vfull);
-      if (_buf.length > MAX_EVENTS) _buf.shift();
-    }
-  }
-}
-function getEvents() {
-  return _buf.slice();
-}
-function clearEvents() {
-  _buf.length = 0;
-}
-
-// src/runtime-context.ts
-var _contexts = /* @__PURE__ */ new Map();
-var _contextStack = [];
-var _abortedIds = /* @__PURE__ */ new Set();
-var _counter = 0;
-function nextContextId() {
-  return `ctx-${++_counter}`;
-}
-function pushContext(id) {
-  const ctxId = id ?? nextContextId();
-  _contexts.set(ctxId, { id: ctxId, startMs: Date.now(), active: true, aborted: false });
-  _contextStack.push(ctxId);
-  return ctxId;
-}
-function popContext() {
-  const id = _contextStack.pop();
-  if (id) {
-    const ctx = _contexts.get(id);
-    if (ctx) ctx.active = false;
-  }
-  return id ?? null;
-}
-function getCurrentContextId() {
-  return _contextStack.length > 0 ? _contextStack[_contextStack.length - 1] : null;
-}
-function abortContext(id) {
-  _abortedIds.add(id);
-  const ctx = _contexts.get(id);
-  if (ctx) {
-    ctx.aborted = true;
-    ctx.active = false;
-    return true;
-  }
-  return false;
-}
-function getActiveContexts() {
-  const now = Date.now();
-  return _contextStack.map((id) => _contexts.get(id)).filter((c) => !!c && c.active && !c.aborted).map((c) => ({ id: c.id, startMs: c.startMs, elapsedMs: now - c.startMs }));
-}
-function resetContexts() {
-  _contexts.clear();
-  _contextStack.length = 0;
-  _abortedIds.clear();
-  _counter = 0;
-}
-
 // src/runtime-store.ts
 var fs2 = __toESM(require("fs"));
 var path3 = __toESM(require("path"));
@@ -14531,6 +17055,7 @@ function __ensureIoWorker() {
 }
 function evalBuiltin(interp2, op, args3, expr2) {
   const normalizedOp2 = op.replace(/_/g, "-");
+  enforceCall(normalizedOp2, expr2 ? { file: expr2.file ?? "", line: expr2.line ?? 0, col: expr2.col ?? 0 } : void 0);
   if (normalizedOp2 !== op && op !== "server_start" && !process.env.FL_NO_DEPRECATION_WARN) {
     console.warn(`\u26A0\uFE0F  [FreeLang v11.5.1] ${op}\uC740 deprecated\uC785\uB2C8\uB2E4. ${normalizedOp2}\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.`);
   }
@@ -18424,9 +20949,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const nodeType = String(args3[1] ?? "thought");
       const nodeLabel = String(args3[2] ?? "");
       const nodeValue = args3.length >= 4 ? args3[3] : void 0;
-      const trace = getTrace(traceId2);
-      if (!trace) return null;
-      trace.add(nodeType, nodeLabel, nodeValue);
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return null;
+      trace2.add(nodeType, nodeLabel, nodeValue);
       return null;
     }
     // (trace-enter id "type" "label") → null
@@ -18435,9 +20960,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const nodeType = String(args3[1] ?? "thought");
       const nodeLabel = String(args3[2] ?? "");
       const nodeValue = args3.length >= 4 ? args3[3] : void 0;
-      const trace = getTrace(traceId2);
-      if (!trace) return null;
-      trace.enter(nodeType, nodeLabel, nodeValue);
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return null;
+      trace2.enter(nodeType, nodeLabel, nodeValue);
       return null;
     }
     // (trace-exit id) → null
@@ -18445,31 +20970,31 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "trace-exit": {
       const traceId2 = String(args3[0] ?? "");
       const result = args3.length >= 2 ? args3[1] : void 0;
-      const trace = getTrace(traceId2);
-      if (!trace) return null;
-      trace.exit(result);
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return null;
+      trace2.exit(result);
       return null;
     }
     // (trace-markdown id) → 마크다운 문자열
     case "trace-markdown": {
       const traceId2 = String(args3[0] ?? "");
-      const trace = getTrace(traceId2);
-      if (!trace) return "";
-      return trace.toMarkdown();
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return "";
+      return trace2.toMarkdown();
     }
     // (trace-tree id) → 텍스트 트리 문자열
     case "trace-tree": {
       const traceId2 = String(args3[0] ?? "");
-      const trace = getTrace(traceId2);
-      if (!trace) return "";
-      return trace.toTree();
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return "";
+      return trace2.toTree();
     }
     // (trace-node-count id) → 노드 수 (숫자)
     case "trace-node-count": {
       const traceId2 = String(args3[0] ?? "");
-      const trace = getTrace(traceId2);
-      if (!trace) return 0;
-      return trace.nodeCount();
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return 0;
+      return trace2.nodeCount();
     }
     // Phase 109: FL → 최적 프롬프트 컴파일러 내장 함수
     // (prompt-compile "blockType" "instruction") → 프롬프트 문자열
@@ -21383,2310 +23908,6 @@ function evalStyleBlock(interp2, op, expr2) {
   throw new Error(`Unknown style block: ${op}`);
 }
 
-// src/eval-special-forms.ts
-init_ast();
-
-// src/tco.ts
-var TAIL_CALL = /* @__PURE__ */ Symbol("TAIL_CALL");
-function tailCall(fn, args3) {
-  return { [TAIL_CALL]: true, fn, args: args3 };
-}
-function isTailCall(v) {
-  return v !== null && typeof v === "object" && v[TAIL_CALL] === true;
-}
-
-// src/return-signal.ts
-var ReturnSignal = class {
-  constructor(value) {
-    this.value = value;
-  }
-};
-function isReturnSignal(e) {
-  return e instanceof ReturnSignal;
-}
-
-// src/compiler.ts
-var BytecodeCompiler = class {
-  compile(node) {
-    const chunk = {
-      instructions: [],
-      constants: [],
-      name: "main"
-    };
-    this.compileExpr(node, chunk);
-    this.emit(chunk, 25 /* HALT */);
-    return chunk;
-  }
-  compileExpr(node, chunk) {
-    switch (node.kind) {
-      case "literal":
-        this.compileLiteral(node, chunk);
-        break;
-      case "variable":
-        this.compileVariable(node, chunk);
-        break;
-      case "sexpr":
-        this.compileSExpr(node, chunk);
-        break;
-      case "block":
-        this.compileBlock(node, chunk);
-        break;
-      default:
-        this.emit(chunk, 25 /* HALT */);
-        break;
-    }
-  }
-  compileLiteral(node, chunk) {
-    if (node.type === "symbol" && typeof node.value === "string") {
-      const bareName = node.value;
-      if (bareName !== "true" && bareName !== "false" && bareName !== "null") {
-        this.emit(chunk, 1 /* PUSH_VAR */, "$" + bareName);
-        return;
-      }
-    }
-    const idx = this.addConst(chunk, node.value);
-    this.emit(chunk, 0 /* PUSH_CONST */, idx);
-  }
-  compileVariable(node, chunk) {
-    this.emit(chunk, 1 /* PUSH_VAR */, node.name);
-  }
-  compileSExpr(node, chunk) {
-    const op = node.op;
-    switch (op) {
-      case "if":
-        this.compileIf(node, chunk);
-        return;
-      case "define":
-        this.compileDefine(node, chunk);
-        return;
-      case "do":
-        this.compileDo(node, chunk);
-        return;
-      case "list":
-        this.compileList(node, chunk);
-        return;
-      case "not":
-        if (node.args.length >= 1) {
-          this.compileExpr(node.args[0], chunk);
-          this.emit(chunk, 22 /* NOT */);
-        }
-        return;
-      case "and":
-        this.compileAnd(node, chunk);
-        return;
-      case "or":
-        this.compileOr(node, chunk);
-        return;
-      case "get":
-      case ".":
-        if (node.args.length >= 2) {
-          this.compileExpr(node.args[0], chunk);
-          const field = node.args[1];
-          if (field.kind === "literal") {
-            this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
-          } else {
-            this.emit(chunk, 25 /* HALT */);
-          }
-        }
-        return;
-    }
-    const binaryOps = {
-      "+": 9 /* ADD */,
-      "-": 10 /* SUB */,
-      "*": 11 /* MUL */,
-      "/": 12 /* DIV */,
-      "%": 13 /* MOD */,
-      "mod": 13 /* MOD */,
-      "==": 14 /* EQ */,
-      "=": 14 /* EQ */,
-      "!=": 19 /* NEQ */,
-      "<": 15 /* LT */,
-      ">": 16 /* GT */,
-      "<=": 17 /* LE */,
-      ">=": 18 /* GE */
-    };
-    if (binaryOps[op] !== void 0) {
-      if (node.args.length >= 2) {
-        this.compileExpr(node.args[0], chunk);
-        this.compileExpr(node.args[1], chunk);
-        this.emit(chunk, binaryOps[op]);
-      } else if (node.args.length === 1) {
-        if (op === "-") {
-          const zeroIdx = this.addConst(chunk, 0);
-          this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
-          this.compileExpr(node.args[0], chunk);
-          this.emit(chunk, 10 /* SUB */);
-        } else {
-          this.compileExpr(node.args[0], chunk);
-        }
-      }
-      return;
-    }
-    this.emit(chunk, 25 /* HALT */);
-  }
-  compileIf(node, chunk) {
-    if (node.args.length < 2) {
-      this.emit(chunk, 25 /* HALT */);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    const jumpIfFalseIdx = chunk.instructions.length;
-    this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
-    this.compileExpr(node.args[1], chunk);
-    const jumpIdx = chunk.instructions.length;
-    this.emit(chunk, 5 /* JUMP */, 0);
-    const elseStart = chunk.instructions.length;
-    chunk.instructions[jumpIfFalseIdx].arg = elseStart;
-    if (node.args.length >= 3) {
-      this.compileExpr(node.args[2], chunk);
-    } else {
-      const nullIdx = this.addConst(chunk, null);
-      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-    }
-    const end = chunk.instructions.length;
-    chunk.instructions[jumpIdx].arg = end;
-  }
-  compileDefine(node, chunk) {
-    if (node.args.length < 2) {
-      this.emit(chunk, 25 /* HALT */);
-      return;
-    }
-    const varNode = node.args[0];
-    const valNode = node.args[1];
-    this.compileExpr(valNode, chunk);
-    const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
-    this.emit(chunk, 2 /* SET_VAR */, name);
-    const nullIdx = this.addConst(chunk, null);
-    this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-  }
-  compileDo(node, chunk) {
-    if (node.args.length === 0) {
-      const nullIdx = this.addConst(chunk, null);
-      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-      return;
-    }
-    for (let i = 0; i < node.args.length; i++) {
-      this.compileExpr(node.args[i], chunk);
-      if (i < node.args.length - 1) {
-        this.emit(chunk, 7 /* POP */);
-      }
-    }
-  }
-  compileList(node, chunk) {
-    for (const arg of node.args) {
-      this.compileExpr(arg, chunk);
-    }
-    this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
-  }
-  compileAnd(node, chunk) {
-    if (node.args.length === 0) {
-      const idx = this.addConst(chunk, true);
-      this.emit(chunk, 0 /* PUSH_CONST */, idx);
-      return;
-    }
-    if (node.args.length === 1) {
-      this.compileExpr(node.args[0], chunk);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    this.compileExpr(node.args[1], chunk);
-    this.emit(chunk, 20 /* AND */);
-  }
-  compileOr(node, chunk) {
-    if (node.args.length === 0) {
-      const idx = this.addConst(chunk, false);
-      this.emit(chunk, 0 /* PUSH_CONST */, idx);
-      return;
-    }
-    if (node.args.length === 1) {
-      this.compileExpr(node.args[0], chunk);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    this.compileExpr(node.args[1], chunk);
-    this.emit(chunk, 21 /* OR */);
-  }
-  compileBlock(node, chunk) {
-    this.emit(chunk, 25 /* HALT */);
-  }
-  addConst(chunk, value) {
-    chunk.constants.push(value);
-    return chunk.constants.length - 1;
-  }
-  emit(chunk, op, arg) {
-    const instr = { op };
-    if (arg !== void 0) instr.arg = arg;
-    chunk.instructions.push(instr);
-  }
-};
-
-// src/vm-eligible.ts
-var vmFunctionRegistry = /* @__PURE__ */ new Map();
-function registerVMFunction(name, vmFunc) {
-  if (vmFunc) {
-    vmFunctionRegistry.set(name, vmFunc);
-  }
-}
-var VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
-  // 산술
-  "+",
-  "-",
-  "*",
-  "/",
-  "%",
-  "mod",
-  // 비교
-  "=",
-  "==",
-  "!=",
-  "<",
-  ">",
-  "<=",
-  ">=",
-  // 논리
-  "and",
-  "or",
-  "not",
-  // 제어
-  "if",
-  "do",
-  // 데이터
-  "list",
-  "get",
-  ".",
-  // 정의
-  "define"
-]);
-function isVMEligible(node) {
-  if (!node || typeof node !== "object") {
-    return false;
-  }
-  const kind = node.kind;
-  switch (kind) {
-    case "literal":
-      return true;
-    case "variable":
-      return true;
-    case "sexpr": {
-      const sexpr = node;
-      if (!sexpr || !sexpr.op) {
-        return false;
-      }
-      if (!VM_SUPPORTED_OPS.has(sexpr.op)) {
-        return false;
-      }
-      if (!sexpr.args || !Array.isArray(sexpr.args)) {
-        return false;
-      }
-      return sexpr.args.every((arg) => isVMEligible(arg));
-    }
-    case "keyword":
-      return false;
-    case "block":
-      return false;
-    case "pattern-match":
-    case "try-block":
-    case "throw":
-    default:
-      return false;
-  }
-}
-
-// src/eval-special-forms.ts
-init_errors();
-
-// src/stdlib-property.ts
-var propRegistry = /* @__PURE__ */ new Map();
-var RAND_STRINGS = "abcdefghijklmnopqrstuvwxyz0123456789 _-";
-function genValue(type) {
-  const t = type.replace(/^:/, "").toLowerCase();
-  switch (t) {
-    case "int":
-    case "integer":
-      return Math.floor(Math.random() * 2001) - 1e3;
-    case "pos-int":
-    case "positive-int":
-      return Math.floor(Math.random() * 1e3) + 1;
-    case "neg-int":
-    case "negative-int":
-      return -(Math.floor(Math.random() * 1e3) + 1);
-    case "nat":
-    case "natural":
-      return Math.floor(Math.random() * 1e3);
-    case "float":
-    case "double":
-      return Math.random() * 2e3 - 1e3;
-    case "number":
-      return Math.random() < 0.5 ? Math.floor(Math.random() * 2001) - 1e3 : Math.random() * 2e3 - 1e3;
-    case "string":
-    case "str": {
-      const len = Math.floor(Math.random() * 20);
-      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
-    }
-    case "nonempty-string":
-    case "ne-string": {
-      const len = Math.floor(Math.random() * 19) + 1;
-      return Array.from({ length: len }, () => RAND_STRINGS[Math.floor(Math.random() * RAND_STRINGS.length)]).join("");
-    }
-    case "bool":
-    case "boolean":
-      return Math.random() < 0.5;
-    case "list":
-    case "array": {
-      const len = Math.floor(Math.random() * 10);
-      return Array.from({ length: len }, () => genValue("int"));
-    }
-    case "any":
-    default: {
-      const pick = Math.floor(Math.random() * 4);
-      if (pick === 0) return genValue("int");
-      if (pick === 1) return genValue("string");
-      if (pick === 2) return genValue("bool");
-      return null;
-    }
-  }
-}
-function generateSample(argTypes) {
-  return argTypes.map((t) => genValue(t));
-}
-function runProp(prop, callFn2, callCheck) {
-  const start = Date.now();
-  let passed = 0;
-  let failed = 0;
-  let firstFailure = null;
-  for (let i = 0; i < prop.samples; i++) {
-    const args3 = generateSample(prop.args);
-    try {
-      const result = callFn2(prop.fn, args3);
-      let checkArgs;
-      try {
-        const fnParams = prop.check?.params ?? [];
-        checkArgs = fnParams.length === args3.length + 1 ? [...args3, result] : args3;
-      } catch {
-        checkArgs = [...args3, result];
-      }
-      const ok2 = callCheck(prop.check, checkArgs);
-      if (ok2 || ok2 === null) {
-        passed++;
-      } else {
-        failed++;
-        if (!firstFailure) firstFailure = { args: args3, result };
-      }
-    } catch (err4) {
-      failed++;
-      if (!firstFailure) firstFailure = { args: args3, result: null, error: err4?.message ?? String(err4) };
-    }
-    if (failed > 0 && firstFailure) break;
-  }
-  return {
-    name: prop.name,
-    fn: prop.fn,
-    samples: prop.samples,
-    passed,
-    failed,
-    firstFailure,
-    durationMs: Date.now() - start
-  };
-}
-
-// src/eval-special-forms.ts
-function checkBudgetInLoop() {
-  if (hasBudget()) checkBudget(Date.now(), 0, 0);
-}
-var _vmCompiler = new BytecodeCompiler();
-var fnMetaRegistry = /* @__PURE__ */ new Map();
-var META_KEYS = /* @__PURE__ */ new Set(["doc", "returns", "context", "effects", "examples", "property"]);
-function extractMapMeta(mapNode) {
-  if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
-  const fields = mapNode.fields;
-  if (!fields || !(fields instanceof Map)) return null;
-  if (!META_KEYS.has([...fields.keys()].find((k) => META_KEYS.has(k)) ?? "")) return null;
-  const meta = {};
-  const strVal = (n) => n?.kind === "literal" ? String(n.value) : void 0;
-  if (fields.has("doc")) meta.doc = strVal(fields.get("doc"));
-  if (fields.has("returns")) meta.returns = strVal(fields.get("returns"));
-  if (fields.has("context")) meta.context = strVal(fields.get("context"));
-  if (fields.has("examples")) meta.examples = strVal(fields.get("examples"));
-  if (fields.has("effects")) {
-    const eNode = fields.get("effects");
-    if (eNode?.kind === "block" && eNode?.type === "Array") {
-      const items = eNode.fields?.get("items");
-      if (Array.isArray(items)) meta.effects = items.map((it) => strVal(it) ?? "?");
-    }
-  }
-  if (fields.has("property")) meta.property = fields.get("property");
-  return meta;
-}
-function inferType2(value) {
-  if (typeof value === "number") return { kind: "type", name: "number" };
-  if (typeof value === "string") return { kind: "type", name: "string" };
-  if (typeof value === "boolean") return { kind: "type", name: "boolean" };
-  if (value === null) return { kind: "type", name: "nil" };
-  if (Array.isArray(value)) return { kind: "type", name: "list" };
-  if (value && typeof value === "object") {
-    if (value["_isVMFunc"] || value.params) return { kind: "type", name: "function" };
-    return { kind: "type", name: "map" };
-  }
-  return void 0;
-}
-var EFFECT_CATALOG = /* @__PURE__ */ new Map([
-  // HTTP 클라이언트
-  ["http_get", "http"],
-  ["http-get", "http"],
-  ["http_post", "http"],
-  ["http-post", "http"],
-  ["http_put", "http"],
-  ["http-put", "http"],
-  ["http_delete", "http"],
-  ["http-delete", "http"],
-  ["http_patch", "http"],
-  ["http-patch", "http"],
-  ["http_get_bearer", "http"],
-  ["http_post_bearer", "http"],
-  ["http_post_json", "http"],
-  ["http_get_json", "http"],
-  // 파일 I/O
-  ["file_read", "file-read"],
-  ["file-read", "file-read"],
-  ["file_write", "file-write"],
-  ["file-write", "file-write"],
-  ["file_append", "file-write"],
-  ["file_delete", "file-write"],
-  ["file_exists", "file-read"],
-  ["file_list", "file-read"],
-  // DB
-  ["db_query", "db-read"],
-  ["db-query", "db-read"],
-  ["db_execute", "db-write"],
-  ["db-execute", "db-write"],
-  ["db_insert", "db-write"],
-  ["db-insert", "db-write"],
-  ["db_update", "db-write"],
-  ["db-update", "db-write"],
-  ["db_delete", "db-write"],
-  ["db-delete", "db-write"],
-  // Shell
-  ["shell_exec", "shell"],
-  ["shell-exec", "shell"],
-  ["shell_exec_result", "shell"],
-  ["shell-exec-result", "shell"],
-  ["shell_run", "shell"],
-  // I/O (stdout)
-  ["println", "io"],
-  ["print", "io"],
-  ["log/info", "io"],
-  ["log/warn", "io"],
-  ["log/error", "io"],
-  // 시간/랜덤 (non-determinism)
-  ["now", "time"],
-  ["timestamp", "time"],
-  ["random", "random"],
-  ["rand-int", "random"],
-  // HTTP 서버 시작
-  ["server_start", "server"],
-  ["server-start", "server"]
-]);
-function collectBodyEffects(node, found) {
-  if (!node) return;
-  if (node.kind === "sexpr") {
-    const op = node.op ?? "";
-    const eff = EFFECT_CATALOG.get(op);
-    if (eff) found.add(eff);
-    if (Array.isArray(node.args)) node.args.forEach((a) => collectBodyEffects(a, found));
-  } else if (node.kind === "block") {
-    if (node.fields instanceof Map) node.fields.forEach((v) => collectBodyEffects(v, found));
-  } else if (node.kind === "literal" || node.kind === "variable") {
-  }
-}
-function checkEffects(fnName, declaredEffects, bodyNode, line, isPure) {
-  const found = /* @__PURE__ */ new Set();
-  collectBodyEffects(bodyNode, found);
-  const pure = isPure || declaredEffects.length === 0;
-  const declaredSet = new Set(declaredEffects.map((e) => e.startsWith(":") ? e.slice(1) : e));
-  const undeclared = [];
-  for (const eff of found) {
-    if (!declaredSet.has(eff)) undeclared.push(eff);
-  }
-  if (undeclared.length > 0) {
-    const hint = undeclared.map((e) => `:${e}`).join(" ");
-    if (pure) {
-      throw new FLRuntimeError(
-        ErrorCodes.PURE_VIOLATION,
-        `${fnName}: ^pure \uD568\uC218\uC5D0\uC11C side effect \uAC10\uC9C0 \u2014 ${hint}`,
-        { fn: fnName, expected: "no side effects", got: hint },
-        void 0,
-        line
-      );
-    }
-    process.stderr.write(
-      `\x1B[33m[effects]\x1B[0m  \x1B[1m${fnName}\x1B[0m${line ? ` (line ${line})` : ""}  \uC120\uC5B8 \uC548 \uB41C effect: \x1B[33m${hint}\x1B[0m  \u2192 :effects \uC5D0 \uCD94\uAC00 \uD544\uC694
-`
-    );
-  }
-}
-function throwArgCount(fn, expected, got, line) {
-  throw new FLRuntimeError(
-    ErrorCodes.ARG_COUNT,
-    `${fn}: expects ${expected} args, got ${got}`,
-    { fn, expected, got: String(got) },
-    void 0,
-    line
-  );
-}
-function throwInvalidForm(fn, msg, line) {
-  throw new FLRuntimeError(
-    ErrorCodes.INVALID_FORM,
-    `${fn}: ${msg}`,
-    { fn },
-    void 0,
-    line
-  );
-}
-function throwFnNotFound(fnName, line) {
-  throw new FLRuntimeError(
-    ErrorCodes.FN_NOT_FOUND,
-    `Function not found: ${fnName}`,
-    { fn: fnName },
-    void 0,
-    line
-  );
-}
-function evalSpecialForm(interp2, op, expr2) {
-  const ev = (node) => interp2.eval(node);
-  const callUser = (name, a) => interp2.callUserFunction(name, a);
-  const callFnVal = (fn, a) => interp2.callFunctionValue(fn, a);
-  const callAsyncFnVal = (fn, a) => interp2.callAsyncFunctionValue(fn, a);
-  const callFn2 = (fn, a) => interp2.callFunction(fn, a);
-  const ctx = interp2.context;
-  if (op === "trace") {
-    if (expr2.args.length === 0) return null;
-    const traceId2 = newTraceId();
-    const traceStart = Date.now();
-    const traceVal = ev(expr2.args[0]);
-    const traceElapsed = Date.now() - traceStart;
-    let traceExprText = "?";
-    try {
-      traceExprText = ctx.macroExpander.astToString(expr2.args[0]);
-    } catch {
-    }
-    const traceDisplay = interp2.toDisplayString ? interp2.toDisplayString(traceVal) : String(traceVal);
-    process.stderr.write(
-      `[TRACE]
-  expr:    ${traceExprText}
-  value:   ${traceDisplay}
-  elapsed: ${traceElapsed}ms
-`
-    );
-    recordEvent({
-      type: "trace",
-      traceId: traceId2,
-      timestamp: Date.now(),
-      file: interp2.currentFilePath,
-      line: expr2.line,
-      expr: traceExprText,
-      value: traceVal,
-      elapsedMs: traceElapsed
-    });
-    return traceVal;
-  }
-  if (op === "with-trace") {
-    if (expr2.args.length === 0) return null;
-    const _wtNodeStr = (n) => {
-      if (!n) return null;
-      if (n.kind === "keyword") return String(n.name);
-      if (n.kind === "literal" && (n.type === "string" || n.type === "symbol")) return String(n.value);
-      return null;
-    };
-    let wtSeverity;
-    let wtArgIdx = 0;
-    if (expr2.args.length >= 3) {
-      const keyStr = _wtNodeStr(expr2.args[0]);
-      if (keyStr === "severity") {
-        const sevStr = _wtNodeStr(expr2.args[1]) ?? "";
-        if (["debug", "info", "warn", "error", "fatal"].includes(sevStr)) {
-          wtSeverity = sevStr;
-          wtArgIdx = 2;
-        }
-      }
-    }
-    const wtBodyArg = expr2.args[wtArgIdx];
-    if (!wtBodyArg) return null;
-    const wtTraceId = newTraceId();
-    const prevLen = getEvents().length;
-    const wtStart = Date.now();
-    const wtVal = ev(wtBodyArg);
-    const wtElapsed = Date.now() - wtStart;
-    let wtExpr = "?";
-    try {
-      wtExpr = ctx.macroExpander.astToString(wtBodyArg);
-    } catch {
-    }
-    const childCount = getEvents().length - prevLen;
-    const wtDisplay = interp2.toDisplayString ? interp2.toDisplayString(wtVal) : String(wtVal);
-    recordEvent({
-      type: "trace",
-      traceId: wtTraceId,
-      timestamp: Date.now(),
-      severity: wtSeverity,
-      expr: `(with-trace ${wtExpr})`,
-      value: wtVal,
-      elapsedMs: wtElapsed
-    });
-    process.stderr.write(
-      `[with-trace] ${wtExpr}
-  value:   ${wtDisplay}
-  elapsed: ${wtElapsed}ms  events: ${childCount}
-`
-    );
-    return wtVal;
-  }
-  if (op === "defcontract") {
-    if (expr2.args.length < 2) throw new Error("defcontract requires name and config map");
-    const nameArg = expr2.args[0];
-    const contractName = nameArg.kind === "variable" ? String(nameArg.name).replace(/^\$/, "") : nameArg.kind === "literal" ? String(nameArg.value) : String(nameArg);
-    const configVal = ev(expr2.args[1]) ?? {};
-    const cfgGet = (k) => configVal[k] ?? configVal[":" + k] ?? null;
-    const cfgStr = (k) => {
-      const v = cfgGet(k);
-      return v != null ? String(v).replace(/^:/, "") : void 0;
-    };
-    const cfgNum = (k) => {
-      const v = cfgGet(k);
-      return v != null ? Number(v) : void 0;
-    };
-    const eventType = cfgStr("event-type") ?? "any";
-    const threshold = cfgNum("threshold") ?? 3;
-    const windowMs = cfgNum("window-ms") ?? 5e3;
-    const action = cfgStr("action") ?? "warn";
-    const errorKind = cfgStr("error-kind");
-    defineContract(contractName, {
-      eventType,
-      threshold,
-      windowMs,
-      action,
-      ...errorKind ? { errorKind } : {}
-    });
-    return contractName;
-  }
-  if (op === "with-budget") {
-    if (expr2.args.length < 2) throw new Error("with-budget requires budget-map and body");
-    const budgetMap = ev(expr2.args[0]) ?? {};
-    const bodyNode = expr2.args[1];
-    const cfgNum = (k) => {
-      const v = budgetMap[k] ?? budgetMap[":" + k];
-      return v != null ? Number(v) : void 0;
-    };
-    const maxMs = cfgNum("max-ms");
-    const maxEvents = cfgNum("max-events");
-    const maxRecursion = cfgNum("max-recursion");
-    const startMs = Date.now();
-    const startEvents = getEvents().length;
-    const startRecursion = interp2.callDepth ?? 0;
-    const ctxId = pushContext();
-    pushBudget({ maxMs, maxEvents, maxRecursion, startMs, startEvents, startRecursion, contextId: ctxId });
-    try {
-      const result = ev(bodyNode);
-      popBudget();
-      popContext();
-      return result;
-    } catch (e) {
-      popBudget();
-      popContext();
-      if (e instanceof BudgetExceededError) {
-        const actual = e.kind === "max-ms" ? Date.now() - startMs : e.kind === "max-events" ? getEvents().length - startEvents : interp2.callDepth - startRecursion;
-        recordEvent({
-          type: "budget-exceeded",
-          timestamp: Date.now(),
-          message: `Budget exceeded: ${e.kind} (limit=${e.limit}, actual=${actual})`,
-          label: e.kind,
-          value: { "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId }
-        });
-        return { "type": "budget-exceeded", "budget-kind": e.kind, "limit": e.limit, "actual": actual, "context-id": ctxId };
-      }
-      throw e;
-    }
-  }
-  if (op === "use") {
-    if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
-    const fs21 = require("fs");
-    const path19 = require("path");
-    let loadedAny = false;
-    for (const arg of expr2.args) {
-      let name = null;
-      if (arg.kind === "literal") name = String(arg.value);
-      else if (arg.kind === "variable") name = String(arg.name).replace(/^\$/, "");
-      if (!name) throwInvalidForm("use", "module name must be symbol or string", expr2.line);
-      const homeDir = require("os").homedir();
-      const candidates = [
-        path19.resolve(process.cwd(), "plugins", name + ".fl"),
-        path19.resolve(homeDir, ".fl", "plugins", name + ".fl"),
-        path19.resolve(process.cwd(), "self/stdlib", name + ".fl"),
-        path19.resolve(process.cwd(), name + ".fl"),
-        path19.resolve(process.cwd(), name)
-      ];
-      let absPath = null;
-      for (const c of candidates) {
-        if (fs21.existsSync(c) && fs21.statSync(c).isFile()) {
-          absPath = c;
-          break;
-        }
-      }
-      if (!absPath) {
-        throw new FLRuntimeError(
-          ErrorCodes.RUNTIME,
-          `(use ${name}): module not found. Tried: ${candidates.join(", ")}`,
-          { fn: "use", varName: name },
-          void 0,
-          expr2.line
-        );
-      }
-      const importedSet = interp2.importedFiles ?? /* @__PURE__ */ new Set();
-      if (importedSet.has(absPath)) continue;
-      importedSet.add(absPath);
-      interp2.importedFiles = importedSet;
-      const src = fs21.readFileSync(absPath, "utf-8");
-      const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
-      const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
-      interp2.interpret(parse3(lex2(src, absPath)));
-      loadedAny = true;
-    }
-    return loadedAny;
-  }
-  if (op === "fn") {
-    if (expr2.args.length < 2) throwArgCount("fn", ">=2", expr2.args.length, expr2.line);
-    const paramsNode = expr2.args[0];
-    const params = [];
-    const paramDefaults = [];
-    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
-      const items = paramsNode.fields.get("items");
-      if (Array.isArray(items)) {
-        const _pAnns = [];
-        let _ii = 0;
-        while (_ii < items.length) {
-          const item = items[_ii];
-          if (item.kind === "literal" && item.type === "symbol" && String(item.value).startsWith("^")) {
-            _ii++;
-            continue;
-          }
-          if (item.kind === "block" && item.type === "Map") {
-            params.push(item);
-            paramDefaults.push(void 0);
-            _pAnns.push(null);
-            _ii++;
-            continue;
-          }
-          if (item.kind === "block" && item.type === "Array") {
-            const inner = item.fields?.get("items") ?? [];
-            if (inner.length >= 2) {
-              const nameNode = inner[0];
-              const n = nameNode.kind === "variable" ? nameNode.name : nameNode.kind === "literal" ? String(nameNode.value) : "";
-              params.push(n.startsWith("$") ? n.slice(1) : n);
-              paramDefaults.push(inner[1]);
-              _pAnns.push(null);
-            }
-            _ii++;
-            continue;
-          }
-          let _pname = null;
-          if (item.kind === "variable") {
-            const n = item.name;
-            _pname = n.startsWith("$") ? n.slice(1) : n;
-          } else if (item.kind === "literal" && item.type === "symbol") {
-            const v = item.value;
-            _pname = v.startsWith("$") ? v.slice(1) : v;
-          }
-          if (_pname !== null) {
-            params.push(_pname);
-            paramDefaults.push(void 0);
-            const _nx = items[_ii + 1];
-            const _nxType = _nx?.kind === "keyword" ? _nx.name : _nx?.kind === "literal" && _nx?.type === "string" ? String(_nx.value) : _nx?.kind === "literal" && _nx?.type === "symbol" ? String(_nx.value) : null;
-            if (_nxType && /^(int|float|number|string|bool|boolean|any|list|array|map|fn|function|nil)$/.test(_nxType)) {
-              _pAnns.push(_nxType);
-              _ii += 2;
-              continue;
-            }
-            _pAnns.push(null);
-          }
-          _ii++;
-        }
-        if (_pAnns.some((a) => a !== null)) {
-          paramsNode.__pAnns = _pAnns;
-        }
-      }
-    } else if (paramsNode.kind === "sexpr") {
-      throwInvalidForm(
-        "fn",
-        `\uD30C\uB77C\uBBF8\uD130 \uBAA9\uB85D\uC740 \uB300\uAD04\uD638 [ ]\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
-  \uC798\uBABB\uB41C \uC608: (fn (x y) ...)
-  \uC62C\uBC14\uB978 \uC608: (fn [$x $y] ...)`,
-        expr2
-      );
-    } else {
-      throwInvalidForm(
-        "fn",
-        `\uD30C\uB77C\uBBF8\uD130\uB294 [\uBCC0\uC2181 \uBCC0\uC2182 ...] \uD615\uD0DC\uC5EC\uC57C \uD569\uB2C8\uB2E4.`,
-        expr2
-      );
-    }
-    const body = expr2.args.length === 2 ? expr2.args[1] : { kind: "sexpr", op: "do", args: expr2.args.slice(1) };
-    const hasDefaults = paramDefaults.some((d) => d !== void 0);
-    const _fnPAnns = paramsNode.__pAnns;
-    return {
-      kind: "function-value",
-      params,
-      ...hasDefaults && { paramDefaults },
-      ..._fnPAnns && { paramAnnotations: _fnPAnns },
-      body,
-      capturedEnv: ctx.variables.snapshot(),
-      name: void 0
-    };
-  }
-  if (op === "defn" || op === "defun") {
-    if (expr2.args.length < 3) throwArgCount("defn", ">=3", expr2.args.length, expr2.line);
-    let argIdx = 0;
-    let isPureHint = false;
-    if (expr2.args[argIdx]?.kind === "literal" && String(expr2.args[argIdx].value).startsWith("^")) {
-      const hint = String(expr2.args[argIdx].value);
-      if (hint === "^pure") isPureHint = true;
-      argIdx++;
-    }
-    const nameNode = expr2.args[argIdx++];
-    let name;
-    if (nameNode.kind === "variable") name = nameNode.name;
-    else if (nameNode.kind === "literal" && nameNode.type === "symbol") name = nameNode.value;
-    else throwInvalidForm("defn", "first argument must be a symbol (function name)", expr2.line);
-    const paramsNode = expr2.args[argIdx];
-    let bodyArgs = expr2.args.slice(argIdx + 1);
-    let _defnRetAnn = null;
-    if (bodyArgs.length >= 2) {
-      const _arrow = bodyArgs[0];
-      if (_arrow?.kind === "literal" && _arrow?.type === "symbol" && _arrow?.value === "->") {
-        const _rt = bodyArgs[1];
-        const _rtn = _rt?.kind === "keyword" ? _rt.name : _rt?.kind === "literal" && (_rt?.type === "symbol" || _rt?.type === "string") ? String(_rt.value) : null;
-        if (_rtn) {
-          _defnRetAnn = _rtn;
-          bodyArgs = bodyArgs.slice(2);
-        }
-      }
-    }
-    let registeredMeta = null;
-    if (bodyArgs.length > 1) {
-      const meta = extractMapMeta(bodyArgs[0]);
-      if (meta) {
-        meta.line = expr2.line;
-        fnMetaRegistry.set(name, meta);
-        registeredMeta = meta;
-        bodyArgs = bodyArgs.slice(1);
-      }
-    }
-    const body = bodyArgs.length === 1 ? bodyArgs[0] : { kind: "sexpr", op: "do", args: bodyArgs };
-    if (isPureHint) {
-      checkEffects(name, [], body, expr2.line, true);
-      if (!registeredMeta) {
-        registeredMeta = { line: expr2.line, effects: [] };
-        fnMetaRegistry.set(name, registeredMeta);
-      } else if (!registeredMeta.effects) {
-        registeredMeta.effects = [];
-      }
-    } else if (registeredMeta?.effects !== void 0) {
-      checkEffects(name, registeredMeta.effects, body, expr2.line);
-    }
-    const fnExpr = { kind: "sexpr", op: "fn", args: [paramsNode, body] };
-    const fnValue = interp2.evalSExpr(fnExpr);
-    fnValue.name = name;
-    if (_defnRetAnn) fnValue.returnAnnotation = _defnRetAnn;
-    try {
-      const funcChunk = _vmCompiler.compileFunctionBody(fnValue.params, fnValue.body, name);
-      const vmFuncObj = {
-        _isVMFunc: true,
-        _chunk: funcChunk,
-        _params: fnValue.params,
-        _closure: fnValue.capturedEnv ? [...fnValue.capturedEnv.entries()] : []
-      };
-      registerVMFunction(name, vmFuncObj);
-    } catch {
-      registerVMFunction(name);
-    }
-    const funcDef = {
-      name,
-      params: fnValue.params,
-      body: fnValue.body,
-      capturedEnv: fnValue.capturedEnv
-    };
-    if (fnValue.paramDefaults) funcDef.paramDefaults = fnValue.paramDefaults;
-    if (fnValue.paramAnnotations) funcDef.paramAnnotations = fnValue.paramAnnotations;
-    if (fnValue.returnAnnotation) funcDef.returnAnnotation = fnValue.returnAnnotation;
-    ctx.functions.set(name, funcDef);
-    if (registeredMeta?.property) {
-      try {
-        const propNode = registeredMeta.property;
-        if (propNode?.kind === "block" && propNode?.type === "Map") {
-          const pf = propNode.fields;
-          const argsNode = pf.get("args");
-          let argTypes = [];
-          if (argsNode?.kind === "block" && argsNode?.type === "Array") {
-            const items = argsNode.fields?.get("items");
-            if (Array.isArray(items)) argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
-          }
-          const checkNode = pf.get("check");
-          const checkFn = checkNode ? ev(checkNode) : null;
-          const samplesNode = pf.get("samples");
-          const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
-          propRegistry.set(`prop-${name}`, {
-            name: `prop-${name}`,
-            fn: name,
-            args: argTypes,
-            check: checkFn,
-            samples,
-            line: expr2.line
-          });
-        }
-      } catch {
-      }
-    }
-    ctx.variables.set("$" + name, fnValue);
-    ctx.variables.set(name, fnValue);
-    return fnValue;
-  }
-  if (op === "defprop") {
-    if (expr2.args.length < 2) throwArgCount("defprop", ">=2", expr2.args.length, expr2.line);
-    const nameNode = expr2.args[0];
-    const propName = nameNode?.kind === "variable" ? nameNode.name : nameNode?.kind === "literal" ? String(nameNode.value) : "prop-" + Date.now();
-    const specNode = expr2.args[1];
-    if (specNode?.kind !== "block" || specNode?.type !== "Map") {
-      throw new FLRuntimeError(
-        ErrorCodes.INVALID_FORM,
-        `defprop: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uB9F5\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 {:fn :args :check}`,
-        {},
-        void 0,
-        expr2.line
-      );
-    }
-    const fields = specNode.fields;
-    const fnNode = fields.get("fn");
-    const fnName = fnNode?.kind === "literal" ? String(fnNode.value) : "";
-    const argsNode = fields.get("args");
-    let argTypes = [];
-    if (argsNode?.kind === "block" && argsNode?.type === "Array") {
-      const items = argsNode.fields?.get("items");
-      if (Array.isArray(items)) {
-        argTypes = items.map((it) => it?.kind === "literal" ? String(it.value).replace(/^:/, "") : "any");
-      }
-    }
-    const checkNode = fields.get("check");
-    const checkFn = checkNode ? ev(checkNode) : null;
-    const samplesNode = fields.get("samples");
-    const samples = samplesNode?.kind === "literal" && typeof samplesNode.value === "number" ? samplesNode.value : 100;
-    const prop = {
-      name: propName,
-      fn: fnName,
-      args: argTypes,
-      check: checkFn,
-      samples,
-      line: expr2.line
-    };
-    propRegistry.set(propName, prop);
-    return prop;
-  }
-  if (op === "async") {
-    if (expr2.args.length < 3) throwArgCount("async", ">=3", expr2.args.length, expr2.line);
-    const nameNode = expr2.args[0];
-    const name = nameNode.name || "async-fn";
-    const paramsNode = expr2.args[1];
-    const params = [];
-    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
-      const items = paramsNode.fields.get("items");
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          if (item.kind === "variable") params.push(item.name);
-        }
-      }
-    } else if (paramsNode.kind === "sexpr") {
-      throwInvalidForm(
-        "async",
-        `\uD30C\uB77C\uBBF8\uD130 \uBAA9\uB85D\uC740 \uB300\uAD04\uD638 [ ]\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
-  \uC798\uBABB\uB41C \uC608: (async myFn (x) ...)
-  \uC62C\uBC14\uB978 \uC608: (async myFn [$x] ...)`,
-        expr2
-      );
-    } else {
-      throwInvalidForm(
-        "async",
-        `\uD30C\uB77C\uBBF8\uD130\uB294 [\uBCC0\uC2181 \uBCC0\uC2182 ...] \uD615\uD0DC\uC5EC\uC57C \uD569\uB2C8\uB2E4.`,
-        expr2
-      );
-    }
-    return {
-      kind: "async-function-value",
-      name,
-      params,
-      body: expr2.args[2],
-      capturedEnv: ctx.variables.snapshot()
-    };
-  }
-  if (op === "set!") {
-    if (expr2.args.length < 2) throwArgCount("set!", ">=2", expr2.args.length, expr2.line);
-    const varHint = expr2.args[0]?.name ?? expr2.args[0]?.value ?? "x";
-    if (process.env.FL_V12 === "1") {
-      throw new FLRuntimeError(
-        ErrorCodes.INVALID_FORM,
-        `[v12] set!\uC740 \uC81C\uAC70\uB410\uC2B5\uB2C8\uB2E4 (line ${expr2.line ?? "?"}). atom\uC744 \uC0AC\uC6A9\uD558\uC138\uC694:
-  (define ${varHint} (atom \uCD08\uAE30\uAC12)) \u2192 (swap! ${varHint} (fn [v] \uC0C8\uAC12)) \uB610\uB294 (reset! ${varHint} \uC0C8\uAC12)`,
-        { fn: "set!" },
-        void 0,
-        expr2.line
-      );
-    }
-    console.warn(`\u26A0\uFE0F  [FreeLang] set! is deprecated (line ${expr2.line ?? "?"}). \uC804\uC5ED \uBCC0\uC218 \uC218\uC815\uC740 \uD074\uB85C\uC800\uC5D0 \uC804\uD30C\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. atom \uAD8C\uC7A5: (define x (atom 0)) (swap! x + 1)`);
-    const nameNode = expr2.args[0];
-    if (nameNode.kind === "sexpr" && nameNode.op === "get") {
-      const getArgs = nameNode.args;
-      const obj = ev(getArgs[0]);
-      const key = ev(getArgs[1]);
-      const value2 = ev(expr2.args[1]);
-      if (obj !== null && typeof obj === "object") {
-        const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key);
-        obj[k] = value2;
-      }
-      return ev(expr2.args[1]);
-    }
-    let name;
-    if (nameNode.kind === "variable") {
-      name = "$" + nameNode.name;
-    } else if (nameNode.kind === "literal") {
-      name = "$" + nameNode.value;
-    } else {
-      throwInvalidForm("set!", "first argument must be a symbol", expr2.line);
-    }
-    const value = ev(expr2.args[1]);
-    if (!ctx.variables.mutate(name, value)) ctx.variables.set(name, value);
-    return value;
-  }
-  if (op === "define") {
-    if (expr2.args.length < 2) throwArgCount("define", ">=2", expr2.args.length, expr2.line);
-    const nameNode = expr2.args[0];
-    let name;
-    if (nameNode.kind === "literal") {
-      name = nameNode.value;
-    } else if (nameNode.kind === "variable") {
-      name = nameNode.name;
-    } else {
-      throwInvalidForm("define", "first argument must be a symbol or string", expr2.line);
-    }
-    if (expr2.args.length >= 3) {
-      const paramsNode = expr2.args[1];
-      const bodyNode = expr2.args.length === 3 ? expr2.args[2] : { kind: "sexpr", op: "do", args: expr2.args.slice(2) };
-      const items = paramsNode.kind === "block" && paramsNode.type === "Array" ? paramsNode.fields.get("items") || [] : paramsNode.kind === "array" ? paramsNode.items || [] : [];
-      const params = items.map((item) => {
-        if (item.kind === "variable") return item.name.startsWith("$") ? item.name : "$" + item.name;
-        if (item.kind === "literal") return "$" + item.value;
-        return "$" + (item.name || item.value || "?");
-      });
-      ctx.functions.set(name, { name, params, body: bodyNode });
-      return null;
-    }
-    const value = ev(expr2.args[1]);
-    if (value !== null && value !== void 0 && value.kind === "function-value") {
-      const funcDef = {
-        name,
-        params: value.params,
-        body: value.body,
-        capturedEnv: value.capturedEnv
-      };
-      if (value._call) funcDef._call = value._call;
-      ctx.functions.set(name, funcDef);
-      ctx.variables.set("$" + name, value);
-      ctx.variables.set(name, value);
-      if (ctx.typeChecker) {
-        const paramTypes = value.params.map(() => ({ kind: "type", name: "any" }));
-        ctx.typeChecker.registerFunction(name, paramTypes, { kind: "type", name: "any" });
-      }
-      return value;
-    } else {
-      const meta = {
-        file: expr2.file,
-        line: expr2.line || nameNode.line,
-        col: nameNode.col,
-        type: inferType2(value)
-      };
-      if (ctx.variables.has("$" + name)) {
-        if (process.env.FL_V12 === "1") {
-          throw new FLRuntimeError(
-            ErrorCodes.INVALID_FORM,
-            `[v12] '${name}'\uC740(\uB294) \uC774\uBBF8 \uC815\uC758\uB410\uC2B5\uB2C8\uB2E4 (line ${expr2.line ?? "?"}). \uAC00\uBCC0 \uAC12\uC740 atom\uC744 \uC0AC\uC6A9\uD558\uC138\uC694:
-  (define ${name} (atom \uCD08\uAE30\uAC12)) \u2192 (swap! ${name} (fn [v] \uC0C8\uAC12))`,
-            { fn: "define", varName: name },
-            void 0,
-            expr2.line
-          );
-        }
-        console.warn(`\u26A0\uFE0F  [FreeLang] '${name}'\uC740(\uB294) \uC774\uBBF8 \uC815\uC758\uB410\uC2B5\uB2C8\uB2E4 (line ${expr2.line ?? "?"}). \uAC00\uBCC0 \uAC12\uC740 atom\uC744 \uC0AC\uC6A9\uD558\uC138\uC694: (define ${name} (atom ${JSON.stringify(value)})) \u2192 (swap! ${name} (fn [v] \uC0C8\uAC12))`);
-      }
-      ctx.variables.set("$" + name, value, meta);
-      return value;
-    }
-  }
-  if (op === "func-ref") {
-    if (expr2.args.length < 1) throwArgCount("func-ref", ">=1", expr2.args.length, expr2.line);
-    const funcName = expr2.args[0].name || String(expr2.args[0]);
-    const func = ctx.functions.get(funcName);
-    if (!func) throwFnNotFound(funcName, expr2.line);
-    return {
-      kind: "function-value",
-      params: func.params,
-      body: func.body,
-      capturedEnv: ctx.variables.snapshot(),
-      name: funcName
-    };
-  }
-  if (op === "call") {
-    if (expr2.args.length < 1) throwArgCount("call", ">=1", expr2.args.length, expr2.line);
-    const fn = ev(expr2.args[0]);
-    const evaluatedArgs = expr2.args.slice(1).map((a) => ev(a));
-    if (fn.kind === "builtin-function") return fn.fn(evaluatedArgs);
-    if (fn.kind === "function-value") return callFnVal(fn, evaluatedArgs);
-    if (fn.kind === "async-function-value") return callAsyncFnVal(fn, evaluatedArgs);
-    if (typeof fn === "string") return callUser(fn, evaluatedArgs);
-    throw new Error(`call expects function-value, got ${fn.kind || typeof fn}`);
-  }
-  if (op === "compose" || op === "comp") {
-    if (expr2.args.length < 1) throw new Error(`${op} requires at least 1 function`);
-    const handles = expr2.args.map((arg) => {
-      const fk = arg.kind;
-      if (fk === "variable") return { type: "name", name: arg.name };
-      if (fk === "literal" && arg.type === "symbol") return { type: "name", name: String(arg.value) };
-      return { type: "val", val: ev(arg) };
-    });
-    const compFn = { kind: "function-value", name: `(${op})`, params: ["__x__"], body: null, env: null };
-    compFn._call = (x) => {
-      let result = x;
-      for (let i = handles.length - 1; i >= 0; i--) {
-        const handle = handles[i];
-        if (handle.type === "val") {
-          result = interp2.callFunctionValue(handle.val, [result]);
-        } else {
-          result = interp2.callUserFunction(handle.name, [result]);
-        }
-      }
-      return result;
-    };
-    return compFn;
-  }
-  if (op === "pipe") {
-    if (expr2.args.length < 2) throw new Error(`pipe requires at least a value and one function`);
-    let pipeValue = ev(expr2.args[0]);
-    for (let i = 1; i < expr2.args.length; i++) {
-      const fnArg = expr2.args[i];
-      let pipeResult;
-      if (fnArg.kind === "literal" && fnArg.type === "symbol") {
-        const fnName = fnArg.value;
-        if (ctx.functions.has(fnName)) pipeResult = callUser(fnName, [pipeValue]);
-        else throw new Error(`Unknown function: ${fnName}`);
-      } else if (fnArg.kind === "variable") {
-        const fnName = fnArg.name;
-        if (ctx.functions.has(fnName)) pipeResult = callUser(fnName, [pipeValue]);
-        else if (ctx.variables.has(fnName)) pipeResult = callFn2(ctx.variables.get(fnName), [pipeValue]);
-        else throw new Error(`Unknown function or variable: ${fnName}`);
-      } else {
-        const fn = ev(fnArg);
-        pipeResult = callFn2(fn, [pipeValue]);
-      }
-      pipeValue = pipeResult;
-    }
-    return pipeValue;
-  }
-  if (op === "->") {
-    if (expr2.args.length < 2) throw new Error(`-> requires at least a value and one step`);
-    const TMP_VAR = "__thread_first_tmp__";
-    let val = ev(expr2.args[0]);
-    for (let i = 1; i < expr2.args.length; i++) {
-      const form = expr2.args[i];
-      const fk = form.kind;
-      if (fk === "sexpr") {
-        const sform = form;
-        ctx.variables.set(TMP_VAR, val);
-        const tmpVar = { kind: "variable", name: TMP_VAR };
-        const newSexpr = { kind: "sexpr", op: sform.op, args: [tmpVar, ...sform.args] };
-        val = ev(newSexpr);
-        ctx.variables.delete(TMP_VAR);
-      } else if (fk === "variable") {
-        const fnName = form.name;
-        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
-        else if (ctx.variables.has(fnName)) val = callFn2(ctx.variables.get(fnName), [val]);
-        else throw new Error(`->: unknown function or variable: ${fnName}`);
-      } else if (fk === "literal" && form.type === "symbol") {
-        const fnName = form.value;
-        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
-        else throw new Error(`->: unknown function: ${fnName}`);
-      } else {
-        const fn = ev(form);
-        val = callFn2(fn, [val]);
-      }
-    }
-    return val;
-  }
-  if (op === "->>") {
-    if (expr2.args.length < 2) throw new Error(`->> requires at least a value and one step`);
-    const TMP_VAR = "__thread_last_tmp__";
-    let val = ev(expr2.args[0]);
-    for (let i = 1; i < expr2.args.length; i++) {
-      const form = expr2.args[i];
-      const fk = form.kind;
-      if (fk === "sexpr") {
-        const sform = form;
-        ctx.variables.set(TMP_VAR, val);
-        const tmpVar = { kind: "variable", name: TMP_VAR };
-        const newSexpr = { kind: "sexpr", op: sform.op, args: [...sform.args, tmpVar] };
-        val = ev(newSexpr);
-        ctx.variables.delete(TMP_VAR);
-      } else if (fk === "variable") {
-        const fnName = form.name;
-        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
-        else if (ctx.variables.has(fnName)) val = callFn2(ctx.variables.get(fnName), [val]);
-        else throw new Error(`->>: unknown function or variable: ${fnName}`);
-      } else if (fk === "literal" && form.type === "symbol") {
-        const fnName = form.value;
-        if (ctx.functions.has(fnName)) val = callUser(fnName, [val]);
-        else throw new Error(`->>: unknown function: ${fnName}`);
-      } else {
-        const fn = ev(form);
-        val = callFn2(fn, [val]);
-      }
-    }
-    return val;
-  }
-  if (op === "?.") {
-    if (expr2.args.length < 1) return null;
-    let val = ev(expr2.args[0]);
-    for (let i = 1; i < expr2.args.length; i++) {
-      if (val === null || val === void 0) return null;
-      const keyArg = expr2.args[i];
-      let key;
-      if (keyArg.kind === "literal") {
-        key = keyArg.value;
-      } else {
-        key = ev(keyArg);
-      }
-      if (typeof key === "string" && key.startsWith(":")) key = key.slice(1);
-      val = val instanceof Map ? val.get(key) ?? val.get(":" + key) ?? null : val?.[String(key)] ?? null;
-    }
-    return val ?? null;
-  }
-  if (op === "as->") {
-    if (expr2.args.length < 3) throw new Error(`as-> requires: (as-> val $name form ...)`);
-    const bindArg = expr2.args[1];
-    let bindName;
-    if (bindArg.kind === "variable") {
-      bindName = bindArg.name;
-    } else if (bindArg.kind === "literal") {
-      bindName = "$" + String(bindArg.value);
-    } else {
-      throw new Error(`as->: second arg must be a binding name like $v`);
-    }
-    let val = ev(expr2.args[0]);
-    ctx.variables.push();
-    try {
-      for (let i = 2; i < expr2.args.length; i++) {
-        ctx.variables.set(bindName, val);
-        val = ev(expr2.args[i]);
-      }
-    } finally {
-      ctx.variables.pop();
-    }
-    return val;
-  }
-  if (op === "??") {
-    if (expr2.args.length < 2) throw new Error(`?? requires at least 2 arguments`);
-    for (let i = 0; i < expr2.args.length; i++) {
-      const val = ev(expr2.args[i]);
-      if (val !== null && val !== void 0) return val;
-    }
-    return null;
-  }
-  if (op === "|>") {
-    if (expr2.args.length < 2) throw new Error(`|> requires at least a value and one function`);
-    let pipeVal = ev(expr2.args[0]);
-    for (let i = 1; i < expr2.args.length; i++) {
-      const step = expr2.args[i];
-      const fk = step.kind;
-      if (fk === "sexpr") {
-        const s = step;
-        const tmpVar = `__pipe_${i}__`;
-        ctx.variables.set(tmpVar, pipeVal);
-        const injectedArg = { kind: "variable", name: tmpVar };
-        const newSExpr = { kind: "sexpr", op: s.op, args: [...s.args, injectedArg], line: s.line };
-        try {
-          pipeVal = ev(newSExpr);
-        } finally {
-          ctx.variables.delete(tmpVar);
-        }
-      } else if (fk === "variable") {
-        const fnName = step.name;
-        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
-        else if (ctx.variables.has(fnName)) pipeVal = callFn2(ctx.variables.get(fnName), [pipeVal]);
-      } else if (fk === "literal" && step.type === "symbol") {
-        const fnName = String(step.value);
-        if (ctx.functions.has(fnName)) pipeVal = callUser(fnName, [pipeVal]);
-        else if (ctx.variables.has(fnName)) pipeVal = callFn2(ctx.variables.get(fnName), [pipeVal]);
-      } else {
-        const fn = ev(step);
-        pipeVal = callFn2(fn, [pipeVal]);
-      }
-    }
-    return pipeVal;
-  }
-  if (op === "let") {
-    return evalLet(interp2, expr2.args);
-  }
-  if (op === "if-let" || op === "when-let") {
-    if (expr2.args.length < 2) throwArgCount(op, ">=2", expr2.args.length, expr2.line);
-    const bindingsNode = expr2.args[0];
-    const outerItems = bindingsNode.kind === "block" && bindingsNode.type === "Array" ? bindingsNode.fields?.get("items") ?? [] : [];
-    if (outerItems.length < 1) throwInvalidForm(op, "binding \uD615\uD0DC\uAC00 [$x expr] \uC774\uC5B4\uC57C \uD568", expr2.line);
-    let pairItems;
-    const firstItem = outerItems[0];
-    if (firstItem.kind === "variable" || firstItem.kind === "literal") {
-      pairItems = outerItems;
-    } else {
-      pairItems = firstItem.kind === "block" && firstItem.type === "Array" ? firstItem.fields?.get("items") ?? [] : [];
-    }
-    if (pairItems.length < 2) throwInvalidForm(op, "[$x expr] \uD615\uD0DC\uAC00 \uC798\uBABB\uB428", expr2.line);
-    const varName = pairItems[0].kind === "variable" ? pairItems[0].name : pairItems[0].kind === "literal" ? String(pairItems[0].value) : "";
-    const value = ev(pairItems[1]);
-    const truthy2 = value !== null && value !== void 0 && value !== false;
-    if (truthy2) {
-      interp2.context.variables.push();
-      try {
-        const meta = {
-          line: pairItems[0].line,
-          col: pairItems[0].col,
-          type: inferType2(value)
-        };
-        interp2.context.variables.set(varName, value, meta);
-        if (op === "if-let") {
-          return ev(expr2.args[1]);
-        } else {
-          let result = null;
-          for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
-          return result;
-        }
-      } finally {
-        interp2.context.variables.pop();
-      }
-    } else {
-      if (op === "if-let" && expr2.args.length >= 3) return ev(expr2.args[2]);
-      return null;
-    }
-  }
-  if (op === "when") {
-    if (expr2.args.length < 2) throwArgCount("when", ">=2", expr2.args.length, expr2.line);
-    const c = ev(expr2.args[0]);
-    if (c !== null && c !== void 0 && c !== false) {
-      let result = null;
-      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
-      return result;
-    }
-    return null;
-  }
-  if (op === "unless") {
-    if (expr2.args.length < 2) throwArgCount("unless", ">=2", expr2.args.length, expr2.line);
-    const c = ev(expr2.args[0]);
-    if (c === null || c === void 0 || c === false) {
-      let result = null;
-      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
-      return result;
-    }
-    return null;
-  }
-  if (op === "set") {
-    if (expr2.args.length !== 2) throwArgCount("set", "exactly 2", expr2.args.length, expr2.line);
-    const varNode = expr2.args[0];
-    let varName;
-    if (varNode.kind === "variable") varName = varNode.name;
-    else if (varNode.kind === "literal" && varNode.type === "symbol") varName = "$" + varNode.value;
-    else throwInvalidForm("set", "first argument must be a variable", expr2.line);
-    const newValue = ev(expr2.args[1]);
-    if (!ctx.variables.mutate(varName, newValue)) throw new Error(`set: variable ${varName} not found in scope`);
-    return newValue;
-  }
-  if (op === "if") {
-    const condition = ev(expr2.args[0]);
-    const branch = condition ? expr2.args[1] : expr2.args[2] || null;
-    if (branch === null) return null;
-    if (interp2.tcoMode && branch !== null) {
-      const b = branch;
-      if (b.kind === "sexpr") {
-        const bop = b.op;
-        const ctx2 = interp2.context;
-        if (typeof bop === "string" && ctx2.functions.has(bop)) {
-          const tailArgs = b.args.map((a) => ev(a));
-          return tailCall(bop, tailArgs);
-        }
-      }
-    }
-    return ev(branch);
-  }
-  if (op === "cond") {
-    return evalCond(interp2, expr2.args);
-  }
-  if (op === "do" || op === "begin" || op === "progn") {
-    if (expr2.args.length >= 2) {
-      const first2 = ev(expr2.args[0]);
-      const isCallable = typeof first2 === "function" || first2?.kind === "function-value" || first2?.kind === "async-function-value" || first2?.kind === "closure";
-      if (isCallable) {
-        const callArgs = expr2.args.slice(1).map((a) => ev(a));
-        if (typeof first2 === "function") return first2(...callArgs);
-        if (first2?.kind === "function-value" || first2?.kind === "async-function-value") return interp2.callFunctionValue(first2, callArgs);
-        if (first2?.kind === "closure") {
-          const params = first2.params || [];
-          ctx.variables.push();
-          try {
-            if (first2["closure-env"]) {
-              for (const [k, v] of Object.entries(first2["closure-env"].vars || {})) ctx.variables.set(k, v);
-            }
-            for (let i = 0; i < params.length; i++) ctx.variables.set(params[i], callArgs[i] ?? null);
-            let result3 = null;
-            for (const node of first2.body || []) result3 = ev(node);
-            return result3;
-          } finally {
-            ctx.variables.pop();
-          }
-        }
-      }
-      let result2 = first2;
-      for (const arg of expr2.args.slice(1)) {
-        if (isBlock(arg) && isControlBlock(arg)) {
-          interp2.evalBlock(arg);
-          result2 = null;
-          continue;
-        }
-        result2 = ev(arg);
-      }
-      return result2;
-    }
-    let result = null;
-    for (const arg of expr2.args) {
-      if (isBlock(arg) && isControlBlock(arg)) {
-        interp2.evalBlock(arg);
-        result = null;
-        continue;
-      }
-      result = ev(arg);
-    }
-    return result;
-  }
-  if (op === "loop") {
-    const bindingsNode = expr2.args[0];
-    const bodyNodes = expr2.args.slice(1);
-    const bindingItems = bindingsNode.kind === "array" ? bindingsNode.items || [] : bindingsNode.kind === "block" && bindingsNode.type === "Array" ? bindingsNode.fields?.get?.("items") || [] : [];
-    const isModernSyntax = bindingItems.length === 3 && bindingItems[0].kind === "sexpr";
-    if (isModernSyntax) {
-      const initExpr = bindingItems[0];
-      const condExpr = bindingItems[1];
-      const updateExpr = bindingItems[2];
-      const varName = initExpr.op || "$i";
-      const initVal = ev(initExpr.args[0]);
-      ctx.variables.push();
-      ctx.variables.set(varName, initVal);
-      let result2 = null;
-      try {
-        while (true) {
-          const condVal = ev(condExpr);
-          const isTruthy = condVal !== null && condVal !== void 0 && condVal !== false;
-          if (!isTruthy) break;
-          for (const bodyNode of bodyNodes) {
-            result2 = ev(bodyNode);
-          }
-          const newVal = ev(updateExpr);
-          ctx.variables.set(varName, newVal);
-        }
-        return result2;
-      } finally {
-        ctx.variables.pop();
-      }
-    }
-    const loopVars = [];
-    const loopInits = [];
-    for (let i = 0; i < bindingItems.length; i += 2) {
-      const varNode = bindingItems[i];
-      const valNode = bindingItems[i + 1];
-      const varName = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : String(varNode.name || varNode.value);
-      loopVars.push(varName);
-      loopInits.push(ev(valNode));
-    }
-    ctx.variables.push();
-    for (let i = 0; i < loopVars.length; i++) {
-      ctx.variables.set(loopVars[i], loopInits[i]);
-    }
-    let result = null;
-    const maxIter = 1e5;
-    let iter = 0;
-    try {
-      while (iter++ < maxIter) {
-        if (iter % 1e3 === 0) checkBudgetInLoop();
-        let recurred = false;
-        for (const bodyNode of bodyNodes) {
-          result = ev(bodyNode);
-          if (result && typeof result === "object" && result.__FL_RECUR__) {
-            const newVals = result.__args;
-            for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
-              ctx.variables.set(loopVars[i], newVals[i]);
-            }
-            recurred = true;
-            break;
-          }
-        }
-        if (!recurred) break;
-      }
-    } finally {
-      ctx.variables.pop();
-    }
-    return result;
-  }
-  if (op === "recur") {
-    const newVals = expr2.args.map((a) => ev(a));
-    return { __FL_RECUR__: true, __args: newVals };
-  }
-  if (op === "while") {
-    let result = null;
-    while (ev(expr2.args[0])) {
-      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
-    }
-    return result;
-  }
-  if (op === "when-not") {
-    if (expr2.args.length < 2) return null;
-    const c = ev(expr2.args[0]);
-    if (c === null || c === void 0 || c === false) {
-      let result = null;
-      for (let i = 1; i < expr2.args.length; i++) result = ev(expr2.args[i]);
-      return result;
-    }
-    return null;
-  }
-  if (op === "dotimes") {
-    const bindingNode = expr2.args[0];
-    const items = bindingNode?.kind === "array" ? bindingNode.items || [] : bindingNode?.fields?.get?.("items") || [];
-    if (items.length < 2) return null;
-    const bindName = items[0]?.name || items[0]?.value || "";
-    const n = Number(ev(items[1]));
-    for (let i = 0; i < n; i++) {
-      interp2.context.variables.push();
-      try {
-        interp2.context.variables.set(bindName, i);
-        for (let j = 1; j < expr2.args.length; j++) ev(expr2.args[j]);
-      } finally {
-        interp2.context.variables.pop();
-      }
-    }
-    return null;
-  }
-  if (op === "doseq") {
-    const bindingNode = expr2.args[0];
-    const items = bindingNode?.kind === "array" ? bindingNode.items || [] : bindingNode?.fields?.get?.("items") || [];
-    if (items.length < 2) return null;
-    const bindName = items[0]?.name || items[0]?.value || String(items[0]?.value ?? "");
-    const coll = ev(items[1]);
-    if (!Array.isArray(coll)) return null;
-    for (const item of coll) {
-      interp2.context.variables.push();
-      try {
-        interp2.context.variables.set(bindName, item);
-        for (let i = 1; i < expr2.args.length; i++) ev(expr2.args[i]);
-      } finally {
-        interp2.context.variables.pop();
-      }
-    }
-    return null;
-  }
-  if (op === "case") {
-    if (expr2.args.length === 0) return null;
-    const testVal = ev(expr2.args[0]);
-    let i = 1;
-    while (i < expr2.args.length - 1) {
-      const matchVal = ev(expr2.args[i]);
-      if (testVal === matchVal) return ev(expr2.args[i + 1]);
-      i += 2;
-    }
-    if (i === expr2.args.length - 1) return ev(expr2.args[i]);
-    return null;
-  }
-  if (op === "for") {
-    const bindingNode = expr2.args[0];
-    const items = bindingNode?.kind === "array" ? bindingNode.items || [] : bindingNode?.fields?.get?.("items") || [];
-    if (items.length < 2) return [];
-    const bindName = items[0]?.name || items[0]?.value || "";
-    const coll = ev(items[1]);
-    if (!Array.isArray(coll)) return [];
-    let whenFn = null;
-    for (let wi = 2; wi < items.length - 1; wi++) {
-      const kw = items[wi]?.value || items[wi]?.name || "";
-      if (kw === ":when" || kw === "when") {
-        whenFn = items[wi + 1];
-        break;
-      }
-    }
-    const result = [];
-    for (const item of coll) {
-      interp2.context.variables.push();
-      try {
-        interp2.context.variables.set(bindName, item);
-        if (whenFn) {
-          const pass = ev(whenFn);
-          if (!pass && pass !== 0) {
-            continue;
-          }
-        }
-        let val = null;
-        for (let bi = 1; bi < expr2.args.length; bi++) val = ev(expr2.args[bi]);
-        result.push(val);
-      } finally {
-        interp2.context.variables.pop();
-      }
-    }
-    return result;
-  }
-  if (op === "and") {
-    let result = true;
-    for (const arg of expr2.args) {
-      result = ev(arg);
-      if (!result) return result;
-    }
-    return result;
-  }
-  if (op === "or") {
-    let last = null;
-    for (const arg of expr2.args) {
-      last = ev(arg);
-      if (last !== null && last !== void 0 && last !== false) return last;
-    }
-    return last;
-  }
-  if (op === "map" && expr2.args.length === 3) {
-    const arr = ev(expr2.args[0]);
-    const paramNode = expr2.args[1];
-    const bodyNode = expr2.args[2];
-    const items = paramNode.kind === "block" && paramNode.type === "Array" ? paramNode.fields.get?.("items") || [] : paramNode.kind === "array" ? paramNode.items || [] : [];
-    const paramNames = items.map((item) => {
-      if (item.kind === "variable") return item.name;
-      if (item.kind === "literal") return "$" + item.value;
-      return "$" + (item.name || item.value || "_");
-    });
-    if (Array.isArray(arr) && paramNames.length > 0) {
-      return arr.map((elem) => {
-        ctx.variables.push();
-        ctx.variables.set(paramNames[0], elem);
-        try {
-          return ev(bodyNode);
-        } finally {
-          ctx.variables.pop();
-        }
-      });
-    }
-    return void 0;
-  }
-  if (op === "deftest" || op === "describe" || op === "it") {
-    const ctx2 = interp2.context;
-    if (!ctx2._testResults) ctx2._testResults = { passed: 0, failed: 0, errors: [] };
-    const name = expr2.args.length > 0 ? String(ev(expr2.args[0])) : "(anonymous)";
-    const bodies = expr2.args.slice(1);
-    try {
-      for (const b of bodies) ev(b);
-      ctx2._testResults.passed++;
-      process.stdout.write(`  \u2713 ${name}
-`);
-    } catch (e) {
-      ctx2._testResults.failed++;
-      const msg = e?.message ?? String(e);
-      ctx2._testResults.errors.push(`  \u2717 ${name}: ${msg}`);
-      process.stdout.write(`  \u2717 ${name}: ${msg}
-`);
-    }
-    return null;
-  }
-  if (op === "is") {
-    const val = expr2.args.length > 0 ? ev(expr2.args[0]) : false;
-    const msg = expr2.args.length > 1 ? String(ev(expr2.args[1])) : `Expected truthy, got: ${JSON.stringify(val)}`;
-    if (!val) throw new Error(msg);
-    return val;
-  }
-  if (op === "is=") {
-    if (expr2.args.length < 2) throwArgCount("is=", "2", expr2.args.length, expr2.line);
-    const expected = ev(expr2.args[0]);
-    const actual = ev(expr2.args[1]);
-    const eq = JSON.stringify(expected) === JSON.stringify(actual);
-    if (!eq) throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
-    return actual;
-  }
-  if (op === "run-tests") {
-    const ctx2 = interp2.context;
-    const r = ctx2._testResults ?? { passed: 0, failed: 0, errors: [] };
-    const total = r.passed + r.failed;
-    process.stdout.write(`
-Test Results: ${r.passed}/${total} passed`);
-    if (r.failed > 0) process.stdout.write(` (${r.failed} FAILED)`);
-    process.stdout.write("\n");
-    ctx2._testResults = { passed: 0, failed: 0, errors: [] };
-    return { passed: r.passed, failed: r.failed, total };
-  }
-  if (op === "test-summary") {
-    const ctx2 = interp2.context;
-    const r = ctx2._testResults ?? { passed: 0, failed: 0, errors: [] };
-    return /* @__PURE__ */ new Map([["passed", r.passed], ["failed", r.failed], ["total", r.passed + r.failed], ["errors", r.errors]]);
-  }
-  if (op === "import") {
-    if (expr2.args.length < 1) throwArgCount("import", "1", expr2.args.length, expr2.line);
-    const filePath = String(ev(expr2.args[0]));
-    const useExpr = { ...expr2, op: "use", args: expr2.args };
-    return interp2.evalSpecialForm("use", useExpr);
-  }
-  if (op === "migrate") {
-    if (expr2.args.length < 2) throwArgCount("migrate", "2", expr2.args.length, expr2.line);
-    const db = ev(expr2.args[0]);
-    const steps = ev(expr2.args[1]);
-    if (!Array.isArray(steps)) throw new Error("migrate: second arg must be [[version sql] ...] array");
-    const ctx2 = interp2.context;
-    if (db === null || db === void 0) {
-      if (!ctx2._migrate_applied) ctx2._migrate_applied = /* @__PURE__ */ new Set();
-      const applied2 = ctx2._migrate_applied;
-      let count3 = 0;
-      for (const step of steps) {
-        const pair = Array.isArray(step) ? step : [step];
-        const version = String(pair[0]);
-        if (applied2.has(version)) continue;
-        applied2.add(version);
-        count3++;
-        process.stdout.write(`  [migrate] applied: ${version}
-`);
-      }
-      if (count3 === 0) process.stdout.write("  [migrate] up to date\n");
-      return { applied: count3, total: steps.length };
-    }
-    const execFn = interp2.context.functions.get("mariadb_exec") ?? interp2.context.functions.get("mariadb-exec");
-    const queryFn = interp2.context.functions.get("mariadb_query") ?? interp2.context.functions.get("mariadb-query");
-    if (!execFn || !queryFn) throw new Error("migrate: mariadb functions not loaded");
-    const exec = (sql, params = []) => callFn2(execFn.body ?? execFn, [db, sql, params]);
-    const query = (sql, params = []) => callFn2(queryFn.body ?? queryFn, [db, sql, params]);
-    exec(`CREATE TABLE IF NOT EXISTS _migrations (
-      version VARCHAR(255) PRIMARY KEY,
-      applied_at BIGINT NOT NULL
-    )`);
-    const rows = query("SELECT version FROM _migrations");
-    const applied = new Set((rows ?? []).map((r) => String(r.version ?? r[0] ?? "")));
-    let count2 = 0;
-    for (const step of steps) {
-      const pair = Array.isArray(step) ? step : [step];
-      const version = String(pair[0]);
-      const sql = String(pair[1] ?? "");
-      if (applied.has(version)) continue;
-      exec(sql);
-      exec("INSERT INTO _migrations (version, applied_at) VALUES (?, ?)", [version, Date.now()]);
-      count2++;
-      process.stdout.write(`  [migrate] applied: ${version}
-`);
-    }
-    if (count2 === 0) process.stdout.write("  [migrate] up to date\n");
-    return { applied: count2, total: steps.length };
-  }
-  if (op === "memoize") {
-    if (expr2.args.length < 1) throwArgCount("memoize", "1", expr2.args.length, expr2.line);
-    const fn = ev(expr2.args[0]);
-    const cache = /* @__PURE__ */ new Map();
-    return (...args3) => {
-      const key = JSON.stringify(args3);
-      if (cache.has(key)) return cache.get(key);
-      const result = callFn2(fn, args3);
-      cache.set(key, result);
-      return result;
-    };
-  }
-  if (op === "partial") {
-    if (expr2.args.length < 1) throwArgCount("partial", ">=1", expr2.args.length, expr2.line);
-    const fn = ev(expr2.args[0]);
-    const partialArgs = expr2.args.slice(1).map(ev);
-    return (...rest) => {
-      const allArgs = [...partialArgs, ...rest];
-      if (typeof fn === "function") return fn(...allArgs);
-      return callFn2(fn, allArgs);
-    };
-  }
-  if (op === "group-by" || op === "group_by") {
-    if (expr2.args.length < 2) throwArgCount("group-by", "2", expr2.args.length, expr2.line);
-    const keyFn = ev(expr2.args[0]);
-    const coll = ev(expr2.args[1]);
-    if (!Array.isArray(coll)) return /* @__PURE__ */ new Map();
-    const getKey = (item) => {
-      if (typeof keyFn === "string") {
-        const k = keyFn.startsWith(":") ? keyFn.slice(1) : keyFn;
-        if (item instanceof Map) return item.get(keyFn) ?? item.get(k) ?? null;
-        return item?.[k] ?? item?.[keyFn] ?? null;
-      }
-      if (typeof keyFn === "function") return keyFn(item);
-      return callFn2(keyFn, [item]);
-    };
-    const result = /* @__PURE__ */ new Map();
-    for (const item of coll) {
-      const key = getKey(item);
-      if (!result.has(key)) result.set(key, []);
-      result.get(key).push(item);
-    }
-    return result;
-  }
-  if (op === "return") {
-    const val = expr2.args.length > 0 ? ev(expr2.args[0]) : null;
-    throw new ReturnSignal(val);
-  }
-  if (op === "map-vals" || op === "map_vals" || op === "map-keys" || op === "map_keys") {
-    const isKey = op === "map-keys" || op === "map_keys";
-    if (expr2.args.length === 1) {
-      const m = ev(expr2.args[0]);
-      if (m instanceof Map) return isKey ? [...m.keys()] : [...m.values()];
-      if (m && typeof m === "object" && !Array.isArray(m)) return isKey ? Object.keys(m) : Object.values(m);
-      return [];
-    }
-    if (expr2.args.length === 2) {
-      const fn = ev(expr2.args[0]);
-      const m = ev(expr2.args[1]);
-      const applyFn = (fn2, arg) => callFn2(fn2, [arg]);
-      if (m instanceof Map) {
-        const out = /* @__PURE__ */ new Map();
-        for (const [k, v] of m.entries())
-          out.set(isKey ? applyFn(fn, k) : k, isKey ? v : applyFn(fn, v));
-        return out;
-      }
-      if (m && typeof m === "object" && !Array.isArray(m)) {
-        const out = {};
-        for (const [k, v] of Object.entries(m))
-          out[isKey ? String(applyFn(fn, k)) : k] = isKey ? v : applyFn(fn, v);
-        return out;
-      }
-      return m;
-    }
-  }
-  if (op === "defstruct") {
-    if (expr2.args.length < 2) {
-      throw new Error(`defstruct requires a name and a field vector`);
-    }
-    const nameNode = expr2.args[0];
-    const structName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
-    if (!structName) throw new Error(`defstruct: struct name is required`);
-    const fieldsNode = expr2.args[1];
-    const fields = [];
-    if (fieldsNode.kind === "block" && fieldsNode.type === "Array") {
-      const items = fieldsNode.fields.get("items");
-      if (Array.isArray(items)) {
-        const isSimpleForm = (() => {
-          if (items.length % 2 !== 0) return true;
-          const TYPE_KW = /* @__PURE__ */ new Set(["int", "float", "number", "string", "bool", "boolean", "any", "list", "array", "map", "fn", "function"]);
-          for (let i = 1; i < items.length; i += 2) {
-            const it = items[i];
-            const v = it?.kind === "keyword" ? it.name : it?.kind === "variable" ? it.name : it?.value;
-            if (TYPE_KW.has(String(v))) return false;
-          }
-          return true;
-        })();
-        if (isSimpleForm) {
-          for (const item of items) {
-            const it = item;
-            const fieldName = it.kind === "keyword" ? it.name : it.kind === "variable" ? it.name : it.kind === "literal" ? String(it.value) : "";
-            if (fieldName) fields.push({ name: fieldName, type: "any" });
-          }
-        } else {
-          for (let i = 0; i < items.length; i += 2) {
-            const nameItem = items[i];
-            const typeItem = items[i + 1];
-            const fieldName = nameItem.kind === "keyword" ? nameItem.name : nameItem.kind === "variable" ? nameItem.name : nameItem.kind === "literal" ? String(nameItem.value) : "";
-            const fieldType = typeItem === void 0 ? "any" : typeItem.kind === "keyword" ? typeItem.name : typeItem.kind === "variable" ? typeItem.name : typeItem.kind === "literal" ? String(typeItem.value) : "any";
-            if (fieldName) fields.push({ name: fieldName, type: fieldType });
-          }
-        }
-      }
-    }
-    const registry = ctx.structs;
-    registry.define({ name: structName, fields });
-    const ctor = registry.makeConstructor(structName);
-    ctx.functions.set(structName, {
-      name: structName,
-      params: fields.map((f) => f.name),
-      body: { kind: "literal", type: "null", value: null },
-      capturedEnv: /* @__PURE__ */ new Map([["__struct_ctor__", ctor]])
-    });
-    ctx[`__native_${structName}`] = ctor;
-    const pred = registry.makePredicate(structName);
-    ctx[`__native_${structName}?`] = pred;
-    for (const field of fields) {
-      const accessorName = `${structName}.${field.name}`;
-      const acc = registry.makeAccessor(structName, field.name);
-      ctx[`__native_${accessorName}`] = acc;
-    }
-    return null;
-  }
-  if (op === "defmacro") {
-    if (expr2.args.length < 3) throw new Error(`defmacro requires name, params, and body`);
-    const nameNode = expr2.args[0];
-    const macroName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
-    const paramsNode = expr2.args[1];
-    const params = [];
-    if (paramsNode.kind === "block" && paramsNode.type === "Array") {
-      const items = paramsNode.fields.get("items");
-      if (Array.isArray(items)) {
-        for (const item of items) {
-          if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
-          else if (item.kind === "literal") params.push("$" + item.value);
-        }
-      }
-    }
-    const body = expr2.args[2];
-    ctx.macroExpander.define(macroName, params, body);
-    return null;
-  }
-  if (op === "macroexpand") {
-    if (expr2.args.length < 1) throw new Error(`macroexpand requires 1 argument`);
-    const form = expr2.args[0];
-    const expanded = ctx.macroExpander.expand(form);
-    return ctx.macroExpander.astToString(expanded);
-  }
-  if (op === "defprotocol") {
-    if (expr2.args.length < 1) throw new Error(`defprotocol requires a name`);
-    const nameNode = expr2.args[0];
-    const protoName = nameNode.kind === "variable" ? nameNode.name : nameNode.kind === "literal" ? String(nameNode.value) : String(nameNode.name ?? nameNode.value ?? "");
-    const methods = [];
-    for (let i = 1; i < expr2.args.length; i++) {
-      const sigNode = expr2.args[i];
-      if (sigNode.kind !== "block" || sigNode.type !== "Array") continue;
-      const items = sigNode.fields.get("items");
-      if (!Array.isArray(items) || items.length < 1) continue;
-      const methodNameNode = items[0];
-      const methodName = methodNameNode.kind === "variable" ? methodNameNode.name : methodNameNode.kind === "literal" ? String(methodNameNode.value) : String(methodNameNode.name ?? methodNameNode.value ?? "");
-      const params = [];
-      if (items.length > 1) {
-        const paramsNode = items[1];
-        if (paramsNode.kind === "block" && paramsNode.type === "Array") {
-          const pItems = paramsNode.fields.get("items");
-          if (Array.isArray(pItems)) {
-            for (const p of pItems) {
-              if (p.kind === "variable") params.push(p.name);
-              else if (p.kind === "literal") params.push("$" + p.value);
-            }
-          }
-        }
-      }
-      let returnType;
-      if (items.length > 2) {
-        const rtNode = items[2];
-        if (rtNode.kind === "keyword") returnType = rtNode.name;
-        else if (rtNode.kind === "literal") returnType = String(rtNode.value);
-      }
-      methods.push({ name: methodName, params, returnType });
-    }
-    ctx.protocols.defineProtocol({ name: protoName, methods });
-    return null;
-  }
-  if (op === "impl") {
-    if (expr2.args.length < 3) throw new Error(`impl requires protocol name, type name, and at least one method`);
-    const protoNameNode = expr2.args[0];
-    const protoName = protoNameNode.kind === "variable" ? protoNameNode.name : protoNameNode.kind === "literal" ? String(protoNameNode.value) : String(protoNameNode.name ?? protoNameNode.value ?? "");
-    const typeNameNode = expr2.args[1];
-    const typeName = typeNameNode.kind === "variable" ? typeNameNode.name : typeNameNode.kind === "literal" ? String(typeNameNode.value) : String(typeNameNode.name ?? typeNameNode.value ?? "");
-    const implMethods = /* @__PURE__ */ new Map();
-    for (let i = 2; i < expr2.args.length; i++) {
-      const implNode = expr2.args[i];
-      if (implNode.kind !== "block" || implNode.type !== "Array") continue;
-      const items = implNode.fields.get("items");
-      if (!Array.isArray(items) || items.length < 3) continue;
-      const methodNameNode = items[0];
-      const methodName = methodNameNode.kind === "variable" ? methodNameNode.name : methodNameNode.kind === "literal" ? String(methodNameNode.value) : String(methodNameNode.name ?? methodNameNode.value ?? "");
-      const params = [];
-      const paramsNode = items[1];
-      if (paramsNode.kind === "block" && paramsNode.type === "Array") {
-        const pItems = paramsNode.fields.get("items");
-        if (Array.isArray(pItems)) {
-          for (const p of pItems) {
-            if (p.kind === "variable") params.push(p.name);
-            else if (p.kind === "literal") params.push("$" + p.value);
-          }
-        }
-      }
-      const body = items[2];
-      implMethods.set(methodName, { params, body });
-    }
-    ctx.protocols.defineImpl({ protocolName: protoName, typeName, methods: implMethods });
-    return null;
-  }
-  if (op === "parallel") {
-    if (expr2.args.length === 0) return [];
-    const results = [];
-    for (const arg of expr2.args) {
-      let val = ev(arg);
-      if (val && typeof val === "object" && typeof val.getValue === "function") {
-        try {
-          val = val.getValue();
-        } catch {
-          val = null;
-        }
-      }
-      results.push(val);
-    }
-    return results;
-  }
-  if (op === "race") {
-    if (expr2.args.length === 0) return null;
-    let firstResult = void 0;
-    for (const arg of expr2.args) {
-      let val = ev(arg);
-      if (val && typeof val === "object" && typeof val.getValue === "function") {
-        try {
-          val = val.getValue();
-        } catch {
-          val = null;
-        }
-      }
-      if (firstResult === void 0) firstResult = val;
-      if (val !== null && val !== void 0) return val;
-    }
-    return firstResult ?? null;
-  }
-  if (op === "with-timeout") {
-    if (expr2.args.length < 2) return null;
-    try {
-      let val = ev(expr2.args[1]);
-      if (val && typeof val === "object" && typeof val.getValue === "function") {
-        try {
-          val = val.getValue();
-        } catch {
-          val = null;
-        }
-      }
-      return val;
-    } catch {
-      return null;
-    }
-  }
-  if (op === "fl-try") {
-    if (expr2.args.length < 1) throw new Error(`fl-try requires at least 1 argument`);
-    const bodyNode = expr2.args[0];
-    const FL_TRY_KEYS = /* @__PURE__ */ new Set([
-      "on-err",
-      "on-type-error",
-      "on-not-found",
-      "on-io",
-      "on-arity",
-      "on-ai",
-      "on-timeout",
-      "on-runtime",
-      "default"
-    ]);
-    const handlers = /* @__PURE__ */ new Map();
-    let i = 1;
-    while (i < expr2.args.length) {
-      const keyNode = expr2.args[i];
-      let key = null;
-      if (keyNode.kind === "keyword") {
-        const v = String(keyNode.name ?? keyNode.value ?? "");
-        if (FL_TRY_KEYS.has(v)) key = v;
-      } else if (keyNode.kind === "literal" && keyNode.type === "string") {
-        const v = keyNode.value.startsWith(":") ? keyNode.value.slice(1) : keyNode.value;
-        if (FL_TRY_KEYS.has(v)) key = v;
-      }
-      if (key !== null && i + 1 < expr2.args.length) {
-        handlers.set(key, ev(expr2.args[i + 1]));
-        i += 2;
-      } else {
-        i++;
-      }
-    }
-    let result;
-    try {
-      const val = ev(bodyNode);
-      if (val && typeof val === "object" && (val._tag === "Ok" || val._tag === "Err")) {
-        result = val;
-      } else {
-        result = ok(val);
-      }
-    } catch (e) {
-      const flErr = fromThrown(e);
-      result = flErr;
-    }
-    if (isErr(result)) {
-      const e = result;
-      const categoryHandlerMap = {
-        "on-type-error": "type-error" /* TYPE_ERROR */,
-        "on-not-found": "not-found" /* NOT_FOUND */,
-        "on-io": "io-error" /* IO */,
-        "on-arity": "arity-error" /* ARITY */,
-        "on-ai": "ai-error" /* AI */,
-        "on-timeout": "timeout" /* TIMEOUT */
-      };
-      let handled = false;
-      for (const [handlerKey, category] of Object.entries(categoryHandlerMap)) {
-        if (handlers.has(handlerKey) && e.category === category) {
-          const fn = handlers.get(handlerKey);
-          const handlerResult = callFnVal(fn, [e]);
-          return handlerResult;
-        }
-      }
-      if (!handled && handlers.has("on-err")) {
-        const fn = handlers.get("on-err");
-        return callFnVal(fn, [e]);
-      }
-      if (!handled && handlers.has("default")) {
-        const fn = handlers.get("default");
-        return callFnVal(fn, [e]);
-      }
-      return result;
-    }
-    return result;
-  }
-  throw new Error(`evalSpecialForm: unknown op "${op}"`);
-}
-function evalLet(interp2, args3) {
-  if (args3.length < 2) throw new Error(`let requires at least 2 arguments`);
-  const bindings = args3[0];
-  const ctx = interp2.context;
-  const ev = (node) => interp2.eval(node);
-  const toVarName = (node) => {
-    if (node?.kind === "variable") {
-      const n = node.name;
-      return n.startsWith("$") ? n : "$" + n;
-    }
-    if (node?.kind === "literal" && node.type === "symbol") {
-      const v = node.value;
-      return v.startsWith("$") ? v : "$" + v;
-    }
-    throw new Error(`Invalid binding variable: expected symbol or variable, got ${node?.kind}`);
-  };
-  ctx.variables.push();
-  if (bindings.kind === "block" && bindings.type === "Array") {
-    const items = bindings.fields.get("items");
-    if (Array.isArray(items) && items.length > 0) {
-      const isNested = items[0]?.kind === "block" && items[0]?.type === "Array";
-      if (isNested) {
-        for (let i = 0; i < items.length; i += 2) {
-          if (!(items[i]?.kind === "block" && items[i]?.type === "Array")) {
-            ctx.variables.pop();
-            throw new Error(`let: 2\uCC28\uC6D0 \uBC14\uC778\uB529\uC5D0\uC11C \uC6D0\uC18C ${i}\uAC00 \uBC30\uC5F4\uC774 \uC544\uB2D8`);
-          }
-        }
-      } else {
-      }
-      if (isNested) {
-        for (const item of items) {
-          if (item.kind === "block" && item.type === "Array") {
-            const bindingItems = item.fields.get("items");
-            if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
-              const varName = toVarName(bindingItems[0]);
-              const value = ev(bindingItems[1]);
-              const meta = {
-                line: bindingItems[0].line,
-                col: bindingItems[0].col,
-                type: inferType2(value)
-              };
-              ctx.variables.set(varName, value, meta);
-            }
-          }
-        }
-      } else {
-        if (items.length % 2 !== 0) {
-          ctx.variables.pop();
-          throw new Error(`let: expected even number of binding items, got ${items.length}`);
-        }
-        for (let i = 0; i < items.length; i += 2) {
-          const pattern = items[i];
-          if (pattern?.kind === "block" && pattern?.type === "Map") {
-            const mapFields = pattern.fields;
-            const keysField = mapFields?.get("keys");
-            if (keysField?.kind === "block" && keysField?.type === "Array") {
-              const sourceMap = ev(items[i + 1]);
-              const keyItems = keysField.fields.get("items") ?? [];
-              for (const keyNode of keyItems) {
-                const rawName = keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value : keyNode?.kind === "variable" ? keyNode.name.replace(/^\$/, "") : null;
-                if (rawName !== null) {
-                  const varName2 = rawName.startsWith("$") ? rawName : "$" + rawName;
-                  const value2 = sourceMap !== null && typeof sourceMap === "object" ? sourceMap[rawName] ?? null : null;
-                  ctx.variables.set(varName2, value2, {
-                    line: keyNode.line,
-                    col: keyNode.col,
-                    type: inferType2(value2)
-                  });
-                }
-              }
-            }
-            continue;
-          }
-          const varName = toVarName(pattern);
-          const value = ev(items[i + 1]);
-          const meta = {
-            line: items[i].line,
-            col: items[i].col,
-            type: inferType2(value)
-          };
-          ctx.variables.set(varName, value, meta);
-        }
-      }
-    }
-  }
-  let result = null;
-  try {
-    for (let bodyIdx = 1; bodyIdx < args3.length; bodyIdx++) {
-      result = ev(args3[bodyIdx]);
-    }
-  } finally {
-    ctx.variables.pop();
-  }
-  return result;
-}
-function evalCond(interp2, args3) {
-  const ev = (node) => interp2.eval(node);
-  const firstArg = args3[0];
-  const isBracketed = firstArg?.kind === "block" && firstArg?.type === "Array" || firstArg?.kind === "sexpr" && firstArg?.op === "do";
-  if (args3.length >= 2 && !isBracketed) {
-    let i = 0;
-    while (i < args3.length - 1) {
-      const testArg = args3[i];
-      const isElse = testArg?.kind === "variable" && (testArg?.name === "else" || testArg?.name === ":else" || testArg?.name === "$else");
-      const test = isElse ? true : ev(testArg);
-      if (test !== null && test !== void 0 && test !== false) {
-        return ev(args3[i + 1]);
-      }
-      i += 2;
-    }
-    if (i < args3.length) return ev(args3[i]);
-    return null;
-  }
-  for (const arg of args3) {
-    let testNode = null;
-    let bodyNodes = [];
-    if (arg.kind === "block" && arg.type === "Array") {
-      const items = arg.fields.get("items");
-      if (Array.isArray(items) && items.length >= 2) {
-        const firstItem = items[0];
-        const isElse = firstItem?.kind === "variable" && (firstItem?.name === "else" || firstItem?.name === ":else" || firstItem?.name === "$else");
-        testNode = isElse ? { kind: "literal", type: "boolean", value: true } : firstItem;
-        bodyNodes = items.slice(1);
-      }
-    } else if (arg.kind === "sexpr" && arg.op === "do" && arg.args.length >= 2) {
-      testNode = arg.args[0];
-      bodyNodes = arg.args.slice(1);
-    } else if (arg.kind === "sexpr" && arg.args.length >= 1) {
-      const s = arg;
-      testNode = { kind: "literal", type: "boolean", value: s.op === "true" ? true : s.op === "false" ? false : s.op === "else" ? true : void 0 };
-      if (testNode.value === void 0) {
-        testNode = { kind: "variable", name: s.op.startsWith("$") ? s.op : "$" + s.op };
-      }
-      bodyNodes = s.args;
-    }
-    if (testNode && bodyNodes.length >= 1) {
-      const test = ev(testNode);
-      if (test) {
-        let result = null;
-        for (const b of bodyNodes) result = ev(b);
-        return result;
-      }
-    }
-  }
-  return null;
-}
-
 // src/eval-reasoning-sequence.ts
 function handleReasoningSequence(interp2, reasoningSeq) {
   const { stages, metadata, feedbackLoop } = reasoningSeq;
@@ -24417,111 +24638,110 @@ function createFileModule() {
 var fs6 = __toESM(require("fs"));
 var fdCache = /* @__PURE__ */ new Map();
 var nextFd = 1e3;
-function getEntry(fd, op) {
-  const entry = fdCache.get(fd);
-  if (entry === void 0) throw new Error(`${op}: invalid file descriptor ${fd}`);
-  return entry;
-}
 function createFdModule() {
   return {
-    // fd_open path mode -> fd  (modes: "r" "w" "a" "r+")
+    // fd_open path mode -> number (fd, mode: r/w/a)
     "fd_open": (filePath, mode) => {
-      const validModes = { r: "r", w: "w", a: "a", "r+": "r+" };
-      const fsMode = validModes[mode];
-      if (!fsMode) throw new Error(`fd_open: invalid mode "${mode}". Use r/w/a/r+`);
-      const nativeFd = fs6.openSync(filePath, fsMode);
-      const syntheticFd = nextFd++;
-      fdCache.set(syntheticFd, { nativeFd, position: 0 });
-      return syntheticFd;
-    },
-    // fd_close fd -> boolean
-    "fd_close": (fd) => {
-      const entry = getEntry(fd, "fd_close");
-      fs6.closeSync(entry.nativeFd);
-      fdCache.delete(fd);
-      return true;
-    },
-    // fd_seek fd offset whence -> number (new position)
-    // whence: 0 = SEEK_SET, 1 = SEEK_CUR, 2 = SEEK_END
-    "fd_seek": (fd, offset, whence) => {
-      const entry = getEntry(fd, "fd_seek");
-      const size2 = fs6.fstatSync(entry.nativeFd).size;
-      switch (whence) {
-        case 0:
-          entry.position = offset;
-          break;
-        case 1:
-          entry.position += offset;
-          break;
-        case 2:
-          entry.position = size2 + offset;
-          break;
-        default:
-          throw new Error(`fd_seek: unknown whence ${whence} (use 0/1/2)`);
+      try {
+        let fsMode;
+        switch (mode) {
+          case "r":
+            fsMode = "r";
+            break;
+          case "w":
+            fsMode = "w";
+            break;
+          case "a":
+            fsMode = "a";
+            break;
+          default:
+            throw new Error(`Invalid mode: ${mode}. Use "r", "w", or "a"`);
+        }
+        const nativeFd = fs6.openSync(filePath, fsMode);
+        const syntheticFd = nextFd++;
+        fdCache.set(syntheticFd, nativeFd);
+        return syntheticFd;
+      } catch (err4) {
+        throw new Error(`fd_open failed for '${filePath}' (${mode}): ${err4.message}`);
       }
-      if (entry.position < 0) entry.position = 0;
-      return entry.position;
     },
-    // fd_tell fd -> number (current position)
-    "fd_tell": (fd) => {
-      return getEntry(fd, "fd_tell").position;
-    },
-    // fd_size fd -> number (file size in bytes)
-    "fd_size": (fd) => {
-      const entry = getEntry(fd, "fd_size");
-      return fs6.fstatSync(entry.nativeFd).size;
-    },
-    // fd_read fd bytes -> string (UTF-8, advances position)
-    "fd_read": (fd, bytes) => {
-      const entry = getEntry(fd, "fd_read");
-      const buf = Buffer.alloc(bytes);
-      const bytesRead = fs6.readSync(entry.nativeFd, buf, 0, bytes, entry.position);
-      entry.position += bytesRead;
-      return buf.toString("utf-8", 0, bytesRead);
-    },
-    // fd_read_bytes fd bytes -> string (base64-encoded binary, advances position)
-    "fd_read_bytes": (fd, bytes) => {
-      const entry = getEntry(fd, "fd_read_bytes");
-      const buf = Buffer.alloc(bytes);
-      const bytesRead = fs6.readSync(entry.nativeFd, buf, 0, bytes, entry.position);
-      entry.position += bytesRead;
-      return buf.toString("base64", 0, bytesRead);
-    },
-    // fd_write fd data -> boolean (UTF-8, advances position)
+    // fd_write fd data -> boolean (write data to file descriptor)
     "fd_write": (fd, data) => {
-      const entry = getEntry(fd, "fd_write");
-      const buf = Buffer.from(data, "utf-8");
-      const written = fs6.writeSync(entry.nativeFd, buf, 0, buf.length, entry.position);
-      entry.position += written;
-      return true;
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        fs6.writeSync(nativeFd, data, "utf-8");
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_write failed on fd ${fd}: ${err4.message}`);
+      }
     },
-    // fd_write_bytes fd base64data -> number (bytes written, binary via base64)
-    "fd_write_bytes": (fd, base64data) => {
-      const entry = getEntry(fd, "fd_write_bytes");
-      const buf = Buffer.from(base64data, "base64");
-      const written = fs6.writeSync(entry.nativeFd, buf, 0, buf.length, entry.position);
-      entry.position += written;
-      return written;
-    },
-    // fd_truncate fd size -> boolean (truncate file at given byte offset)
-    "fd_truncate": (fd, size2) => {
-      const entry = getEntry(fd, "fd_truncate");
-      fs6.ftruncateSync(entry.nativeFd, size2);
-      if (entry.position > size2) entry.position = size2;
-      return true;
-    },
-    // fd_fsync fd -> boolean (flush fd to disk)
+    // fd_fsync fd -> boolean (flush file descriptor to disk)
     "fd_fsync": (fd) => {
-      const entry = getEntry(fd, "fd_fsync");
-      fs6.fsyncSync(entry.nativeFd);
-      return true;
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        fs6.fsyncSync(nativeFd);
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_fsync failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_close fd -> boolean (close file descriptor)
+    "fd_close": (fd) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        fs6.closeSync(nativeFd);
+        fdCache.delete(fd);
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_close failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_read fd bytes -> string (read bytes from file descriptor)
+    "fd_read": (fd, bytes) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        const buf = Buffer.alloc(bytes);
+        const bytesRead = fs6.readSync(nativeFd, buf, 0, bytes);
+        return buf.toString("utf-8", 0, bytesRead);
+      } catch (err4) {
+        throw new Error(`fd_read failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_seek fd offset whence -> number (whence: 0/1/2)
+    "fd_seek": (fd, offset, whence) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        const stats = fs6.fstatSync(nativeFd);
+        return stats.size;
+      } catch (err4) {
+        throw new Error(`fd_seek failed on fd ${fd}: ${err4.message}`);
+      }
     },
     // fd_flush -> boolean (flush all open fds)
     "fd_flush": () => {
-      for (const entry of fdCache.values()) {
-        fs6.fsyncSync(entry.nativeFd);
+      try {
+        for (const nativeFd of fdCache.values()) {
+          fs6.fsyncSync(nativeFd);
+        }
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_flush failed: ${err4.message}`);
       }
-      return true;
     }
   };
 }
@@ -24791,6 +25011,151 @@ function createTimerModule(interpreter) {
       }
     }
   };
+}
+
+// src/stdlib-cron.ts
+var cronJobs = /* @__PURE__ */ new Map();
+var lastCheckTime = 0;
+var checkInterval = null;
+function generateJobId() {
+  return "cron-" + Date.now() + "-" + Math.random().toString(36).slice(2, 9);
+}
+function parseField(field, min, max) {
+  if (field === "*") {
+    return null;
+  }
+  const values = [];
+  const parts = field.split(",");
+  for (const part of parts) {
+    if (part.includes("/")) {
+      const [range, stepStr] = part.split("/");
+      const step = parseInt(stepStr, 10);
+      if (range === "*") {
+        for (let i = min; i <= max; i += step) {
+          values.push(i);
+        }
+      } else if (range.includes("-")) {
+        const [startStr, endStr] = range.split("-");
+        const start = parseInt(startStr, 10);
+        const end = parseInt(endStr, 10);
+        for (let i = start; i <= end; i += step) {
+          if (i >= min && i <= max) values.push(i);
+        }
+      } else {
+        const num = parseInt(range, 10);
+        for (let i = num; i <= max; i += step) {
+          if (i >= min && i <= max) values.push(i);
+        }
+      }
+    } else if (part.includes("-")) {
+      const [startStr, endStr] = part.split("-");
+      const start = parseInt(startStr, 10);
+      const end = parseInt(endStr, 10);
+      for (let i = start; i <= end; i++) {
+        if (i >= min && i <= max) values.push(i);
+      }
+    } else {
+      const num = parseInt(part, 10);
+      if (num >= min && num <= max) values.push(num);
+    }
+  }
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+function parseCronExpression(expression) {
+  const fields = expression.trim().split(/\s+/);
+  if (fields.length !== 5) {
+    throw new Error(
+      `Cron \uD45C\uD604\uC2DD \uC624\uB958: 5\uAC1C \uD544\uB4DC \uD544\uC694 (\uBC1B\uC740 \uAC12: ${fields.length}\uAC1C)`
+    );
+  }
+  const [minuteField, hourField, dayField, monthField, dayOfWeekField] = fields;
+  return {
+    minute: parseField(minuteField, 0, 59),
+    hour: parseField(hourField, 0, 23),
+    day: parseField(dayField, 1, 31),
+    month: parseField(monthField, 1, 12),
+    dayOfWeek: parseField(dayOfWeekField, 0, 6)
+  };
+}
+function isTimeMatch(now, cronField) {
+  const minute = now.getMinutes();
+  const hour = now.getHours();
+  const day = now.getDate();
+  const month = now.getMonth() + 1;
+  const dayOfWeek = now.getDay();
+  const minuteMatch = cronField.minute === null || cronField.minute.includes(minute);
+  const hourMatch = cronField.hour === null || cronField.hour.includes(hour);
+  const monthMatch = cronField.month === null || cronField.month.includes(month);
+  let dayMatch = true;
+  const dayConstrained = cronField.day !== null;
+  const dayOfWeekConstrained = cronField.dayOfWeek !== null;
+  if (dayConstrained && dayOfWeekConstrained) {
+    dayMatch = cronField.day.includes(day) || cronField.dayOfWeek.includes(dayOfWeek);
+  } else if (dayConstrained) {
+    dayMatch = cronField.day.includes(day);
+  } else if (dayOfWeekConstrained) {
+    dayMatch = cronField.dayOfWeek.includes(dayOfWeek);
+  }
+  return minuteMatch && hourMatch && monthMatch && dayMatch;
+}
+function startScheduler() {
+  if (checkInterval !== null) return;
+  checkInterval = setInterval(() => {
+    const now = Date.now();
+    if (now - lastCheckTime < 6e4) return;
+    lastCheckTime = now;
+    const currentTime = /* @__PURE__ */ new Date();
+    for (const job of cronJobs.values()) {
+      try {
+        const cronField = parseCronExpression(job.expression);
+        if (isTimeMatch(currentTime, cronField)) {
+          Promise.resolve().then(() => job.callback()).catch(() => {
+          });
+        }
+      } catch (e) {
+      }
+    }
+  }, 6e4);
+}
+function stopScheduler() {
+  if (checkInterval !== null && cronJobs.size === 0) {
+    clearInterval(checkInterval);
+    checkInterval = null;
+    lastCheckTime = 0;
+  }
+}
+function cron_schedule(expression, callback) {
+  parseCronExpression(expression);
+  if (typeof callback !== "function" && !callback?.__fl_function) {
+    throw new Error(`Cron \uC624\uB958: \uCF5C\uBC31\uC740 \uD568\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4`);
+  }
+  const jobId = generateJobId();
+  cronJobs.set(jobId, {
+    id: jobId,
+    expression,
+    callback,
+    createdAt: /* @__PURE__ */ new Date()
+  });
+  startScheduler();
+  return jobId;
+}
+function cron_cancel(jobId) {
+  const deleted = cronJobs.delete(jobId);
+  stopScheduler();
+  return deleted;
+}
+function cron_list() {
+  return Array.from(cronJobs.values()).map((job) => ({
+    id: job.id,
+    expression: job.expression,
+    created_at: job.createdAt.toISOString()
+  }));
+}
+function cron_clear() {
+  const count2 = cronJobs.size;
+  cronJobs.clear();
+  stopScheduler();
+  return count2;
 }
 
 // src/stdlib-error.ts
@@ -38374,6 +38739,17 @@ function loadAllStdlib(interp2) {
   interp2.registerModule(bitsModule);
   interp2.registerModule(binaryModule);
   interp2.registerModule(createTimerModule(interp2));
+  interp2.registerModule({
+    // v11.7.0: Cron scheduler
+    "cron-schedule": (expr2, cb) => cron_schedule(expr2, () => interp2.callFunctionValue(cb, [])),
+    "cron_schedule": (expr2, cb) => cron_schedule(expr2, () => interp2.callFunctionValue(cb, [])),
+    "cron-cancel": (id) => cron_cancel(id),
+    "cron_cancel": (id) => cron_cancel(id),
+    "cron-list": () => cron_list(),
+    "cron_list": () => cron_list(),
+    "cron-clear": () => cron_clear(),
+    "cron_clear": () => cron_clear()
+  });
   interp2.registerModule(errorModule);
   interp2.registerModule(httpModule);
   const shellModule = createShellModule();
@@ -39121,58 +39497,7 @@ function loadAllStdlib(interp2) {
     "hash-sha256": (v) => (0, import_crypto10.createHash)("sha256").update(v, "utf8").digest("hex"),
     "hmac-sha256": (key, msg) => (0, import_crypto10.createHmac)("sha256", key).update(msg, "utf8").digest("hex"),
     "hash_md5": (v) => (0, import_crypto10.createHash)("md5").update(v, "utf8").digest("hex"),
-    "hash-md5": (v) => (0, import_crypto10.createHash)("md5").update(v, "utf8").digest("hex"),
-    // ── cron-schedule (v11.7.0) ────────────────────────────────
-    ...(() => {
-      const _cronJobs = new Map();
-      let _cronInterval = null;
-      function _pf(f, mn, mx) {
-        if (f === "*") return null;
-        const vals = [];
-        for (const part of f.split(",")) {
-          if (part.includes("/")) {
-            const [range, stepStr] = part.split("/");
-            const step = parseInt(stepStr, 10) || 1;
-            const [lo, hi] = range === "*" ? [mn, mx] : range.split("-").map(Number);
-            for (let i = (lo ?? mn); i <= (hi ?? mx); i += step) if (i >= mn && i <= mx) vals.push(i);
-          } else if (part.includes("-")) {
-            const [a2, b2] = part.split("-").map(Number);
-            for (let i = a2; i <= b2; i++) if (i >= mn && i <= mx) vals.push(i);
-          } else { const n2 = parseInt(part, 10); if (n2 >= mn && n2 <= mx) vals.push(n2); }
-        }
-        return [...new Set(vals)].sort((a2, b2) => a2 - b2);
-      }
-      function _mc(expr, now) {
-        const fs = expr.trim().split(/\s+/);
-        if (fs.length < 5) return false;
-        const [mf, hf, df, mof, dowf] = fs.slice(fs.length - 5);
-        const min = _pf(mf, 0, 59), hr = _pf(hf, 0, 23), dy = _pf(df, 1, 31), mo = _pf(mof, 1, 12), dow = _pf(dowf, 0, 6);
-        const m = now.getMinutes(), h = now.getHours(), d = now.getDate(), mo2 = now.getMonth() + 1, dw = now.getDay();
-        if (min && !min.includes(m)) return false;
-        if (hr && !hr.includes(h)) return false;
-        if (mo && !mo.includes(mo2)) return false;
-        const dc = dy !== null, dwc = dow !== null;
-        if (dc && dwc) { if (!dy.includes(d) && !dow.includes(dw)) return false; }
-        else if (dc && !dy.includes(d)) return false;
-        else if (dwc && !dow.includes(dw)) return false;
-        return true;
-      }
-      function _start() {
-        if (_cronInterval) return;
-        _cronInterval = setInterval(() => {
-          const now = new Date();
-          for (const job of _cronJobs.values()) { try { if (_mc(job.expr, now)) Promise.resolve().then(() => job.cb()).catch(() => {}); } catch (e2) {} }
-        }, 60000);
-      }
-      return {
-        "cron-schedule": (expr, cb) => { const id = "cron-" + Date.now() + "-" + Math.random().toString(36).slice(2,8); _cronJobs.set(id, {expr: String(expr), cb}); _start(); return id; },
-        "cron_schedule": (expr, cb) => _aliases["cron-schedule"](expr, cb),
-        "cron-cancel": (id) => { const ok = _cronJobs.delete(String(id)); if (_cronJobs.size === 0 && _cronInterval) { clearInterval(_cronInterval); _cronInterval = null; } return ok; },
-        "cron_cancel": (id) => _aliases["cron-cancel"](id),
-        "cron-list": () => Array.from(_cronJobs.values()).map(j => ({id: j.id ?? "", expression: j.expr, created_at: new Date().toISOString()})),
-        "cron_list": () => _aliases["cron-list"]()
-      };
-    })()
+    "hash-md5": (v) => (0, import_crypto10.createHash)("md5").update(v, "utf8").digest("hex")
   };
   const _authAliases = {
     "bcrypt-hash": "auth_hash_password",
@@ -39993,31 +40318,52 @@ function callUserFunction(interp2, name, args3) {
   if (interp2.tcoMode) {
     return callUserFunctionTCO(interp2, name, args3);
   }
+  const _effBase = name.replace(/\[.*$/, "");
+  enforceCall(_effBase);
   if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
+    const _vmAllowed = resolveFnAllowed(_effBase);
+    pushFrame(_effBase, _vmAllowed);
+    let _vmOk = false;
+    let _vmResult;
     try {
-      const vmFunc = vmFunctionRegistry.get(name);
-      const initialVars = /* @__PURE__ */ new Map();
-      if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
-        for (const [k, v] of vmFunc._closure) {
-          initialVars.set(k, v);
+      try {
+        const vmFunc = vmFunctionRegistry.get(name);
+        const initialVars = /* @__PURE__ */ new Map();
+        if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
+          for (const [k, v] of vmFunc._closure) {
+            initialVars.set(k, v);
+          }
+        } else {
+          const snapshot = interp2.context.variables.snapshot();
+          for (const [k, v] of snapshot) {
+            initialVars.set(k, v);
+          }
         }
-      } else {
-        const snapshot = interp2.context.variables.snapshot();
-        for (const [k, v] of snapshot) {
-          initialVars.set(k, v);
+        for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
+          initialVars.set("$" + vmName, vmFuncObj);
+          initialVars.set(vmName, vmFuncObj);
         }
+        for (let i = 0; i < vmFunc._params.length; i++) {
+          initialVars.set(vmFunc._params[i], args3[i] ?? null);
+        }
+        _vmResult = _callVM.run(vmFunc._chunk, initialVars);
+        _vmOk = true;
+      } catch {
       }
-      for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
-        initialVars.set("$" + vmName, vmFuncObj);
-        initialVars.set(vmName, vmFuncObj);
-      }
-      for (let i = 0; i < vmFunc._params.length; i++) {
-        initialVars.set(vmFunc._params[i], args3[i] ?? null);
-      }
-      return _callVM.run(vmFunc._chunk, initialVars);
-    } catch {
+    } finally {
+      popFrame();
     }
+    if (_vmOk) return _vmResult;
   }
+  const _interpAllowed = resolveFnAllowed(_effBase);
+  pushFrame(_effBase, _interpAllowed);
+  try {
+    return _callUserFunctionInterpPath(interp2, name, args3);
+  } finally {
+    popFrame();
+  }
+}
+function _callUserFunctionInterpPath(interp2, name, args3) {
   let baseName = name;
   let typeArgs = null;
   const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
@@ -40096,8 +40442,8 @@ function callUserFunction(interp2, name, args3) {
     throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
-    const _stack2 = interp2.callStack ?? [];
-    const tail = _stack2.slice(-10).map((s, i) => `  #${_stack2.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
+    const _stack3 = interp2.callStack ?? [];
+    const tail = _stack3.slice(-10).map((s, i) => `  #${_stack3.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
     throw new Error(
       `[E_STACK_OVERFLOW] line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'
 ` + (tail ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
@@ -40221,6 +40567,17 @@ function callFunctionValue(interp2, fn, args3) {
   if (fn.kind !== "function-value") {
     throw new Error(`Expected function-value, got ${fn.kind}`);
   }
+  const _effName = fn.name ?? "<anonymous>";
+  enforceCall(_effName);
+  const _allowed = resolveFnAllowed(_effName);
+  pushFrame(_effName, _allowed);
+  try {
+    return _callFunctionValueBody(interp2, fn, args3);
+  } finally {
+    popFrame();
+  }
+}
+function _callFunctionValueBody(interp2, fn, args3) {
   if (fn.paramDefaults) {
     while (args3.length < fn.params.length) {
       const def = fn.paramDefaults[args3.length];
@@ -40281,7 +40638,10 @@ function callAsyncFunctionValue(interp2, fn, args3) {
   if (fn.kind !== "async-function-value") {
     throw new Error(`Expected async-function-value, got ${fn.kind}`);
   }
+  const _effName = fn.name ?? "<anonymous>";
   return new FreeLangPromise((resolve9, reject) => {
+    enforceCall(_effName);
+    pushFrame(_effName, resolveFnAllowed(_effName));
     const savedStack = interp2.context.variables.saveStack();
     try {
       interp2.context.variables.fromSnapshot(fn.capturedEnv);
@@ -40298,11 +40658,14 @@ function callAsyncFunctionValue(interp2, fn, args3) {
       reject(error);
     } finally {
       interp2.context.variables.restoreStack(savedStack);
+      popFrame();
     }
   });
 }
 function callFunction(interp2, fn, args3) {
   if (fn.kind === "builtin-function") {
+    const _bname = fn.name ?? "<builtin>";
+    enforceCall(_bname);
     return fn.fn(args3.map((arg) => interp2.eval(arg)));
   } else if (fn.kind === "function-value") {
     return callFunctionValue(interp2, fn, args3);
@@ -40328,11 +40691,16 @@ function callUserFunctionTCO(interp2, name, args3) {
   let currentArgs = args3;
   const prevTcoMode = interp2.tcoMode;
   interp2.tcoMode = true;
+  let _haveFrame = false;
   try {
     for (let i = 0; i < 2e6; i++) {
       let baseName = currentName;
       const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
       if (bracketMatch) baseName = bracketMatch[1];
+      if (_haveFrame) popFrame();
+      enforceCall(baseName);
+      pushFrame(baseName, resolveFnAllowed(baseName));
+      _haveFrame = true;
       let func = interp2.context.functions.get(baseName);
       if (!func) {
         const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
@@ -40410,12 +40778,14 @@ function callUserFunctionTCO(interp2, name, args3) {
     }
     throw new Error(`TCO: \uCD5C\uB300 \uBC18\uBCF5(2,000,000) \uCD08\uACFC \u2014 '${currentName}'\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131`);
   } finally {
+    if (_haveFrame) popFrame();
     interp2.tcoMode = prevTcoMode;
   }
 }
 function callFunctionValueTCO(interp2, fn, args3) {
   const prevTcoMode = interp2.tcoMode;
   interp2.tcoMode = true;
+  let _haveFrame = false;
   try {
     let currentFn = fn;
     let currentArgs = args3;
@@ -40423,6 +40793,11 @@ function callFunctionValueTCO(interp2, fn, args3) {
       if (currentFn.kind !== "function-value") {
         throw new Error(`Expected function-value, got ${currentFn.kind}`);
       }
+      const _effName = currentFn.name ?? "<anonymous>";
+      if (_haveFrame) popFrame();
+      enforceCall(_effName);
+      pushFrame(_effName, resolveFnAllowed(_effName));
+      _haveFrame = true;
       const savedStack = interp2.context.variables.saveStack();
       let result;
       try {
@@ -40436,6 +40811,10 @@ function callFunctionValueTCO(interp2, fn, args3) {
       }
       if (isTailCall(result)) {
         if (typeof result.fn === "string") {
+          if (_haveFrame) {
+            popFrame();
+            _haveFrame = false;
+          }
           return callUserFunctionTCO(interp2, result.fn, result.args);
         } else {
           currentFn = result.fn;
@@ -40447,49 +40826,64 @@ function callFunctionValueTCO(interp2, fn, args3) {
     }
     throw new Error("TCO: \uCD5C\uB300 \uBC18\uBCF5(1,000,000) \uCD08\uACFC \u2014 function-value\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131");
   } finally {
+    if (_haveFrame) popFrame();
     interp2.tcoMode = prevTcoMode;
   }
 }
 function callUserFunctionRaw(interp2, name, args3) {
   const func = interp2.context.functions.get(name);
   if (!func) throw new FunctionNotFoundError(name, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0);
-  if (typeof func.body === "function") return func.body(...args3);
-  let result;
-  if (func.capturedEnv) {
-    const savedStack = interp2.context.variables.saveStack();
-    try {
-      interp2.context.variables.fromSnapshot(func.capturedEnv);
-      for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args3[i]);
+  const _effBase = name.replace(/\[.*$/, "");
+  enforceCall(_effBase);
+  pushFrame(_effBase, resolveFnAllowed(_effBase));
+  try {
+    if (typeof func.body === "function") return func.body(...args3);
+    let result;
+    if (func.capturedEnv) {
+      const savedStack = interp2.context.variables.saveStack();
+      try {
+        interp2.context.variables.fromSnapshot(func.capturedEnv);
+        for (let i = 0; i < func.params.length; i++) {
+          interp2.context.variables.set(func.params[i], args3[i]);
+        }
+        result = interp2.eval(func.body);
+      } finally {
+        interp2.context.variables.restoreStack(savedStack);
       }
-      result = interp2.eval(func.body);
-    } finally {
-      interp2.context.variables.restoreStack(savedStack);
-    }
-  } else {
-    interp2.context.variables.push();
-    try {
-      for (let i = 0; i < func.params.length; i++) {
-        interp2.context.variables.set(func.params[i], args3[i]);
+    } else {
+      interp2.context.variables.push();
+      try {
+        for (let i = 0; i < func.params.length; i++) {
+          interp2.context.variables.set(func.params[i], args3[i]);
+        }
+        result = interp2.eval(func.body);
+      } finally {
+        interp2.context.variables.pop();
       }
-      result = interp2.eval(func.body);
-    } finally {
-      interp2.context.variables.pop();
     }
+    return result;
+  } finally {
+    popFrame();
   }
-  return result;
 }
 function callFunctionValueRaw(interp2, fn, args3) {
   if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
-  const savedStack = interp2.context.variables.saveStack();
+  const _effName = fn.name ?? "<anonymous>";
+  enforceCall(_effName);
+  pushFrame(_effName, resolveFnAllowed(_effName));
   try {
-    interp2.context.variables.fromSnapshot(fn.capturedEnv);
-    for (let i = 0; i < fn.params.length; i++) {
-      interp2.context.variables.set(fn.params[i], args3[i]);
+    const savedStack = interp2.context.variables.saveStack();
+    try {
+      interp2.context.variables.fromSnapshot(fn.capturedEnv);
+      for (let i = 0; i < fn.params.length; i++) {
+        interp2.context.variables.set(fn.params[i], args3[i]);
+      }
+      return interp2.eval(fn.body);
+    } finally {
+      interp2.context.variables.restoreStack(savedStack);
     }
-    return interp2.eval(fn.body);
   } finally {
-    interp2.context.variables.restoreStack(savedStack);
+    popFrame();
   }
 }
 
