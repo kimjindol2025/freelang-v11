@@ -182,9 +182,33 @@
         "callAsyncFunctionValue (async sync entry only, C4-3)",
         "callFunction (dispatch, builtin-function kind enforce, C4-3)"
       ],
-      "result": "PASS",
-      "verified_by": "1184+ jest tests (1175 base + 9 audit unit) + C4-1/2/3 unit suites 27 cases",
+      "result": "PARTIAL → PASS (C4-4 후 정정)",
+      "verified_by": "1184 jest tests (C4-3 시점)",
+      "amendment": "C6 진행 중 9번째 진입점 발견 — evalBuiltin switch-case (eval-builtins.ts:893) 가 callUserFunction 우회. C4-4 hot fix 로 진입부 enforce 추가. dec-007 invariant 복원.",
       "date": "2026-05-20"
+    },
+
+    "audit-c4-4": {
+      "t": "audit",
+      "v": "C4-4 evalBuiltin gate unify — missing architectural layer 완성",
+      "discovery": "C6 E2E 디버깅 중 발견. println 같은 builtin이 evalBuiltin switch-case (e.g. case \"println\": process.stdout.write) 로 직접 dispatch 되어 callUserFunction 통과 안 함 → 우리 C4-1/2/3 enforce 도달 못함.",
+      "fix": "eval-builtins.ts:893 evalBuiltin 진입부에 _enforceEffect(normalizedOp, span) 추가. frame push 없음 (builtin 즉시 return). enforceCall 3상 의미론으로 idempotent — default case 가 callUserFunction 호출 시 중복 enforce 되어도 안전 (event dedup collapse).",
+      "result": "PASS",
+      "verified_by": "C6 E2E 3/3 PASS (L0/L1 분리 시나리오) + 회귀 1223 PASS (rate-limiter err-006 + build-determinism worktree 환경 한계 제외)",
+      "date": "2026-05-21"
+    },
+
+    "arch-l0-l1-layers": {
+      "t": "decision",
+      "v": "Effect enforcement 는 2-layer defense — L0 static pre-filter + L1 runtime correctness. 둘 다 보존.",
+      "why": [
+        "L0 (eval-special-forms.ts:checkEffects + EFFECT_CATALOG): defn 시점 fast-fail, cheap, obvious io pattern 차단",
+        "L1 (effect-enforcer.ts + 9 entry hooks): 호출 시점 frame stack 기반 정확한 검증",
+        "L0 제거 시 cold path 검증 사라짐, trivial error 도 execution 까지 감",
+        "L0/L1 통합 시 'partial static analysis engine' 재설계 — C8급 작업으로 폭증"
+      ],
+      "lock": true,
+      "date": "2026-05-21"
     },
 
     "err-001": {

@@ -17,6 +17,7 @@ import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
 import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase C: strict 모드
+import { enforceCall as _enforceEffect } from "./effect-enforcer"; // C4-4: missing arch layer
 
 // Phase 후속: list/map 깊은 동등성 (T77 palindrome에서 발견된 한계 해결)
 function flDeepEq(a: any, b: any): boolean {
@@ -893,6 +894,12 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
   // AI-First #3: snake_case ↔ kebab-case 양방향 허용
   // 내부 구현은 kebab-case 기준 — snake_case 입력 시 자동 변환
   const normalizedOp = op.replace(/_/g, '-');
+
+  // C4-4: missing architectural layer completion (dec-007 invariant 복원).
+  // evalBuiltin switch-case 직접 dispatch 는 callUserFunction 우회 → 여기서 한 번 enforce.
+  // frame push 없음 (builtin 은 즉시 return). enforceCall 은 idempotent (3상 처리) —
+  // default case 가 callUserFunction 호출 시 중복 enforce 되어도 안전 (event는 dedup collapse).
+  _enforceEffect(normalizedOp, expr ? { file: (expr as any).file ?? "", line: (expr as any).line ?? 0, col: (expr as any).col ?? 0 } : undefined);
 
   // Phase X-2: Deprecation 경고 (snake_case 호출 시) — FL_NO_DEPRECATION_WARN=1 로 끄기 가능
   if (normalizedOp !== op && op !== 'server_start' && !process.env.FL_NO_DEPRECATION_WARN) {
