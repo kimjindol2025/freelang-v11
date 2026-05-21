@@ -85,6 +85,9 @@ function inferType(value: any): { kind: "type"; name: string } | undefined {
 
 // ── AI-Native Phase 2: Effects 정적 분석 ─────────────────────────
 // 함수명 → 발생 effect 매핑 (well-known side effects)
+// SPEC.airc dec-011 LOCK — L0 compatibility-only taxonomy.
+// L1 canonical (BUILTIN_EFFECTS + EffectTag) 으로의 alias 는 effect-aliases.ts 참조.
+// 신규 effect 는 L1 에서 흡수하고 본 catalog 에는 alias 만 추가한다.
 export const EFFECT_CATALOG = new Map<string, string>([
   // HTTP 클라이언트
   ["http_get",            "http"], ["http-get",            "http"],
@@ -94,27 +97,39 @@ export const EFFECT_CATALOG = new Map<string, string>([
   ["http_patch",          "http"], ["http-patch",          "http"],
   ["http_get_bearer",     "http"], ["http_post_bearer",    "http"],
   ["http_post_json",      "http"], ["http_get_json",       "http"],
+  // WebSocket — dec-011: L0=http, L1=net (alias 흡수)
+  ["ws_send", "http"], ["ws-send", "http"],
   // 파일 I/O
   ["file_read",  "file-read"],  ["file-read",  "file-read"],
   ["file_write", "file-write"], ["file-write", "file-write"],
-  ["file_append","file-write"], ["file_delete","file-write"],
-  ["file_exists","file-read"],  ["file_list",  "file-read"],
+  ["file_append","file-write"], ["file-append","file-write"],
+  ["file_delete","file-write"], ["file-delete","file-write"],
+  ["file_exists","file-read"],  ["file-exists","file-read"],
+  ["file_list",  "file-read"],
+  ["file_append_line", "file-write"], ["file-append-line", "file-write"],
   // DB
   ["db_query",   "db-read"],  ["db-query",   "db-read"],
   ["db_execute", "db-write"], ["db-execute", "db-write"],
   ["db_insert",  "db-write"], ["db-insert",  "db-write"],
   ["db_update",  "db-write"], ["db-update",  "db-write"],
   ["db_delete",  "db-write"], ["db-delete",  "db-write"],
+  ["db_transaction", "db-write"], ["db-transaction", "db-write"],
+  ["db_exec",    "db-write"], ["db-exec",    "db-write"], // alias of db-execute
   // Shell
   ["shell_exec", "shell"], ["shell-exec", "shell"],
   ["shell_exec_result", "shell"], ["shell-exec-result", "shell"],
   ["shell_run",  "shell"],
+  ["process_spawn", "shell"], ["process-spawn", "shell"],
   // I/O (stdout)
   ["println", "io"], ["print", "io"],
   ["log/info", "io"], ["log/warn", "io"], ["log/error", "io"],
   // 시간/랜덤 (non-determinism)
   ["now",        "time"], ["timestamp", "time"],
+  ["now_ms",     "time"], ["now-ms",    "time"],
+  ["sleep",      "time"],
   ["random",     "random"], ["rand-int",  "random"],
+  ["rand",       "random"], // alias of random
+  ["uuid",       "random"],
   // HTTP 서버 시작
   ["server_start", "server"], ["server-start", "server"],
 ]);
