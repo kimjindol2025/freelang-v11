@@ -307,8 +307,40 @@
         "jest 1192+ PASS (회귀)",
         "bootstrap.js 무관 (dec-010 scope_out)"
       ],
-      "verified": false,
+      "verified": true,
       "next": []
+    },
+
+    "audit-c8-taxonomy": {
+      "t": "audit",
+      "v": "C8 L0/L1 taxonomy normalization — dec-011 LOCK 적용 후 정합성 검증",
+      "evidence": {
+        "commits": [
+          "2a875d3e C8-1: SPEC.airc + dec-011 LOCK + graveyard final + lock 배열",
+          "6e440543 docs(plan): C8 effect-taxonomy PLAN — 11절 1절 보완",
+          "20c2705f C8-2: effect-aliases.ts + toCanonical (38줄)",
+          "4206b29d C8-3: EFFECT_CATALOG hole 7건 + alias 2건 + kebab 사전 누락 3건",
+          "2fd43578 C8-4: consistency test 72 cases — drift 회귀 자동 차단"
+        ],
+        "jest_total": "1313 PASS, 7 FAIL (사전 known: rate-limiter err-006 + build-determinism worktree 한계)",
+        "c8_suites": "effect-aliases 18 + effect-taxonomy-consistency 72 = 90 신규 PASS",
+        "consistency": "BUILTIN_EFFECTS 23 키 ⊆ EFFECT_CATALOG 66 entries, hole=0, mismatch=0",
+        "l0_vocabulary_size": "10 (alias_table 정의역과 정확히 일치)",
+        "regression": "본 C8 작업으로 인한 신규 fail 0 건. C7 baseline 1223 + 신규 90 = 1313",
+        "blog": "post #1156 (C8-1), 후속 통합 블로그 예정",
+        "branch": "feature/effect-taxonomy @ gogs.dclub.kr/kim/freelang-v11 (HEAD 2fd43578)"
+      },
+      "invariants_verified": [
+        "L1 BUILTIN_EFFECTS = canonical truth (변경 없음)",
+        "L0 EFFECT_CATALOG = compatibility-only (alias 만 확장)",
+        "effect-types.ts EffectTag 6 종 변경 없음",
+        "runtime enforcement gate (9 entry hooks) 변경 없음",
+        "bootstrap.js out-of-scope (dec-010)",
+        "auto consistency test 72 cases — 미래 drift 차단 보장"
+      ],
+      "result": "PASS",
+      "next": ["통합 블로그 (C8-2~C8-4)", "master 병합 (사용자 release cycle)", "tasks.dclub.kr t_1779339704348 done"],
+      "date": "2026-05-21"
     },
 
     "err-001": {
