@@ -28377,16 +28377,76 @@ function createWorkflowModule() {
 // src/stdlib-resource.ts
 var import_child_process3 = require("child_process");
 var os = __toESM(require("os"));
+// CRITICAL FIX #1: run() function error handling
 function run(cmd2, timeout = 1e4) {
   try {
     return (0, import_child_process3.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
-  } catch {
+  } catch (e) {
+    // [2026-05-21] Log error instead of silent fail - helps with debugging
+    console.warn(`[stdlib:run] Command failed: "${cmd2}" - ${e.message}`);
     return "";
+  }
+}
+// CRITICAL FIX #2-0: Classify failures as retryable vs fatal
+function classifyError(code) {
+  const retryableCodes = new Set([
+    "ETIMEDOUT",      // Timeout
+    "ECONNREFUSED",   // Connection refused (transient)
+    "ECONNRESET",     // Connection reset
+    "EAGAIN",         // Resource temporarily unavailable
+    "EADDRINUSE",     // Port/address in use (transient)
+    "EHOSTUNREACH",   // Host unreachable (transient)
+    "ENETUNREACH",    // Network unreachable (transient)
+    "ENOTFOUND",      // DNS resolution fail (transient)
+  ]);
+
+  const fatalCodes = new Set([
+    "ENOENT",         // File/command not found
+    "EACCES",         // Permission denied
+    "EINVAL",         // Invalid argument
+    "ENOEXEC",        // Not executable
+    "EISDIR",         // Is a directory
+    "EBADF",          // Bad file descriptor
+  ]);
+
+  return {
+    retryable: retryableCodes.has(code),
+    fatal: fatalCodes.has(code),
+    code: code
+  };
+}
+
+function runWithError(cmd2, timeout = 1e4) {
+  try {
+    const output = (0, import_child_process3.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
+    return { ok: true, value: output };
+  } catch (e) {
+    const classification = classifyError(e.code || "UNKNOWN");
+    return {
+      ok: false,
+      value: "",
+      error: {
+        message: e.message || "Unknown error",
+        code: e.code || "UNKNOWN",
+        status: e.status || null,
+        signal: e.signal || null,
+        retryable: classification.retryable,  // Can be retried
+        fatal: classification.fatal           // Should not retry
+      }
+    };
   }
 }
 function runLines(cmd2) {
   const out = run(cmd2);
   return out ? out.split("\n").map((l) => l.trim()).filter(Boolean) : [];
+}
+function runLinesWithError(cmd2) {
+  const result = runWithError(cmd2);
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+  const lines = result.value.split("\n").map((l) => l.trim()).filter(Boolean);
+  return { ok: true, value: lines };
 }
 function parseKv(lines, sep2 = ":") {
   const obj = {};
@@ -38836,9 +38896,18 @@ function loadAllStdlib(interp2) {
       return null;
     },
     // AI-Native Phase 1: fn-meta — 사용자 정의 함수의 메타 조회
+    // CRITICAL FIX #2: Safe default instead of null for unregistered functions
     "fn-meta": (name) => {
       const meta = fnMetaRegistry.get(name);
-      if (!meta) return null;
+      if (!meta) {
+        // [2026-05-21] Return safe default instead of null to prevent NullPointerException
+        console.warn(`[fn-meta] Function '${name}' not found in fnMetaRegistry, returning safe default`);
+        return /* @__PURE__ */ new Map([
+          ["doc", "undefined"],
+          ["returns", "any"],
+          ["effects", []]
+        ]);
+      }
       const m = /* @__PURE__ */ new Map();
       if (meta.doc) m.set("doc", meta.doc);
       if (meta.returns) m.set("returns", meta.returns);

@@ -84,34 +84,48 @@
 (defn cron-tick [cr]
   (let [now-map (-cron-now)
         jobs    (deref (get cr :jobs))
-        result  (atom {:ran [] :errors []})]
+        result  (atom {:ran [] :errors []})
+        now     (now-ms)]
     (doseq [name (obj-keys jobs)]
-      (let [job  (get jobs name)
-            expr (get job :expr)]
-        (when (-cron-matches? expr now-map)
+      (let [job      (get jobs name)
+            expr     (get job :expr)
+            last-run (get job :last-run)
+            can-run? (or (nil? last-run) (> (- now last-run) 60000))]
+        (when (and (-cron-matches? expr now-map) can-run?)
+          ;; Step 1: :last-run을 BEFORE handler 실행으로 원자적 업데이트 (중복 실행 방지)
+          (swap! (get cr :jobs) assoc name (assoc job :last-run now))
+          ;; Step 2: handler 실행 (실패해도 :last-run은 이미 업데이트됨)
           (try
             ((get job :handler))
-            (swap! (get cr :jobs) assoc name
-                   (assoc (assoc job :last-run (now-ms))
-                          :run-count (+ (get job :run-count) 1)))
+            ;; Step 3: 성공 시 run-count 증가
+            (let [current-job (get (deref (get cr :jobs)) name)]
+              (swap! (get cr :jobs) assoc name
+                     (assoc current-job :run-count (+ 1 (get current-job :run-count)))))
             (swap! result assoc :ran (append (get (deref result) :ran) name))
             (catch err
+              ;; ⚠️ 실패했지만 :last-run은 이미 업데이트됨 (60초 내 재실행 방지)
               (swap! result assoc :errors (append (get (deref result) :errors)
                                                   {:name name :error (get err "message")})))))))
     (deref result)))
 
 (defn cron-tick-now [cr]
   (let [jobs   (deref (get cr :jobs))
-        result (atom {:ran [] :errors []})]
+        result (atom {:ran [] :errors []})
+        now    (now-ms)]
     (doseq [name (obj-keys jobs)]
       (let [job (get jobs name)]
+        ;; Step 1: :last-run을 BEFORE handler 실행으로 원자적 업데이트
+        (swap! (get cr :jobs) assoc name (assoc job :last-run now))
+        ;; Step 2: handler 실행
         (try
           ((get job :handler))
-          (swap! (get cr :jobs) assoc name
-                 (assoc (assoc job :last-run (now-ms))
-                        :run-count (+ (get job :run-count) 1)))
+          ;; Step 3: 성공 시 run-count 증가
+          (let [current-job (get (deref (get cr :jobs)) name)]
+            (swap! (get cr :jobs) assoc name
+                   (assoc current-job :run-count (+ 1 (get current-job :run-count)))))
           (swap! result assoc :ran (append (get (deref result) :ran) name))
           (catch err
+            ;; 실패: :last-run은 이미 업데이트됨
             (swap! result assoc :errors (append (get (deref result) :errors)
                                                 {:name name :error (get err "message")}))))))
     (deref result)))
