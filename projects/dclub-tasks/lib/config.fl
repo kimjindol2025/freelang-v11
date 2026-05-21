@@ -1,0 +1,10 @@
+[FUNC tasks-config-get :params [$key $default]
+  :body (let [v (shell_env $key)]
+    (if (= $v "") $default $v))]
+
+[FUNC dclub-tasks-config :params []
+  :body {
+    :db (tasks-config-get "DCLUB_TASKS_DB" "/tmp/dclub-tasks.db")
+    :port (* (tasks-config-get "DCLUB_TASKS_PORT" "30130") 1)
+    :queue_url (tasks-config-get "DCLUB_QUEUE_URL" "http://localhost:30110")
+  }]
