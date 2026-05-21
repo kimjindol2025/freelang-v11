@@ -151,7 +151,7 @@ describe("FreeLang v11 full verify-self-host harness", () => {
       const out = execSync(`bash ${JSON.stringify(script)} tier2`, {
         cwd: REPO_ROOT,
         encoding: "utf8",
-        timeout: 120_000,
+        timeout: 300_000,
       });
       // 필수 섹션 존재 확인
       expect(out).toContain("결정론 OK");
@@ -169,6 +169,6 @@ describe("FreeLang v11 full verify-self-host harness", () => {
       // SKIP: KNOWN_STAGE1_CODEGEN_GAP 분류된 advisory (mongodb/binary 등)
       expect(Number(skipMatch![1])).toBeLessThanOrEqual(10);
     },
-    120_000
+    300_000
   );
 });

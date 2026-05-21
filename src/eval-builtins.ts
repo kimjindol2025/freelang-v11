@@ -883,6 +883,7 @@ function __ensureIoWorker(): void {
     process.stderr.write(`[IO Worker] error: ${e.message}\n`);
     (globalThis as any).__ioWorker = null;
   });
+  worker.unref();
   (globalThis as any).__ioWorker   = worker;
   (globalThis as any).__ioCtrlBuf  = ctrlBuf;
   (globalThis as any).__ioDataBuf  = dataBuf;
