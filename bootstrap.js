@@ -2013,13 +2013,34 @@ ${parenHint}` : parenHint;
       // (try body (catch [pattern] handler) (finally cleanup))
       parseTryExpression() {
         const bodyExprs = [];
-        while (this.check("LParen" /* LParen */) || !this.check("RParen" /* RParen */)) {
-          if (this.check("LParen" /* LParen */) && this.pos + 1 < this.tokens.length) {
-            const next = this.tokens[this.pos + 1];
-            if (next.type === "Symbol" /* Symbol */ && (next.value === "catch" || next.value === "finally")) break;
+        // STRICT MODE: body는 최대 1개 표현식만 허용. 여러 개는 do로 감싸야 함.
+
+        // 첫 번째 토큰 확인 — (catch 또는 (finally이면 body 없음
+        if (this.check("LParen" /* LParen */) && this.pos + 1 < this.tokens.length) {
+          const nextToken = this.tokens[this.pos + 1];
+
+          // 첫 S-expr이 catch나 finally가 아니면 body 파싱
+          if (!(nextToken.type === "Symbol" /* Symbol */ && (nextToken.value === "catch" || nextToken.value === "finally"))) {
+            bodyExprs.push(this.parseValue());
+
+            // body 파싱 후 다음이 반드시 catch/finally여야 함 (Strict)
+            if (this.check("LParen" /* LParen */) && this.pos + 1 < this.tokens.length) {
+              const afterBodyToken = this.tokens[this.pos + 1];
+              if (!(afterBodyToken.type === "Symbol" /* Symbol */ && (afterBodyToken.value === "catch" || afterBodyToken.value === "finally"))) {
+                const line = afterBodyToken.line || 0;
+                throw new SyntaxError(
+                  `Strict try-catch syntax: after body expression, expected 'catch' or 'finally', ` +
+                  `got '${afterBodyToken.value}' at line ${line}. ` +
+                  `For multiple body expressions, wrap with (do ...)`
+                );
+              }
+            } else if (!this.check("RParen" /* RParen */)) {
+              throw new SyntaxError(
+                `Strict try-catch syntax: expected 'catch', 'finally', or ')' after try body. ` +
+                `Got unexpected token at line ${this.peek().line || 0}`
+              );
+            }
           }
-          if (this.isAtEnd() || this.check("RParen" /* RParen */)) break;
-          bodyExprs.push(this.parseValue());
         }
         const body = bodyExprs.length === 1 ? bodyExprs[0] : makeSExpr("do", bodyExprs);
         const catchClauses = [];
