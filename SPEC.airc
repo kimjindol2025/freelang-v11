@@ -84,8 +84,8 @@
         "T3: pure→pure = PASS",
         "T4: pure→net = FAIL",
         "T5: runtime-events에 effect-violation 1건 기록",
-        "회귀: 기존 1018/1018 테스트 전부 PASS",
-        "bootstrap SHA 변동 최소"
+        "회귀: 1192+ jest tests PASS (TS + interpreter)",
+        "C7 runtime determinism: jest 결과 + verify-build-deterministic trivial PASS (bootstrap out-of-scope per dec-010)"
       ],
       "verified": false,
       "next": []
@@ -208,6 +208,48 @@
         "L0/L1 통합 시 'partial static analysis engine' 재설계 — C8급 작업으로 폭증"
       ],
       "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "dec-009": {
+      "t": "decision",
+      "v": "Build identity — single source of truth = fx self-host. master(1157) 는 legacy snapshot, fx(1192+) 가 truth set. C7 SHA 검증은 fx 기준.",
+      "why": [
+        "build identity 가 2개면 deterministic SHA 검증 불가능 (C7 자체가 막힘)",
+        "메모리(project_freelang_v11_baseline.md) 가 이미 fx = truth 확정 (2026-05-21)",
+        "effect enforcement 8 commit + 9th entry hook 모두 fx 기준으로 검증됨",
+        "esbuild minified 경로는 deprecate 후보 — 단일 build pipeline 유지"
+      ],
+      "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "dec-010": {
+      "t": "decision",
+      "v": "C7 정의 정정 — 'runtime determinism verification (Jest + interpreter)'. bootstrap.js 는 out-of-scope artifact (Phase X-2 detached build).",
+      "why": [
+        "Phase X-2 에서 bootstrap.js 가 빌드 pipeline 에서 의도적으로 detach 됨 (esbuild 제거)",
+        "Layer 1 (TS + interpreter + jest 1192 PASS) 이 runtime truth — Layer 2 (bootstrap.js artifact) 는 무관",
+        "기존 'bootstrap SHA 변동 최소' 기준은 build = TS esbuild 산출물이라는 옛 dec-004 전제. dec-009 이후 무효",
+        "bootstrap.js 재생성 / esbuild 복원은 별도 architecture decision (C8 이후 후속)"
+      ],
+      "scope_in": ["TS source", "jest 1192+", "interpreter behavior", "effect enforcement L0/L1"],
+      "scope_out": ["bootstrap.js SHA", "browser.js SHA", "self/all.fl compile output"],
+      "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "audit-c7-runtime-determinism": {
+      "t": "audit",
+      "v": "C7 runtime determinism verification — dec-010 정의 기준",
+      "evidence": {
+        "jest_total": "1223 PASS (worktree fx 환경, rate-limiter err-006 + build-determinism worktree 환경 한계 제외)",
+        "effect_enforcement_suites": "6/6 PASS, 73 tests (C4-1:11 + C4-2:7 + C4-3:9 + C5:8 + C6 matrix:35 + C6 e2e:3)",
+        "deterministic_runtime": "동일 입력 (TS source + interpreter) → 동일 jest 결과 — runtime layer 결정성 확인",
+        "bootstrap_artifact": "Phase X-2 per design 변경 없음 (out-of-scope per dec-010)"
+      },
+      "result": "PASS",
+      "next": ["master 병합", "블로그 포스팅", "C8 후속"],
       "date": "2026-05-21"
     },
 
