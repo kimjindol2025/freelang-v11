@@ -80,10 +80,10 @@
 |--------|------|------|
 | **BP-1** ✅ | `docs/PLAN-build-pipeline-unify.md` (본 문서) — DESK `t_1779346120945` 트레이스 시작 | `ff795b71` |
 | **BP-2** ✅ | `docs/BUILD-SYSTEM.md` 신규 — 3-track 구조 + self-host future label | `407288ad` |
-| **BP-3** | `scripts/build.js` esbuild **build** 복원 — /tmp/build-p18.js 흡수, minify=false, 기존 `extractSignatures` / `gen-ai-prompt` / alias lint 보존, **watch 제외** | `node scripts/build.js` 실행 성공 |
-| **BP-4** | `scripts/build.js` esbuild **watch context** 추가 — `--watch` 플래그 활성화 (dev UX layer) | `node scripts/build.js --watch` 동작 |
-| **BP-5** | bootstrap.js 재생성 + size/header 검증 | size 1.7~1.9MB, `__create` 시그니처 유지 |
-| **BP-6** | `npm run test:fast` 회귀 — 1192+ PASS | jest 결과 |
+| **BP-3** ✅ | `scripts/build.js` esbuild **build** 복원 — /tmp/build-p18.js 흡수, minify=false, 기존 `extractSignatures` / `gen-ai-prompt` / alias lint 보존, **watch 제외** | `58ee7ed9` — 100 lines, 202ms |
+| **BP-4** ✅ | `scripts/build.js` esbuild **watch context** 추가 — `--watch` 플래그 활성화 (dev UX layer) | `fd45bdcd` — 110 lines, daemon 동작 확인 |
+| **BP-5** ✅ | bootstrap.js 재생성 + size/header 검증 | `75d6515e` — 1.79MB, `__create` 시그니처 유지 |
+| **BP-6** ✅ | `npm run test:fast` 회귀 — 1192+ PASS | 1313/1320 PASS (회귀 0) — ## 7 참조 |
 
 ### Build vs Watch 분리 근거 (2026-05-21 사용자 결정)
 - **BP-3 = build correctness** (single source of truth 복구, deterministic build path)
@@ -127,7 +127,41 @@
 3. **bootstrap.js byte-identical 보장 없음**: esbuild 버전 차이 가능. size/header 호환 + test:fast PASS가 회귀 기준
 4. **메모리 `bootstrap_js_from_ts.md` 정정 타이밍**: 전체 완료 후 일괄. 도중 자동 트리거 방지
 
-## 7. 참조
+## 7. 검증 결과 (BP-6, 2026-05-21)
+
+`npm run test:fast` 실행 결과:
+
+- **Tests**: 1313 passed, 7 failed, **1320 total**
+- **PLAN success criteria 충족**: 1313 > 1192+ ✓
+- **BP 작업 추가 회귀 = 0** ✓
+
+### 7개 실패 = 사전 회귀 (baseline issue, BP scope 밖)
+
+| Suite | 실패 수 | 원인 | 분류 |
+|-------|---------|------|------|
+| `build-determinism.test.ts` | 1 | `browser.js missing after build #1` (Phase X-2부터 동일) | infra debt |
+| `rate-limiter.test.ts` | 6 | `TypeError: server.close is not a function` + timeout | infra debt |
+
+### 격리 검증 (rate-limiter 책임 귀속)
+
+이전 bootstrap.js (`e1037069`, effect-taxonomy 56b3f674)로 되돌려 rate-limiter 단독 실행:
+
+| Bootstrap | rate-limiter 결과 |
+|-----------|---------|
+| `e1037069` (baseline) | 6 failed, 1 passed |
+| `5f5b68fba` (BP-5 새 빌드) | 6 failed, 1 passed |
+
+→ **동일 패턴 = baseline 회귀**. BP 변경 영향 없음.
+
+### Scope 분리 (사용자 결정 2026-05-21)
+
+7개 실패는 본 P1 작업과 별개 — **runtime/infra debt** 영역. 다음 사이클에 P2 backlog로 분리:
+- `browser.js build pipeline 미구현` → 별도 DESK 태스크
+- `rate-limiter background drift` → 별도 DESK 태스크
+
+BP-6는 "검증 성공"으로 종료. 본 PLAN은 P0(즉시)로 완료 처리.
+
+## 8. 참조
 
 - 인수인계: 메모리 `project_freelang_v11_handoff_2026-05-21.md` (P1 항목)
 - baseline: 메모리 `project_freelang_v11_baseline.md`
