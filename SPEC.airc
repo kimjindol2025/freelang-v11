@@ -12,7 +12,7 @@
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
 
-  "hot": "task-effect-enforcement",
+  "hot": "task-effect-taxonomy",
 
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
@@ -253,6 +253,64 @@
       "date": "2026-05-21"
     },
 
+    "dec-011": {
+      "t": "decision",
+      "v": "L0 (EFFECT_CATALOG, eval-special-forms.ts) 은 compatibility-only taxonomy, non-authoritative. L1 (BUILTIN_EFFECTS + EffectTag, effect-types.ts/builtin-effects.ts) 만 canonical effect enforcement source of truth.",
+      "why": [
+        "L0 10종 vs L1 6종 어휘 불일치 mismatch 가 누적되면 enforcement 의미가 흔들린다",
+        "L0 확장은 taxonomy explosion → enforcement dilution 으로 이어진다 (graveyard 경고 :db/:gpu/:fs-*)",
+        "L0 는 정책 힌트·legacy hooks 흡수용. 신규 effect 는 L1 에서 흡수하고 L0 는 alias 만 추가",
+        "dec-005 6종 어휘 lock 의 운영 메커니즘 — 어휘 폭발 차단",
+        "arch-l0-l1-layers 의 'L0/L1 둘 다 보존' 결정과 양립 — 보존하되 판정권은 L1 단일"
+      ],
+      "alias_table": {
+        "http": "net",
+        "file-read": "io",
+        "file-write": "io",
+        "db-read": "io",
+        "db-write": "io",
+        "shell": "process",
+        "server": "net",
+        "io": "io",
+        "time": "time",
+        "random": "random"
+      },
+      "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "task-effect-taxonomy": {
+      "t": "task",
+      "v": "C8 — L0/L1 taxonomy normalization. L0 를 L1 에 수렴시키는 정리 작업 (새 설계 아님, 경계 고정)",
+      "entry": ["SPEC.airc"],
+      "scope": [
+        "src/effect-aliases.ts (신규) — toCanonical(l0: string): EffectTag",
+        "src/eval-special-forms.ts (수정) — EFFECT_CATALOG hole 보강 + 함수명 alias",
+        "src/__tests__/effect-taxonomy-consistency.test.ts (신규) — drift 회귀 차단"
+      ],
+      "commits": [
+        "C8-1: SPEC.airc + dec-011 LOCK + graveyard final 승격 + hot 갱신 + lock 배열 확장",
+        "C8-2: effect-aliases.ts + toCanonical (canonical mapping)",
+        "C8-3: EFFECT_CATALOG hole 보강 (file-append-line, db-transaction, ws-send=http, process-spawn=shell, now-ms, sleep, uuid) + 함수명 alias (db-exec=db-write, rand=random)",
+        "C8-4: consistency test + jest 1192+ 회귀"
+      ],
+      "decisions_pinned": [
+        "ws-send → http (L0). L1=net 으로 alias 흡수. 신규 카테고리 금지",
+        "함수명 alias (db-exec/rand) 는 L0 catalog 확장으로 흡수. L1 BUILTIN_EFFECTS 영향 없음",
+        "graveyard :db/:gpu/:fs-* 세분화 final:true 승격 — future strict mode 에서도 L0 확장 금지"
+      ],
+      "branch": "feature/effect-taxonomy",
+      "branch_policy": "fx HEAD 8a5ded96 (feature/effect-enforcement frozen) 에서 분기. master 디렉토리 미접촉.",
+      "success": [
+        "BUILTIN_EFFECTS 전 키에 대해 L0 catalog 등록 보장 (양방향 hole 없음)",
+        "toCanonical(EFFECT_CATALOG[name]) ⊆ BUILTIN_EFFECTS[name] 의 EffectTag set (consistency)",
+        "jest 1192+ PASS (회귀)",
+        "bootstrap.js 무관 (dec-010 scope_out)"
+      ],
+      "verified": false,
+      "next": []
+    },
+
     "err-001": {
       "t": "error",
       "v": "server_req_header/get 반환값 null이 (= $v nil)로 false 평가됨",
@@ -321,14 +379,15 @@
     {"rule": "컴파일러 결함 우회 금지", "why": "스펙 오염 방지"},
     {"rule": "bootstrap.js 직접 편집 금지", "why": "빌드 산출물이므로 덮어씌워짐"},
     {"rule": "effect metadata absent = legacy unrestricted", "why": "self-host bootstrap 및 기존 테스트 호환 보장"},
-    {"rule": "모든 callable entry는 단일 effect gate 통과", "why": "builtin 우회 차단·TCO silent bypass 방지"}
+    {"rule": "모든 callable entry는 단일 effect gate 통과", "why": "builtin 우회 차단·TCO silent bypass 방지"},
+    {"rule": "L0 (EFFECT_CATALOG) 은 compatibility-only taxonomy. L1 (BUILTIN_EFFECTS + EffectTag) 만 canonical effect enforcement source of truth", "why": "어휘 폭발·enforcement 약화 방지. 판정권 분기 차단. 신규 effect 는 L1 흡수 + L0 alias 만 추가"}
   ],
 
   "graveyard": [
     {"idea": "외부 npm 패키지 허용", "why": "의존성 지옥 + 결정론 파괴", "final": true},
     {"idea": "복수 파서 공존", "why": "동작 불일치 발생. AI가 어느 기준으로 코드를 써야 할지 모름", "final": true},
     {"idea": "compile-time purity inference", "why": "현 단계에선 과함. runtime explicit enforcement만으로 시작. 추론은 오탐·미탐 부담이 크다", "final": true},
-    {"idea": ":db / :gpu / :fs-read / :fs-write 세분화 effect", "why": "MVP 단계엔 과함. :io 하나로 통합. 어휘 폭발은 enforce 약화로 이어진다", "final": false},
+    {"idea": ":db / :gpu / :fs-read / :fs-write 세분화 effect", "why": "MVP 단계엔 과함. :io 하나로 통합. 어휘 폭발은 enforce 약화로 이어진다. dec-011 LOCK 으로 final 승격 (2026-05-21) — future strict mode 에서도 L0 확장 금지, 신규 effect 는 L1 흡수 + L0 alias 만 허용", "final": true},
     {"idea": "capability graph (effect polymorphism·algebraic effects)", "why": "타입 시스템 동반 필요. MVP 경계를 무너뜨린다", "final": false},
     {"idea": "builtin object에 _effects 어트리뷰트 부착", "why": "hidden mutation·serialization drift·accidental overwrite 위험. 별도 registry Map이 안전", "final": true}
   ],
