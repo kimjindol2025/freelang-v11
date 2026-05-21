@@ -95,6 +95,10 @@ export class Interpreter {
   private static readonly _vm = new VM();
   private static readonly _vmEnabled = process.env.FL_VM === "1";
 
+  // DU-1: 성능 최적화 — 어댑터/debug 플래그 캐싱
+  private static _duAdapter: any = null;
+  private static readonly _duDebugEnabled = process.env.DU_DEBUG === "true";
+
   // Phase 52: FL 파일 import 지원
   public importedFiles: Set<string> = new Set();
   public currentFilePath: string = process.cwd();
@@ -176,6 +180,14 @@ export class Interpreter {
 
     // Phase 98: Agent 빌트인 등록 (agent-new, agent-run, agent-done?, agent-result, ...)
     this.registerAgentBuiltins();
+  }
+
+  // DU-1: 어댑터 캐싱 (성능 최적화 — 매 호출마다 require() 방지)
+  private static getDUAdapter() {
+    if (!this._duAdapter) {
+      this._duAdapter = require("./adapter-builtin-to-funcdef");
+    }
+    return this._duAdapter;
   }
 
   // Phase 98: Agent 빌트인 함수 등록
@@ -1949,18 +1961,19 @@ export class Interpreter {
       // 먼저 unified resolveFunction으로 함수를 찾아보고, 찾으면 호출
       // 못 찾으면 기존 evalBuiltin으로 fallback (backward compat)
       try {
-        if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: trying resolveFunction...`);
-        const { resolveFunction, callFunction } = require("./adapter-builtin-to-funcdef");
-        const resolved = resolveFunction(this, op);
-        if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: resolved=${resolved ? "yes" : "no"}`);
+        // DU-1: 캐시된 어댑터 사용 (성능 최적화 — 매 호출마다 require() 불필요)
+        if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: resolveFunction 시도...`);
+        const duAdapter = Interpreter.getDUAdapter();
+        const resolved = duAdapter.resolveFunction(this, op);
+        if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: resolved=${resolved ? "yes" : "no"}`);
         if (resolved) {
           // DU path: unified function call
-          if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: calling callFunction...`);
-          return callFunction(this, op, args, expr);
+          if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: callFunction 호출...`);
+          return duAdapter.callFunction(this, op, args, expr);
         }
       } catch (_duErr: any) {
         // DU error: fallback to evalBuiltin
-        if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: DU error: ${_duErr?.message}`);
+        if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: DU 오류: ${_duErr?.message}`);
       }
 
       // Fallback to evalBuiltin (legacy path)

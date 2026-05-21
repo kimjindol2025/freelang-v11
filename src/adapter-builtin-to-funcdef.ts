@@ -7,6 +7,19 @@
 import type { InterpreterLike } from "./types";
 import { lookupBuiltinEffects } from "./builtin-effects";
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Module Cache: require() 오버헤드 제거 (DU-1 성능 최적화)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let evalBuiltinCache: any = null;
+
+function getEvalBuiltin() {
+  if (!evalBuiltinCache) {
+    const mod = require("./eval-builtins");
+    evalBuiltinCache = mod.evalBuiltin || mod.default;
+  }
+  return evalBuiltinCache;
+}
+
 /**
  * 통일된 함수 정의 구조
  * builtin과 user function을 동일하게 취급하기 위한 인터페이스
@@ -47,10 +60,9 @@ export function builtinToFunctionDef(
 
   // builtin 실행 함수: evalBuiltin 호출 (DU-2에서 분리 예정)
   const impl = (args: any[]) => {
-    // DU-1: evalBuiltin은 아직 호출 (circular import 방지를 위해 dynamic require)
+    // DU-1: evalBuiltin은 아직 호출 (캐시된 모듈 재사용 — 성능 최적)
     // DU-2에서 builtin impl을 분리하면 직접 호출로 변경
-    const evalBuiltinModule = require("./eval-builtins");
-    const evalBuiltinFunc = evalBuiltinModule.evalBuiltin || evalBuiltinModule.default;
+    const evalBuiltinFunc = getEvalBuiltin();
     return evalBuiltinFunc(interp, name, args, null);
   };
 
@@ -85,11 +97,13 @@ export function userFunctionToDef(
     effectTags.push(...funcObj.effects);
   }
 
-  // user 함수 실행
+  // user 함수 실행: impl은 호출되지 않음 (callFunction이 callUserFunction으로 라우팅)
+  // impl이 실수로 호출되면 명확한 에러 반환
   const impl = (args: any[]) => {
-    // 실제 호출은 callUserFunction이 담당
-    // 이곳에서는 함수 객체 정보만 사용
-    return null; // placeholder
+    throw new Error(
+      `[userFunctionToDef] User functions must be called via callUserFunction, ` +
+      `not via impl. Function: ${name}`
+    );
   };
 
   return {
@@ -122,13 +136,13 @@ export function resolveFunction(
 
   // 1. User 함수 우선 (fnMetaRegistry)
   let baseName = name;
-  let typeArgs = null;
 
   // 타입 인자 파싱 (name[T1,T2] 형태)
+  // TODO: DU-2에서 type specialization을 위해 사용할 예정
   const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
   if (bracketMatch) {
     baseName = bracketMatch[1];
-    typeArgs = bracketMatch[2];
+    // const typeArgs = bracketMatch[2];  // future use
   }
 
   const userFunc = interp.context.functions?.get(baseName);
