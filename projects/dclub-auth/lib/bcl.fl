@@ -1,0 +1,59 @@
+;; bcl.fl — Back-Channel Logout token 발송 (OIDC BCL spec)
+;;
+;; 토큰 형식 (RFC 7519 + OpenID BCL):
+;;   header: {alg:RS256, kid, typ:logout+jwt}
+;;   payload: {iss, sub, aud, iat, jti(uuid), sid, events:{"http://schemas.openid.net/event/backchannel-logout":{}}}
+;;   nonce 금지 (replay 가능성 차단)
+
+(load "projects/dclub-auth/lib/jwt-rs256.fl")
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/clients-store.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
+(load "projects/dclub-auth/lib/config.fl")
+
+;; logout token 빌드 — RS256 서명 (jwt-rs256-sign 재사용)
+[FUNC bcl-build-token :params [$db $cfg $user-id $client-id $sid]
+  :body (let [
+    iss (get $cfg "issuer")
+    active (jwks-active $db)
+    kid (get $active "kid")
+    priv (get $active "private_pem")
+    claims {"iss" $iss
+            "sub" $user-id
+            "aud" $client-id
+            "jti" (uuid_v4)
+            "events" {"http://schemas.openid.net/event/backchannel-logout" {}}
+            "sid" $sid}
+    ;; 짧은 만료 — 60초
+    token (jwt-rs256-sign $claims $priv $kid 60)
+  ]
+    $token)]
+
+;; 한 client 에 logout token POST
+[FUNC bcl-deliver-one :params [$db $client-row $token]
+  :body (let [
+    raw (get $client-row "backchannel_logout_uri")
+    bcl-uri (if (string? $raw) $raw "")
+  ]
+    (if (= $bcl-uri "")
+      {:client_id (get $client-row "client_id") :delivered false :reason "no bcl_uri"}
+      (let [
+        body (str "logout_token=" $token)
+        resp (http_post_form $bcl-uri $body)
+      ]
+        (do
+          (audit-log $db "bcl.delivered" nil (get $client-row "client_id") nil
+            {:bcl_uri $bcl-uri :resp_len (length $resp)})
+          {:client_id (get $client-row "client_id") :delivered true :resp $resp}))))]
+
+;; 세션의 모든 client 에 deliver
+[FUNC bcl-deliver-all :params [$db $cfg $user-id $sid $client-ids]
+  :body (map (fn [cid]
+    (let [
+      client-row (clients-find $db cid)
+      token (bcl-build-token $db $cfg $user-id cid $sid)
+    ]
+      (if (= client-row nil)
+        {:client_id cid :delivered false :reason "client not found"}
+        (bcl-deliver-one $db client-row token))))
+    $client-ids)]

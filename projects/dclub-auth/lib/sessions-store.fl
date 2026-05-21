@@ -1,0 +1,104 @@
+;; sessions-store.fl — 서버 세션 (Back-Channel Logout 지원)
+;;
+;; 기존 stateless JWT 위에 SSO 세션을 추적하는 테이블 추가.
+;; /token 발급 시 sid 생성 → id_token claim 으로 포함 → /end-session 에서 sid 로 무효화.
+
+(load "projects/dclub-auth/lib/audit-log.fl")
+
+[FUNC sessions-ensure-table :params [$db]
+  :body (do
+    (db_create $db "CREATE TABLE IF NOT EXISTS sso_sessions (
+      sid          TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL,
+      client_ids   TEXT NOT NULL,
+      expires_at   INTEGER NOT NULL,
+      revoked      INTEGER NOT NULL DEFAULT 0,
+      revoked_at   TEXT,
+      created_at   TEXT NOT NULL
+    )")
+    (db_create $db "CREATE INDEX IF NOT EXISTS idx_sso_user ON sso_sessions(user_id, revoked)"))]
+
+;; ── 발급 ──────────────────────────────────────────
+[FUNC sessions-issue :params [$db $user-id $client-id $lifetime-seconds]
+  :body (let [
+    sid (auth_random_token 24)
+    now-ms (now_ms)
+    expires (+ $now-ms (* $lifetime-seconds 1000))
+  ]
+    (do
+      (db_insert $db "sso_sessions" {
+        :sid $sid
+        :user_id $user-id
+        :client_ids $client-id
+        :expires_at $expires
+        :revoked 0
+        :created_at (now_iso)
+      })
+      $sid))]
+
+;; 한 사용자에 한 client 추가 연결 (다른 RP가 같은 세션 활용)
+[FUNC sessions-add-client :params [$db $sid $client-id]
+  :body (let [
+    rows (db_query $db
+      "SELECT client_ids FROM sso_sessions WHERE sid=? LIMIT 1"
+      [$sid])
+  ]
+    (if (= (length $rows) 0)
+      false
+      (let [
+        existing (get (get $rows 0) "client_ids")
+        already (or (= $existing $client-id)
+                    (regex_match $existing (str ",?" $client-id ",?")))
+      ]
+        (if $already
+          true
+          (db_update $db "sso_sessions"
+            {:client_ids (str $existing "," $client-id)}
+            (str "sid='" $sid "'"))))))]
+
+;; ── 조회 ──────────────────────────────────────────
+[FUNC sessions-find :params [$db $sid]
+  :body (let [
+    rows (db_query $db
+      "SELECT sid, user_id, client_ids, expires_at, revoked FROM sso_sessions WHERE sid=? LIMIT 1"
+      [$sid])
+  ]
+    (if (= (length $rows) 0) nil (get $rows 0)))]
+
+[FUNC sessions-active? :params [$db $sid]
+  :body (let [s (sessions-find $db $sid)]
+    (if (= $s nil)
+      false
+      (and (= (get $s "revoked") 0)
+           (> (get $s "expires_at") (now_ms)))))]
+
+;; ── 무효화 ───────────────────────────────────────
+[FUNC sessions-revoke :params [$db $sid]
+  :body (db_update $db "sso_sessions"
+    {:revoked 1 :revoked_at (now_iso)}
+    (str "sid='" $sid "'"))]
+
+[FUNC sessions-revoke-by-user :params [$db $user-id]
+  :body (db_update $db "sso_sessions"
+    {:revoked 1 :revoked_at (now_iso)}
+    (str "user_id='" $user-id "' AND revoked=0"))]
+
+;; 활성 세션의 client_ids → 배열
+[FUNC sessions-clients :params [$db $sid]
+  :body (let [s (sessions-find $db $sid)]
+    (if (= $s nil)
+      []
+      (str_split (get $s "client_ids") ",")))]
+
+;; ── 운영: clients 테이블에 BCL URL 컬럼 추가 (idempotent) ──
+[FUNC clients-add-bcl-column :params [$db]
+  :body (do
+    ;; SQLite 는 ALTER TABLE ADD COLUMN IF NOT EXISTS 미지원.
+    ;; PRAGMA로 확인 후 add — 실패는 무시 (이미 존재).
+    (let [
+      cols (db_query $db "PRAGMA table_info(clients)" [])
+      has-bcl (reduce (fn [acc c] (or acc (= (get c "name") "backchannel_logout_uri"))) false $cols)
+    ]
+      (if (not $has-bcl)
+        (db_create $db "ALTER TABLE clients ADD COLUMN backchannel_logout_uri TEXT")
+        true)))]

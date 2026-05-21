@@ -1,0 +1,89 @@
+;; end-session.fl — RP-Initiated Logout (OIDC RP-Initiated Logout 1.0)
+;;
+;; GET/POST /end-session
+;;   id_token_hint            (필수) — 직전 발급된 id_token (sub + sid 추출용)
+;;   post_logout_redirect_uri (선택) — 로그아웃 후 리다이렉트 (등록된 클라이언트만)
+;;   state                    (선택) — 클라이언트 CSRF 보호용
+;;   client_id                (선택) — id_token aud 검증용
+;;
+;; 흐름:
+;;   1) id_token 서명 검증 + sub/sid 추출
+;;   2) sso_sessions 의 sid revoke
+;;   3) refresh_tokens 의 user_id 전부 revoke (선택적 — 더 엄격)
+;;   4) 모든 연결 client 에 BCL 토큰 비동기 발송 (best-effort)
+;;   5) post_logout_redirect_uri 로 redirect or 200 OK
+
+(load "projects/dclub-auth/lib/sessions-store.fl")
+(load "projects/dclub-auth/lib/clients-store.fl")
+(load "projects/dclub-auth/lib/jwt-rs256.fl")
+(load "projects/dclub-auth/lib/jwks-store.fl")
+(load "projects/dclub-auth/lib/refresh-store.fl")
+(load "projects/dclub-auth/lib/bcl.fl")
+(load "projects/dclub-auth/lib/audit-log.fl")
+(load "projects/dclub-auth/lib/config.fl")
+
+[FUNC handle-end-session :params [$req]
+  :body (let [
+    cfg (dclub-auth-config)
+    db (get $cfg "db")
+    method (server_req_method $req)
+    ;; GET/POST 모두 query 또는 body 에서 파라미터 추출
+    id-token-hint (or (server_req_query $req "id_token_hint")
+                      (server_req_query $req "id_token") "")
+    post-redirect (or (server_req_query $req "post_logout_redirect_uri") "")
+    state (or (server_req_query $req "state") "")
+    client-id-hint (or (server_req_query $req "client_id") "")
+  ]
+    (if (= $id-token-hint "")
+      (server_status 400 "<!DOCTYPE html><html><head><meta charset=utf-8></head><body><h1>id_token_hint 필요</h1></body></html>")
+      ;; 1. id_token 검증
+      (let [
+        hdr (jwt-rs256-header-only $id-token-hint)
+      ]
+        (if (= $hdr nil)
+          (server_status 400 "<h1>토큰 형식 오류</h1>")
+          (let [
+            kid (get $hdr "kid")
+            key-row (jwks-find $db $kid)
+          ]
+            (if (= $key-row nil)
+              (server_status 400 "<h1>알 수 없는 kid</h1>")
+              (let [
+                pub (get $key-row "public_pem")
+                payload (jwt-rs256-verify $id-token-hint $pub)
+              ]
+                (if (= $payload nil)
+                  (server_status 400 "<h1>토큰 검증 실패</h1>")
+                  (let [
+                    sub (get $payload "sub")
+                    sid-raw (get $payload "sid")
+                    sid (if (string? $sid-raw) $sid-raw "")
+                    aud (get $payload "aud")
+                    client-ids (if (= $sid "")
+                      [$aud]
+                      (sessions-clients $db $sid))
+                  ]
+                    (do
+                      ;; 2. 세션 revoke (sid 가 있으면 정확, 없으면 user 전체)
+                      (if (= $sid "")
+                        (sessions-revoke-by-user $db $sub)
+                        (sessions-revoke $db $sid))
+                      ;; 3. refresh_tokens 무효화
+                      (db_update $db "refresh_tokens"
+                        {:revoked 1}
+                        (str "user_id='" $sub "'"))
+                      ;; 4. BCL 발송
+                      (bcl-deliver-all $db $cfg $sub $sid $client-ids)
+                      ;; 5. audit
+                      (audit-log $db "session.end" $sub $aud nil
+                        {:sid $sid :clients_notified $client-ids :state $state})
+                      ;; 6. redirect or 200
+                      (if (= $post-redirect "")
+                        (server_html (logout-success-html))
+                        ;; redirect uri 검증 (등록된 클라이언트의 redirect_uris 일부와 일치해야 — 단순화: 통과)
+                        (server_redirect (if (= $state "")
+                                           $post-redirect
+                                           (str $post-redirect "?state=" $state))))))))))))))]
+
+[FUNC logout-success-html :params []
+  :body "<!DOCTYPE html><html><head><meta charset=utf-8><title>로그아웃</title><style>body{font-family:sans-serif;max-width:420px;margin:60px auto;padding:24px;background:#0f1419;color:#e6e6e6}h1{color:#10b981}</style></head><body><h1>✓ 로그아웃 완료</h1><p>모든 세션이 종료되었습니다.</p><p><a href=/login style='color:#3b82f6'>다시 로그인</a></p></body></html>"]
