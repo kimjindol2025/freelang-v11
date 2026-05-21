@@ -74,15 +74,21 @@
 - **B안 (self-host 진화 로드맵)**: stage1.js는 432줄 runtime helpers. bootstrap.js 컴파일러로 진화시키려면 stage2 신규 작업 — P1 범위 초과
 - **C안 (이원화 명시)**: 모순 고정 + 장기 부채 누적
 
-## 3. 구현 계획 (5 commits)
+## 3. 구현 계획 (6 commits)
 
 | Commit | 범위 | 검증 |
 |--------|------|------|
-| **BP-1** | `docs/PLAN-build-pipeline-unify.md` (본 문서) — DESK `t_1779346120945` 트레이스 시작 | 문서 존재 |
-| **BP-2** | `docs/BUILD-SYSTEM.md` 신규 — 3-track 구조 + self-host future label | markdown 가독 |
-| **BP-3** | `scripts/build.js` esbuild 복원 — /tmp/build-p18.js 흡수, minify=false, 기존 `extractSignatures` / `gen-ai-prompt` / alias lint 보존 | `node scripts/build.js` 실행 성공 |
-| **BP-4** | bootstrap.js 재생성 + size/header 검증 | size 1.7~1.9MB, `__create` 시그니처 유지 |
-| **BP-5** | `npm run test:fast` 회귀 — 1192+ PASS | jest 결과 |
+| **BP-1** ✅ | `docs/PLAN-build-pipeline-unify.md` (본 문서) — DESK `t_1779346120945` 트레이스 시작 | `ff795b71` |
+| **BP-2** ✅ | `docs/BUILD-SYSTEM.md` 신규 — 3-track 구조 + self-host future label | `407288ad` |
+| **BP-3** | `scripts/build.js` esbuild **build** 복원 — /tmp/build-p18.js 흡수, minify=false, 기존 `extractSignatures` / `gen-ai-prompt` / alias lint 보존, **watch 제외** | `node scripts/build.js` 실행 성공 |
+| **BP-4** | `scripts/build.js` esbuild **watch context** 추가 — `--watch` 플래그 활성화 (dev UX layer) | `node scripts/build.js --watch` 동작 |
+| **BP-5** | bootstrap.js 재생성 + size/header 검증 | size 1.7~1.9MB, `__create` 시그니처 유지 |
+| **BP-6** | `npm run test:fast` 회귀 — 1192+ PASS | jest 결과 |
+
+### Build vs Watch 분리 근거 (2026-05-21 사용자 결정)
+- **BP-3 = build correctness** (single source of truth 복구, deterministic build path)
+- **BP-4 = dev UX layer** (hot rebuild, stateful esbuild context)
+- 한 commit에 섞으면 build pipeline + dev tooling + runtime correctness가 혼합 → C7 determinism 의미가 흐려질 위험. 분리하여 BP-3은 아키텍처 결정, BP-4는 편의 기능으로 경계 명확화
 
 ### Success criteria
 - `scripts/build.js` 실행만으로 bootstrap.js 정상 재생성
