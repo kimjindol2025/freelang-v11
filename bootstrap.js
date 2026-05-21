@@ -31512,6 +31512,22 @@ function createTestModule(callFn2) {
       }
       return true;
     },
+    // required: nil 값 감지 (API 입력 검증)
+    "required": (value, message) => {
+      if (value === null || value === void 0) {
+        throw new FLRuntimeError(`Required value missing: ${message}`);
+      }
+      return value;
+    },
+    // debug-assert: assert + 컨텍스트
+    "debug-assert": (condition, tag, context) => {
+      if (!condition) {
+        console.error(`[ASSERT FAILED] ${tag}`);
+        console.error(`  Context: ${JSON.stringify(context)}`);
+        throw new FLRuntimeError(`Debug assert failed: ${tag}`);
+      }
+      return true;
+    },
     // test-report: 전체 결과 통계 출력 + 반환
     "test-report": () => {
       const passed = results.filter((r) => r.passed).length;

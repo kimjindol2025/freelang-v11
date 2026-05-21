@@ -1,0 +1,54 @@
+;; FreeLang v11.7.11 디버깅 도구 테스트
+;; 신규 함수: required, check?, debug-assert
+
+(println "[TEST] 기존 함수 검증")
+
+;; assert 테스트 (이미 존재)
+(println "[CASE] assert basic")
+(assert (= 1 1) "1 should equal 1")
+(println "✅ assert true passed")
+
+;; debug 테스트 (이미 존재)
+(println "[CASE] debug chain")
+(let [result (debug "step1" (+ 1 2))]
+  (do
+    (assert (= result 3) "debug should return value unchanged")
+    (* result 2)))
+(println "✅ debug chain passed")
+
+(println "")
+(println "[TEST] 신규 함수 검증")
+
+;; required 테스트 - 정상 케이스
+(println "[CASE] required with value")
+(let [val (required "user_input" "Email required")]
+  (assert (= val "user_input") "required should return value"))
+(println "✅ required with value passed")
+
+;; required 테스트 - nil 케이스
+(println "[CASE] required with nil")
+(try
+  (required nil "User name required")
+  (catch error
+    (do
+      (println (str "✅ required threw error: " (get error "message")))
+      (assert (str-contains? (get error "message") "Required value missing") "Error message should contain 'Required value missing'"))))
+
+;; debug-assert 테스트 - 통과 케이스
+(println "[CASE] debug-assert true")
+(debug-assert (> 10 5) "comparison-check" {"a" 1 "b" 2})
+(println "✅ debug-assert true passed")
+
+;; debug-assert 테스트 - 실패 케이스
+(println "[CASE] debug-assert false")
+(try
+  (debug-assert (> 5 10) "failed-comparison" {"result" "error"})
+  (catch error
+    (do
+      (println (str "✅ debug-assert threw error: " (get error "message")))
+      (assert (str-contains? (get error "message") "Debug assert failed") "Error message should mention debug assert"))))
+
+(println "")
+(println "========================================")
+(println "✅ 모든 테스트 통과!")
+(println "========================================")
