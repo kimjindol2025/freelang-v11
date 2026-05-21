@@ -1945,6 +1945,26 @@ export class Interpreter {
     }
 
     try {
+      // DU-1: Dispatch Unification Phase 1 — Adapter Layer
+      // 먼저 unified resolveFunction으로 함수를 찾아보고, 찾으면 호출
+      // 못 찾으면 기존 evalBuiltin으로 fallback (backward compat)
+      try {
+        if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: trying resolveFunction...`);
+        const { resolveFunction, callFunction } = require("./adapter-builtin-to-funcdef");
+        const resolved = resolveFunction(this, op);
+        if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: resolved=${resolved ? "yes" : "no"}`);
+        if (resolved) {
+          // DU path: unified function call
+          if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: calling callFunction...`);
+          return callFunction(this, op, args, expr);
+        }
+      } catch (_duErr: any) {
+        // DU error: fallback to evalBuiltin
+        if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: DU error: ${_duErr?.message}`);
+      }
+
+      // Fallback to evalBuiltin (legacy path)
+      if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: fallback to evalBuiltin`);
       return evalBuiltin(this, op, args, expr);
     } catch (err: any) {
       // ReturnSignal / BudgetExceededError는 가로채지 않고 그대로 전파
