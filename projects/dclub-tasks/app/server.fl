@@ -1,0 +1,50 @@
+;; server.fl — dclub-tasks HTTP API (Phase X3)
+
+(load "projects/dclub-tasks/lib/config.fl")
+(load "projects/dclub-tasks/lib/tasks-store.fl")
+(load "projects/dclub-tasks/lib/scheduler.fl")
+
+(define cfg (dclub-tasks-config))
+(define DB (get $cfg "db"))
+(tasks-ensure-tables $DB)
+
+[FUNC handle-task-add :params [$req]
+  :body (let [
+    body-raw (server_req_body $req)
+    body (if (string? $body-raw) (json_parse $body-raw) $body-raw)
+    name (get $body "name")
+    cron-expr (get $body "cron")
+    topic (get $body "topic")
+    payload (get $body "payload")
+    ok (task-add $DB $name $cron-expr $topic $payload)
+  ]
+    (if $ok
+      (server_json {:status "added" :name $name :next_run (cron_next_match $cron-expr (now_ms))})
+      (server_status 400 {:error "invalid_cron" :cron $cron-expr})))]
+
+[FUNC handle-task-list :params [$req]
+  :body (server_json {:tasks (task-list $DB)})]
+
+[FUNC handle-task-runs :params [$req]
+  :body (let [
+    limit-raw (server_req_query $req "limit")
+    limit (if (or (= $limit-raw nil) (= $limit-raw "")) 50 (* $limit-raw 1))
+  ]
+    (server_json {:runs (task-recent-runs $DB $limit)}))]
+
+[FUNC handle-tasks-health :params [$req]
+  :body (server_json {:status "ok" :db $DB :ts (now_ms)})]
+
+[FUNC tasks-tick :params []
+  :body (scheduler-tick $DB)]
+
+(server_post "/admin/tasks" "handle-task-add")
+(server_get "/admin/tasks" "handle-task-list")
+(server_get "/admin/runs" "handle-task-runs")
+(server_get "/health" "handle-tasks-health")
+
+;; 매분 tick (60초마다)
+(set_interval "tasks-tick" 60000)
+
+(println (str "[dclub-tasks] db=" $DB " port=" (get $cfg "port") " queue=" (get $cfg "queue_url")))
+(server_start (get $cfg "port"))
