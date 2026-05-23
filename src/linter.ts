@@ -103,7 +103,7 @@ export function buildLintContext(ast: ASTNode[], source: string): LintContext {
     "keys", "values", "entries", "merge", "json-parse", "json-stringify",
     "throw", "try", "catch", "await", "async",
     "match", "fn", "let*",
-    "append", "reverse", "sort", "zip", "flat-map",
+    "append", "reverse", "sort", "zip", "flat-map", "group-by", "safe-get",
     "max", "min", "abs", "floor", "ceil", "round", "sqrt", "pow",
     "now", "date-format", "sleep", "http-get", "http-post",
     // Phase 63+ 추가 내장
@@ -129,7 +129,7 @@ export function buildLintContext(ast: ASTNode[], source: string): LintContext {
     "and": 2, "or": 2,
     "get": 2, "push": 2, "cons": 2, "concat": 2, "pow": 2,
     "merge": 2, "zip": 2, "append": 2, "assoc": 3, "dissoc": 2,
-    "filter": 2, "each": 2, "map": 2, "sort": 2, "flat-map": 2,
+    "filter": 2, "each": 2, "map": 2, "sort": 2, "flat-map": 2, "group-by": 2, "sort-by": 2,
     "reduce": 3, "range": 2, "substring": 3,
   };
   for (const [fn, arity] of Object.entries(knownArities)) {

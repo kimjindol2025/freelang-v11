@@ -3522,6 +3522,29 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       return _getDef;
     }
+    case "safe-get": case "safe_get": {
+      // (safe-get map key)          — nil이면 에러 throw (필수 필드)
+      // (safe-get map key default)  — nil이면 default 반환 (선택 필드)
+      let sgKey: any = args[1];
+      if (sgKey !== null && typeof sgKey === "object" && (sgKey as any).kind === "keyword") sgKey = (sgKey as any).name;
+      const sgHasDefault = args.length >= 3;
+      const sgDefault = sgHasDefault ? args[2] : undefined;
+      let sgVal: any = null;
+      if (args[0] instanceof Map) {
+        const sgK = String(sgKey).replace(/^:/, "");
+        sgVal = args[0].has(sgK) ? args[0].get(sgK) : null;
+      } else if (args[0] !== null && typeof args[0] === "object") {
+        const sgK = typeof sgKey === "string" && sgKey.startsWith(":") ? sgKey.slice(1) : String(sgKey);
+        sgVal = args[0][sgK] !== undefined ? args[0][sgK] : (args[0][String(sgKey)] !== undefined ? args[0][String(sgKey)] : null);
+      } else if (Array.isArray(args[0])) {
+        sgVal = typeof sgKey === "number" ? (args[0][sgKey] ?? null) : null;
+      }
+      if (sgVal === null || sgVal === undefined) {
+        if (sgHasDefault) return sgDefault;
+        throw new Error(`safe-get: key '${sgKey}' is nil — use (safe-get map key default) for optional fields`);
+      }
+      return sgVal;
+    }
     case "block-items":
       // Array 블록에서 items 추출 (셀프 호스팅용)
       if (args[0] && typeof args[0] === "object" && args[0].kind === "block" && args[0].type === "Array") {
@@ -3965,6 +3988,24 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         if (typeof ka === "number" && typeof kb === "number") return ka - kb;
         return String(ka).localeCompare(String(kb));
       });
+    }
+    case "group-by": case "group_by": {
+      // (group-by keyfn coll) → map<string, list>
+      // keyfn: fn 또는 string(필드명 단축)
+      if (!Array.isArray(args[1])) return {};
+      const gbFn = args[0];
+      const gbArr = args[1] as any[];
+      const gbIsField = typeof gbFn === "string";
+      const gbExtract = gbIsField
+        ? (x: any) => (x !== null && typeof x === "object") ? String(x[gbFn] ?? x[":" + gbFn] ?? "null") : "null"
+        : (x: any) => String(callFnVal(gbFn, [x]) ?? "null");
+      const gbResult: Record<string, any[]> = {};
+      for (const item of gbArr) {
+        const k = gbExtract(item);
+        if (!gbResult[k]) gbResult[k] = [];
+        gbResult[k].push(item);
+      }
+      return gbResult;
     }
     case "zip": {
       // (zip arr1 arr2) → [[a1 b1] [a2 b2] ...]

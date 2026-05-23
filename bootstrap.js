@@ -23231,6 +23231,29 @@ Test Results: ${r.passed}/${total} passed`);
       return callFn2(fn, allArgs);
     };
   }
+  if (op === "safe-get" || op === "safe_get") {
+    if (expr2.args.length < 2) throwArgCount("safe-get", "2+", expr2.args.length, expr2.line);
+    const sgColl = ev(expr2.args[0]);
+    let sgKey = ev(expr2.args[1]);
+    if (sgKey !== null && typeof sgKey === "object" && sgKey.kind === "keyword") sgKey = sgKey.name;
+    const sgHasDefault = expr2.args.length >= 3;
+    const sgDefault = sgHasDefault ? ev(expr2.args[2]) : void 0;
+    let sgVal = null;
+    if (sgColl instanceof Map) {
+      const k = String(sgKey).replace(/^:/, "");
+      sgVal = sgColl.has(k) ? sgColl.get(k) : sgColl.has(String(sgKey)) ? sgColl.get(String(sgKey)) : null;
+    } else if (Array.isArray(sgColl)) {
+      sgVal = typeof sgKey === "number" ? sgColl[sgKey] ?? null : null;
+    } else if (sgColl !== null && typeof sgColl === "object") {
+      const k = typeof sgKey === "string" && sgKey.startsWith(":") ? sgKey.slice(1) : String(sgKey);
+      sgVal = sgColl[k] !== void 0 ? sgColl[k] : sgColl[String(sgKey)] !== void 0 ? sgColl[String(sgKey)] : null;
+    }
+    if (sgVal === null || sgVal === void 0) {
+      if (sgHasDefault) return sgDefault;
+      throw new Error(`safe-get: key '${sgKey}' is nil — use (safe-get map key default) for optional fields`);
+    }
+    return sgVal;
+  }
   if (op === "group-by" || op === "group_by") {
     if (expr2.args.length < 2) throwArgCount("group-by", "2", expr2.args.length, expr2.line);
     const keyFn = ev(expr2.args[0]);
@@ -43039,7 +43062,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace", "defcontract", "with-budget"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "safe-get", "safe_get", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace", "defcontract", "with-budget"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);

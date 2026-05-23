@@ -1715,6 +1715,33 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     };
   }
 
+  // ── safe-get ─────────────────────────────────────────────────────
+  // (safe-get map key)         — nil이면 에러 throw (필수 필드)
+  // (safe-get map key default) — nil이면 default 반환 (선택 필드)
+  if (op === "safe-get" || op === "safe_get") {
+    if (expr.args.length < 2) throwArgCount("safe-get", "2+", expr.args.length, expr.line);
+    const sgColl = ev(expr.args[0]);
+    let sgKey: any = ev(expr.args[1]);
+    if (sgKey !== null && typeof sgKey === "object" && (sgKey as any).kind === "keyword") sgKey = (sgKey as any).name;
+    const sgHasDefault = expr.args.length >= 3;
+    const sgDefault = sgHasDefault ? ev(expr.args[2]) : undefined;
+    let sgVal: any = null;
+    if (sgColl instanceof Map) {
+      const k = String(sgKey).replace(/^:/, "");
+      sgVal = sgColl.has(k) ? sgColl.get(k) : (sgColl.has(String(sgKey)) ? sgColl.get(String(sgKey)) : null);
+    } else if (Array.isArray(sgColl)) {
+      sgVal = typeof sgKey === "number" ? (sgColl[sgKey] ?? null) : null;
+    } else if (sgColl !== null && typeof sgColl === "object") {
+      const k = typeof sgKey === "string" && sgKey.startsWith(":") ? sgKey.slice(1) : String(sgKey);
+      sgVal = sgColl[k] !== undefined ? sgColl[k] : (sgColl[String(sgKey)] !== undefined ? sgColl[String(sgKey)] : null);
+    }
+    if (sgVal === null || sgVal === undefined) {
+      if (sgHasDefault) return sgDefault;
+      throw new Error(`safe-get: key '${sgKey}' is nil — use (safe-get map key default) for optional fields`);
+    }
+    return sgVal;
+  }
+
   // ── group-by ─────────────────────────────────────────────────────
   // (group-by key-fn coll) → {:key [items...]} map
   // key-fn: keyword string (:status) or FL function
