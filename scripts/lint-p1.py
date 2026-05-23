@@ -56,6 +56,7 @@ def tokenize(code: str) -> List[Tuple[str, str, int]]:
         ('RBRACKET', r'\]'),
         ('LBRACE',   r'\{'),
         ('RBRACE',   r'\}'),
+        ('BACKTICK', r'`[^`]*`'),  # 백틱 문자열 (단일 토큰으로 취급)
         ('STRING',   r'"(?:\\.|[^"])*"'),
         ('KEYWORD',  r':[a-zA-Z0-9_-]+'),
         ('SYMBOL',   r'[a-zA-Z_$][a-zA-Z0-9_?!*-]*'),
@@ -234,7 +235,7 @@ class P1Linter:
 
     # ============ P1-4: 문자열 보간 최적화 ============
     def _check_p1_4_string_interp(self):
-        """(str ...) 인자 4개 이상 감지"""
+        """(str ...) 인자 5개 이상이면 백틱 사용 권장 (단, 백틱 자체는 제외)"""
         i = 0
         while i < len(self.tokens):
             token, kind, line = self.tokens[i]
@@ -244,6 +245,7 @@ class P1Linter:
                 j = i + 1
                 arg_count = 0
                 paren_depth = 0
+                has_backtick = False
 
                 while j < len(self.tokens):
                     t = self.tokens[j][0]
@@ -255,14 +257,17 @@ class P1Linter:
                         paren_depth -= 1
                         if paren_depth < 0:  # str ( ... ) 종료
                             break
-                    elif paren_depth == 0 and tk in ('STRING', 'SYMBOL'):
-                        # str 인자: 문자열 또는 심볼
-                        arg_count += 1
+                    elif paren_depth == 0:
+                        if tk == 'BACKTICK':
+                            has_backtick = True
+                        elif tk in ('STRING', 'SYMBOL'):
+                            # str 인자: 문자열 또는 심볼
+                            arg_count += 1
 
                     j += 1
 
-                # 4개 이상이면 경고
-                if arg_count >= 4:
+                # 백틱 사용하지 않고 5개 이상이면 경고
+                if arg_count > 4 and not has_backtick:
                     col = self.lines[line - 1].find('str') + 1 if line <= len(self.lines) else 1
                     self.violations.append(Violation(
                         'P1-4', self.filepath, line, col,
@@ -318,86 +323,86 @@ class P1Linter:
     # ============ P1-5: 타입 안전성 ============
     def _check_p1_5_type_safety(self):
         """db-get/json-parse 후 직접 (get) 사용, nil 체크 없음"""
+        # (let [[$var (db-get ...)]] ... (get $var ...) 패턴 검사
         i = 0
         while i < len(self.tokens):
-            token, kind, line = self.tokens[i]
+            # let [ 패턴 찾기
+            if (self.tokens[i][1] == 'SYMBOL' and self.tokens[i][0] == 'let' and
+                i + 1 < len(self.tokens) and self.tokens[i + 1][0] == '['):
 
-            # db-get / json-parse 호출 추적
-            if kind == 'SYMBOL' and token in ('db-get', 'db-post', 'json-parse'):
-                dangerous_fn = token
-                dangerous_line = line
+                # 바인딩 변수 추출: let [[$var ...] 또는 let [$var ...]
+                j = i + 2
+                if j < len(self.tokens) and self.tokens[j][0] == '[':
+                    j += 1  # let [[ 형태
 
-                # let 바인딩 변수 찾기: (let [[$var (db-xxx ...)]])
-                bound_var = None
-                j = i - 1
+                # j는 이제 변수 위치 ($user 또는 다른 심볼)
+                if j < len(self.tokens) and self.tokens[j][0].startswith('$'):
+                    bound_var = self.tokens[j][0]
 
-                # 역추적: (let [[$var (db-get ...)]])
-                # i는 db-get의 위치
-                # 뒤로 가면서 [ [ $var 구조 찾기
-                while j >= 0 and j > i - 50:
-                    # $var 찾았으면, 그 앞이 [[인지 확인
-                    if (self.tokens[j][1] == 'SYMBOL' and self.tokens[j][0].startswith('$') and
-                        j >= 2 and self.tokens[j - 1][0] == '[' and self.tokens[j - 2][0] == '['):
-                        bound_var = self.tokens[j][0]
-                        break
-                    j -= 1
+                    # j+1 이후에서 (db-get/db-post) 찾기 (json-parse는 제외 — 문자열 직렬화)
+                    dangerous_fn = None
+                    k = j + 1
+                    paren_depth = 0
 
-                if not bound_var:
-                    i += 1
-                    continue
+                    while k < len(self.tokens) and k < j + 60:
+                        if self.tokens[k][0] == '(':
+                            paren_depth += 1
+                            if paren_depth == 1 and k + 1 < len(self.tokens):
+                                if self.tokens[k + 1][0] in ['db-get', 'db-post']:
+                                    dangerous_fn = self.tokens[k + 1][0]
+                                    break
+                        elif self.tokens[k][0] == ')':
+                            paren_depth -= 1
+                            if paren_depth < 0:
+                                break
+                        k += 1
 
-                # bound_var 이후 (get bound_var) 패턴 검사
-                k = i + 1
-                nil_check_found = False
-                direct_get_found = False
-                get_line = 0
+                    # dangerous_fn이 있으면 forward search로 nil 체크 후 get 패턴 확인
+                    if dangerous_fn:
+                        m = j
+                        nil_check_found = False
+                        direct_get_found = False
+                        get_line = 0
+                        depth = 0
 
-                depth = 0
-                while k < len(self.tokens) and k < i + 200:
-                    if self.tokens[k][0] == '(':
-                        depth += 1
-                    elif self.tokens[k][0] == ')':
-                        depth -= 1
-                        if depth < 0:
-                            break
+                        while m < len(self.tokens) and m < j + 200:
+                            tok = self.tokens[m][0]
 
-                    # nil 체크 패턴 확인
-                    if self.tokens[k][1] == 'SYMBOL':
-                        # (if bound_var ...)
-                        if (self.tokens[k][0] == 'if' and k + 1 < len(self.tokens) and
-                            self.tokens[k + 1][0] == bound_var):
-                            nil_check_found = True
-                            break
+                            if tok == '(':
+                                depth += 1
+                            elif tok == ')':
+                                depth -= 1
+                                if depth < 0:  # let 블록 완료
+                                    break
 
-                        # (safe-get bound_var ...)
-                        if (self.tokens[k][0] == 'safe-get' and k + 1 < len(self.tokens) and
-                            self.tokens[k + 1][0] == bound_var):
-                            nil_check_found = True
-                            break
+                            # nil 체크 먼저 감지
+                            if self.tokens[m][1] == 'SYMBOL':
+                                if (tok in ['if', 'or'] and m + 1 < len(self.tokens) and
+                                    self.tokens[m + 1][0] == bound_var):
+                                    nil_check_found = True
 
-                        # (or bound_var ...)
-                        if (self.tokens[k][0] == 'or' and k + 1 < len(self.tokens) and
-                            self.tokens[k + 1][0] == bound_var):
-                            nil_check_found = True
-                            break
+                                if (tok == 'safe-get' and m + 1 < len(self.tokens) and
+                                    self.tokens[m + 1][0] == bound_var):
+                                    nil_check_found = True
 
-                        # (get bound_var ...) - 직접 접근
-                        if (self.tokens[k][0] == 'get' and k + 1 < len(self.tokens) and
-                            self.tokens[k + 1][0] == bound_var):
-                            direct_get_found = True
-                            get_line = self.tokens[k][2]
+                                # (get $var) 감지
+                                if (tok == 'get' and m + 1 < len(self.tokens) and
+                                    self.tokens[m + 1][0] == bound_var and not nil_check_found):
+                                    direct_get_found = True
+                                    get_line = self.tokens[m][2]
+                                    break
 
-                    k += 1
+                            m += 1
 
-                # ⚠️ 직접 get은 있는데 nil 체크가 없으면 경고
-                if direct_get_found and not nil_check_found:
-                    col = self.lines[get_line - 1].find('get') + 1 if get_line <= len(self.lines) else 1
-                    self.violations.append(Violation(
-                        'P1-5', self.filepath, get_line, col,
-                        f'{dangerous_fn} 결과 {bound_var}: nil 체크 없이 (get) 접근',
-                        f'(if {bound_var} (get {bound_var} ...) nil) 또는 (safe-get {bound_var} ...)',
-                        severity="warning"
-                    ))
+                        # 위반: 직접 get이 있고 nil 체크가 없음
+                        if direct_get_found:
+                            col = self.lines[get_line - 1].find('get') + 1 if get_line <= len(self.lines) else 1
+                            self.violations.append(Violation(
+                                'P1-5', self.filepath, get_line, col,
+                                f'{dangerous_fn} 결과 {bound_var}: nil 체크 없이 (get) 접근',
+                                f'(if {bound_var} (get {bound_var} ...) nil)',
+                                severity="warning"
+                            ))
 
             i += 1
 
