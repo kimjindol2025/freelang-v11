@@ -129,7 +129,7 @@ class P1Linter:
 
     # ============ P1-2: HTTP 응답 json-parse ============
     def _check_p1_2_http_json(self):
-        """http-* → let 바인딩 → (get) 사용 패턴에서 json-parse 확인"""
+        """http-* 응답 직접 (get) 사용 감지: http-xxx → ... → (get) 패턴"""
         i = 0
         while i < len(self.tokens):
             token, kind, line = self.tokens[i]
@@ -138,61 +138,64 @@ class P1Linter:
                 http_name = token
                 http_line = line
 
-                # (let [$var (http-xxx ...)] ...) 패턴 찾기
-                # i는 http-xxx의 위치
-                # 역추적으로 let과 바인딩 변수 찾기
-
-                found_var = None
-                j = i - 1
-                while j >= 0 and j > i - 50:
-                    if self.tokens[j][0] == '[':
-                        # 이전 토큰이 심볼인지 확인 (변수명)
-                        if j - 1 >= 0 and self.tokens[j - 1][1] == 'SYMBOL' and self.tokens[j - 1][0].startswith('$'):
-                            found_var = self.tokens[j - 1][0]
-                            break
-                    j -= 1
-
-                if not found_var:
-                    i += 1
-                    continue
-
-                # http-xxx 다음부터 끝까지 스캔하여:
-                # 1. json-parse found_var 있으면 OK
-                # 2. (get found_var) 있으면 ❌
-                k = i + 1
-                has_json_parse = False
-                get_without_parse = False
+                # http-xxx 호출 후 범위 내 (get 사용 여부 확인
+                j = i + 1
+                paren_depth = 0
+                http_call_end = i
+                found_get = False
+                found_json_parse = False
                 get_line = 0
 
+                # 1. http-xxx 호출의 끝 찾기
+                while j < len(self.tokens) and j < i + 100:
+                    if self.tokens[j][0] == '(':
+                        paren_depth += 1
+                    elif self.tokens[j][0] == ')':
+                        paren_depth -= 1
+                        if paren_depth < 0:
+                            http_call_end = j
+                            break
+                    j += 1
+
+                # 2. http-xxx 이후 다음 let/코드 블록 스캔
+                k = http_call_end + 1
                 depth = 0
-                while k < len(self.tokens) and k < i + 200:
-                    if self.tokens[k][0] == '(':
+                context_end = min(i + 300, len(self.tokens))  # 최대 300 토큰 스캔
+
+                while k < context_end:
+                    t = self.tokens[k][0]
+                    tk = self.tokens[k][1]
+
+                    if t == '(':
                         depth += 1
-                    elif self.tokens[k][0] == ')':
+                    elif t == ')':
                         depth -= 1
                         if depth < 0:
                             break
 
-                    # (json-parse found_var) 확인
-                    if (self.tokens[k][1] == 'SYMBOL' and self.tokens[k][0] == 'json-parse' and
-                        k + 1 < len(self.tokens) and found_var in self.tokens[k + 1][0]):
-                        has_json_parse = True
+                    # (json-parse ...) 패턴
+                    if tk == 'SYMBOL' and t == 'json-parse':
+                        found_json_parse = True
+                        break  # json-parse 있으면 OK
 
-                    # (get found_var) 확인
-                    if (self.tokens[k][1] == 'SYMBOL' and self.tokens[k][0] == 'get' and
-                        k + 1 < len(self.tokens) and self.tokens[k + 1][0] == found_var and
-                        not has_json_parse):
-                        get_without_parse = True
-                        get_line = self.tokens[k][2]
+                    # (get ... ) 패턴 - http 응답 변수 참조
+                    if (tk == 'SYMBOL' and t == 'get' and k + 1 < len(self.tokens)):
+                        # get 다음이 $로 시작하는 변수면 경고 (http 응답 변수로 추정)
+                        next_token = self.tokens[k + 1][0]
+                        if next_token.startswith('$'):
+                            found_get = True
+                            get_line = self.tokens[k][2]
+                            break
 
                     k += 1
 
-                if get_without_parse and not has_json_parse:
+                # ❌ get은 있는데 json-parse는 없으면 경고
+                if found_get and not found_json_parse:
                     col = self.lines[get_line - 1].find('get') + 1 if get_line <= len(self.lines) else 1
                     self.violations.append(Violation(
                         'P1-2', self.filepath, get_line, col,
-                        f'{http_name} 응답 파싱 없음: (get {found_var} ...) 사용',
-                        f'(let [[$data (json-parse {found_var})]] (get $data ...))',
+                        f'{http_name} 응답을 파싱 없이 (get)로 접근',
+                        f'(let [[$data (json-parse $resp)]] (get $data "key")) 또는 (http-get-json url)',
                         severity="error"
                     ))
 
@@ -320,49 +323,81 @@ class P1Linter:
             token, kind, line = self.tokens[i]
 
             # db-get / json-parse 호출 추적
-            if kind == 'SYMBOL' and token in ('db-get', 'json-parse'):
-                # let 바인딩 확인
+            if kind == 'SYMBOL' and token in ('db-get', 'db-post', 'json-parse'):
+                dangerous_fn = token
+                dangerous_line = line
+
+                # let 바인딩 변수 찾기: (let [[$var (db-xxx ...)]])
                 bound_var = None
-                if i > 0 and self.tokens[i - 2][0] == '[' and self.tokens[i - 1][1] == 'SYMBOL':
-                    bound_var = self.tokens[i - 1][0]
+                j = i - 1
 
-                if bound_var:
-                    # 이후 (get bound_var ...) 확인
-                    j = i + 1
-                    depth = 0
-                    found_if = False
-                    found_safe_get = False
+                # 역추적: (let [[$var (db-get ...)]])
+                # i는 db-get의 위치
+                # 뒤로 가면서 [ [ $var 구조 찾기
+                while j >= 0 and j > i - 50:
+                    # $var 찾았으면, 그 앞이 [[인지 확인
+                    if (self.tokens[j][1] == 'SYMBOL' and self.tokens[j][0].startswith('$') and
+                        j >= 2 and self.tokens[j - 1][0] == '[' and self.tokens[j - 2][0] == '['):
+                        bound_var = self.tokens[j][0]
+                        break
+                    j -= 1
 
-                    while j < len(self.tokens) and j < i + 150:
-                        if self.tokens[j][0] == '(':
-                            depth += 1
-                        elif self.tokens[j][0] == ')':
-                            depth -= 1
-                            if depth < 0:
-                                break
+                if not bound_var:
+                    i += 1
+                    continue
 
-                        # (if bound_var ...) 패턴
-                        if (self.tokens[j][1] == 'SYMBOL' and self.tokens[j][0] == 'if' and
-                            j + 1 < len(self.tokens) and self.tokens[j + 1][0] == bound_var):
-                            found_if = True
+                # bound_var 이후 (get bound_var) 패턴 검사
+                k = i + 1
+                nil_check_found = False
+                direct_get_found = False
+                get_line = 0
 
-                        # (safe-get bound_var ...) 또는 (or bound_var ...)
-                        if ((self.tokens[j][1] == 'SYMBOL' and self.tokens[j][0] == 'safe-get') or
-                            (self.tokens[j][1] == 'SYMBOL' and self.tokens[j][0] == 'or' and
-                             j + 1 < len(self.tokens) and self.tokens[j + 1][0] == bound_var)):
-                            found_safe_get = True
+                depth = 0
+                while k < len(self.tokens) and k < i + 200:
+                    if self.tokens[k][0] == '(':
+                        depth += 1
+                    elif self.tokens[k][0] == ')':
+                        depth -= 1
+                        if depth < 0:
+                            break
 
-                        j += 1
+                    # nil 체크 패턴 확인
+                    if self.tokens[k][1] == 'SYMBOL':
+                        # (if bound_var ...)
+                        if (self.tokens[k][0] == 'if' and k + 1 < len(self.tokens) and
+                            self.tokens[k + 1][0] == bound_var):
+                            nil_check_found = True
+                            break
 
-                    # ⚠️ nil 체크 없이 사용
-                    if not found_if and not found_safe_get:
-                        col = self.lines[line - 1].find(token) + 1 if line <= len(self.lines) else 1
-                        self.violations.append(Violation(
-                            'P1-5', self.filepath, line, col,
-                            f'{token} 결과 {bound_var}: nil 체크 없음',
-                            f'(if {bound_var} (get {bound_var} ...) default) 또는 (safe-get {bound_var} ...)',
-                            severity="warning"
-                        ))
+                        # (safe-get bound_var ...)
+                        if (self.tokens[k][0] == 'safe-get' and k + 1 < len(self.tokens) and
+                            self.tokens[k + 1][0] == bound_var):
+                            nil_check_found = True
+                            break
+
+                        # (or bound_var ...)
+                        if (self.tokens[k][0] == 'or' and k + 1 < len(self.tokens) and
+                            self.tokens[k + 1][0] == bound_var):
+                            nil_check_found = True
+                            break
+
+                        # (get bound_var ...) - 직접 접근
+                        if (self.tokens[k][0] == 'get' and k + 1 < len(self.tokens) and
+                            self.tokens[k + 1][0] == bound_var):
+                            direct_get_found = True
+                            get_line = self.tokens[k][2]
+
+                    k += 1
+
+                # ⚠️ 직접 get은 있는데 nil 체크가 없으면 경고
+                if direct_get_found and not nil_check_found:
+                    col = self.lines[get_line - 1].find('get') + 1 if get_line <= len(self.lines) else 1
+                    self.violations.append(Violation(
+                        'P1-5', self.filepath, get_line, col,
+                        f'{dangerous_fn} 결과 {bound_var}: nil 체크 없이 (get) 접근',
+                        f'(if {bound_var} (get {bound_var} ...) nil) 또는 (safe-get {bound_var} ...)',
+                        severity="warning"
+                    ))
 
             i += 1
 
