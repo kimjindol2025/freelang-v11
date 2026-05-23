@@ -1278,7 +1278,7 @@
   (if (>= $i (length $items)) $acc
   (let [[$name (cgc-extract-name (get $items $i))]
         [$val (cgc (get $items (+ $i 1)))]
-        [$tmp (str "_fl_linit_" $i)]]
+        [$tmp (str "__fl_loop_tmp_" $i)]]
     (loop-make-decls $items (+ $i 2)
       (str $acc
            "    FLValue " $tmp " = " $val ";\n"

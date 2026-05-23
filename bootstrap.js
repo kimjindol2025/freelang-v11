@@ -32656,7 +32656,8 @@ ${exportsStr}
         if (!nameNode) continue;
         const name = this.extractVarName(nameNode);
         const val = valNode ? this.genNode(valNode) : "null";
-        inits.push(`let ${name} = ${val};`);
+        const tmpName = `__fl_loop_${i}`;
+        inits.push(`let ${tmpName} = ${val}; let ${name} = ${tmpName};`);
         names.push(name);
       }
       const bodyParts = bodyExprs.map((e) => this.genNode(e).trim()).filter((s) => s !== "");
@@ -43521,10 +43522,6 @@ function cmdCodegen(args3) {
   }
 }
 function cmdCompile(args3) {
-  const targetIdx = args3.indexOf("--target");
-  if (targetIdx !== -1 && args3[targetIdx + 1] === "c") {
-    return cmdCompileC(args3);
-  }
   const outputIdx = args3.indexOf("-o");
   const inputFile = args3.find((a) => !a.startsWith("-") && a !== args3[outputIdx + 1]);
   const outputFile = outputIdx !== -1 ? args3[outputIdx + 1] : null;
@@ -43561,35 +43558,6 @@ function cmdCompile(args3) {
     } else {
       process.stdout.write(js);
     }
-  } catch (err4) {
-    console.error(formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput));
-    process.exit(1);
-  }
-}
-function cmdCompileC(args3) {
-  const outputIdx = args3.indexOf("-o");
-  const inputFile = args3.find((a) => !a.startsWith("-") && a !== args3[outputIdx + 1]);
-  const outputFile = outputIdx !== -1 ? args3[outputIdx + 1] : null;
-  if (!inputFile || !outputFile) {
-    console.error(`\x1B[31m오류\x1B[0m  사용법: compile <file.fl> --target c -o <out.c>`);
-    process.exit(1);
-  }
-  const absInput = path18.resolve(inputFile);
-  const absOutput = path18.resolve(outputFile);
-  if (!fs21.existsSync(absInput)) {
-    console.error(`\x1B[31m오류\x1B[0m  파일을 찾을 수 없습니다: ${inputFile}`);
-    process.exit(1);
-  }
-  try {
-    const { execSync } = require("child_process");
-    const cgcOutJs = path18.join(__dirname, "self/cgc-main.out.js");
-    const cmd = `node ${cgcOutJs} ${absInput} ${absOutput}`;
-    execSync(cmd, { stdio: "inherit", cwd: __dirname });
-    const dir = path18.dirname(absOutput);
-    if (dir !== "." && !fs21.existsSync(dir)) {
-      fs21.mkdirSync(dir, { recursive: true });
-    }
-    console.log(`\x1B[32m✓\x1B[0m  C 코드 생성  ${path18.basename(inputFile)} → ${outputFile}`);
   } catch (err4) {
     console.error(formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput));
     process.exit(1);

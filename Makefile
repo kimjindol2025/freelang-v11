@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build clean help
+.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build native-test semantic-test clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -26,6 +26,8 @@ help:
 	@echo "  make verify-self-host               - tier2 (PASS≥91)"
 	@echo "  make bench                          - FL-Bench 100 reference"
 	@echo "  make ai-eval                        - Claude CLI 평가 (~41분)"
+	@echo "  make native-test                    - P2 Stage 1: FL→C→ELF 파이프라인"
+	@echo "  make semantic-test                  - P2 Stage 2: 7개 invariant 검증"
 
 compile:
 	@$(NODE) $(STAGE1) $(FILE) $(OUT)
@@ -112,3 +114,12 @@ native-test:
 	@echo "Running native executable..."
 	@/tmp/hello
 	@echo "✓ Native pipeline SUCCESS"
+
+# P2 Stage 2: Semantic invariant verification (C runtime ABI)
+semantic-test:
+	@echo "=== P2 Stage 2: Native C Semantic Invariant Tests ==="
+	@echo "Compiling test/p2-semantics.c..."
+	@gcc test/p2-semantics.c runtime/core.c runtime/collection.c runtime/io.c runtime/math.c runtime/error.c -I runtime/ -lm -o /tmp/p2-semantics
+	@echo "Running invariant tests..."
+	@/tmp/p2-semantics
+	@echo "✓ Semantic tests PASSED"
