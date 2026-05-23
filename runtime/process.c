@@ -104,5 +104,5 @@ FLValue _fl_process_spawn(FLValue cmd, FLValue args) {
 }
 
 /* ── try/catch 런타임 ── */
-FLTryFrame fl_try_stack[FL_TRY_MAX];
-int fl_try_top = 0;
+extern FLTryFrame fl_try_stack[FL_TRY_MAX];
+extern int fl_try_top;

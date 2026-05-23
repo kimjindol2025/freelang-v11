@@ -1,0 +1,13 @@
+;; Parity test: nested loop structures
+(defn nested-sum [n]
+  (loop [i 0 total 0]
+    (if (>= i n)
+      total
+      (recur (+ i 1)
+        (+ total
+          (loop [j 0 row-sum 0]
+            (if (>= j i)
+              row-sum
+              (recur (+ j 1) (+ row-sum 1)))))))))
+
+(println (nested-sum 5))

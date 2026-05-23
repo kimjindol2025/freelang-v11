@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// FreeLang v11 build script — stage1.js로 bootstrap.js 생성 (esbuild 제거)
-// v11.10: 빌드 전에 stdlib 시그니처 JSON 을 생성해서 번들에 embed (fn-doc 배포 대응)
-// v11.7.12: L3 고정점 달성 후 C 컴파일러 활용 → npm 0개 목표
+// FreeLang v11 build script — esbuild bundle (production build path)
+// docs/PLAN-build-pipeline-unify.md (BP-3) — esbuild 정식화 2026-05-21
+// docs/BUILD-SYSTEM.md — 3-track 구조 (Production / Runtime / Experimental)
+// 빌드 전 stdlib 시그니처 JSON 생성 후 번들에 embed (fn-doc 배포 대응)
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -51,28 +52,53 @@ try {
 
 const isWatch = process.argv.includes("--watch") || process.argv.includes("-w");
 
-// Phase X-2: npm esbuild 제거 → pre-built bootstrap.js 유지
-// (src/ 변경 시에만 tsc + 수동 번들링으로 재생성)
-function checkBootstrapBuilt() {
-  const REPO = path.resolve(__dirname, "..");
-  const bootstrapJsPath = path.join(REPO, "bootstrap.js");
+// bootstrap.js bundle (production build path) — docs/BUILD-SYSTEM.md 참조
+const REPO = path.resolve(__dirname, "..");
+const NODE_EXTERNALS = [
+  "tls", "net", "fs", "path", "child_process", "os",
+  "http", "https", "url", "util", "stream", "buffer",
+  "crypto", "readline", "events", "vm", "tty", "assert",
+  "worker_threads", "zlib", "dgram", "dns", "http2",
+  "perf_hooks", "inspector", "v8", "module",
+  "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
+];
 
-  if (!fs.existsSync(bootstrapJsPath)) {
-    console.error("bootstrap.js not found. Run 'git checkout bootstrap.js' or rebuild with typescript compiler.");
-    process.exit(1);
-  }
-
-  const size = fs.statSync(bootstrapJsPath).size;
-  console.log(`bootstrap=pre-built (no rebuild, esbuild removed) size=${Math.round(size / 1024)}KB`);
+function bootstrapOpts() {
+  return {
+    absWorkingDir: REPO,
+    entryPoints: ["src/cli.ts"],
+    bundle: true,
+    platform: "node",
+    target: "node18",
+    outfile: "bootstrap.js",
+    loader: { ".json": "json" },
+    minify: false,
+    external: NODE_EXTERNALS,
+    logLevel: "info",
+  };
 }
 
-// Node.js 빌드 (pre-built bootstrap.js 사용)
+function buildBootstrap() {
+  const esbuild = require("esbuild");
+  return esbuild.build(bootstrapOpts()).then(() => {
+    const size = fs.statSync(path.join(REPO, "bootstrap.js")).size;
+    console.log(`bootstrap=built size=${Math.round(size / 1024)}KB`);
+  });
+}
+
+function watchBootstrap() {
+  const esbuild = require("esbuild");
+  return esbuild.context(bootstrapOpts()).then((ctx) => ctx.watch()).then(() => {
+    console.log("bootstrap=watching (Ctrl+C to stop)");
+  });
+}
+
+// Node.js 빌드
 let nodeBuild;
 if (isWatch) {
-  console.log("bootstrap=watch not supported (esbuild removed). Use tsc --watch instead.");
-  nodeBuild = Promise.resolve();
+  nodeBuild = watchBootstrap();
 } else {
-  nodeBuild = Promise.resolve().then(() => checkBootstrapBuilt());
+  nodeBuild = buildBootstrap();
 }
 
 // 브라우저 빌드: Phase X-2에서 esbuild 제거, 추후 구현 예정

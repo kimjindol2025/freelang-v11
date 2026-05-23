@@ -5,6 +5,14 @@
 #include <math.h>
 #include <time.h>
 
+/* ── Error Handling Global State ── */
+FLTryFrame fl_try_stack[FL_TRY_MAX];
+int fl_try_top = 0;
+
+/* ── CLI Arguments Global State ── */
+static FLValue* global_argv = NULL;
+static int global_argc = 0;
+
 /* ── 값 생성 ── */
 
 FLValue fl_int(int64_t v) {

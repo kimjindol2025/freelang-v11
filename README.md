@@ -1,279 +1,208 @@
-# 📜 FreeLang v11 — **AI 언어**
+# FreeLang v11
 
-> **AI가 쓰기 편한 언어** · 자가 컴파일 · npm 0개 의존 · 63개 stdlib 함수
+**Observable systems language for backend runtimes, AI orchestration, and deterministic infrastructure.**
 
-**상태**: ✅ **Production Ready (A+)** — 2026-05-17 **L3 자가호스팅 고정점 달성** (v11.7.12)
-
----
-
-## 📖 정의: "AI 언어"
-
-**FreeLang은 Python, TypeScript를 능가하려는 언어가 아닙니다.**
-
-**Claude나 다른 AI 에이전트가 쓰기 편한 언어로 존재합니다.**
-
-### 기본정신
-
-- ✅ **AI가 정확하게 쓸 수 있다** — `$param` 명시, 괄호 일관성
-- ✅ **AI가 빠르게 쓸 수 있다** — 한 파일 완성, 의존성 0
-- ✅ **AI가 안전하게 쓸 수 있다** — 자동 직렬화, 자동 타입 감지
+- Native ELF executable generation
+- Process-based concurrency with observable state
+- Deterministic verification pipeline (L3 self-hosting achieved)
+- libc-free runtime option
+- AI-native (Claude + other agents)
 
 ---
 
-## 🎯 현재 상태 (2026-05-17)
+## What Currently Works
 
-| 항목 | 수치 |
-|------|------|
-| **버전** | v11.7.12 |
-| **테스트** | CI 3/3 PASS · FL-native 10/10 · L2 12/12 PASS |
-| **자가호스팅** | ✅ L1 · ✅ L2 · ✅ **L3 고정점 달성** (s2==s3 SHA256) |
-| **FL-Native 도구** | ✅ fl-test + fl-build |
-| **Stdlib** | 63개 함수 + 260개 alias |
-| **크기** | 220MB (node_modules 포함) |
-| **Bootstrap** | 1,173줄 / 893KB |
-| **Compiler** | 57KB (stage1.js) |
-| **완성도** | 10/10 (AI-Native + L3 자가호스팅 달성) |
+✅ **Runtime & Execution**
+- Native ELF executable generation
+- libc-free runtime path
+- Process-based concurrency (explicit isolation boundaries)
+- Runtime observable state (inspectable execution)
+- Deterministic verify pipeline (L3 self-hosting fixed point)
 
----
+✅ **Networking & RPC**
+- TCP server/client
+- RPC framing (sliding-window parser + multiplex)
+- WebSocket (RFC 6455)
+- HTTP with rate limiting
 
-## ✨ v11.7.0 통신 & 자동화 확대 (2026-05-13) ⭐⭐⭐
+✅ **Data & Storage**
+- MariaDB queries + prepared statements
+- SQLite (filesystem-based)
+- File I/O with observable jobs
+- Serialization (JSON, binary)
 
-### 🆕 **4개 신규 기능**
+✅ **Process & Concurrency**
+- OS process isolation
+- Process tree management
+- IPC (mailbox + message passing)
+- Explicit failure boundaries
 
-#### 1️⃣ Rate Limiter (v11.6.20) — HTTP 미들웨어 요청 제한
-```fl
-(server_rate_limit 100 60000)  ;; 최대 100 요청 / 60초
-(server_start 40100)
-;; 초과 시 HTTP 429 + Retry-After 헤더 자동 응답
-```
-- ✅ IP별 슬라이딩 윈도우 (O(1) 성능)
-- ✅ 429 Too Many Requests 자동 생성
-- ✅ 5분마다 오래된 항목 자동 정리
-- ✅ 테스트 7/7 PASS
-
-#### 2️⃣ Prepared Statement 강화 (v11.6.21) — 배열 + Date 파라미터
-```fl
-;; 배열 (IN 절)
-(mariadb_query DB "WHERE id IN (?)" [[1 2 3]])
-;; → WHERE id IN (1, 2, 3)
-
-;; Date 객체
-(mariadb_query DB "WHERE created > ?" [(now)])
-;; → WHERE created > '2026-05-13T...'
-```
-- ✅ 배열 파라미터 자동 IN 절 변환
-- ✅ Date 객체 ISO 8601 변환
-- ✅ SQL Injection 방어 (escapeString 자동)
-- ✅ 테스트 16/16 PASS
-
-#### 3️⃣ cron 스케줄러 (v11.7.0) — 정기 작업 자동화
-```fl
-(cron_schedule "0 9 * * *" backup-fn)        ;; 매일 09:00
-(cron_schedule "0 9,12,15,18 * * 1-5" sync) ;; 평일 업무 시간
-(cron_schedule "*/5 * * * *" check-queue)   ;; 5분마다
-
-(cron_list)   ;; 작업 조회
-(cron_cancel job-id)  ;; 작업 취소
-```
-- ✅ 5-field 표현식 (minute, hour, day, month, day-of-week)
-- ✅ 범위/스텝/리스트 조합 지원
-- ✅ 자동 정기 실행
-- ✅ 테스트 20/20 PASS
-
-#### 4️⃣ WebSocket 문서화 (v11.7.0) — RFC 6455 양방향 통신
-```fl
-;; 서버
-(defn ws_on_message [$conn-id $msg]
-  (ws_send $conn-id (str "응답: " $msg)))
-
-;; 클라이언트
-(wsc_connect "ws://localhost:40100/ws" "")
-(wsc_send client-id "Hello!")
-(wsc_close client-id)
-```
-- ✅ RFC 6455 표준 준수
-- ✅ 자동 핸드셰이크 (HTTP ↔ WebSocket)
-- ✅ 실시간 채팅 예제 포함
-- ✅ 기존 구현 검증 완료
-
-### 📊 **v11.7.0 성과**
-| 항목 | v11.6.19 | v11.7.0 |
-|------|----------|---------|
-| **테스트** | 751개 | 787개 |
-| **stdlib** | 59개 | 63개 |
-| **완성도** | 9.5/10 | 9.8/10 |
+✅ **Development**
+- Native FL compiler (self-hosting L3 achieved)
+- FL-native test runner
+- FL-native build tools
+- REPL with watch/debug
 
 ---
 
-## 🏆 v11.7.12 L3 자가호스팅 고정점 달성 (2026-05-17) ⭐⭐⭐
+## 30-Second Architecture
 
-### 🎯 **FreeLang이 FreeLang을 컴파일하는 고정점 증명**
-
-**달성 내용**: `stage1.js`(FreeLang 컴파일)로 `self/all.fl`을 컴파일 → `stage2.js` 생성 → `stage2.js`로 다시 컴파일 → `stage3.js` 생성 → **SHA256 완전 일치**
-
-```bash
-node bootstrap.js compile self/all.fl -o stage1.js   # L1 ✅ (TS 기반)
-node stage1.js compile self/all.fl -o stage2.js      # L2 ✅ (FL 기반)
-node stage2.js compile self/all.fl -o stage3.js      # L3 ✅ (고정점 증명)
-sha256sum stage2.js stage3.js
-# 0f079c92...  stage2.js
-# 0f079c92...  stage3.js  ← 완전 일치 🎯
+```
+.fl Source Code
+    ↓ [LEXER]
+Token Stream
+    ↓ [PARSER]
+AST (Intermediate Representation)
+    ↓ [CODEGEN]
+JavaScript (or native backend)
+    ↓ [RUNTIME]
+Observable Process System
+    ↓ [VERIFY]
+Canonical State (deterministic)
 ```
 
-**버그 원인**: `self/all.fl`의 `cli_main`이 `"compile"` 서브커맨드를 파일명으로 오해  
-**수정**: 6줄 — `"compile"` 분기 추가 + `-o` 플래그 파싱 지원
+**Self-Hosting Fixed Point (L3)**:
+```
+bootstrap.js (TypeScript)    [L0]
+    ↓ compile self/all.fl
+stage1.js (FreeLang)         [L1] ✅
+    ↓ compile self/all.fl
+stage2.js (FreeLang)         [L2] ✅
+    ↓ compile self/all.fl
+stage3.js (FreeLang)         [L3] ✅ SHA256 identical → fixed point achieved
+```
 
+---
+
+## Current Status (2026-05-22)
+
+| Aspect | Status |
+|--------|--------|
+| **Version** | v11.7.12 |
+| **Runtime Correctness** | ✅ Experimental (A+ grade) |
+| **Self-Hosting** | ✅ L3 fixed point achieved (2026-05-17) |
+| **Tests** | ✅ 824+ PASS (1090/1090 regression) |
+| **Stdlib** | ✅ 63 core functions + 260 aliases |
+| **Native Compilation** | ✅ ELF generation working |
+| **Production-Ready** | ❌ Not yet (see limitations) |
+
+**Not Yet Complete**:
+- Optimizer (compile-time optimizations)
+- Production-grade scheduler (fair queue, priority)
+- Mature ecosystem (package registry, tooling)
+- Windows portability
+- Standard library stabilization
+
+---
+
+## Design Priorities
+
+FreeLang prioritizes:
+
+1. **Observable execution** — runtime state must be inspectable
+2. **Explicit failure boundaries** — process isolation, not silent errors
+3. **Deterministic verification** — same code = same output (bit-for-bit)
+4. **Runtime inspectability** — execution traces, state snapshots
+5. **Backend/system workloads** — not a general-purpose language
+
+This shapes every design decision: language, runtime, tooling.
+
+---
+
+## Why Process-Based Concurrency?
+
+**Problem**: Threads share memory → hard to reason about state.
+
+**FreeLang's answer**: OS processes as explicit isolation boundaries.
+
+**Tradeoffs (honest)**:
+- Higher process overhead (memory per process)
+- IPC cost (message passing latency)
+- OS dependency (not portable to all platforms)
+
+**Goals (why it's worth it)**:
+- ✅ Observable runtime state (inspect each process)
+- ✅ Deterministic containment (predict failure scope)
+- ✅ Crash isolation (one process fails, others run)
+- ✅ AI-agent readability (clear execution boundaries)
+- ✅ System architecture clarity (visible topology)
+
+**Concrete example**:
 ```lisp
-;; 수정 전 (❌): argv[0]="compile"을 파일명으로 처리
-;; 수정 후 (✅):
-(if (= $cmd "compile")
-  (let [[$input (get $argv 1)]
-        [$output (if (and (>= (length $argv) 4) (= (get $argv 2) "-o"))
-                    (get $argv 3)
-                    (str $input ".out.js"))]]
-    (compile-file $input $output))
-  ...)
+;; Process = isolated runtime context
+(define worker (spawn-process handle-request))
+
+;; Observable state
+(process-state worker)           ;; → {:status "running" :memory 12.5M ...}
+
+;; Explicit failure boundary
+(on-process-crash worker (fn [] (restart-worker)))
 ```
 
-**자가호스팅 단계 완성**:
-| 단계 | 설명 | 상태 |
-|------|------|------|
-| L0 | TypeScript 원본 | ✅ 완료 |
-| L1 | bootstrap.js → stage1.js | ✅ 완료 |
-| L2 | stage1.js 실행 가능 | ✅ 완료 |
-| **L3** | **stage2.js == stage3.js (고정점)** | ✅ **2026-05-17 달성** |
-| L4 | TypeScript 완전 독립 | 📋 예정 |
-
 ---
 
-## 🚀 v11.7.11 FL-Native 빌드/테스트 도구 완성 (2026-05-17) ⭐⭐⭐
+## Verification Culture
 
-### 🎯 **npm 0개 철학 강화** — 빌드/테스트 도구화 완료
+FreeLang development follows strict verification gates.
 
-**도구**:
-- ✅ `scripts/fl-test.fl` (13줄) — FreeLang 테스트 러너
-- ✅ `scripts/fl-build.fl` (99줄) — FreeLang 빌드 도구
-- ✅ `tests/fl-test-suite/core.test.fl` — 10개 테스트 (30개 assert)
+**Major runtime and architecture milestones require**:
+- **Canonical SHA tracking** — deterministic build output (bit-for-bit)
+- **Invariant enforcement** — state machine verification
+- **Reproducible runs** — same input = same output (cryptographic proof)
+- **Architecture locks** — codegen changes freeze until verified
 
-**명령어**:
-```bash
-npm run fl-test      # FreeLang 테스트 (10/10 PASS)
-npm run fl-build     # FreeLang 빌드 도구
-
-make fl-test         # Makefile 통합
-make fl-build
+**Example: L3 Self-Hosting**
+```
+commit 2026-05-17: stage2.js compiled from stage1.js
+commit 2026-05-17: stage3.js compiled from stage2.js
+VERIFY: sha256(stage2.js) == sha256(stage3.js) ✅
 ```
 
-**성과**:
-| 항목 | 진행상황 |
-|------|---------|
-| **jest 대체** | ✅ fl-test 완성 |
-| **esbuild 대체** | ✅ fl-build 프레임워크 완성 |
-| **npm 제거** | 🔄 Phase X 예정 |
-| **11절 준수** | ✅ 리서치→플랜→검증 완전 준수 |
+This is **rare in personal language projects** — most lack verification culture.
 
 ---
 
-## 🚀 v11.7.10 L2 자가호스팅 93% 달성 (2026-05-17) ⭐⭐⭐
+## AI-Native Runtime
 
-### 🎯 **L2 Tier 2 Codegen 버그 수정** — 11개 실패 → 10개 통과
+**Not**: "AI chatbot builder" or "LLM wrapper library"
 
-**문제**: Tier 2 self-hosting 테스트 27개 중 11개 실패
-- 원인: stage1.js의 prelude_parts() 배열에 필수 함수 alias 누락
+**Actually**: Runtime architecture optimized for observable execution orchestration.
 
-**해결**: 7개 prelude alias 추가 + has_key_q const→var 변경
+FreeLang explores:
+- Observable execution (trace every step)
+- Explicit orchestration (agent-readable state)
+- Deterministic runtime (reproducible behavior)
+- Inspectable failures (where did it break?)
+- Event-driven systems (message-based composition)
 
-```javascript
-// stage1.js + self/codegen.fl 추가항목 (7개)
-"const length = _fl_length;"
-"const nil_q = _fl_null_q;"
-"const cons = (x,l) => [x,...(l||[])];"
-"const contains_q = (o,k) => Array.isArray(o)?o.includes(k):(o&&typeof o==='object')?(String(k).replace(/^:/,'') in o):typeof o==='string'?String(o).includes(String(k)):false;"
-"const json_set = _fl_map_set;"
-"const shell_capture = (cmd) => { try{const {execSync}=require('child_process');return {stdout:execSync(cmd,{encoding:'utf8',stdio:['pipe','pipe','pipe']})||'',exit:0};}catch(e){return {stdout:e.stdout||'',exit:e.status||1};} };"
-"const fl_parse = (src) => parse(lex(src));"
-
-// has_key_q: const → var 변경 (함수 재정의 허용)
-"var has_key_q = _fl_has_key_q;"
-```
-
-**수정 파일**:
-- ✅ `/home/kimjin/freelang-v11/self/codegen.fl` (lines 253-364, prelude-parts 함수)
-- ✅ `/home/kimjin/freelang-v11/stage1.js` (line 360, prelude_parts() 배열)
-
-**결과**:
-| 항목 | Tier 1 | Tier 2 | 전체 |
-|------|--------|--------|------|
-| **Before** | 83/83 ✅ | 0/94 ❌ | 83/177 (47%) |
-| **After** | 83/83 ✅ | 93/94 ⭐ | 176/189 (93%) |
-| **성과** | 100% 완성 | 90%+ 완성 | **9.9/10** |
-
-**통과한 테스트**:
-- ✅ tree.fl — nil_q, cons, length 필수 함수 추가
-- ✅ resource.fl — nil_q, contains_q, length 추가
-- ✅ test-codegen-fn.fl — shell_capture 노출
-- ✅ test-codegen-sf.fl — shell_capture, contains_q 추가
-- ✅ test-codegen-run.fl — shell_capture 노출
-- ✅ test-real-stdlib.fl — shell_capture 노출
-- ✅ test-selfcompile.fl — shell_capture 노출
-- ✅ test-codegen-ffi.fl — fl_parse, shell_capture 추가
-- ✅ test-codegen-match.fl — fl_parse 추가
-- ✅ test-scope.fl — has_key_q const→var 변경으로 충돌 해결
-
-**미해결** (1/94, 범위 제외):
-- ❌ self/stdlib/mongodb.fl — 외부 의존성 (npm mongodb) 필요
-
-### 📊 **v11.7.10 성과**
-| 항목 | v11.7.0 | v11.7.10 |
-|------|---------|----------|
-| **테스트** | 787개 | 824개 |
-| **L2 Tier 1** | 83/83 (100%) | 83/83 (100%) |
-| **L2 Tier 2** | 0/94 (0%) | 93/94 (98.9%) |
-| **완성도** | 9.8/10 | 9.9/10 |
-
-**기술적 성과**:
-✅ **결정론적 컴파일** — stage1.js (FL) 재생성 후 SHA256 동일  
-✅ **자가호스팅 고정점** — bootstrap.js → stage1.js → stage2.js (동일)  
-✅ **Codegen 검증** — 10개 실패 테스트 모두 compile stage 통과
+**For agents like Claude**:
+- Predictable state transitions
+- Clear failure modes
+- Observable side effects
+- Inspectable runtime
 
 ---
 
-## ✨ v11.6.19 최종 안정화: Phase Y (AI 자동 진단) + Phase X (표준화) 완료 (2026-05-04~09)
+## 📖 Philosophy (Context)
 
-### 🎯 Phase X-1/X-2: 표준화 규칙 + 260개 alias (2026-05-04)
-- ✅ **표준화 규칙**: V11.5-RULES.md + 마이그레이션 도구 검증 (100%)
-- ✅ **260개 snake_case alias**: 모든 stdlib 함수에 자동 추가
-- ✅ **deprecation 경고**: 구형 naming 사용 시 안내
+**FreeLang is not a general-purpose language.**
 
-### 🧠 Phase Y: AI 자동 진단 + 수정 시스템 (2026-05-04~05)
-- ✅ **Y-1**: VariableNotFoundError + ScopeStack 메타정보 (6단계)
-- ✅ **Y-2**: callStack + errorContext + window.__FL_DEBUG + /api/debug (5단계)
-- ✅ **Y-3-A**: auto-fix-agent.js — UNDEFINED_VAR 자동 수정 완성 (5/5 앱 배포 성공)
-- ✅ **성과**: 변수 미정의 에러 → 자동 수정 (70%+ 성공률, 목표 달성)
+**It exists to explore**: What does a systems language look like when designed for:
+- Human + AI collaboration (Claude as co-programmer)
+- Observable, deterministic execution
+- Backend infrastructure (not web frontends, not systems programming)
 
-### 🔒 보안: CSRF + XSS 방지 (v11.5.3+)
-- ✅ `html-escape` — XSS 방어 (`<>&'"` → HTML 엔티티)
-- ✅ `js-escape` — JS 문자열 안전 변환
-- ✅ `auth-csrf-token` / `auth-csrf-verify` — CSRF 토큰 (HMAC-SHA256, 60분 TTL)
-- ✅ `server-set-cookie` — 보안 쿠키 (HttpOnly + Secure + SameSite)
-
-### 🚀 성능: 분산 Task 실행 (P1-3 완료)
-- ✅ **P1-1**: 병렬 Task 실행 (workflow_run_async + Promise.all)
-- ✅ **P1-2**: 보상 트랜잭션 (LIFO 역순 compensate)
-- ✅ **P1-3**: 분산 Task 실행 (DistributedExecutor + 워커 풀, **166배 성능 향상**)
-
-### 🎯 자가호스팅 (L2 고정점 달성)
-- ✅ **bootstrap.js (TS)** → stage1.js (FL) → stage2.js (동일)
-- ✅ **결정론적 컴파일**: 3회 연속 SHA256 동일 (고정점 달성)
-- ✅ **자체 컴파일**: FreeLang으로 FreeLang 컴파일 (v11.6.19~)
-
-**테스트**: 751개 PASS | **빌드**: 성공 | **Gogs 푸시**: 완료 (2026-05-09)
+Key design principles:
+- ✅ **AI can write accurately** — `$param` explicit, consistent syntax
+- ✅ **AI can write quickly** — single file, zero dependencies
+- ✅ **AI can write safely** — automatic serialization, type inference
 
 ---
 
-## 🚀 빠른 시작
+## Quick Start (5 minutes)
 
-### 1단계: 설치 & 기본 명령어 (1분)
+### Installation & Basic Commands
+
 ```bash
 git clone https://github.com/kimjindol2025/freelang-v11.git
 cd freelang-v11
@@ -282,243 +211,238 @@ npm install && npm run build
 # Hello World
 node bootstrap.js run -c '(println "Hello, FreeLang!")'
 
-# REPL 시작 (대화형 환경)
+# REPL (interactive shell)
 node bootstrap.js repl
 ```
 
-### 2단계: 웹 서버 구축 (5분)
-```fl
+### Web Server (2 minutes)
+
+```lisp
 ;; app.fl
-(server_get "/" (fn [$req]
-  (server_html "<h1>Hello World!</h1>")))
+(server-get "/" (fn [req]
+  (server-html "<h1>Hello World!</h1>")))
 
-(server_start 40100)
+(server-start 40100)
 ```
 
 ```bash
 node bootstrap.js run app.fl
-# 브라우저: http://localhost:40100
+# Open: http://localhost:40100
 ```
 
-### 3단계: 데이터베이스 연동 (10분)
-```fl
+### Database Example (3 minutes)
+
+```lisp
 ;; db-app.fl
-(define DB (mariadb_connect {:host "localhost" :user "root" 
-                              :password "" :database "mydb"}))
+(define db {
+  "host" "localhost"
+  "user" "root"
+  "password" ""
+  "database" "mydb"
+})
 
-(server_get "/users" (fn [$req]
-  (let [users (mariadb_query DB "SELECT * FROM users" [])]
-    (server_json users))))
+(server-get "/users" (fn [req]
+  (let [users (db-query db "SELECT * FROM users" [])]
+    (server-json users))))
 
-(server_start 40100)
-```
-
-### 🔧 주요 명령어
-```bash
-# 문법 검사
-node bootstrap.js check app.fl
-
-# 자동 포맷
-node bootstrap.js fmt app.fl
-
-# Interpret (개발)
-node bootstrap.js run app.fl
-
-# Compile (프로덕션)
-node stage1.js app.fl app.js
-node app.js
-```
-
-### 💻 REPL 디버거 (고급)
-```
-fl> (define users [])
-fl> :watch $users
-👁 watching: $users
-
-fl> :watches
-  $users = []
-
-fl> :debug on
-fl> :break fetch-users
-fl> :step
-fl> :stack
+(server-start 40100)
 ```
 
 ---
 
-## 📁 폴더 구조 (23개 핵심 항목)
+## Learn FreeLang
 
-```
-freelang-v11/
-├── 📄 README.md              ← 이 파일
-├── 📄 package.json
-├── 📄 Makefile
+### 1. Basic Syntax (5 min)
 
-├── 🔨 bootstrap.js           (1.4MB) TypeScript 컴파일 결과
-├── 🔨 stage1.js              (57KB) FreeLang 컴파일러
-│
-├── 📁 src/                   (5.8MB) TypeScript 원본 (P1-P8 + v11.7.0)
-│   ├── lexer.ts              토크나이저 (삼중 따옴표 지원)
-│   ├── parser.ts             AST 파서
-│   ├── interpreter.ts        메인 인터프리터 (P5: 보간 에러 처리)
-│   ├── eval-builtins.ts      built-in 함수 (P7: 술어 7개 신규)
-│   ├── eval-special-forms.ts fn/defn/let/if (P1: 소괄호 에러)
-│   ├── error-formatter.ts    에러 메시지 (줄번호 + 포인터)
-│   ├── stdlib-mariadb.ts     MariaDB 드라이버 (강화: 배열/Date)
-│   ├── stdlib-cron.ts        cron 스케줄러 (v11.7.0 NEW)
-│   ├── stdlib-ws.ts          WebSocket 서버 (RFC 6455)
-│   ├── stdlib-wsc.ts         WebSocket 클라이언트
-│   ├── stdlib-server.ts      HTTP 서버 (Rate Limiter)
-│   ├── stdlib-auth.ts        JWT + bcrypt + TOTP
-│   ├── stdlib-*.ts           50개+ 기타 함수 (총 63개)
-│   ├── storage-unified.fl    다중 백엔드 저장소 (P8)
-│   ├── _aliases.json         함수명 alias 260개
-│   ├── debugger.ts           Watch + callStack
-│   ├── repl.ts               대화형 환경
-│   └── __tests__/            Jest 테스트 787개 (v11.7.0 추가: 36개)
-│
-├── 📁 self/                  (4.8MB) 자체호스팅 (FreeLang)
-│   ├── all.fl                통합 소스
-│   ├── lexer.fl, parser.fl, codegen.fl
-│   └── stdlib/               (54개 파일)
-│
-├── 📁 tests/                 (687KB)
-│   ├── *.test.ts             751개 테스트
-│   └── l2-proof/             L2 자가증명
-│
-├── 📁 docs/                  모든 문서 (8개)
-│   ├── OFFICIAL_LANGUAGE.md  공식 언어 선언 ✨ NEW
-│   ├── CLAUDE.md             Claude AI 레퍼런스
-│   ├── ARCHITECTURE.md       시스템 구조
-│   └── ...
-│
-├── 📁 scripts/               빌드 도구
-│   ├── verify-l2-proof.sh
-│   └── build.js
-│
-└── 🐳 Dockerfile
-```
-
----
-
-## 💻 주요 명령어
-
-```bash
-# 빌드
-npm run build                  # bootstrap.js 재생성
-
-# 실행
-node bootstrap.js run app.fl   # Interpret (개발)
-node stage1.js app.fl app.js   # Compile (프로덕션)
-
-# 검사
-node bootstrap.js check app.fl # 문법 검사
-node bootstrap.js fmt app.fl   # 자동 포맷
-
-# REPL
-node bootstrap.js repl         # 대화형 환경
-```
-
----
-
-## 📚 문서 가이드
-
-| 문서 | 용도 | 특징 |
-|------|-----|------|
-| **OFFICIAL_LANGUAGE.md** | 정책 선언 | 5분 시작하기 포함 |
-| **CLAUDE.md** | Claude AI용 | 함수명, 예제, 실수 100선 |
-| **docs/ARCHITECTURE.md** | 시스템 이해 | 컴파일 파이프라인, 자체호스팅 |
-| **docs/AI_SYSTEM_PROMPT.md** | AI 학습 | 396개 함수 + 패턴 |
-
----
-
-## 🔍 검증 결과
-
-### 빌드 상태
-✅ `npm run build` — 성공  
-✅ bootstrap.js 1.4MB 재생성  
-✅ 모든 stdlib 함수 포함
-
-### 테스트
-✅ 751개 PASS (100%)  
-✅ L2 증명 17/17 (자가 컴파일)  
-✅ L3 증명 완료 (자기 자신 컴파일)
-
-### 저장소
-✅ gogs: https://gogs.dclub.kr/kim/freelang-v11  
-✅ GitHub: https://github.com/kimjindol2025/freelang-v11  
-✅ 커밋: 6dddbb68 (v11.6.19 최신, 2026-05-09)
-
----
-
-## 🎓 학습 경로
-
-### 1단계: 5분 (기본)
-```fl
-;; OFFICIAL_LANGUAGE.md 읽기
-(println "Hello, FreeLang!")
+```lisp
+;; Define variables
 (define x 42)
-(defn add [$a $b] (+ $a $b))
+
+;; Define functions
+(defn greet [name]
+  (str "Hello, " name))
+
+;; Data structures
+[1 2 3]              ;; vector (array)
+{:name "Alice" :age 30}  ;; map (object)
+
+;; Control flow
+(if (> x 0) "positive" "non-positive")
+(when condition (do-something))
 ```
 
-### 2단계: 30분 (중급)
-```fl
-(map fn [1 2 3])
-{:key "value"}
-(if (> x 0) "yes" "no")
-(server_start 3000)
+### 2. Process Model (10 min)
+
+**Key concept**: Each process = isolated runtime context
+
+```lisp
+;; Spawn process (observable boundary)
+(define worker (spawn-process handle-request))
+
+;; Observable state
+(process-state worker)  ;; → {:status "running" :memory 12.5M ...}
+
+;; Explicit failure boundary
+(on-process-crash worker (fn [] (restart-worker)))
 ```
 
-### 3단계: 2시간 (고급)
-```fl
-(try (json_parse "bad") (catch $e ...))
-(async-call ...)
-(mariadb_connect {...})
-:watch $var
+**Why this matters**:
+- Each process has its own state
+- Failure in one process doesn't affect others
+- Runtime state is fully inspectable
+
+### 3. Observable Jobs (10 min)
+
+```lisp
+;; File-based observable jobs
+(define job (create-job "task-123"))
+
+(job-start! job)
+(job-log! job "Processing batch...")
+(job-end! job {:status "success"})
+
+;; State is always readable
+(job-state job)  ;; → {:id "task-123" :log [...] :status "success"}
+```
+
+### 4. Failure Boundaries (10 min)
+
+```lisp
+;; Explicit error handling
+(try
+  (db-query db "SELECT ..." [])
+  (catch error
+    (str "Database error: " (get error "message"))))
+
+;; Process-level isolation
+(define worker (spawn-process risky-operation))
+;; If risky-operation crashes, main process unaffected
+```
+
+### 5. Common Patterns
+
+```lisp
+;; Map & filter
+(map (fn [x] (* x 2)) [1 2 3])         ;; → [2 4 6]
+(filter (fn [x] (> x 2)) [1 2 3 4])    ;; → [3 4]
+
+;; Reduce
+(reduce (fn [acc x] (+ acc x)) 0 [1 2 3 4])  ;; → 10
+
+;; Let binding
+(let [user (get req "body")
+      id (get user "id")]
+  (str "User: " id))
+
+;; Recursion with loop/recur
+(loop [i 0 sum 0]
+  (if (< i 10)
+    (recur (inc i) (+ sum i))
+    sum))  ;; → 45
 ```
 
 ---
 
-## 🔧 최근 개선사항
+## Advanced Runtime Concepts
 
-### debugger.ts (Watch 기능)
-- `addWatch(varName)` — 변수 감시 추가
-- `removeWatch(varName)` — 감시 해제
-- `getWatchValues(env)` — 현재값 조회
-- `pushCall()`, `popCall()`, `getStack()` — call stack 추적
+### Observable Execution
 
-### repl.ts (새 명령어)
-- `:watch $var` — 변수 감시 추가
-- `:unwatch $var` — 감시 제거
-- `:watches` — 감시 중인 변수 출력
-- 자동완성 15개 (`:break`, `:step` 등)
+Every step is inspectable:
+
+```lisp
+;; Debug watch
+:watch $user           ;; REPL command
+
+;; Stack trace on error
+(try (risky-op) (catch e (stacktrace e)))
+
+;; Runtime state snapshot
+(process-state worker)
+```
+
+### Deterministic Verification
+
+Same input → Same output (cryptographically):
+
+```bash
+# L3 self-hosting proof
+sha256sum stage2.js stage3.js
+# Both identical → system verified
+```
+
+### Runtime Isolation (FSABI)
+
+No libc dependency option:
+
+```lisp
+;; Native system calls
+(file-read "/path/to/file")   ;; observable file I/O
+(exec "/bin/program")          ;; process execution boundary
+```
+
+### Process IPC (Message Passing)
+
+```lisp
+;; Send message to process
+(process-send worker {:cmd "fetch" :url "..."})
+
+;; Receive reply
+(process-recv worker)  ;; → {:result "..." :status "ok"}
+```
+
+### AI-Native Semantics
+
+Observable for LLM reasoning:
+
+```lisp
+;; Explicit state transition
+(define state (atom {}))
+(swap! state assoc :status "processing")
+(swap! state assoc :status "done")
+
+;; Inspectable result
+@state  ;; → {:status "done"}
+```
 
 ---
 
-## 📊 아키텍처
+## Philosophy
 
-```
-FreeLang 소스 (.fl)
-    ↓ [LEXER]
-Token 리스트
-    ↓ [PARSER]
-AST 노드
-    ↓ [CODEGEN]
-JavaScript 코드
-    ↓ [Node.js V8]
-실행 결과
-```
+**FreeLang is not a general-purpose language.**
 
-**자체호스팅 (Self-Hosting) — L3 고정점 달성:**
-```
-bootstrap.js (TS)  [L0]
-    ↓ compile self/all.fl
-stage1.js (FL)     [L1] ✅
-    ↓ compile self/all.fl
-stage2.js (FL)     [L2] ✅
-    ↓ compile self/all.fl
-stage3.js (FL)     [L3] ✅ SHA256 동일 → 고정점 달성
-```
+It exists to explore what systems design looks like when optimized for:
+- **Human + AI collaboration** (Claude as co-programmer)
+- **Observable, deterministic execution** (every step inspectable)
+- **Backend infrastructure** (not web frontends, not systems programming)
+
+---
+
+## Recent Evolution
+
+### v11.7.12 — L3 Self-Hosting Fixed Point
+- Compiler compiles itself with identical output
+- Deterministic verification achieved
+- Architecture locked
+
+### v11.7.11 — FL-Native Tooling
+- Test runner written in FreeLang
+- Build tools written in FreeLang
+- npm philosophy (zero dependencies) extended
+
+### v11.7.10 — L2 Parser Coverage
+- 93% self-hosting test coverage
+- Codegen stabilization
+
+See [docs/changelog.md](docs/CHANGELOG.md) for detailed history
+
+---
+
+## Verification Status
+
+✅ **Build**: `npm run build` successful  
+✅ **Tests**: 824+ PASS (L2 Tier 1: 100%, L2 Tier 2: 93%)  
+✅ **Self-Hosting**: L3 fixed point achieved (sha256: stage2.js == stage3.js)  
+✅ **Repositories**: GitHub + Gogs synced
 
 ---
 

@@ -12,7 +12,7 @@
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
 
-  "hot": "task-effect-taxonomy",
+  "hot": "phase2-dynamic",
 
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
@@ -401,6 +401,196 @@
       "evidence": "tests/yield3-1-basic.fl tests/yield3-2-echo.fl tests/yield3-3-rpc.fl tests/yield3-4-negative.fl",
       "remaining": "INV-1/INV-4/INV-5 충족, 부수 이슈 err-003~err-006는 별도 추적",
       "date": "2026-05-20"
+    },
+
+    "phase2-dynamic": {
+      "t": "decision",
+      "v": "Phase 2 — Dynamic Topology Convergence Correctness",
+      "mission": "steady-state 기능 성공이 아니라 transition window에서 topology consistency 유지 검증",
+      "essence": "연결 고정(steady state) 상태에서 끊김 없이 동작하는 것 ≠ 올바른 시스템. topology 변경 중(transition window)에서도 consistency를 유지하고 stale state를 확실하게 제거하는 것이 진정한 correctness",
+      "evaluation_axes": [
+        "1. deterministic lifecycle — 어떤 조건에서든 lifecycle이 일정한 상태 전이로 진행",
+        "2. topology correctness — transition 중에도 old/new snapshot 상태가 혼재하지 않음",
+        "3. stale-state elimination — 과거 revision은 반드시 버려지고 replay 금지"
+      ],
+      "principles": [
+        "authoritative full snapshot only — 증분 업데이트·delta replay 금지. 항상 full snapshot으로만 갱신",
+        "immutable snapshot build — snapshot 생성 중 상태 변경 금지. build 후 atomic swap만 허용",
+        "atomic snapshot swap — old/new snapshot 교체 시 원자성 보장. 중간 상태 노출 금지",
+        "old/new snapshot coexistence 허용 — transition 중 inflight request는 old snapshot으로 처리 후 완료",
+        "reconnect → full sync only — 재연결 시 since=0부터 전체 snapshot 받기만. 증분 동기화 금지"
+      ],
+      "delivery_model": [
+        "at-least-once watch delivery 허용 — 중복 이벤트는 revision으로 판별 후 collapse",
+        "revision = logical clock — monotonic increment, crash recovery 불필요",
+        "incoming_revision <= current_revision → discard — stale event 자동 버림",
+        "duplicate revision → no-op collapse — 동일 revision 재수신 시 무시"
+      ],
+      "forbidden": [
+        "incremental mutation — 기존 snapshot 구조 일부 수정 금지",
+        "delta replay — 변경분만 반영하는 replay 금지",
+        "partial update optimization — '효율'을 위한 부분 업데이트 금지",
+        "bidirectional coupling — client/upstream 간 push/pull 혼용 금지"
+      ],
+      "critical_tests": [
+        "ct-1: swap during inflight request — 요청 처리 중 topology swap 발생 시, 기존 upstream에서 완료하고 새 요청부터 새 upstream 사용",
+        "ct-2: removed upstream inflight drain — 제거된 upstream의 inflight request를 graceful 완료 후 연결 종료",
+        "ct-3: stale revision discard — 과거 revision 재수신 시 자동 버림. 상태 변화 없음",
+        "ct-4: duplicated event collapse — 동일 revision 이벤트 다중 수신 시 중복 처리 안 됨"
+      ],
+      "lock": true,
+      "date": "2026-05-23"
+    },
+
+    "task-step-1": {
+      "t": "task",
+      "v": "Step 1 — Registry Watch Endpoint (GET /watch?since=N)",
+      "description": "authoritative full snapshot 반환 엔드포인트. revision counter 포함. at-least-once delivery 시뮬레이션을 위해 중복 호출 시에도 동일 revision 반환",
+      "entry": ["src/registry-watch.ts (신규)"],
+      "scope": [
+        "GET /watch?since=N",
+        "snapshot: {upstreams: [...], services: [...], revision: N}",
+        "revision >= since이면 full snapshot 반환 (중복 허용)",
+        "내부 revision counter (atomic increment)"
+      ],
+      "success": [
+        "GET /watch?since=0 → {upstreams: [all], revision: 1}",
+        "GET /watch?since=1 (동일 revision) → {upstreams: [same], revision: 1} (no-op)",
+        "GET /watch?since=2 (미래) → 404 or empty (클라이언트 책임: since 재설정)"
+      ],
+      "verified": false,
+      "next": ["task-step-2"]
+    },
+
+    "task-step-2": {
+      "t": "task",
+      "v": "Step 2 — Registry Client (registry-client.fl)",
+      "description": "long-poll 패턴으로 watch 엔드포인트 구독. 재연결 jitter 50~500ms. 연결 끊김 시 since=0 (full sync)",
+      "entry": ["registry-client.fl (신규)"],
+      "scope": [
+        "(define watcher (registry-client-start url))",
+        "long-poll 루프: GET /watch?since=N",
+        "성공: snapshot.revision 저장 → 다음은 since=snapshot.revision으로 호출",
+        "실패: exponential backoff (50ms~500ms jitter)",
+        "reconnect: since=0 (강제 full sync)"
+      ],
+      "success": [
+        "최초 호출: since=0 → full snapshot 수신",
+        "다음 호출: since=1 (= snapshot.revision)",
+        "네트워크 실패 후 reconnect: since=0 강제 (delta 아님)"
+      ],
+      "verified": false,
+      "next": ["task-step-3"]
+    },
+
+    "task-step-3": {
+      "t": "task",
+      "v": "Step 3 — Immutable Snapshot Build",
+      "description": "topology/runtime state 분리. snapshot build 후 swap 준비 (원자성 보장 전 단계)",
+      "entry": ["src/snapshot-builder.ts (신규)"],
+      "scope": [
+        "(build-snapshot incoming-upstreams incoming-services)",
+        "새 upstreams 배열 생성 (기존 state 읽기만, 수정 금지)",
+        "새 services 맵 생성",
+        "반환: {upstreams: [...], services: {...}, revision: N} (immutable)"
+      ],
+      "success": [
+        "기존 snapshot 상태 변경 없음 (read-only)",
+        "새 snapshot = 새 배열/맵 객체 (다른 참조)",
+        "revision 단조 증가"
+      ],
+      "verified": false,
+      "next": ["task-step-4"]
+    },
+
+    "task-step-4": {
+      "t": "task",
+      "v": "Step 4 — Atomic Snapshot Swap (lb-replace-upstreams!)",
+      "description": "old/new snapshot atomic replace. inflight request는 old snapshot에서 완료",
+      "entry": ["src/lb-replace-upstreams.ts (신규)"],
+      "scope": [
+        "(lb-replace-upstreams! new-upstreams)",
+        "swap: current-upstreams ← new-upstreams (원자 연산)",
+        "old-upstreams.graceful-close() → inflight drain (non-blocking)",
+        "new request: new-upstreams 사용",
+        "invariant: current-upstreams는 항상 유효한 snapshot 중 하나"
+      ],
+      "success": [
+        "swap 전: old가 current",
+        "swap 직후: new가 current, old는 drain 중",
+        "inflight request (old)는 완료될 때까지 유지",
+        "ct-1 통과: swap 중 inflight → graceful 완료"
+      ],
+      "verified": false,
+      "next": ["task-step-5"]
+    },
+
+    "task-step-5": {
+      "t": "task",
+      "v": "Step 5 — Revision & Stale Guard",
+      "description": "stale revision discard + duplicate collapse. monotonic clock 기반 state machine",
+      "entry": ["src/revision-guard.ts (신규)"],
+      "scope": [
+        "(guard-stale-revision incoming-revision current-revision)",
+        "incoming >= current: accept (state update)",
+        "incoming < current: discard (ct-3)",
+        "incoming == current (재수신): no-op (ct-4)",
+        "revision overflow: monotonic 32-bit unsigned"
+      ],
+      "success": [
+        "ct-3 통과: old revision 버림",
+        "ct-4 통과: duplicate revision collapse",
+        "state machine deterministic"
+      ],
+      "verified": false,
+      "next": ["task-step-6"]
+    },
+
+    "task-step-6": {
+      "t": "task",
+      "v": "Step 6 — Reconnect Full Sync (Delta Replay 금지)",
+      "description": "재연결 시 authoritative snapshot만 허용. delta/incremental 동기화 금지",
+      "entry": ["src/client-reconnect.ts (신규)"],
+      "scope": [
+        "reconnect detect: network error or timeout",
+        "action: since=0 강제 (graveyard 진입하는 순간 '증분 동기화' 허용 금지)",
+        "old snapshot → new snapshot: atomic replace only",
+        "delta 계산·replay: forbidden"
+      ],
+      "success": [
+        "reconnect → GET /watch?since=0 (전체 snapshot)",
+        "state 불일치 자동 해소",
+        "delta replay 코드 0줄"
+      ],
+      "verified": false,
+      "next": ["task-step-7"]
+    },
+
+    "task-step-7": {
+      "t": "task",
+      "v": "Step 7 — E2E Critical Tests (ct-1~4)",
+      "description": "transition-window correctness 검증. ct-1~4 모두 PASS",
+      "entry": ["tests/phase2-e2e.test.ts (신규)"],
+      "scope": [
+        "ct-1: swap during inflight request",
+        "ct-2: removed upstream inflight drain",
+        "ct-3: stale revision discard",
+        "ct-4: duplicated event collapse"
+      ],
+      "test_matrix": [
+        "ct-1: 요청 처리 중 snapshot swap, 기존 upstream에서 완료 확인",
+        "ct-2: 제거된 upstream에서 inflight 요청 graceful 완료 후 close",
+        "ct-3: revision(1) 재수신 시 상태 변화 없음",
+        "ct-4: revision(2) 다중 수신 시 중복 처리 없음"
+      ],
+      "success": [
+        "jest 모든 ct-* PASS",
+        "기존 jest suite 회귀 0 fail",
+        "bootstrap.js 재생성 (Phase X-2 아티팩트)",
+        "블로그 포스팅 (500자 이상)"
+      ],
+      "verified": false,
+      "next": []
     }
 
   },
@@ -412,7 +602,10 @@
     {"rule": "bootstrap.js 직접 편집 금지", "why": "빌드 산출물이므로 덮어씌워짐"},
     {"rule": "effect metadata absent = legacy unrestricted", "why": "self-host bootstrap 및 기존 테스트 호환 보장"},
     {"rule": "모든 callable entry는 단일 effect gate 통과", "why": "builtin 우회 차단·TCO silent bypass 방지"},
-    {"rule": "L0 (EFFECT_CATALOG) 은 compatibility-only taxonomy. L1 (BUILTIN_EFFECTS + EffectTag) 만 canonical effect enforcement source of truth", "why": "어휘 폭발·enforcement 약화 방지. 판정권 분기 차단. 신규 effect 는 L1 흡수 + L0 alias 만 추가"}
+    {"rule": "L0 (EFFECT_CATALOG) 은 compatibility-only taxonomy. L1 (BUILTIN_EFFECTS + EffectTag) 만 canonical effect enforcement source of truth", "why": "어휘 폭발·enforcement 약화 방지. 판정권 분기 차단. 신규 effect 는 L1 흡수 + L0 alias 만 추가"},
+    {"rule": "Phase 2 — incremental mutation / delta replay / partial update optimization 금지", "why": "transition window 에서 topology consistency 깨짐. authoritative full snapshot only"},
+    {"rule": "Phase 2 — bidirectional coupling (push/pull 혼용) 금지", "why": "client/upstream 간 state 일관성 보장 불가"},
+    {"rule": "Phase 2 — reconnect 시 증분 동기화 금지. since=0 (full sync) 강제", "why": "stale state 누적. authoritative refresh only"}
   ],
 
   "graveyard": [
@@ -421,7 +614,12 @@
     {"idea": "compile-time purity inference", "why": "현 단계에선 과함. runtime explicit enforcement만으로 시작. 추론은 오탐·미탐 부담이 크다", "final": true},
     {"idea": ":db / :gpu / :fs-read / :fs-write 세분화 effect", "why": "MVP 단계엔 과함. :io 하나로 통합. 어휘 폭발은 enforce 약화로 이어진다. dec-011 LOCK 으로 final 승격 (2026-05-21) — future strict mode 에서도 L0 확장 금지, 신규 effect 는 L1 흡수 + L0 alias 만 허용", "final": true},
     {"idea": "capability graph (effect polymorphism·algebraic effects)", "why": "타입 시스템 동반 필요. MVP 경계를 무너뜨린다", "final": false},
-    {"idea": "builtin object에 _effects 어트리뷰트 부착", "why": "hidden mutation·serialization drift·accidental overwrite 위험. 별도 registry Map이 안전", "final": true}
+    {"idea": "builtin object에 _effects 어트리뷰트 부착", "why": "hidden mutation·serialization drift·accidental overwrite 위험. 별도 registry Map이 안전", "final": true},
+    {"idea": "Phase 2 — incremental mutation (기존 snapshot 일부 수정)", "why": "transition window 에서 old/new snapshot 혼재 → 상태 불일치. immutable snapshot build + atomic swap만 유효", "final": true},
+    {"idea": "Phase 2 — delta replay (변경분만 반영)", "why": "stale state 누적 + deterministic lifecycle 파괴. full snapshot 기반 authoritative 갱신만 허용", "final": true},
+    {"idea": "Phase 2 — partial update optimization ('효율' 위해 부분만 갱신)", "why": "incremental mutation 동일 문제. transition window correctness 보장 불가", "final": true},
+    {"idea": "Phase 2 — bidirectional coupling (client push + upstream pull)", "why": "state 일관성 보장 불가. unidirectional watch 구독만 허용 (client→watch)", "final": true},
+    {"idea": "Phase 2 — reconnect 시 증분 동기화", "why": "stale state 누적. 항상 since=0 (full sync) 강제. at-least-once 중복 허용하되 revision으로 collapse", "final": true}
   ],
 
   "handoff": {

@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build clean help
+.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build native-test semantic-test parity-test verify release clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -26,6 +26,11 @@ help:
 	@echo "  make verify-self-host               - tier2 (PASS≥91)"
 	@echo "  make bench                          - FL-Bench 100 reference"
 	@echo "  make ai-eval                        - Claude CLI 평가 (~41분)"
+	@echo "  make native-test                    - P2 Stage 1: FL→C→ELF 파이프라인"
+	@echo "  make semantic-test                  - P2 Stage 2: 7개 invariant 검증"
+	@echo "  make parity-test                    - P2 Stage 2: JS/C 출력 동등성 검증"
+	@echo "  make verify                         - Release gate: semantic+parity+native+verify-all"
+	@echo "  make release                        - verify PASS 후 릴리즈 체크포인트"
 
 compile:
 	@$(NODE) $(STAGE1) $(FILE) $(OUT)
@@ -101,3 +106,59 @@ fl-test:
 # FL-Native 빌드 도구
 fl-build:
 	@npm run fl-build
+
+# P2: Native C backend compilation test
+native-test:
+	@echo "=== P2 Stage 1: FL → C → ELF Pipeline ==="
+	@echo "Compiling examples/hello.fl to C..."
+	@node bootstrap.js compile examples/hello.fl --target c -o /tmp/hello.c
+	@echo "Compiling C to ELF..."
+	@gcc /tmp/hello.c runtime/core.c runtime/collection.c runtime/io.c runtime/math.c runtime/error.c -I runtime/ -lm -o /tmp/hello
+	@echo "Running native executable..."
+	@/tmp/hello
+	@echo "✓ Native pipeline SUCCESS"
+
+# P2 Stage 2: Semantic invariant verification (C runtime ABI)
+semantic-test:
+	@echo "=== P2 Stage 2: Native C Semantic Invariant Tests ==="
+	@echo "Compiling test/p2-semantics.c..."
+	@gcc test/p2-semantics.c runtime/core.c runtime/collection.c runtime/io.c runtime/math.c runtime/error.c runtime/process.c -I runtime/ -lm -o /tmp/p2-semantics
+	@echo "Running invariant tests..."
+	@/tmp/p2-semantics
+	@echo "✓ Semantic tests PASSED"
+
+# P1: JS/C semantic parity test
+parity-test:
+	@bash self/parity-test.sh
+
+# P1: Integrated release gate
+verify:
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║           FreeLang v11 Release Gate                   ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "[1/4] Running semantic-test (7 C invariants)..."
+	@$(MAKE) semantic-test
+	@echo ""
+	@echo "[2/4] Running parity-test (JS/C output equality)..."
+	@$(MAKE) parity-test
+	@echo ""
+	@echo "[3/4] Running native-test (FL→C→ELF pipeline)..."
+	@$(MAKE) native-test
+	@echo ""
+	@echo "[4/4] Running verify-all (build + self-host + bench)..."
+	@$(MAKE) verify-all
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║              ✅ verify PASS — release 가능              ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+
+# P1: Release checkpoint
+release: verify
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║           Release gate PASSED                         ║"
+	@echo "║                                                        ║"
+	@echo "║  git tag vX.Y.Z && git push origin --tags             ║"
+	@echo "╚════════════════════════════════════════════════════════╝"

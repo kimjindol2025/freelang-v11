@@ -396,7 +396,8 @@ export class JSCodegen {
         if (!nameNode) continue;
         const name = this.extractVarName(nameNode);
         const val = valNode ? this.genNode(valNode) : "null";
-        inits.push(`let ${name} = ${val};`);
+        const tmpName = `__fl_loop_${i}`;
+        inits.push(`let ${tmpName} = ${val}; let ${name} = ${tmpName};`);
         names.push(name);
       }
 
