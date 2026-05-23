@@ -101,3 +101,14 @@ fl-test:
 # FL-Native 빌드 도구
 fl-build:
 	@npm run fl-build
+
+# P2: Native C backend compilation test
+native-test:
+	@echo "=== P2 Stage 1: FL → C → ELF Pipeline ==="
+	@echo "Compiling examples/hello.fl to C..."
+	@node bootstrap.js compile examples/hello.fl --target c -o /tmp/hello.c
+	@echo "Compiling C to ELF..."
+	@gcc /tmp/hello.c runtime/core.c runtime/collection.c runtime/io.c runtime/math.c runtime/error.c -I runtime/ -lm -o /tmp/hello
+	@echo "Running native executable..."
+	@/tmp/hello
+	@echo "✓ Native pipeline SUCCESS"
