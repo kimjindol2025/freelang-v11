@@ -4056,6 +4056,10 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       Atomics.wait(new Int32Array(buf), 0, 0, ms);
       return null;
     }
+    case "fl-async-sleep": {
+      const ms = Math.max(0, Number(args[0] ?? 0));
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
     case "push":
       if (!Array.isArray(args[0])) return [args[1]];
       return [...args[0], args[1]];

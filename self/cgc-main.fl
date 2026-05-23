@@ -1518,4 +1518,4 @@
       (file-write $output $c-code)
       (println (str "Compiled " $input " -> " $output))))))
 
-(cgc-run (cli-args))
+;; Entry point removed — called directly from bootstrap.js cmdCompileC
