@@ -43563,6 +43563,59 @@ function cmdCompile(args3) {
     process.exit(1);
   }
 }
+function cmdCompileC(args3) {
+  const outputIdx = args3.indexOf("-o");
+  const inputFile = args3.find((a) => !a.startsWith("-") && a !== args3[outputIdx + 1]);
+  const outputFile = outputIdx !== -1 ? args3[outputIdx + 1] : null;
+  if (!inputFile) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC785\uB825 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: compile <file.fl> --target c [-o <out.c>]`);
+    process.exit(1);
+  }
+  const absInput = path18.resolve(inputFile);
+  if (!fs21.existsSync(absInput)) {
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
+    process.exit(1);
+  }
+  try {
+    const bootstrapDir = path18.dirname(process.argv[1]);
+    const cgcPath = path18.join(bootstrapDir, "self", "cgc-main.out.js");
+    if (!fs21.existsSync(cgcPath)) {
+      console.error(`\x1B[31m\uC624\uB958\x1B[0m  C \uCF54\uB4DC \uC0DD\uC131\uAE30\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${cgcPath}`);
+      process.exit(1);
+    }
+    const { execSync: execSync2 } = require("child_process");
+    const tmpOutput = path18.join("/tmp", `cgc_${Date.now()}.c`);
+    try {
+      execSync2(`node "${cgcPath}" "${absInput}" "${tmpOutput}"`, { stdio: "pipe" });
+    } catch (e) {
+      console.error(`\x1B[31m\uC624\uB958\x1B[0m  C \uCF54\uB4DC \uC0DD\uC131 \uC2E4\uD328: ${e.message}`);
+      process.exit(1);
+    }
+    if (!fs21.existsSync(tmpOutput)) {
+      console.error(`\x1B[31m\uC624\uB958\x1B[0m  C \uCF54\uB4DC \uC0DD\uC131 \uC2E4\uD328: \uCD9C\uB825 \uD30C\uC77C \uC5C6\uC74C`);
+      process.exit(1);
+    }
+    const cCode = fs21.readFileSync(tmpOutput, "utf-8");
+    if (outputFile) {
+      const absOutput = path18.resolve(outputFile);
+      const dir = path18.dirname(absOutput);
+      if (dir !== "." && !fs21.existsSync(dir)) {
+        fs21.mkdirSync(dir, { recursive: true });
+      }
+      fs21.writeFileSync(absOutput, cCode, "utf-8");
+      console.log(`\x1B[32m\u2713\x1B[0m  C \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path18.basename(inputFile)} \u2192 ${outputFile}`);
+    } else {
+      process.stdout.write(cCode);
+    }
+    try {
+      fs21.unlinkSync(tmpOutput);
+    } catch {
+    }
+  } catch (err4) {
+    console.error(formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput));
+    process.exit(1);
+  }
+}
 function cmdRepl() {
   console.log(`FreeLang v11 REPL  (\x1B[2m:q / (exit) / (quit) \uC885\uB8CC  :help \uB3C4\uC6C0\uB9D0  :reset \uC138\uC158 \uCD08\uAE30\uD654\x1B[0m)`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
@@ -44647,7 +44700,12 @@ switch (cmd) {
       printSubHelp("compile");
       process.exit(1);
     }
-    cmdCompile(args2.slice(1));
+    const target = args2.includes("--target") ? args2[args2.indexOf("--target") + 1] : "js";
+    if (target === "c") {
+      cmdCompileC(args2.slice(1));
+    } else {
+      cmdCompile(args2.slice(1));
+    }
     break;
   }
   case "codegen": {

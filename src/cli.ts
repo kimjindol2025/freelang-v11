@@ -644,6 +644,75 @@ function cmdCompile(args: string[]): void {
   }
 }
 
+function cmdCompileC(args: string[]): void {
+  // C 타겟 컴파일: compile input.fl --target c -o output.c
+  const outputIdx = args.indexOf("-o");
+  const inputFile = args.find(a => !a.startsWith("-") && a !== args[outputIdx + 1]);
+  const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : null;
+
+  if (!inputFile) {
+    console.error(`\x1b[31m오류\x1b[0m  입력 파일을 지정하세요: compile <file.fl> --target c [-o <out.c>]`);
+    process.exit(1);
+  }
+
+  const absInput = path.resolve(inputFile);
+  if (!fs.existsSync(absInput)) {
+    console.error(`\x1b[31m오류\x1b[0m  파일을 찾을 수 없습니다: ${inputFile}`);
+    process.exit(1);
+  }
+
+  try {
+    // cgc-main.out.js 위치 찾기
+    const bootstrapDir = path.dirname(process.argv[1]);
+    const cgcPath = path.join(bootstrapDir, "self", "cgc-main.out.js");
+
+    if (!fs.existsSync(cgcPath)) {
+      console.error(`\x1b[31m오류\x1b[0m  C 코드 생성기를 찾을 수 없습니다: ${cgcPath}`);
+      process.exit(1);
+    }
+
+    // cgc-main.out.js를 subprocess로 실행 (임시 파일에 출력)
+    const { execSync } = require("child_process");
+    const tmpOutput = path.join("/tmp", `cgc_${Date.now()}.c`);
+
+    try {
+      execSync(`node "${cgcPath}" "${absInput}" "${tmpOutput}"`, { stdio: "pipe" });
+    } catch (e: any) {
+      console.error(`\x1b[31m오류\x1b[0m  C 코드 생성 실패: ${e.message}`);
+      process.exit(1);
+    }
+
+    // 생성된 C 코드 읽기
+    if (!fs.existsSync(tmpOutput)) {
+      console.error(`\x1b[31m오류\x1b[0m  C 코드 생성 실패: 출력 파일 없음`);
+      process.exit(1);
+    }
+
+    const cCode = fs.readFileSync(tmpOutput, "utf-8");
+
+    // 최종 출력
+    if (outputFile) {
+      const absOutput = path.resolve(outputFile);
+      const dir = path.dirname(absOutput);
+      if (dir !== "." && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(absOutput, cCode, "utf-8");
+      console.log(`\x1b[32m✓\x1b[0m  C 컴파일 완료  ${path.basename(inputFile)} → ${outputFile}`);
+    } else {
+      process.stdout.write(cCode);
+    }
+
+    // 임시 파일 정리
+    try {
+      fs.unlinkSync(tmpOutput);
+    } catch {}
+  } catch (err: any) {
+    console.error(formatError(err, fs.readFileSync(absInput, "utf-8"), absInput));
+    process.exit(1);
+  }
+}
+
 // ─────────────────────────────────────────
 // repl 커맨드
 // ─────────────────────────────────────────
@@ -1907,7 +1976,12 @@ switch (cmd) {
   case "compile": {
     if (args[1] === "--help" || args[1] === "-h") { printSubHelp("compile"); break; }
     if (args.length < 2) { printSubHelp("compile"); process.exit(1); }
-    cmdCompile(args.slice(1));
+    const target = args.includes("--target") ? args[args.indexOf("--target") + 1] : "js";
+    if (target === "c") {
+      cmdCompileC(args.slice(1));
+    } else {
+      cmdCompile(args.slice(1));
+    }
     break;
   }
   case "codegen": {
