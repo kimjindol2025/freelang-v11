@@ -429,7 +429,12 @@ function flExecOpNative(op: string, vals: any[]): any {
       const fs = require("fs");
       const path = require("path");
       try {
-        const resolvedPath = path.resolve(process.cwd(), filePath);
+        // v11.7.12: 현재 파일 기준 상대경로 지원
+        const currentFile = (interp as any).currentFilePath;
+        const baseDir = currentFile && !path.isAbsolute(filePath)
+          ? path.dirname(currentFile)
+          : process.cwd();
+        const resolvedPath = path.resolve(baseDir, filePath);
         const src = fs.readFileSync(resolvedPath, "utf-8");
         // Use lex and parse builtins that are already available
         const { lex } = require("./lexer");
@@ -962,7 +967,12 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const fs = require("fs");
       const path = require("path");
       try {
-        const resolvedPath = path.resolve(process.cwd(), filePath);
+        // v11.7.12: 현재 파일 기준 상대경로 지원
+        const currentFile = (interp as any).currentFilePath;
+        const baseDir = currentFile && !path.isAbsolute(filePath)
+          ? path.dirname(currentFile)
+          : process.cwd();
+        const resolvedPath = path.resolve(baseDir, filePath);
 
         // 모듈 캐시 — watch 모드(-w)가 아닐 때 재파싱 방지
         const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
@@ -1117,10 +1127,15 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
           filePath = filePath + ".fl";
         }
 
-        // Resolve path (relative to current working directory or absolute)
+        // Resolve path (relative to current file or current working directory or absolute)
+        // v11.7.12: 현재 파일 기준 상대경로 지원
+        const currentFile = (interp as any).currentFilePath;
+        const baseDir = currentFile && !path.isAbsolute(filePath)
+          ? path.dirname(currentFile)
+          : process.cwd();
         const resolvedPath = path.isAbsolute(filePath)
           ? filePath
-          : path.resolve(process.cwd(), filePath);
+          : path.resolve(baseDir, filePath);
 
         // Phase L1.5: Check module cache first (deterministic semantics)
         if (MODULE_CACHE.has(resolvedPath)) {

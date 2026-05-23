@@ -14137,7 +14137,9 @@ function flExecOpNative(op, vals) {
       const fs21 = require("fs");
       const path19 = require("path");
       try {
-        const resolvedPath = path19.resolve(process.cwd(), filePath);
+        const currentFile = interp.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.resolve(baseDir, filePath);
         const src = fs21.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
@@ -14613,7 +14615,9 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const fs21 = require("fs");
       const path19 = require("path");
       try {
-        const resolvedPath = path19.resolve(process.cwd(), filePath);
+        const currentFile = interp2.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.resolve(baseDir, filePath);
         const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
         if (!MODULE_CACHE_DISABLED && !isWatchMode && !nsPrefix) {
           if (!interp2.__loadCache) interp2.__loadCache = /* @__PURE__ */ new Set();
@@ -14752,7 +14756,9 @@ function evalBuiltin(interp2, op, args3, expr2) {
         if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
           filePath = filePath + ".fl";
         }
-        const resolvedPath = path19.isAbsolute(filePath) ? filePath : path19.resolve(process.cwd(), filePath);
+        const currentFile = interp2.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.isAbsolute(filePath) ? filePath : path19.resolve(baseDir, filePath);
         if (MODULE_CACHE.has(resolvedPath)) {
           return MODULE_CACHE.get(resolvedPath);
         }
