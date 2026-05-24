@@ -135,7 +135,7 @@ run_fixpoint() {
   log_section "L4" "Self-Host Fixpoint"
 
   if [[ -f "${SCRIPT_DIR}/scripts/verify-l4-fixpoint.sh" ]]; then
-    if bash "${SCRIPT_DIR}/scripts/verify-l4-fixpoint.sh" 2>/dev/null | grep -q "Fixed-point"; then
+    if bash "${SCRIPT_DIR}/scripts/verify-l4-fixpoint.sh" 2>/dev/null | grep -q "FIXED-POINT"; then
       log_pass "Fixpoint: gen1.c == gen2.c == gen3.c (SHA 일치)"
     else
       log_fail "Fixpoint: 고정점 미달성"

@@ -1,0 +1,12 @@
+;; tests/e2e/fib.fl — D3: Recursive Function with Recur (TCO)
+;; Golden reference: tail-call optimization via goto
+
+(defn fib-recur [$n $a $b]
+  (if (<= $n 0)
+    $a
+    (recur (- $n 1) $b (+ $a $b))))
+
+(defn fib [$n]
+  (fib-recur $n 0 1))
+
+(println (fib 10))
