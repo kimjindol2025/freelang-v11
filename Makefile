@@ -14,7 +14,7 @@ REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
 
-.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build native-test semantic-test parity-test verify release clean help
+.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build native-test semantic-test parity-test verify verify-core verify-full release clean help
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -33,8 +33,10 @@ help:
 	@echo "  make c-parity                       - JS/C 출력 동등성 검증"
 	@echo "  make c-verify                       - C backend gate: semantic+c-test+c-parity"
 	@echo ""
-	@echo "  [Release]"
-	@echo "  make release                        - verify + c-verify 완료 후 릴리즈"
+	@echo "  [Release & Verification]"
+	@echo "  make verify-core                    - P2-Core gate (필수): semantic+parity+native"
+	@echo "  make verify-full                    - Full verification (선택): verify-core + verify-all"
+	@echo "  make release VERSION=v11.X.X        - Release candidate (requires verify-core PASS)"
 	@echo ""
 	@echo "  [Infrastructure]"
 	@echo "  make verify-all                     - 4개 검증 통합 대시보드"
@@ -151,6 +153,40 @@ verify:
 verify-fast:
 	@bash scripts/ci-verify.sh --fast
 
+# P2-Core: Release candidate gate (필수)
+verify-core:
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║           P2-Core Release Gate (필수)                 ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "[1/3] Running semantic-test (7 C invariants)..."
+	@$(MAKE) semantic-test
+	@echo ""
+	@echo "[2/3] Running parity-test (JS/C output equality)..."
+	@$(MAKE) parity-test
+	@echo ""
+	@echo "[3/3] Running native-test (FL→C→ELF pipeline)..."
+	@$(MAKE) native-test
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║           ✅ verify-core PASS — 배포 가능              ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+
+# Full verification (선택)
+verify-full: verify-core
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║        Full Verification (선택 — verify-all)          ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "[4/4] Running verify-all (build + self-host + bench)..."
+	@$(MAKE) verify-all
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║  ✅ verify-full PASS — 고급 검증 완료 (선택사항)      ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+
 # P2-Core: FL → C → ELF hello.fl
 c-hello:
 	@echo "=== P2-Core: FL → C → ELF Pipeline (hello.fl) ==="
@@ -195,15 +231,29 @@ c-verify:
 	@echo "║     ✅ c-verify PASS — C backend stable                ║"
 	@echo "╚════════════════════════════════════════════════════════╝"
 
+<<<<<<< HEAD
 # Release checkpoint (Phase 1E CI gate + C backend)
 release: verify c-verify
+=======
+# P2-Core: Release gate (requires verify-core PASS)
+release: verify-core
+	@if [ -z "$(VERSION)" ]; then \
+		echo ""; \
+		echo "사용: make release VERSION=v11.X.X"; \
+		echo ""; \
+		exit 1; \
+	fi
+>>>>>>> cb573f7c (build: verify-core, verify-full, release 명령 추가)
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════╗"
-	@echo "║           Release gate PASSED                         ║"
+	@echo "║         Release Candidate: $(VERSION)                   ║"
 	@echo "║                                                        ║"
-	@echo "║  ✅ JS backend (verify PASS)                          ║"
-	@echo "║  ✅ C backend (c-verify PASS)                         ║"
+	@echo "║  ✅ P2-Core gate PASSED                               ║"
+	@echo "║  ✅ semantic-test PASS                                ║"
+	@echo "║  ✅ parity-test PASS                                  ║"
+	@echo "║  ✅ native-test PASS                                  ║"
 	@echo "║                                                        ║"
+<<<<<<< HEAD
 	@echo "║  git tag vX.Y.Z && git push origin --tags             ║"
 	@echo "║                                                        ║"
 	@echo "║  All CI gates verified:                              ║"
@@ -211,4 +261,15 @@ release: verify c-verify
 	@echo "║    L1 Unit:          PASS                            ║"
 	@echo "║    L3 E2E:           PASS                            ║"
 	@echo "║    L4 Fixpoint:      PASS                            ║"
+=======
+	@echo "╚════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "Creating git tag: $(VERSION)"
+	@git tag -a $(VERSION) -m "[Release] P2-Core approved"
+	@echo "Pushing tag to origin..."
+	@git push origin $(VERSION)
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║  ✅ Release $(VERSION) created and pushed               ║"
+>>>>>>> cb573f7c (build: verify-core, verify-full, release 명령 추가)
 	@echo "╚════════════════════════════════════════════════════════╝"
