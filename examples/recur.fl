@@ -1,0 +1,8 @@
+;; recur test: list processing with loop/recur
+(defn process-list [items]
+  (loop [cur items acc []]
+    (if (nil? cur)
+      acc
+      (recur (rest cur) (append acc (first cur))))))
+
+(println (process-list [1 2 3]))
