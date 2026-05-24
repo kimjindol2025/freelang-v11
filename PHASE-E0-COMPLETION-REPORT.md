@@ -9,15 +9,15 @@
 
 ## Executive Summary
 
-Phase E-0 transforms Phase D's technical achievement (L4 fixed-point) into a formally documented, production-ready state. All 4 stabilization subtasks completed:
+Phase E-0 transforms Phase D's technical achievement (L4 fixed-point) into a formally documented, production-ready state. All 5 stabilization subtasks completed:
 
-| Task | Deliverable | Status | Commit |
-|------|-------------|--------|--------|
+| Task | Deliverable | Status | Commits |
+|------|-------------|--------|---------|
 | E-0-1 | Core doc sync (4 files) | ✅ | be3b6f6a, 303aad49, f3c4b774, d9cab035 |
-| E-0-2 | BUILD-SYSTEM.md Native Path | ✅ | d9cab035 (included in E-0-1) |
+| E-0-2 | BUILD-SYSTEM.md Native Path | ✅ | d9cab035 |
 | E-0-3 | LINK-PROFILES.md (new doc) | ✅ | abcadfcd |
 | E-0-4 | verify-l4-fixpoint.sh PATH automation | ✅ | 74dc93a0 |
-| E-0-5 | Blog post + completion report | ✅ | 1c6c375 (kim), this file |
+| E-0-5 | Blog post + completion report | ✅ | 1c6c375 (kim), cdeb1a6e (freelang-v11) |
 
 ---
 
