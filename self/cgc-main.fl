@@ -1496,6 +1496,13 @@
        true)]
     [true true]))))
 
+;; ── Helper for ir-validator ──
+(defn includes-item [$arr $val]
+  (loop [$i 0]
+    (if (>= $i (length $arr)) false
+      (if (= (get $arr $i) $val) true
+        (recur (+ $i 1))))))
+
 (defn ir-validate [$nodes]
   (if (or (null? $nodes) (= (length $nodes) 0))
     true

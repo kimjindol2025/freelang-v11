@@ -666,7 +666,7 @@
 ;; ── TCO: Extract initial values from loop declaration ──
 (defn loop-extract-inits [$items $i $acc]
   (if (>= $i (length $items)) (reverse $acc)
-  (if (= (mod $i 2) 1)
+  (if (= (rem $i 2) 1)
     (loop-extract-inits $items (+ $i 1) (push $acc (get $items $i)))
     (loop-extract-inits $items (+ $i 1) $acc))))
 
