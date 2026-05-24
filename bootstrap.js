@@ -2011,15 +2011,27 @@ ${parenHint}` : parenHint;
       }
       // Phase 11: Parse try-catch-finally expressions
       // (try body (catch [pattern] handler) (finally cleanup))
+      // STRICT MODE: body는 최대 1개 표현식만 허용. 여러 개는 do로 감싸야 함.
       parseTryExpression() {
         const bodyExprs = [];
-        while (this.check("LParen" /* LParen */) || !this.check("RParen" /* RParen */)) {
-          if (this.check("LParen" /* LParen */) && this.pos + 1 < this.tokens.length) {
-            const next = this.tokens[this.pos + 1];
-            if (next.type === "Symbol" /* Symbol */ && (next.value === "catch" || next.value === "finally")) break;
+        if (this.check("LParen" /* LParen */) && this.pos + 1 < this.tokens.length) {
+          const nextToken = this.tokens[this.pos + 1];
+          if (!(nextToken.type === "Symbol" /* Symbol */ && (nextToken.value === "catch" || nextToken.value === "finally"))) {
+            bodyExprs.push(this.parseValue());
+            if (this.check("LParen" /* LParen */) && this.pos + 1 < this.tokens.length) {
+              const afterBodyToken = this.tokens[this.pos + 1];
+              if (!(afterBodyToken.type === "Symbol" /* Symbol */ && (afterBodyToken.value === "catch" || afterBodyToken.value === "finally"))) {
+                const line = afterBodyToken.line || 0;
+                throw new SyntaxError(
+                  `Strict try-catch syntax: after body expression, expected 'catch' or 'finally', got '${afterBodyToken.value}' at line ${line}. For multiple body expressions, wrap with (do ...)`
+                );
+              }
+            } else if (!this.check("RParen" /* RParen */)) {
+              throw new SyntaxError(
+                `Strict try-catch syntax: expected 'catch', 'finally', or ')' after try body. Got unexpected token at line ${this.peek().line || 0}`
+              );
+            }
           }
-          if (this.isAtEnd() || this.check("RParen" /* RParen */)) break;
-          bodyExprs.push(this.parseValue());
         }
         const body = bodyExprs.length === 1 ? bodyExprs[0] : makeSExpr("do", bodyExprs);
         const catchClauses = [];
@@ -2789,1247 +2801,7 @@ var init_errors = __esm({
   }
 });
 
-// src/_stdlib-signatures.json
-var require_stdlib_signatures = __commonJS({
-  "src/_stdlib-signatures.json"(exports2, module2) {
-    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "binary", name: "buf_u32be", params: "n", returns: "string (base64 of 4-byte big-endian uint32)" }, { module: "binary", name: "buf_u8", params: "n", returns: "string (base64 of 1 byte)" }, { module: "binary", name: "buf_str", params: "s", returns: "string (base64 of UTF-8 encoded string)" }, { module: "binary", name: "buf_concat", params: "list", returns: "string (base64 of concatenated byte buffers)" }, { module: "binary", name: "buf_len", params: "b64", returns: "number (byte count)" }, { module: "binary", name: "buf_read_u32be", params: "b64 offset", returns: "number (big-endian uint32 at byte offset)" }, { module: "binary", name: "buf_read_u8", params: "b64 offset", returns: "number (uint8 at byte offset)" }, { module: "binary", name: "buf_read_str", params: "b64 offset len", returns: "string (UTF-8 string from byte range)" }, { module: "binary", name: "buf_crc32", params: "b64", returns: "number (IEEE 802.3 CRC32 of all bytes)" }, { module: "binary", name: "buf_slice", params: "b64 offset len", returns: "string (sub-buffer as base64)" }, { module: "binary", name: "buf_from_bytes", params: "b64", returns: "string (alias: identity, for clarity in code)" }, { module: "binary", name: "buf_f64le", params: "n", returns: "string (base64 of 8-byte float64 little-endian)" }, { module: "binary", name: "buf_read_f64le", params: "b64 offset", returns: "number (float64 LE at byte offset)" }, { module: "binary", name: "buf_u32le", params: "n", returns: "string (base64 of 4-byte uint32 little-endian)" }, { module: "binary", name: "buf_read_u32le", params: "b64 offset", returns: "number (uint32 LE at byte offset)" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "capture-error", name: "capture_error_args", params: "fn args context?", returns: "{ok, result, error?}" }, { module: "capture-error", name: "error_log", params: "", returns: "[{message, name, stack, timestamp, context?}, ...]" }, { module: "capture-error", name: "error_log_clear", params: "", returns: "count cleared" }, { module: "capture-error", name: "error_log_last", params: "n?", returns: "last n errors (default 10)" }, { module: "capture-error", name: "error_count", params: "", returns: "number of captured errors" }, { module: "capture-error", name: "make_error", params: "message name? code?", returns: "plain object" }, { module: "capture-error", name: "error_message", params: "err", returns: "string" }, { module: "capture-error", name: "error_stack", params: "err", returns: "[string]" }, { module: "capture-error", name: "retry", params: "fn attempts delay_ms?", returns: "{ok, result, attempts_used, error?}" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "frequencies", params: "arr", returns: "{value: count}  (count occurrences of each value)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "cron", name: "cron_validate", params: "expr", returns: "bool" }, { module: "cron", name: "cron_match", params: "expr ts_ms", returns: "bool  (\uD574\uB2F9 \uC2DC\uAC01\uC774 cron \uC2DD\uACFC \uC77C\uCE58\uD558\uB294\uC9C0)" }, { module: "cron", name: "cron_next_match", params: "expr from_ms", returns: "ms  (from \uC774\uD6C4 \uB2E4\uC74C \uC77C\uCE58 \uC2DC\uAC01, \uCD5C\uB300 1\uB144)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "csv-parse", params: "text [delimiter]", returns: "[[string]] (quoted fields \uC644\uC804 \uC9C0\uC6D0)" }, { module: "data", name: "csv-parse-map", params: "text [delimiter]", returns: "[{header: val}] (\uD5E4\uB354 \uD3EC\uD568 \uD30C\uC2F1)" }, { module: "data", name: "csv-stringify", params: "rows [delimiter]", returns: "string" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "data", name: "empty?", params: "x", returns: "boolean (\uBC30\uC5F4/\uBB38\uC790\uC5F4/\uAC1D\uCCB4/nil \uBAA8\uB450 \uC9C0\uC6D0)" }, { module: "data", name: "array-empty?", params: "x", returns: "boolean (\uBC30\uC5F4\uB9CC \uD655\uC778)" }, { module: "data", name: "str_replace_in", params: "s old new", returns: "string (replaceAll, \uC778\uC790 \uC21C\uC11C: s \uBA3C\uC800)" }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: '""' }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "file", name: "file_read_or", params: "filePath defaultVal", returns: "string | any (\uD30C\uC77C \uC5C6\uAC70\uB098 \uC624\uB958 \uC2DC \uAE30\uBCF8\uAC12 \uBC18\uD658)" }, { module: "http-macro", name: "http_get_json", params: "url headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_post_json", params: "url body headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_ok?", params: "result", returns: "boolean" }, { module: "http-macro", name: "http_body", params: "result", returns: "parsed body or null" }, { module: "http-macro", name: "http_status", params: "result", returns: "number" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_static", params: "dir [urlPrefix]", returns: 'null  \uC815\uC801 \uD30C\uC77C \uC11C\uBE59 (server-static "public" "/")' }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_csp_nonce", params: "", returns: "string (\uD604\uC7AC \uC694\uCCAD\uC758 CSP nonce \u2014 <script nonce=...> \uB4F1\uC5D0 \uC0AC\uC6A9)" }, { module: "http-server", name: "server_set_cookie", params: "name value opts", returns: "cookie string (HttpOnly+Secure+SameSite \uC790\uB3D9)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_files", params: "req", returns: "array of multipart files" }, { module: "http-server", name: "server_req_fields", params: "req", returns: "map of multipart text fields" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_post_bearer", params: "url body token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_retry_post", params: "url body token retries", returns: '{:status 200 :body "..."}' }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "http", name: "http-post-data", params: "url data", returns: "parsed JSON data | nil  (#12 \uD574\uACB0)" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "optional", name: "require_optional", params: "modName", returns: "true/false (\uC124\uCE58 \uC5EC\uBD80)" }, { module: "optional", name: "optional_call", params: "modName fnPath args", returns: "result or throws" }, { module: "optional", name: "optional_has?", params: "modName", returns: "boolean" }, { module: "optional", name: "optional_version", params: "modName", returns: "string or nil" }, { module: "perf", name: "profile_fn", params: "fn count", returns: "PerfResult" }, { module: "perf", name: "trace_expr", params: "fn label", returns: "TraceResult" }, { module: "perf", name: "perf_stats", params: "", returns: "PerfStats" }, { module: "perf", name: "now_ms", params: "", returns: "number" }, { module: "perf", name: "elapsed_ms", params: "start", returns: "number" }, { module: "perf", name: "bench", params: "fn iterations", returns: "{ms, ops_per_sec}" }, { module: "perf", name: "time_fn", params: "fn args...", returns: "{result, ms}" }, { module: "process", name: "shell_exec_stdout", params: "cmd cwd?", returns: "string | null (stdout\uB9CC \uBC18\uD658, \uC2E4\uD328 \uC2DC null)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "rest-crud", name: "route_info", params: "basePath", returns: "{base, param_name, supported_ops: [...]}" }, { module: "rest-crud", name: "path_param", params: "req paramName", returns: "string or nil" }, { module: "rest-crud", name: "rest_response", params: "status body", returns: "Map" }, { module: "rest-crud", name: "rest_ok", params: "body", returns: "Map (200)" }, { module: "rest-crud", name: "rest_created", params: "body", returns: "Map (201)" }, { module: "rest-crud", name: "rest_not_found", params: "msg", returns: "Map (404)" }, { module: "rest-crud", name: "rest_error", params: "status msg", returns: "Map" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_safe", params: "program args", returns: "string (\uC778\uC790 \uBC30\uC5F4 \uBC29\uC2DD \u2014 \uC0AC\uC6A9\uC790 \uC785\uB825 \uC548\uC804 \uC2E4\uD589, sh -c \uBBF8\uC0AC\uC6A9)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string | null (\uD658\uACBD\uBCC0\uC218 \uC5C6\uC73C\uBA74 null)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "verify", name: "check_parens", params: "code", returns: "VerifyResult" }, { module: "verify", name: "verify_code", params: "code", returns: "{valid, error_count, first_error}" }, { module: "verify", name: "fix_parens", params: "code", returns: "\uC790\uB3D9 \uC218\uC815\uB41C \uCF54\uB4DC (or original if already valid)" }, { module: "verify", name: "count_parens", params: "code", returns: "{open, close, balanced}" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
-  }
-});
-
-// src/debugger.ts
-var debugger_exports = {};
-__export(debugger_exports, {
-  DebugSession: () => DebugSession,
-  getGlobalDebugSession: () => getGlobalDebugSession,
-  handleBreak: () => handleBreak,
-  setGlobalDebugSession: () => setGlobalDebugSession
-});
-function getGlobalDebugSession() {
-  if (!_globalSession) {
-    _globalSession = new DebugSession();
-  }
-  return _globalSession;
-}
-function setGlobalDebugSession(session) {
-  _globalSession = session;
-}
-function handleBreak(session, loc, env) {
-  if (!session.enabled) return;
-  session.onBreak(loc, env);
-}
-var DebugSession, _globalSession;
-var init_debugger = __esm({
-  "src/debugger.ts"() {
-    DebugSession = class _DebugSession {
-      constructor() {
-        /** 중단점 집합 — "file:line" 형태 */
-        this.breakpoints = /* @__PURE__ */ new Set();
-        /** step 모드 — true면 모든 줄에서 break */
-        this.stepMode = false;
-        /** 디버그 모드 활성화 여부 */
-        this.enabled = false;
-        /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
-        this.onBreakCallback = null;
-        /** 소스맵 (선택적) */
-        this.sourceMap = null;
-        /** 브레이크 이벤트 로그 (테스트 검증용) */
-        this.breakLog = [];
-        /** watch 변수 목록 */
-        this.watchList = /* @__PURE__ */ new Set();
-        /** 호출 스택 */
-        this.callStack = [];
-      }
-      static _key(file, line) {
-        return `${file}:${line}`;
-      }
-      /** 중단점 추가 */
-      addBreakpoint(file, line) {
-        this.breakpoints.add(_DebugSession._key(file, line));
-      }
-      /** 중단점 제거 */
-      removeBreakpoint(file, line) {
-        this.breakpoints.delete(_DebugSession._key(file, line));
-      }
-      /** 해당 위치가 중단점인지 확인 */
-      isBreakpoint(file, line) {
-        return this.breakpoints.has(_DebugSession._key(file, line));
-      }
-      /**
-       * 중단점 도달 시 처리:
-       * - 콘솔에 "[BREAK] file:line:col" 출력
-       * - 환경 변수 스냅샷 기록
-       * - watch 변수 값 출력
-       * - 호출 스택 출력
-       * - 콜백 실행
-       */
-      onBreak(loc, env) {
-        if (!this.enabled) return;
-        const event = { loc, env: { ...env } };
-        this.breakLog.push(event);
-        const locStr = `${loc.file}:${loc.line}:${loc.col}`;
-        console.log(`[BREAK] ${locStr}`);
-        if (this.callStack.length > 0) {
-          console.log(`  stack: [${this.callStack.join(" > ")}]`);
-        }
-        if (this.watchList.size > 0) {
-          const watchValues = this.getWatchValues(env);
-          const hasWatched = Object.keys(watchValues).length > 0;
-          if (hasWatched) {
-            console.log(`  \u{1F441} watch:`);
-            for (const [k, v] of Object.entries(watchValues)) {
-              const display = typeof v === "object" ? JSON.stringify(v) : String(v);
-              console.log(`    ${k} = ${display.slice(0, 80)}`);
-            }
-          }
-        }
-        const entries = Object.entries(env).slice(0, 10);
-        if (entries.length > 0) {
-          console.log(`  env:`);
-          for (const [k, v] of entries) {
-            const display = typeof v === "object" ? JSON.stringify(v) : String(v);
-            console.log(`    ${k} = ${display.slice(0, 80)}`);
-          }
-        }
-        if (this.onBreakCallback) {
-          this.onBreakCallback(event);
-        }
-      }
-      /** 중단점 모두 제거 */
-      clearBreakpoints() {
-        this.breakpoints.clear();
-      }
-      /** 중단점 개수 */
-      breakpointCount() {
-        return this.breakpoints.size;
-      }
-      /** watch에 변수 추가 */
-      addWatch(varName) {
-        this.watchList.add(varName);
-      }
-      /** watch에서 변수 제거 */
-      removeWatch(varName) {
-        this.watchList.delete(varName);
-      }
-      /** watch 중인 변수들의 현재값 반환 */
-      getWatchValues(env) {
-        const values = {};
-        for (const varName of this.watchList) {
-          if (varName in env) {
-            values[varName] = env[varName];
-          } else {
-            values[varName] = void 0;
-          }
-        }
-        return values;
-      }
-      /** 호출 스택에 함수명 추가 */
-      pushCall(fnName) {
-        this.callStack.push(fnName);
-      }
-      /** 호출 스택에서 제거 */
-      popCall() {
-        if (this.callStack.length > 0) {
-          this.callStack.pop();
-        }
-      }
-      /** 현재 호출 스택 반환 */
-      getStack() {
-        return [...this.callStack];
-      }
-    };
-    _globalSession = null;
-  }
-});
-
-// src/lint-rules.ts
-var lint_rules_exports = {};
-__export(lint_rules_exports, {
-  ALL_RULES: () => ALL_RULES,
-  arityCheck: () => arityCheck,
-  deadCode: () => deadCode,
-  emptyBody: () => emptyBody,
-  getRuleByName: () => getRuleByName,
-  shadowedVars: () => shadowedVars,
-  undefinedVars: () => undefinedVars,
-  unreachableMatch: () => unreachableMatch,
-  unusedBindings: () => unusedBindings
-});
-function getFuncParams(block) {
-  const paramsField = block.fields.get("params");
-  if (!paramsField) return [];
-  const params = Array.isArray(paramsField) ? paramsField : [paramsField];
-  if (params.length === 1 && params[0].kind === "block" && params[0].type === "Array") {
-    const items = params[0].fields?.get("items");
-    if (!Array.isArray(items)) return [];
-    const result = [];
-    for (const item of items) {
-      if (item.kind === "variable") result.push(item.name);
-      else if (item.kind === "block" && item.type === "Array") {
-        const inner = item.fields?.get("items");
-        if (inner && inner[0]?.kind === "variable") result.push(inner[0].name);
-      }
-    }
-    return result;
-  }
-  return params.filter((p) => p.kind === "variable").map((p) => p.name);
-}
-function getFuncBody(block) {
-  const bodyField = block.fields.get("body");
-  if (!bodyField) return [];
-  return Array.isArray(bodyField) ? bodyField : [bodyField];
-}
-function collectLetBindings(nodes) {
-  const bindings = [];
-  walkAST(nodes, (node) => {
-    if (node.kind === "sexpr" && (node.op === "let" || node.op === "let*" || node.op === "letrec") && node.args.length >= 1) {
-      const bindingsNode = node.args[0];
-      if (bindingsNode.kind === "block" && bindingsNode.type === "Array") {
-        const items = bindingsNode.fields.get("items");
-        if (Array.isArray(items)) {
-          for (const item of items) {
-            if (item.kind === "block" && item.type === "Array") {
-              const subItems = item.fields.get("items");
-              if (Array.isArray(subItems) && subItems[0]?.kind === "variable") {
-                bindings.push({ name: subItems[0].name });
-              }
-            } else if (item.kind === "variable") {
-              bindings.push({ name: item.name });
-            }
-          }
-        }
-      }
-    }
-  });
-  return bindings;
-}
-function getRuleByName(name) {
-  return ALL_RULES.find((r) => r.name === name);
-}
-var undefinedVars, unusedBindings, shadowedVars, arityCheck, emptyBody, unreachableMatch, deadCode, ALL_RULES;
-var init_lint_rules = __esm({
-  "src/lint-rules.ts"() {
-    init_linter();
-    undefinedVars = {
-      name: "undefined-vars",
-      check(ast, ctx) {
-        const diagnostics = [];
-        const globalScope = new Set(ctx.variables);
-        for (const fn of ctx.functions) {
-          globalScope.add("$" + fn);
-          globalScope.add(fn);
-        }
-        for (const node of ast) {
-          if (node.kind === "block" && node.type === "FUNC") {
-            const localScope = new Set(globalScope);
-            for (const p of getFuncParams(node)) {
-              localScope.add(p);
-            }
-            const body = getFuncBody(node);
-            for (const b of collectLetBindings(body)) {
-              localScope.add(b.name);
-            }
-            walkAST(body, (n) => {
-              if (n.kind === "sexpr" && n.op === "define" && n.args[0]?.kind === "variable") {
-                localScope.add(n.args[0].name);
-              }
-            });
-            walkAST(body, (n) => {
-              if (n.kind === "variable") {
-                const name = n.name;
-                const stripped = name.startsWith("$") ? name.slice(1) : name;
-                if (!localScope.has(name) && !localScope.has(stripped) && !localScope.has("$" + stripped)) {
-                  diagnostics.push({
-                    rule: "undefined-vars",
-                    severity: "warn",
-                    message: `\uBBF8\uC815\uC758 \uBCC0\uC218 \uCC38\uC870: ${name} (FUNC ${node.name} \uB0B4)`,
-                    line: node.line
-                  });
-                }
-              }
-            });
-          } else if (node.kind === "sexpr") {
-            walkAST([node], (n) => {
-              if (n.kind === "variable") {
-                const name = n.name;
-                const stripped = name.startsWith("$") ? name.slice(1) : name;
-                if (!globalScope.has(name) && !globalScope.has(stripped) && !globalScope.has("$" + stripped) && !ctx.functions.has(stripped)) {
-                  diagnostics.push({
-                    rule: "undefined-vars",
-                    severity: "warn",
-                    message: `\uBBF8\uC815\uC758 \uBCC0\uC218 \uCC38\uC870: ${name}`
-                  });
-                }
-              }
-            });
-          }
-        }
-        return diagnostics;
-      }
-    };
-    unusedBindings = {
-      name: "unused-bindings",
-      check(ast, ctx) {
-        const diagnostics = [];
-        for (const node of ast) {
-          if (node.kind !== "block" || node.type !== "FUNC") continue;
-          const body = getFuncBody(node);
-          const letBindings = [];
-          walkAST(body, (n) => {
-            if (n.kind === "sexpr" && (n.op === "let" || n.op === "let*") && n.args.length >= 1) {
-              const bindNode = n.args[0];
-              if (bindNode.kind === "block" && bindNode.type === "Array") {
-                const items = bindNode.fields.get("items");
-                if (Array.isArray(items)) {
-                  for (const item of items) {
-                    if (item.kind === "block" && item.type === "Array") {
-                      const subItems = item.fields.get("items");
-                      if (Array.isArray(subItems) && subItems[0]?.kind === "variable") {
-                        letBindings.push({ name: subItems[0].name });
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          });
-          const defineBindings = [];
-          walkAST(body, (n) => {
-            if (n.kind === "sexpr" && n.op === "define" && n.args[0]?.kind === "variable") {
-              defineBindings.push({ name: n.args[0].name });
-            }
-          });
-          const usedVars = /* @__PURE__ */ new Set();
-          walkAST(body, (n) => {
-            if (n.kind === "variable") {
-              usedVars.add(n.name);
-              usedVars.add(n.name.replace(/^\$/, ""));
-            }
-          });
-          for (const binding of letBindings) {
-            const bare = binding.name.replace(/^\$/, "");
-            let useCount = 0;
-            walkAST(body, (n) => {
-              if (n.kind === "variable") {
-                const vbare = n.name.replace(/^\$/, "");
-                if (vbare === bare) useCount++;
-              }
-            });
-            if (useCount < 2) {
-              diagnostics.push({
-                rule: "unused-bindings",
-                severity: "warn",
-                message: `\uBBF8\uC0AC\uC6A9 let \uBC14\uC778\uB529: ${binding.name} (FUNC ${node.name} \uB0B4)`
-              });
-            }
-          }
-          for (const binding of defineBindings) {
-            const bare = binding.name.replace(/^\$/, "");
-            let useCount = 0;
-            walkAST(body, (n) => {
-              if (n.kind === "variable") {
-                const vbare = n.name.replace(/^\$/, "");
-                if (vbare === bare) useCount++;
-              }
-            });
-            if (useCount < 2) {
-              diagnostics.push({
-                rule: "unused-bindings",
-                severity: "warn",
-                message: `\uBBF8\uC0AC\uC6A9 define \uBC14\uC778\uB529: ${binding.name} (FUNC ${node.name} \uB0B4)`
-              });
-            }
-          }
-        }
-        return diagnostics;
-      }
-    };
-    shadowedVars = {
-      name: "shadowed-vars",
-      check(ast, ctx) {
-        const diagnostics = [];
-        for (const node of ast) {
-          if (node.kind !== "block" || node.type !== "FUNC") continue;
-          const paramNames = new Set(getFuncParams(node).map((p) => p.replace(/^\$/, "")));
-          const body = getFuncBody(node);
-          walkAST(body, (n) => {
-            if (n.kind === "sexpr" && (n.op === "let" || n.op === "let*") && n.args.length >= 1) {
-              const bindNode = n.args[0];
-              if (bindNode.kind === "block" && bindNode.type === "Array") {
-                const items = bindNode.fields.get("items");
-                if (Array.isArray(items)) {
-                  for (const item of items) {
-                    if (item.kind === "block" && item.type === "Array") {
-                      const subItems = item.fields.get("items");
-                      if (Array.isArray(subItems) && subItems[0]?.kind === "variable") {
-                        const vname = subItems[0].name.replace(/^\$/, "");
-                        if (paramNames.has(vname)) {
-                          diagnostics.push({
-                            rule: "shadowed-vars",
-                            severity: "warn",
-                            message: `\uBCC0\uC218 \uC100\uB3C4\uC789: $${vname}\uB294 \uD30C\uB77C\uBBF8\uD130\uB97C \uB36E\uC5B4\uC501\uB2C8\uB2E4 (FUNC ${node.name})`
-                          });
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          });
-          for (const param of paramNames) {
-            if (ctx.variables.has("$" + param) || ctx.variables.has(param)) {
-              diagnostics.push({
-                rule: "shadowed-vars",
-                severity: "info",
-                message: `\uD30C\uB77C\uBBF8\uD130 $${param}\uC774 \uC804\uC5ED \uBCC0\uC218\uB97C \uC100\uB3C4\uC789\uD569\uB2C8\uB2E4 (FUNC ${node.name})`
-              });
-            }
-          }
-        }
-        return diagnostics;
-      }
-    };
-    arityCheck = {
-      name: "arity-check",
-      check(ast, ctx) {
-        const diagnostics = [];
-        const variadic = /* @__PURE__ */ new Set([
-          "print",
-          "println",
-          "list",
-          "array",
-          "concat",
-          "str",
-          "+",
-          "-",
-          "*",
-          "/",
-          "and",
-          "or",
-          "do",
-          "begin",
-          "cond",
-          "if",
-          "let",
-          "let*",
-          "define",
-          "match",
-          "fn",
-          "map",
-          "filter",
-          "each",
-          "reduce",
-          "range"
-        ]);
-        function checkCallArgs(sexpr) {
-          if (sexpr.kind !== "sexpr") return;
-          const fnName = sexpr.op;
-          if (variadic.has(fnName)) return;
-          const expectedArity = ctx.funcArity.get(fnName);
-          if (expectedArity === void 0) return;
-          const actualArgs = sexpr.args.length;
-          if (actualArgs !== expectedArity) {
-            diagnostics.push({
-              rule: "arity-check",
-              severity: "warn",
-              message: `\uD568\uC218 ${fnName}: ${expectedArity}\uAC1C \uC778\uC790 \uD544\uC694, ${actualArgs}\uAC1C \uC804\uB2EC\uB428`,
-              line: sexpr.line
-            });
-          }
-          for (const arg of sexpr.args) {
-            if (arg.kind === "sexpr") checkCallArgs(arg);
-          }
-        }
-        walkAST(ast, (node) => {
-          if (node.kind === "sexpr") {
-            checkCallArgs(node);
-          }
-        });
-        return diagnostics;
-      }
-    };
-    emptyBody = {
-      name: "empty-body",
-      check(ast, ctx) {
-        const diagnostics = [];
-        for (const node of ast) {
-          if (node.kind !== "block" || node.type !== "FUNC") continue;
-          const bodyField = node.fields.get("body");
-          let isEmpty = false;
-          if (!bodyField) {
-            isEmpty = true;
-          } else if (Array.isArray(bodyField) && bodyField.length === 0) {
-            isEmpty = true;
-          } else if (!Array.isArray(bodyField) && bodyField.kind === "block" && bodyField.type === "Array") {
-            const items = bodyField.fields?.get("items");
-            if (!items || Array.isArray(items) && items.length === 0) {
-              isEmpty = true;
-            }
-          }
-          if (isEmpty) {
-            diagnostics.push({
-              rule: "empty-body",
-              severity: "warn",
-              message: `\uBE48 \uD568\uC218 \uBC14\uB514: FUNC ${node.name}`,
-              line: node.line
-            });
-          }
-        }
-        return diagnostics;
-      }
-    };
-    unreachableMatch = {
-      name: "unreachable-match",
-      check(ast, ctx) {
-        const diagnostics = [];
-        walkAST(ast, (node) => {
-          if (node.kind === "sexpr" && node.op === "cond") {
-            let elseFound = false;
-            for (let i = 0; i < node.args.length; i++) {
-              const clause = node.args[i];
-              if (elseFound) {
-                diagnostics.push({
-                  rule: "unreachable-match",
-                  severity: "warn",
-                  message: `\uB3C4\uB2EC \uBD88\uAC00 cond \uCF00\uC774\uC2A4: else \uC774\uD6C4 \uCF00\uC774\uC2A4 \uBC1C\uACAC (\uC778\uB371\uC2A4 ${i})`,
-                  line: node.line
-                });
-                break;
-              }
-              if (clause.kind === "block" && clause.type === "Array") {
-                const items = clause.fields.get("items");
-                if (Array.isArray(items) && items.length >= 1) {
-                  const condExpr = items[0];
-                  if (condExpr.kind === "literal" && condExpr.value === true || condExpr.kind === "literal" && condExpr.type === "symbol" && condExpr.value === "else" || condExpr.kind === "sexpr" && condExpr.op === "else") {
-                    elseFound = true;
-                  }
-                }
-              } else if (clause.kind === "sexpr" && clause.op === "else") {
-                elseFound = true;
-              }
-            }
-          }
-          if (node.kind === "pattern-match") {
-            let wildcardFound = false;
-            for (let i = 0; i < node.cases.length; i++) {
-              const c = node.cases[i];
-              if (wildcardFound) {
-                diagnostics.push({
-                  rule: "unreachable-match",
-                  severity: "warn",
-                  message: `\uB3C4\uB2EC \uBD88\uAC00 match \uCF00\uC774\uC2A4: wildcard \uC774\uD6C4 \uCF00\uC774\uC2A4 (\uC778\uB371\uC2A4 ${i})`
-                });
-                break;
-              }
-              if (c.pattern.kind === "wildcard-pattern") {
-                wildcardFound = true;
-              }
-            }
-          }
-        });
-        return diagnostics;
-      }
-    };
-    deadCode = {
-      name: "dead-code",
-      check(ast, ctx) {
-        const diagnostics = [];
-        function isPureValue(node) {
-          if (node.kind === "literal") return true;
-          if (node.kind === "variable") return true;
-          if (node.kind === "keyword") return true;
-          if (node.kind === "sexpr") {
-            const pureFns = /* @__PURE__ */ new Set([
-              "+",
-              "-",
-              "*",
-              "/",
-              "%",
-              "<",
-              ">",
-              "<=",
-              ">=",
-              "=",
-              "!=",
-              "and",
-              "or",
-              "not",
-              "str",
-              "num",
-              "bool",
-              "list",
-              "array",
-              "get",
-              "length",
-              "count",
-              "first",
-              "rest",
-              "keys",
-              "values",
-              "concat",
-              "append",
-              "reverse"
-            ]);
-            if (pureFns.has(node.op)) {
-              return node.args.every((a) => isPureValue(a));
-            }
-          }
-          return false;
-        }
-        walkAST(ast, (node) => {
-          if (node.kind === "sexpr" && node.op === "do") {
-            const stmts = node.args;
-            for (let i = 0; i < stmts.length - 1; i++) {
-              if (isPureValue(stmts[i])) {
-                diagnostics.push({
-                  rule: "dead-code",
-                  severity: "warn",
-                  message: `Dead code: do \uBE14\uB85D\uC5D0\uC11C \uACB0\uACFC\uAC00 \uC0AC\uC6A9\uB418\uC9C0 \uC54A\uB294 \uC21C\uC218 \uD45C\uD604\uC2DD (\uC778\uB371\uC2A4 ${i})`,
-                  line: node.line
-                });
-              }
-            }
-          }
-        });
-        return diagnostics;
-      }
-    };
-    ALL_RULES = [
-      undefinedVars,
-      unusedBindings,
-      shadowedVars,
-      arityCheck,
-      emptyBody,
-      unreachableMatch,
-      deadCode
-    ];
-  }
-});
-
-// src/linter.ts
-function walkAST(nodes, cb, parent) {
-  for (const node of nodes) {
-    cb(node, parent);
-    if (node.kind === "block") {
-      for (const [, val] of node.fields) {
-        const children = Array.isArray(val) ? val : [val];
-        walkAST(children, cb, node);
-      }
-    } else if (node.kind === "sexpr") {
-      cb(node, parent);
-      walkAST(node.args, cb, node);
-    } else if (node.kind === "pattern-match") {
-      walkAST([node.value], cb, node);
-      for (const c of node.cases) {
-        walkAST([c.body], cb, node);
-        if (c.guard) walkAST([c.guard], cb, node);
-      }
-      if (node.defaultCase) walkAST([node.defaultCase], cb, node);
-    } else if (node.kind === "try-block") {
-      walkAST([node.body], cb, node);
-      if (node.catchClauses) {
-        for (const clause of node.catchClauses) {
-          walkAST([clause.handler], cb, node);
-        }
-      }
-      if (node.finallyBlock) walkAST([node.finallyBlock], cb, node);
-    } else if (node.kind === "await") {
-      walkAST([node.argument], cb, node);
-    } else if (node.kind === "throw") {
-      walkAST([node.argument], cb, node);
-    } else if (node.kind === "async-function") {
-      walkAST([node.body], cb, node);
-    }
-  }
-}
-function buildLintContext(ast, source) {
-  const functions = /* @__PURE__ */ new Set();
-  const variables = /* @__PURE__ */ new Set();
-  const funcArity = /* @__PURE__ */ new Map();
-  const builtins = [
-    "print",
-    "println",
-    "+",
-    "-",
-    "*",
-    "/",
-    "%",
-    "<",
-    ">",
-    "<=",
-    ">=",
-    "=",
-    "!=",
-    "and",
-    "or",
-    "not",
-    "if",
-    "cond",
-    "let",
-    "define",
-    "do",
-    "begin",
-    "list",
-    "array",
-    "map",
-    "get",
-    "set",
-    "push",
-    "pop",
-    "length",
-    "count",
-    "filter",
-    "reduce",
-    "each",
-    "range",
-    "concat",
-    "str",
-    "num",
-    "bool",
-    "first",
-    "rest",
-    "cons",
-    "nil?",
-    "empty?",
-    "null?",
-    "type-of",
-    "string-length",
-    "substring",
-    "string-split",
-    "string-join",
-    "string-contains",
-    "keys",
-    "values",
-    "entries",
-    "merge",
-    "json-parse",
-    "json-stringify",
-    "throw",
-    "try",
-    "catch",
-    "await",
-    "async",
-    "match",
-    "fn",
-    "let*",
-    "append",
-    "reverse",
-    "sort",
-    "zip",
-    "flat-map",
-    "max",
-    "min",
-    "abs",
-    "floor",
-    "ceil",
-    "round",
-    "sqrt",
-    "pow",
-    "now",
-    "date-format",
-    "sleep",
-    "http-get",
-    "http-post",
-    // Phase 63+ 추가 내장
-    "defstruct",
-    "defprotocol",
-    "impl",
-    "->",
-    "push!",
-    "map-get",
-    "map-set",
-    "defmacro",
-    "when",
-    "unless",
-    "iterate",
-    "take",
-    "filter-lazy",
-    "parallel",
-    "channel",
-    "send!",
-    "receive!",
-    "assoc",
-    "dissoc",
-    "update"
-  ];
-  for (const b of builtins) {
-    functions.add(b);
-  }
-  const knownArities = {
-    "not": 1,
-    "nil?": 1,
-    "empty?": 1,
-    "null?": 1,
-    "type-of": 1,
-    "length": 1,
-    "count": 1,
-    "first": 1,
-    "rest": 1,
-    "reverse": 1,
-    "keys": 1,
-    "values": 1,
-    "json-parse": 1,
-    "json-stringify": 1,
-    "str": 1,
-    "num": 1,
-    "bool": 1,
-    "abs": 1,
-    "floor": 1,
-    "ceil": 1,
-    "round": 1,
-    "sqrt": 1,
-    "print": 1,
-    "println": 1,
-    "+": 2,
-    "-": 2,
-    "*": 2,
-    "/": 2,
-    "%": 2,
-    "<": 2,
-    ">": 2,
-    "<=": 2,
-    ">=": 2,
-    "=": 2,
-    "!=": 2,
-    "and": 2,
-    "or": 2,
-    "get": 2,
-    "push": 2,
-    "cons": 2,
-    "concat": 2,
-    "pow": 2,
-    "merge": 2,
-    "zip": 2,
-    "append": 2,
-    "assoc": 3,
-    "dissoc": 2,
-    "filter": 2,
-    "each": 2,
-    "map": 2,
-    "sort": 2,
-    "flat-map": 2,
-    "reduce": 3,
-    "range": 2,
-    "substring": 3
-  };
-  for (const [fn, arity] of Object.entries(knownArities)) {
-    funcArity.set(fn, arity);
-  }
-  for (const node of ast) {
-    if (node.kind === "block" && node.type === "FUNC") {
-      functions.add(node.name);
-      const paramsField = node.fields.get("params");
-      if (paramsField) {
-        const params = Array.isArray(paramsField) ? paramsField : [paramsField];
-        if (params.length === 1 && params[0].kind === "block" && params[0].type === "Array") {
-          const items = params[0].fields?.get("items");
-          if (Array.isArray(items)) {
-            funcArity.set(node.name, items.length);
-          } else {
-            funcArity.set(node.name, 0);
-          }
-        } else {
-          const varParams = params.filter((p) => p.kind === "variable");
-          funcArity.set(node.name, varParams.length);
-        }
-      } else {
-        funcArity.set(node.name, 0);
-      }
-    }
-  }
-  for (const node of ast) {
-    if (node.kind === "sexpr" && node.op === "define" && node.args.length >= 1) {
-      const nameNode = node.args[0];
-      if (nameNode.kind === "variable") {
-        variables.add(nameNode.name);
-      }
-    }
-  }
-  return { source, functions, variables, funcArity };
-}
-function createDefaultLinter() {
-  const { ALL_RULES: ALL_RULES2 } = (init_lint_rules(), __toCommonJS(lint_rules_exports));
-  const linter = new FLLinter();
-  for (const rule of ALL_RULES2) {
-    linter.addRule(rule);
-  }
-  return linter;
-}
-var FLLinter;
-var init_linter = __esm({
-  "src/linter.ts"() {
-    init_lexer();
-    init_parser();
-    FLLinter = class {
-      constructor() {
-        this.rules = [];
-      }
-      addRule(rule) {
-        this.rules.push(rule);
-        return this;
-      }
-      lint(src) {
-        let tokens;
-        let ast;
-        try {
-          tokens = lex(src);
-          ast = parse(tokens);
-        } catch (e) {
-          return [{
-            rule: "parse-error",
-            severity: "error",
-            message: `Parse error: ${e.message}`
-          }];
-        }
-        const ctx = buildLintContext(ast, src);
-        const diagnostics = [];
-        for (const rule of this.rules) {
-          try {
-            const diags = rule.check(ast, ctx);
-            diagnostics.push(...diags);
-          } catch (e) {
-          }
-        }
-        return diagnostics;
-      }
-      /**
-       * severity 필터링
-       */
-      lintFiltered(src, severity) {
-        return this.lint(src).filter((d) => d.severity === severity);
-      }
-    };
-  }
-});
-
-// src/cli.ts
-var fs21 = __toESM(require("fs"));
-var path18 = __toESM(require("path"));
-var readline = __toESM(require("readline"));
-init_lexer();
-init_parser();
-
-// src/interpreter.ts
-var fs15 = __toESM(require("fs"));
-var path14 = __toESM(require("path"));
-init_lexer();
-init_parser();
-init_ast();
-
-// src/type-checker.ts
-var BUILTIN_TYPES = /* @__PURE__ */ new Map([
-  // Arithmetic
-  ["+", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
-  ["-", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
-  ["*", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
-  ["/", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
-  // Comparison
-  ["=", { params: [{ kind: "type", name: "any" }, { kind: "type", name: "any" }], returnType: { kind: "type", name: "bool" } }],
-  ["<", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "bool" } }],
-  [">", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "bool" } }],
-  // String
-  ["concat", { params: [{ kind: "type", name: "string" }, { kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
-  ["upper", { params: [{ kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
-  ["lower", { params: [{ kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
-  // Collection
-  ["list", { params: [{ kind: "type", name: "any" }], returnType: { kind: "type", name: "array<any>" } }]
-]);
-var TypeChecker = class {
-  constructor() {
-    this.functionTypes = /* @__PURE__ */ new Map();
-    this.variableTypes = /* @__PURE__ */ new Map();
-  }
-  /**
-   * Register a function type (from FUNC block with type annotations)
-   */
-  registerFunction(funcName, paramTypes, returnType) {
-    this.functionTypes.set(funcName, { params: paramTypes, returnType });
-  }
-  /**
-   * Register a variable type
-   */
-  registerVariable(varName, type) {
-    this.variableTypes.set(varName, type);
-  }
-  /**
-   * Check function call: verify argument types match parameter types
-   */
-  checkFunctionCall(funcName, argTypes) {
-    const builtinType = BUILTIN_TYPES.get(funcName);
-    if (builtinType) {
-      if (argTypes.length !== builtinType.params.length) {
-        return {
-          valid: false,
-          message: `Function '${funcName}' expects ${builtinType.params.length} arguments, got ${argTypes.length}`
-        };
-      }
-      return { valid: true, message: "OK", inferredType: builtinType.returnType };
-    }
-    const userFuncType = this.functionTypes.get(funcName);
-    if (userFuncType) {
-      if (argTypes.length !== userFuncType.params.length) {
-        return {
-          valid: false,
-          message: `Function '${funcName}' expects ${userFuncType.params.length} arguments, got ${argTypes.length}`
-        };
-      }
-      for (let i = 0; i < argTypes.length; i++) {
-        if (!this.isCompatible(argTypes[i], userFuncType.params[i])) {
-          return {
-            valid: false,
-            message: `Argument ${i + 1} to '${funcName}': expected ${userFuncType.params[i].name}, got ${argTypes[i].name}`
-          };
-        }
-      }
-      return { valid: true, message: "OK", inferredType: userFuncType.returnType };
-    }
-    return { valid: false, message: `Unknown function: ${funcName}` };
-  }
-  /**
-   * Check variable assignment
-   */
-  checkAssignment(varName, valueType, declaredType) {
-    if (declaredType && !this.isCompatible(valueType, declaredType)) {
-      return {
-        valid: false,
-        message: `Variable '${varName}' declared as ${declaredType.name}, but assigned ${valueType.name}`
-      };
-    }
-    return { valid: true, message: "OK" };
-  }
-  /**
-   * Infer type from AST node
-   */
-  inferType(node) {
-    const literal = node;
-    const variable = node;
-    const sexpr = node;
-    if (literal.kind === "literal") {
-      switch (literal.type) {
-        case "number":
-          return { kind: "type", name: "int" };
-        case "string":
-          return { kind: "type", name: "string" };
-        case "boolean":
-          return { kind: "type", name: "bool" };
-        default:
-          return { kind: "type", name: "any" };
-      }
-    }
-    if (variable.kind === "variable") {
-      const varType = this.variableTypes.get(variable.name);
-      return varType || { kind: "type", name: "any" };
-    }
-    if (sexpr.kind === "sexpr") {
-      const funcType = BUILTIN_TYPES.get(sexpr.op) || this.functionTypes.get(sexpr.op);
-      if (funcType) {
-        return funcType.returnType;
-      }
-    }
-    return { kind: "type", name: "any" };
-  }
-  /**
-   * Register a generic function type (Phase 4)
-   */
-  registerGenericFunction(funcName, generics, paramTypes, returnType) {
-    this.functionTypes.set(funcName, {
-      params: paramTypes,
-      returnType,
-      generics,
-      isGeneric: generics.length > 0
-    });
-  }
-  /**
-   * Instantiate generic function with concrete types (Phase 4)
-   * E.g., identity[T] with T=int becomes identity with param type int
-   */
-  instantiateGenericFunction(funcName, typeArgs) {
-    const funcType = this.functionTypes.get(funcName);
-    if (!funcType || !funcType.isGeneric) {
-      return {
-        valid: false,
-        message: `Function '${funcName}' is not generic`
-      };
-    }
-    if (!funcType.generics || typeArgs.length !== funcType.generics.length) {
-      return {
-        valid: false,
-        message: `Function '${funcName}' expects ${funcType.generics?.length || 0} type arguments, got ${typeArgs.length}`
-      };
-    }
-    const substitution = /* @__PURE__ */ new Map();
-    for (let i = 0; i < funcType.generics.length; i++) {
-      substitution.set(funcType.generics[i], typeArgs[i]);
-    }
-    const instantiatedParams = funcType.params.map((param) => this.substituteType(param, substitution));
-    const instantiatedReturn = this.substituteType(funcType.returnType, substitution);
-    return {
-      valid: true,
-      message: "OK",
-      inferredType: instantiatedReturn
-    };
-  }
-  /**
-   * Substitute type variables with concrete types (Phase 4)
-   */
-  substituteType(type, substitution) {
-    if (type.isTypeVariable && substitution.has(type.name)) {
-      return substitution.get(type.name) || type;
-    }
-    if (type.generic) {
-      return {
-        ...type,
-        generic: this.substituteType(type.generic, substitution)
-      };
-    }
-    if (type.union) {
-      return {
-        ...type,
-        union: type.union.map((t) => this.substituteType(t, substitution))
-      };
-    }
-    return type;
-  }
-  /**
-   * Check type compatibility
-   */
-  isCompatible(actualType, expectedType) {
-    if (actualType.name === expectedType.name) return true;
-    if (expectedType.name === "any" || actualType.name === "any") return true;
-    if (actualType.name === "int" && expectedType.name === "string") return true;
-    if (actualType.name === "string" && expectedType.name === "int") return true;
-    return false;
-  }
-};
-function createTypeChecker() {
-  return new TypeChecker();
-}
-
-// src/type-system.ts
-function inferType(value) {
-  if (value === null || value === void 0) return "null";
-  if (typeof value === "boolean") return "bool";
-  if (typeof value === "number") return Number.isInteger(value) ? "int" : "float";
-  if (typeof value === "string") return "string";
-  if (Array.isArray(value)) return "array";
-  if (typeof value === "function") return "fn";
-  if (typeof value === "object") return "map";
-  return "any";
-}
-function isCompatible(actual, expected) {
-  if (expected === "any") return true;
-  if (actual === "any") return true;
-  if (actual === expected) return true;
-  if (expected === "number" && (actual === "int" || actual === "float")) return true;
-  if (expected === "float" && actual === "int") return true;
-  return false;
-}
-function toFlType(typeName) {
-  switch (typeName) {
-    case "int":
-      return "int";
-    case "float":
-      return "float";
-    case "number":
-      return "number";
-    case "string":
-      return "string";
-    case "bool":
-      return "bool";
-    case "boolean":
-      return "bool";
-    case "array":
-    case "array<any>":
-      return "array";
-    case "map":
-      return "map";
-    case "fn":
-    case "function":
-      return "fn";
-    case "null":
-      return "null";
-    default:
-      return "any";
-  }
-}
-var RuntimeTypeChecker = class {
-  constructor(strict = false) {
-    // 함수 이름 → 타입 시그니처 (타입 어노테이션이 있는 함수만 등록)
-    this.funcTypes = /* @__PURE__ */ new Map();
-    this.strict = strict;
-  }
-  get isStrict() {
-    return this.strict;
-  }
-  /**
-   * 함수 타입 시그니처 등록
-   * paramTypeNames: TypeAnnotation.name 문자열 배열 (기존 type-checker와 호환)
-   */
-  registerFunc(name, paramTypeNames, retTypeName) {
-    this.funcTypes.set(name, {
-      params: paramTypeNames.map(toFlType),
-      ret: toFlType(retTypeName)
-    });
-  }
-  /**
-   * 함수 호출 시 인수 타입 검증
-   * strict 모드가 아니거나, 시그니처가 미등록이면 아무것도 하지 않음
-   */
-  checkCall(name, argValues) {
-    if (!this.strict) return;
-    const sig = this.funcTypes.get(name);
-    if (!sig) return;
-    const checkCount = Math.min(sig.params.length, argValues.length);
-    for (let i = 0; i < checkCount; i++) {
-      const expected = sig.params[i];
-      if (expected === "any") continue;
-      const actual = inferType(argValues[i]);
-      if (!isCompatible(actual, expected)) {
-        const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
-        throw new FLRuntimeError2(
-          ErrorCodes2.TYPE_MISMATCH,
-          `'${name}': arg ${i + 1} expected ${expected}, got ${actual}`,
-          { fn: name, arg: i, expected, got: actual, value: argValues[i] }
-        );
-      }
-    }
-  }
-  /**
-   * 함수 반환값 타입 검증 (optional — strict 모드)
-   */
-  checkReturn(name, retValue) {
-    if (!this.strict) return;
-    const sig = this.funcTypes.get(name);
-    if (!sig || sig.ret === "any") return;
-    const actual = inferType(retValue);
-    if (!isCompatible(actual, sig.ret)) {
-      const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
-      throw new FLRuntimeError2(
-        ErrorCodes2.TYPE_MISMATCH,
-        `'${name}' return: expected ${sig.ret}, got ${actual}`,
-        { fn: name, expected: sig.ret, got: actual, value: retValue }
-      );
-    }
-  }
-  /**
-   * 등록된 함수 시그니처 조회 (테스트용)
-   */
-  getSignature(name) {
-    return this.funcTypes.get(name);
-  }
-  /**
-   * 등록된 함수 목록 (테스트용)
-   */
-  registeredFuncs() {
-    return Array.from(this.funcTypes.keys());
-  }
-};
-
-// src/interpreter.ts
-init_errors();
-
 // src/error-formatter.ts
-init_errors();
 function levenshtein(a, b) {
   const m = a.length;
   const n = b.length;
@@ -4048,171 +2820,6 @@ function levenshtein(a, b) {
   }
   return dp[m][n];
 }
-var KNOWN_ALIASES = {
-  // 환경변수
-  "env": { correct: "shell_env", usage: '(shell_env "KEY")' },
-  "get_env": { correct: "shell_env", usage: '(shell_env "KEY")' },
-  "get-env": { correct: "shell_env", usage: '(shell_env "KEY")' },
-  "get_env_or": { correct: "shell_env", usage: '(or (shell_env "KEY") "default")' },
-  // 맵 조작
-  "obj_merge": { correct: "assoc", usage: '(assoc map "key" value)' },
-  "obj-merge": { correct: "assoc", usage: '(assoc map "key" value)' },
-  "merge": { correct: "assoc", usage: '(assoc map "key" value)' },
-  "obj_omit": { correct: "dissoc", usage: '(dissoc map "key")' },
-  "obj-omit": { correct: "dissoc", usage: '(dissoc map "key")' },
-  "obj_pick": { correct: "get", usage: '(get map "key")' },
-  "dict": { correct: "map-set", usage: '(map-set {} "key" value)' },
-  // 문자열
-  "str_length": { correct: "length", usage: '(length "hello")' },
-  "string_length": { correct: "length", usage: '(length "hello")' },
-  "str_concat": { correct: "str", usage: '(str "a" "b" "c")' },
-  "str_to_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
-  "parse_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
-  "int_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
-  "to_string": { correct: "str", usage: "(str value)" },
-  "to_str": { correct: "str", usage: "(str value)" },
-  // 타입 체크
-  "is_null": { correct: "nil?", usage: "(nil? value)" },
-  "is_nil": { correct: "nil?", usage: "(nil? value)" },
-  "null?": { correct: "nil?", usage: "(nil? value)" },
-  "is_array": { correct: "array?", usage: "(array? value)" },
-  "is_string": { correct: "string?", usage: "(string? value)" },
-  "is_number": { correct: "number?", usage: "(number? value)" },
-  // 배열
-  "push": { correct: "append", usage: "(append arr item)" },
-  "list_append": { correct: "append", usage: "(append arr item)" },
-  "array_push": { correct: "append", usage: "(append arr item)" },
-  "array_length": { correct: "length", usage: "(length arr)" },
-  "first": { correct: "get", usage: "(get arr 0)" },
-  "head": { correct: "get", usage: "(get arr 0)" },
-  // 출력
-  "console_log": { correct: "println", usage: "(println value)" },
-  "console.log": { correct: "println", usage: "(println value)" },
-  "print": { correct: "println", usage: "(println value)" },
-  "log": { correct: "println", usage: "(println value)" },
-  // DB
-  "mariadb_all": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
-  "db_query": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
-  // mariadb-* kebab-case — (load "stdlib/db.fl") 또는 DB 맵 정의 필요
-  "mariadb-query": { correct: "mariadb_query", usage: '\uBA3C\uC800 DB \uB9F5 \uC815\uC758: (define DB {:host "localhost" :user "u" :password "p" :database "d"})\n  \uADF8 \uD6C4: (mariadb_query DB "SELECT ..." [params])' },
-  "mariadb-exec": { correct: "mariadb_exec", usage: '(mariadb_exec DB "INSERT INTO ..." [params])' },
-  "mariadb-one": { correct: "mariadb_one", usage: '(mariadb_one DB "SELECT ... LIMIT 1" [params])  ;; \u2192 \uB2E8\uC77C row \uBC18\uD658' },
-  // db-query / db-exec 는 universal wrapper로 구현됨 — 힌트 제거
-  // HTTP
-  "http_post": { correct: "http_get", usage: '(http_get url {:method "POST" :body data})' },
-  "fetch": { correct: "http_get", usage: "(http_get url)" },
-  // 서버
-  "server_listen": { correct: "server_start", usage: "(server_start 40000)" },
-  "listen": { correct: "server_start", usage: "(server_start 40000)" },
-  // 에러
-  "raise": { correct: "error", usage: '(error "\uBA54\uC2DC\uC9C0")' },
-  "panic": { correct: "error", usage: '(error "\uBA54\uC2DC\uC9C0")' },
-  // 문자열 변환 (#str-to-int 오용)
-  "str-to-int": { correct: "str-to-num", usage: '(str-to-num "42")' },
-  "str_to_int": { correct: "str-to-num", usage: '(str-to-num "42")' },
-  "parse-int": { correct: "str-to-num", usage: '(str-to-num "42")' },
-  "parseInt": { correct: "str-to-num", usage: '(str-to-num "42")' },
-  // 맵 키 목록
-  "json_keys": { correct: "keys", usage: "(keys map)" },
-  "json-keys": { correct: "keys", usage: "(keys map)" },
-  "map-keys": { correct: "keys", usage: "(keys map)" },
-  "object-keys": { correct: "keys", usage: "(keys map)" },
-  // HTTP 데이터 추출 (#11/#12/#13)
-  "http-simple-get": { correct: "http-get-data", usage: "(http-get-data url)" },
-  "http-fetch": { correct: "http-get-data", usage: "(http-get-data url)" },
-  // 맵 병합 (#39)
-  "obj-merge": { correct: "merge", usage: "(merge map1 map2)" },
-  "obj_merge": { correct: "merge", usage: "(merge map1 map2)" },
-  // 배열 길이 (#42)
-  "size": { correct: "length", usage: "(length arr)" },
-  // 문자열 분리 (#43)
-  "split": { correct: "str-split", usage: '(str-split "a,b" ",")' },
-  "str_split": { correct: "str-split", usage: '(str-split "a,b" ",")' },
-  // JSON 파싱 (#44)
-  "JSON.parse": { correct: "json-parse", usage: '(json-parse "{}")' },
-  "parseJSON": { correct: "json-parse", usage: '(json-parse "{}")' },
-  "parse_json": { correct: "json-parse", usage: '(json-parse "{}")' },
-  // JSON 직렬화 (#45)
-  "JSON.stringify": { correct: "json-stringify", usage: "(json-stringify {})" },
-  "toJSON": { correct: "json-stringify", usage: "(json-stringify {})" },
-  "stringify": { correct: "json-stringify", usage: "(json-stringify {})" },
-  // 숫자→문자열 (#57)
-  "num-to-str": { correct: "num_to_str", usage: "(num_to_str 42)" },
-  "numToStr": { correct: "num_to_str", usage: "(num_to_str 42)" },
-  "number_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
-  // 문자열 공백 제거 (#78)
-  "trim": { correct: "str-trim", usage: '(str-trim "  hello  ")' },
-  "str_trim": { correct: "str-trim", usage: '(str-trim "  hello  ")' },
-  // 문자열 시작 여부 (#79)
-  "starts-with?": { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
-  "startsWith": { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
-  // 문자열 포함 여부 (#80)
-  "includes": { correct: "str-contains", usage: '(str-contains "hello" "ell")' },
-  "str_includes": { correct: "str-contains", usage: '(str-contains "hello" "ell")' },
-  // 대문자 변환 (#81)
-  "to-upper": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
-  "toUpperCase": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
-  "to_upper": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
-  // 문자열 변환 (#82)
-  "toString": { correct: "str", usage: "(str value)" },
-  // 시간 (#37)
-  "Date.now": { correct: "now-ms", usage: "(now-ms)" },
-  "Date.now()": { correct: "now-ms", usage: "(now-ms)" },
-  "now_ms": { correct: "now-ms", usage: "(now-ms)" },
-  "currentTimeMs": { correct: "now-ms", usage: "(now-ms)" },
-  // 수학 (#90) — num-round 등 잘못된 함수명
-  "num-round": { correct: "round", usage: "(round 3.7)  ;; \u2192 4 | \uC18C\uC218\uC810 \uC774\uD558 \uC81C\uAC70\uB294 (int 3.7) \u2192 3" },
-  "num_round": { correct: "round", usage: "(round 3.7)" },
-  "Math.round": { correct: "round", usage: "(round 3.7)" },
-  "Math.floor": { correct: "floor", usage: "(floor 3.7)  ;; \u2192 3" },
-  "Math.ceil": { correct: "ceil", usage: "(ceil 3.2)   ;; \u2192 4" },
-  "Math.abs": { correct: "abs", usage: "(abs -5)     ;; \u2192 5" },
-  "Math.max": { correct: "max", usage: "(max 3 7)    ;; \u2192 7" },
-  "Math.min": { correct: "min", usage: "(min 3 7)    ;; \u2192 3" },
-  "Math.pow": { correct: "pow", usage: "(pow 2 10)   ;; \u2192 1024" },
-  "Math.sqrt": { correct: "sqrt", usage: "(sqrt 16)    ;; \u2192 4" },
-  "truncate": { correct: "int", usage: "(int 3.9)    ;; \u2192 3 (\uC18C\uC218\uC810 \uBC84\uB9BC)" },
-  "trunc": { correct: "int", usage: "(int 3.9)    ;; \u2192 3" },
-  "num-abs": { correct: "abs", usage: "(abs -5)" },
-  "num-floor": { correct: "floor", usage: "(floor 3.7)" },
-  "num-ceil": { correct: "ceil", usage: "(ceil 3.2)" },
-  // 정규식 — regex-test 12회 오용 (fl errors TOP 1)
-  "regex-test": { correct: "re-test", usage: '(re-test "^hello" "hello world")  ;; \u2192 true' },
-  "regex_test": { correct: "re-test", usage: '(re-test "\uD328\uD134" \uBB38\uC790\uC5F4)' },
-  "regexp-test": { correct: "re-test", usage: '(re-test "\uD328\uD134" \uBB38\uC790\uC5F4)' },
-  "re-match": { correct: "re-test", usage: '(re-test "\uD328\uD134" \uBB38\uC790\uC5F4)  ;; boolean \uBC18\uD658' },
-  // #47: req["params"]["id"] 대신 server_req_param 사용
-  "req_param": { correct: "server_req_param", usage: '(server_req_param req "id")' },
-  "req-param": { correct: "server_req_param", usage: '(server_req_param req "id")' },
-  "req_query": { correct: "server_req_query", usage: '(server_req_query req "key")' },
-  "req-query": { correct: "server_req_query", usage: '(server_req_query req "key")' },
-  "req_body": { correct: "server_req_body", usage: "(server_req_body req)" },
-  "req-body": { correct: "server_req_body", usage: "(server_req_body req)" },
-  // #67: mariadb_connect positional args
-  "mariadb_connect": { correct: "mariadb_connect", usage: '(mariadb_connect {:host "h" :user "u" :password "p" :database "d"}) \uB610\uB294 (mariadb_connect "host" "user" "pass" "db")' },
-  // 추가 HTTP 힌트
-  "http-post-json": { correct: "http_post", usage: "(http_post url (json-stringify body))" },
-  // #47: req params 접근 힌트
-  "req-params": { correct: "server_req_param", usage: '(server_req_param req "id") \u2014 URL :id \uD30C\uB77C\uBBF8\uD130 \uC811\uADFC' },
-  "req-param": { correct: "server_req_param", usage: '(server_req_param req "id")' },
-  // #51: (get req "params") → server_req_param 안내
-  "params": { correct: "server_req_param", usage: '(server_req_param req "id") \u2014 URL :id \uD30C\uB77C\uBBF8\uD130. (get (get req "params") "id") \uB300\uC2E0 \uC0AC\uC6A9' },
-  // #48: body 자동 파싱 — server_req_body 또는 get req "body" 사용 안내
-  "req_body_raw": { correct: "server_req_body", usage: "(server_req_body req) \u2014 body \uBB38\uC790\uC5F4 \uBC18\uD658. JSON\uC774\uBA74 (json-parse (server_req_body req)) \uC0AC\uC6A9" },
-  "body_parse": { correct: "get", usage: '(get req "body") \u2014 Content-Type: application/json \uC694\uCCAD\uC740 \uC790\uB3D9 \uD30C\uC2F1. \uADF8 \uC678\uB294 (json-parse (server_req_body req)) \uD544\uC694' },
-  // #52: express.fl + server_* 혼용 금지
-  "app-get": { correct: "server-get", usage: '(load "src/express.fl") \uC5C6\uC774 server-get \uC0AC\uC6A9. express.fl \uB85C\uB4DC \uD6C4\uC5D0\uB294 app-* \uACC4\uC5F4\uB9CC \uC0AC\uC6A9\uD558\uC138\uC694.' },
-  "app-post": { correct: "server-post", usage: '(load "src/express.fl") \uC5C6\uC774 server-post \uC0AC\uC6A9. \uD63C\uC6A9 \uAE08\uC9C0: \uD55C \uD504\uB85C\uC81D\uD2B8\uC5D0\uC11C server_* / app-* \uC911 \uD558\uB098\uB9CC \uC120\uD0DD.' },
-  "app-listen": { correct: "server-start", usage: '(load "src/express.fl") \uC5C6\uC774 app-listen \uC0AC\uC6A9. express.fl \uB85C\uB4DC \uD6C4\uC5D0\uB9CC app-listen \uC0AC\uC6A9 \uAC00\uB2A5.' },
-  "res-json": { correct: "server-json", usage: '(load "src/express.fl") \uC5C6\uC774 res-json \uC0AC\uC6A9. express.fl \uB85C\uB4DC \uD6C4\uC5D0\uB9CC res-* \uACC4\uC5F4 \uC0AC\uC6A9 \uAC00\uB2A5.' },
-  "res-status": { correct: "server-status", usage: '(load "src/express.fl") \uC5C6\uC774 res-status \uC0AC\uC6A9. \uD63C\uC6A9 \uAE08\uC9C0.' },
-  // #53/#54: WebSocket 힌트
-  "ws_handler": { correct: "ws-handler", usage: "(ws-handler (fn [conn msg] ...)) \u2014 conn: \uC5F0\uACB0 \uAC1D\uCCB4, msg: \uC218\uC2E0 \uBA54\uC2DC\uC9C0" },
-  "on-close": { correct: "ws-on-close", usage: "(ws-on-close conn (fn [] ...)) \u2014 \uC5F0\uACB0 \uC885\uB8CC \uD578\uB4E4\uB7EC" },
-  // #99: server_start 블로킹 힌트
-  "server_listen": { correct: "server_start", usage: "(server_start port) \u2014 \uC774\uD6C4 \uCF54\uB4DC\uB294 \uC2E4\uD589\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uCD08\uAE30\uD654\uB294 server_start \uD638\uCD9C \uC804\uC5D0 \uC644\uB8CC\uD558\uC138\uC694." },
-  "server-listen": { correct: "server_start", usage: "(server_start port)" }
-};
 function suggestSimilar(name, candidates) {
   let best = null;
   let bestDist = Infinity;
@@ -4226,850 +2833,179 @@ function suggestSimilar(name, candidates) {
   }
   return best;
 }
-
-// src/logger.ts
-var StructuredLogger = class {
-  constructor(initialLevel) {
-    this.logLevelOrder = {
-      debug: 0,
-      info: 1,
-      warn: 2,
-      error: 3
-    };
-    const envLevel = process.env.LOG_LEVEL;
-    this.currentLogLevel = initialLevel || envLevel || "info";
-    if (process.env.DEBUG_LOGGER) {
-      console.log(`[Logger] Initialized with log level: ${this.currentLogLevel}`);
-    }
-  }
-  debug(message, data) {
-    this.log("debug", message, data);
-  }
-  info(message, data) {
-    this.log("info", message, data);
-  }
-  warn(message, data) {
-    this.log("warn", message, data);
-  }
-  error(message, data) {
-    this.log("error", message, data);
-  }
-  setLogLevel(level) {
-    this.currentLogLevel = level;
-  }
-  /**
-   * 실제 로그 출력 로직
-   */
-  log(level, message, data) {
-    if (this.logLevelOrder[level] < this.logLevelOrder[this.currentLogLevel]) {
-      return;
-    }
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-    const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
-    const fullMessage = `${prefix} ${message}`;
-    switch (level) {
-      case "debug":
-        console.log(fullMessage, data ? data : "");
-        break;
-      case "info":
-        console.log(fullMessage, data ? data : "");
-        break;
-      case "warn":
-        console.warn(fullMessage, data ? data : "");
-        break;
-      case "error":
-        console.error(fullMessage, data ? data : "");
-        break;
-    }
-  }
-};
-var globalLogger = new StructuredLogger();
-function getGlobalLogger() {
-  return globalLogger;
-}
-
-// src/interpreter-scope.ts
-var ScopeStack = class {
-  constructor() {
-    this.stack = [/* @__PURE__ */ new Map()];
-    /** Phase Y-1: 메타정보 저장소 — 키: "depth:name", 값: ScopeVarMeta */
-    this.meta = /* @__PURE__ */ new Map();
-  }
-  /** 스코프 체인 역방향 탐색 — 가장 안쪽 스코프 우선 */
-  get(name) {
-    for (let i = this.stack.length - 1; i >= 0; i--) {
-      if (this.stack[i].has(name)) return this.stack[i].get(name);
-    }
-    return void 0;
-  }
-  has(name) {
-    for (let i = this.stack.length - 1; i >= 0; i--) {
-      if (this.stack[i].has(name)) return true;
-    }
-    return false;
-  }
-  /** 현재 스코프에 새 바인딩 생성 */
-  set(name, val, meta) {
-    this.stack[this.stack.length - 1].set(name, val);
-    if (meta) {
-      const depth = this.stack.length - 1;
-      this.meta.set(`${depth}:${name}`, {
-        scope: "local",
-        ...meta
-      });
-    }
-  }
-  /** 전역(최상위) 스코프에 직접 저장 — 최상위 define용 */
-  setGlobal(name, val, meta) {
-    this.stack[0].set(name, val);
-    if (meta) {
-      this.meta.set(`0:${name}`, {
-        scope: "global",
-        ...meta
-      });
-    }
-  }
-  /** 변수의 메타정보 조회 */
-  getMeta(name) {
-    for (let i = this.stack.length - 1; i >= 0; i--) {
-      if (this.stack[i].has(name)) {
-        return this.meta.get(`${i}:${name}`);
-      }
-    }
-    return void 0;
-  }
-  /** 현재 스코프의 모든 변수명 반환 (에러 메시지용) */
-  getCurrentScopeVars() {
-    if (this.stack.length === 0) return [];
-    return Array.from(this.stack[this.stack.length - 1].keys());
-  }
-  /** 현재 스코프 체인에서 정의된 모든 변수명 반환 */
-  getAllVars() {
-    const vars = /* @__PURE__ */ new Set();
-    for (const scope of this.stack) {
-      for (const name of scope.keys()) {
-        vars.add(name);
-      }
-    }
-    return Array.from(vars);
-  }
-  /** set!용: 스코프 체인에서 기존 바인딩을 찾아 수정, 없으면 false 반환 */
-  mutate(name, val) {
-    for (let i = this.stack.length - 1; i >= 0; i--) {
-      if (this.stack[i].has(name)) {
-        this.stack[i].set(name, val);
-        return true;
-      }
-    }
-    return false;
-  }
-  /** 새 함수 스코프 시작 */
-  push() {
-    this.stack.push(/* @__PURE__ */ new Map());
-  }
-  /** 함수 스코프 종료 */
-  pop() {
-    if (this.stack.length > 1) this.stack.pop();
-  }
-  /** 클로저 캡처용: 현재 스코프 체인 전체를 단일 Map으로 병합 (메타정보 포함) */
-  snapshot() {
-    const merged = /* @__PURE__ */ new Map();
-    for (const scope of this.stack) {
-      for (const [k, v] of scope) merged.set(k, v);
-    }
-    return merged;
-  }
-  /** 스냅샷 Map으로 스택을 새로 초기화 (callFunctionValue용) */
-  fromSnapshot(snap) {
-    this.stack = [new Map(snap)];
-    this.meta = /* @__PURE__ */ new Map();
-  }
-  /** 전체 스택 저장 (callFunctionValue 복원용).
-   *  stack[0](전역)은 참조로 보존 — fl-reload 등 전역 수정이 함수 반환 후에도 유지됨.
-   *  클로저 스코프(stack[1+])는 격리를 위해 복사. */
-  saveStack() {
-    return [this.stack[0], ...this.stack.slice(1).map((s) => new Map(s))];
-  }
-  /** 저장된 스택으로 복원 */
-  restoreStack(saved) {
-    this.stack = saved;
-  }
-  /** 가장 안쪽 스코프에서 이름 삭제 */
-  delete(name) {
-    for (let i = this.stack.length - 1; i >= 0; i--) {
-      if (this.stack[i].has(name)) {
-        this.stack[i].delete(name);
-        return;
-      }
-    }
-  }
-};
-
-// src/web-search-adapter.ts
-var WebSearchAdapter = class {
-  // 24 hours
-  constructor(apiKey, provider = "mock") {
-    this.cacheTtlMs = 24 * 60 * 60 * 1e3;
-    this.cache = /* @__PURE__ */ new Map();
-    this.apiKey = apiKey;
-    this.apiProvider = provider;
-  }
-  /**
-   * Synchronous search (for integration with sync interpreters)
-   * Only uses cached/mock results, no real API calls
-   */
-  searchSync(query, options = {}) {
-    const { limit = 10, cache = true } = options;
-    if (cache) {
-      const cached = this.getCachedResult(query);
-      if (cached) {
-        return cached.map((r) => ({ ...r, source: "cache" }));
-      }
-    }
-    const results = this.searchMock(query, limit);
-    if (cache) {
-      this.cacheResult(query, results);
-    }
-    return results;
-  }
-  /**
-   * Asynchronous search (for async-aware interpreters)
-   * Returns cached result or calls API based on provider
-   */
-  async search(query, options = {}) {
-    const { limit = 10, cache = true, timeout = 5e3 } = options;
-    if (cache) {
-      const cached = this.getCachedResult(query);
-      if (cached) {
-        return cached.map((r) => ({ ...r, source: "cache" }));
-      }
-    }
-    let results;
-    try {
-      switch (this.apiProvider) {
-        case "brave":
-          results = await this.searchBrave(query, limit, timeout);
-          break;
-        case "serper":
-          results = await this.searchSerper(query, limit, timeout);
-          break;
-        case "mock":
-        default:
-          results = this.searchMock(query, limit);
-      }
-    } catch (error) {
-      console.warn(`Search API failed: ${error.message}, using mock results`);
-      results = this.searchMock(query, limit);
-    }
-    if (cache) {
-      this.cacheResult(query, results);
-    }
-    return results;
-  }
-  /**
-   * Brave Search API integration
-   * https://api.search.brave.com/res/v1/web/search
-   */
-  async searchBrave(query, limit, timeout) {
-    if (!this.apiKey) {
-      throw new Error("Brave Search requires API key (BRAVE_SEARCH_KEY)");
-    }
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    try {
-      const response = await fetch("https://api.search.brave.com/res/v1/web/search", {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "X-Subscription-Token": this.apiKey
-        },
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        throw new Error(`Brave API error: ${response.status}`);
-      }
-      const data = await response.json();
-      const webResults = data.web || [];
-      return webResults.slice(0, limit).map((item) => ({
-        title: item.title,
-        url: item.url,
-        snippet: item.description,
-        source: "api",
-        relevance: 0.9,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString()
-      }));
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-  /**
-   * Serper API integration
-   * https://google.serper.dev/search
-   */
-  async searchSerper(query, limit, timeout) {
-    if (!this.apiKey) {
-      throw new Error("Serper requires API key (SERPER_API_KEY)");
-    }
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-    try {
-      const response = await fetch("https://google.serper.dev/search", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": this.apiKey,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          q: query,
-          num: Math.min(limit, 10)
-        }),
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        throw new Error(`Serper API error: ${response.status}`);
-      }
-      const data = await response.json();
-      const results = data.organic || [];
-      return results.slice(0, limit).map((item) => ({
-        title: item.title,
-        url: item.link,
-        snippet: item.snippet,
-        source: "api",
-        relevance: 0.85,
-        timestamp: (/* @__PURE__ */ new Date()).toISOString()
-      }));
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-  /**
-   * Mock search for testing/offline mode
-   */
-  searchMock(query, limit) {
-    const mockDatabase = {
-      "ai trends 2026": [
-        {
-          title: "2026 AI Trends: Multimodal Systems Dominate",
-          url: "https://example.com/ai-trends-2026",
-          snippet: "Multimodal AI systems combining text, image, and audio are becoming the standard...",
-          source: "api",
-          relevance: 0.95
-        },
-        {
-          title: "AI Safety & Alignment: Key Focus Areas",
-          url: "https://example.com/ai-safety-2026",
-          snippet: "As AI systems become more capable, safety and alignment research intensifies...",
-          source: "api",
-          relevance: 0.88
-        },
-        {
-          title: "Enterprise AI Adoption Accelerates",
-          url: "https://example.com/enterprise-ai-2026",
-          snippet: "Companies are deploying AI for productivity gains across departments...",
-          source: "api",
-          relevance: 0.82
-        }
-      ],
-      "typescript performance": [
-        {
-          title: "TypeScript Performance Optimization Guide",
-          url: "https://example.com/ts-perf",
-          snippet: "Learn how to optimize TypeScript compilation and runtime performance...",
-          source: "api",
-          relevance: 0.92
-        },
-        {
-          title: "Build Tools: esbuild vs tsc vs swc",
-          url: "https://example.com/build-tools-comparison",
-          snippet: "Comparing modern TypeScript build tools and their performance characteristics...",
-          source: "api",
-          relevance: 0.87
-        }
-      ]
-    };
-    const normalizedQuery = query.toLowerCase();
-    const results = mockDatabase[normalizedQuery] || // Generic fallback
-    [
-      {
-        title: `Results for: ${query}`,
-        url: `https://example.com/search?q=${encodeURIComponent(query)}`,
-        snippet: `Mock search results for query: "${query}"`,
-        source: "api",
-        relevance: 0.75
-      }
-    ];
-    return results.slice(0, limit);
-  }
-  /**
-   * Get cached result if not expired
-   */
-  getCachedResult(query) {
-    const cached = this.cache.get(query);
-    if (!cached) return null;
-    if (Date.now() > cached.expiresAt) {
-      this.cache.delete(query);
-      return null;
-    }
-    return cached.results;
-  }
-  /**
-   * Store search results in cache
-   */
-  cacheResult(query, results) {
-    const now = Date.now();
-    this.cache.set(query, {
-      results,
-      timestamp: now,
-      expiresAt: now + this.cacheTtlMs
-    });
-  }
-  /**
-   * Clear cache for specific query or all
-   */
-  clearCache(query) {
-    if (query) {
-      this.cache.delete(query);
-    } else {
-      this.cache.clear();
-    }
-  }
-  /**
-   * Get cache statistics
-   */
-  getCacheStats() {
-    const queries = Array.from(this.cache.keys());
-    let oldestEntry;
-    for (const [query, entry] of this.cache.entries()) {
-      if (!oldestEntry || entry.timestamp < oldestEntry.timestamp) {
-        oldestEntry = { query, timestamp: entry.timestamp };
-      }
-    }
-    return {
-      size: this.cache.size,
-      queries,
-      oldestEntry
+var KNOWN_ALIASES;
+var init_error_formatter = __esm({
+  "src/error-formatter.ts"() {
+    init_errors();
+    KNOWN_ALIASES = {
+      // 환경변수
+      "env": { correct: "shell_env", usage: '(shell_env "KEY")' },
+      "get_env": { correct: "shell_env", usage: '(shell_env "KEY")' },
+      "get-env": { correct: "shell_env", usage: '(shell_env "KEY")' },
+      "get_env_or": { correct: "shell_env", usage: '(or (shell_env "KEY") "default")' },
+      // 맵 조작
+      "obj_merge": { correct: "assoc", usage: '(assoc map "key" value)' },
+      "obj-merge": { correct: "assoc", usage: '(assoc map "key" value)' },
+      "merge": { correct: "assoc", usage: '(assoc map "key" value)' },
+      "obj_omit": { correct: "dissoc", usage: '(dissoc map "key")' },
+      "obj-omit": { correct: "dissoc", usage: '(dissoc map "key")' },
+      "obj_pick": { correct: "get", usage: '(get map "key")' },
+      "dict": { correct: "map-set", usage: '(map-set {} "key" value)' },
+      // 문자열
+      "str_length": { correct: "length", usage: '(length "hello")' },
+      "string_length": { correct: "length", usage: '(length "hello")' },
+      "str_concat": { correct: "str", usage: '(str "a" "b" "c")' },
+      "str_to_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
+      "parse_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
+      "int_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
+      "to_string": { correct: "str", usage: "(str value)" },
+      "to_str": { correct: "str", usage: "(str value)" },
+      // 타입 체크
+      "is_null": { correct: "nil?", usage: "(nil? value)" },
+      "is_nil": { correct: "nil?", usage: "(nil? value)" },
+      "null?": { correct: "nil?", usage: "(nil? value)" },
+      "is_array": { correct: "array?", usage: "(array? value)" },
+      "is_string": { correct: "string?", usage: "(string? value)" },
+      "is_number": { correct: "number?", usage: "(number? value)" },
+      // 배열
+      "push": { correct: "append", usage: "(append arr item)" },
+      "list_append": { correct: "append", usage: "(append arr item)" },
+      "array_push": { correct: "append", usage: "(append arr item)" },
+      "array_length": { correct: "length", usage: "(length arr)" },
+      "first": { correct: "get", usage: "(get arr 0)" },
+      "head": { correct: "get", usage: "(get arr 0)" },
+      // 출력
+      "console_log": { correct: "println", usage: "(println value)" },
+      "console.log": { correct: "println", usage: "(println value)" },
+      "print": { correct: "println", usage: "(println value)" },
+      "log": { correct: "println", usage: "(println value)" },
+      // DB
+      "mariadb_all": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+      "db_query": { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+      // mariadb-* kebab-case — (load "stdlib/db.fl") 또는 DB 맵 정의 필요
+      "mariadb-query": { correct: "mariadb_query", usage: '\uBA3C\uC800 DB \uB9F5 \uC815\uC758: (define DB {:host "localhost" :user "u" :password "p" :database "d"})\n  \uADF8 \uD6C4: (mariadb_query DB "SELECT ..." [params])' },
+      "mariadb-exec": { correct: "mariadb_exec", usage: '(mariadb_exec DB "INSERT INTO ..." [params])' },
+      "mariadb-one": { correct: "mariadb_one", usage: '(mariadb_one DB "SELECT ... LIMIT 1" [params])  ;; \u2192 \uB2E8\uC77C row \uBC18\uD658' },
+      // db-query / db-exec 는 universal wrapper로 구현됨 — 힌트 제거
+      // HTTP
+      "http_post": { correct: "http_get", usage: '(http_get url {:method "POST" :body data})' },
+      "fetch": { correct: "http_get", usage: "(http_get url)" },
+      // 서버
+      "server_listen": { correct: "server_start", usage: "(server_start 40000)" },
+      "listen": { correct: "server_start", usage: "(server_start 40000)" },
+      // 에러
+      "raise": { correct: "error", usage: '(error "\uBA54\uC2DC\uC9C0")' },
+      "panic": { correct: "error", usage: '(error "\uBA54\uC2DC\uC9C0")' },
+      // 문자열 변환 (#str-to-int 오용)
+      "str-to-int": { correct: "str-to-num", usage: '(str-to-num "42")' },
+      "str_to_int": { correct: "str-to-num", usage: '(str-to-num "42")' },
+      "parse-int": { correct: "str-to-num", usage: '(str-to-num "42")' },
+      "parseInt": { correct: "str-to-num", usage: '(str-to-num "42")' },
+      // 맵 키 목록
+      "json_keys": { correct: "keys", usage: "(keys map)" },
+      "json-keys": { correct: "keys", usage: "(keys map)" },
+      "map-keys": { correct: "keys", usage: "(keys map)" },
+      "object-keys": { correct: "keys", usage: "(keys map)" },
+      // HTTP 데이터 추출 (#11/#12/#13)
+      "http-simple-get": { correct: "http-get-data", usage: "(http-get-data url)" },
+      "http-fetch": { correct: "http-get-data", usage: "(http-get-data url)" },
+      // 맵 병합 (#39)
+      "obj-merge": { correct: "merge", usage: "(merge map1 map2)" },
+      "obj_merge": { correct: "merge", usage: "(merge map1 map2)" },
+      // 배열 길이 (#42)
+      "size": { correct: "length", usage: "(length arr)" },
+      // 문자열 분리 (#43)
+      "split": { correct: "str-split", usage: '(str-split "a,b" ",")' },
+      "str_split": { correct: "str-split", usage: '(str-split "a,b" ",")' },
+      // JSON 파싱 (#44)
+      "JSON.parse": { correct: "json-parse", usage: '(json-parse "{}")' },
+      "parseJSON": { correct: "json-parse", usage: '(json-parse "{}")' },
+      "parse_json": { correct: "json-parse", usage: '(json-parse "{}")' },
+      // JSON 직렬화 (#45)
+      "JSON.stringify": { correct: "json-stringify", usage: "(json-stringify {})" },
+      "toJSON": { correct: "json-stringify", usage: "(json-stringify {})" },
+      "stringify": { correct: "json-stringify", usage: "(json-stringify {})" },
+      // 숫자→문자열 (#57)
+      "num-to-str": { correct: "num_to_str", usage: "(num_to_str 42)" },
+      "numToStr": { correct: "num_to_str", usage: "(num_to_str 42)" },
+      "number_to_str": { correct: "num_to_str", usage: "(num_to_str 42)" },
+      // 문자열 공백 제거 (#78)
+      "trim": { correct: "str-trim", usage: '(str-trim "  hello  ")' },
+      "str_trim": { correct: "str-trim", usage: '(str-trim "  hello  ")' },
+      // 문자열 시작 여부 (#79)
+      "starts-with?": { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+      "startsWith": { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+      // 문자열 포함 여부 (#80)
+      "includes": { correct: "str-contains", usage: '(str-contains "hello" "ell")' },
+      "str_includes": { correct: "str-contains", usage: '(str-contains "hello" "ell")' },
+      // 대문자 변환 (#81)
+      "to-upper": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
+      "toUpperCase": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
+      "to_upper": { correct: "str-to-upper", usage: '(str-to-upper "hello")' },
+      // 문자열 변환 (#82)
+      "toString": { correct: "str", usage: "(str value)" },
+      // 시간 (#37)
+      "Date.now": { correct: "now-ms", usage: "(now-ms)" },
+      "Date.now()": { correct: "now-ms", usage: "(now-ms)" },
+      "now_ms": { correct: "now-ms", usage: "(now-ms)" },
+      "currentTimeMs": { correct: "now-ms", usage: "(now-ms)" },
+      // 수학 (#90) — num-round 등 잘못된 함수명
+      "num-round": { correct: "round", usage: "(round 3.7)  ;; \u2192 4 | \uC18C\uC218\uC810 \uC774\uD558 \uC81C\uAC70\uB294 (int 3.7) \u2192 3" },
+      "num_round": { correct: "round", usage: "(round 3.7)" },
+      "Math.round": { correct: "round", usage: "(round 3.7)" },
+      "Math.floor": { correct: "floor", usage: "(floor 3.7)  ;; \u2192 3" },
+      "Math.ceil": { correct: "ceil", usage: "(ceil 3.2)   ;; \u2192 4" },
+      "Math.abs": { correct: "abs", usage: "(abs -5)     ;; \u2192 5" },
+      "Math.max": { correct: "max", usage: "(max 3 7)    ;; \u2192 7" },
+      "Math.min": { correct: "min", usage: "(min 3 7)    ;; \u2192 3" },
+      "Math.pow": { correct: "pow", usage: "(pow 2 10)   ;; \u2192 1024" },
+      "Math.sqrt": { correct: "sqrt", usage: "(sqrt 16)    ;; \u2192 4" },
+      "truncate": { correct: "int", usage: "(int 3.9)    ;; \u2192 3 (\uC18C\uC218\uC810 \uBC84\uB9BC)" },
+      "trunc": { correct: "int", usage: "(int 3.9)    ;; \u2192 3" },
+      "num-abs": { correct: "abs", usage: "(abs -5)" },
+      "num-floor": { correct: "floor", usage: "(floor 3.7)" },
+      "num-ceil": { correct: "ceil", usage: "(ceil 3.2)" },
+      // 정규식 — regex-test 12회 오용 (fl errors TOP 1)
+      "regex-test": { correct: "re-test", usage: '(re-test "^hello" "hello world")  ;; \u2192 true' },
+      "regex_test": { correct: "re-test", usage: '(re-test "\uD328\uD134" \uBB38\uC790\uC5F4)' },
+      "regexp-test": { correct: "re-test", usage: '(re-test "\uD328\uD134" \uBB38\uC790\uC5F4)' },
+      "re-match": { correct: "re-test", usage: '(re-test "\uD328\uD134" \uBB38\uC790\uC5F4)  ;; boolean \uBC18\uD658' },
+      // #47: req["params"]["id"] 대신 server_req_param 사용
+      "req_param": { correct: "server_req_param", usage: '(server_req_param req "id")' },
+      "req-param": { correct: "server_req_param", usage: '(server_req_param req "id")' },
+      "req_query": { correct: "server_req_query", usage: '(server_req_query req "key")' },
+      "req-query": { correct: "server_req_query", usage: '(server_req_query req "key")' },
+      "req_body": { correct: "server_req_body", usage: "(server_req_body req)" },
+      "req-body": { correct: "server_req_body", usage: "(server_req_body req)" },
+      // #67: mariadb_connect positional args
+      "mariadb_connect": { correct: "mariadb_connect", usage: '(mariadb_connect {:host "h" :user "u" :password "p" :database "d"}) \uB610\uB294 (mariadb_connect "host" "user" "pass" "db")' },
+      // 추가 HTTP 힌트
+      "http-post-json": { correct: "http_post", usage: "(http_post url (json-stringify body))" },
+      // #47: req params 접근 힌트
+      "req-params": { correct: "server_req_param", usage: '(server_req_param req "id") \u2014 URL :id \uD30C\uB77C\uBBF8\uD130 \uC811\uADFC' },
+      "req-param": { correct: "server_req_param", usage: '(server_req_param req "id")' },
+      // #51: (get req "params") → server_req_param 안내
+      "params": { correct: "server_req_param", usage: '(server_req_param req "id") \u2014 URL :id \uD30C\uB77C\uBBF8\uD130. (get (get req "params") "id") \uB300\uC2E0 \uC0AC\uC6A9' },
+      // #48: body 자동 파싱 — server_req_body 또는 get req "body" 사용 안내
+      "req_body_raw": { correct: "server_req_body", usage: "(server_req_body req) \u2014 body \uBB38\uC790\uC5F4 \uBC18\uD658. JSON\uC774\uBA74 (json-parse (server_req_body req)) \uC0AC\uC6A9" },
+      "body_parse": { correct: "get", usage: '(get req "body") \u2014 Content-Type: application/json \uC694\uCCAD\uC740 \uC790\uB3D9 \uD30C\uC2F1. \uADF8 \uC678\uB294 (json-parse (server_req_body req)) \uD544\uC694' },
+      // #52: express.fl + server_* 혼용 금지
+      "app-get": { correct: "server-get", usage: '(load "src/express.fl") \uC5C6\uC774 server-get \uC0AC\uC6A9. express.fl \uB85C\uB4DC \uD6C4\uC5D0\uB294 app-* \uACC4\uC5F4\uB9CC \uC0AC\uC6A9\uD558\uC138\uC694.' },
+      "app-post": { correct: "server-post", usage: '(load "src/express.fl") \uC5C6\uC774 server-post \uC0AC\uC6A9. \uD63C\uC6A9 \uAE08\uC9C0: \uD55C \uD504\uB85C\uC81D\uD2B8\uC5D0\uC11C server_* / app-* \uC911 \uD558\uB098\uB9CC \uC120\uD0DD.' },
+      "app-listen": { correct: "server-start", usage: '(load "src/express.fl") \uC5C6\uC774 app-listen \uC0AC\uC6A9. express.fl \uB85C\uB4DC \uD6C4\uC5D0\uB9CC app-listen \uC0AC\uC6A9 \uAC00\uB2A5.' },
+      "res-json": { correct: "server-json", usage: '(load "src/express.fl") \uC5C6\uC774 res-json \uC0AC\uC6A9. express.fl \uB85C\uB4DC \uD6C4\uC5D0\uB9CC res-* \uACC4\uC5F4 \uC0AC\uC6A9 \uAC00\uB2A5.' },
+      "res-status": { correct: "server-status", usage: '(load "src/express.fl") \uC5C6\uC774 res-status \uC0AC\uC6A9. \uD63C\uC6A9 \uAE08\uC9C0.' },
+      // #53/#54: WebSocket 힌트
+      "ws_handler": { correct: "ws-handler", usage: "(ws-handler (fn [conn msg] ...)) \u2014 conn: \uC5F0\uACB0 \uAC1D\uCCB4, msg: \uC218\uC2E0 \uBA54\uC2DC\uC9C0" },
+      "on-close": { correct: "ws-on-close", usage: "(ws-on-close conn (fn [] ...)) \u2014 \uC5F0\uACB0 \uC885\uB8CC \uD578\uB4E4\uB7EC" },
+      // #99: server_start 블로킹 힌트
+      "server_listen": { correct: "server_start", usage: "(server_start port) \u2014 \uC774\uD6C4 \uCF54\uB4DC\uB294 \uC2E4\uD589\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uCD08\uAE30\uD654\uB294 server_start \uD638\uCD9C \uC804\uC5D0 \uC644\uB8CC\uD558\uC138\uC694." },
+      "server-listen": { correct: "server_start", usage: "(server_start port)" }
     };
   }
-};
-
-// src/learned-facts-store.ts
-var fs = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
-var LearnedFactsStore = class {
-  constructor(filePath = "./data/learned-facts.json", defaultTtlDays = 30) {
-    this.defaultTtlDays = 30;
-    this.autoSaveInterval = 5e3;
-    // Auto-save every 5 seconds
-    this.isDirty = false;
-    this.filePath = filePath;
-    this.facts = /* @__PURE__ */ new Map();
-    this.defaultTtlDays = defaultTtlDays;
-    const dir = path2.dirname(this.filePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    this.loadFromFile();
-    this.startAutoSave();
-  }
-  /**
-   * Save a learned fact
-   */
-  save(key, data, options) {
-    const { confidence, source, ttlDays = this.defaultTtlDays } = options;
-    if (confidence < 0 || confidence > 1) {
-      throw new Error(`Invalid confidence: ${confidence}. Must be between 0 and 1.`);
-    }
-    const now = Date.now();
-    const fact = {
-      key,
-      data,
-      confidence,
-      source,
-      timestamp: now,
-      expiresAt: now + ttlDays * 24 * 60 * 60 * 1e3,
-      accessCount: 0,
-      lastAccessed: now
-    };
-    this.facts.set(key, fact);
-    this.isDirty = true;
-  }
-  /**
-   * Load a learned fact by key
-   */
-  load(key) {
-    const fact = this.facts.get(key);
-    if (!fact) return null;
-    if (Date.now() > fact.expiresAt) {
-      this.facts.delete(key);
-      this.isDirty = true;
-      return null;
-    }
-    fact.accessCount++;
-    fact.lastAccessed = Date.now();
-    this.isDirty = true;
-    return fact;
-  }
-  /**
-   * Load all learned facts (non-expired)
-   */
-  loadAll() {
-    const results = [];
-    const now = Date.now();
-    let hasExpired = false;
-    for (const [key, fact] of this.facts.entries()) {
-      if (now > fact.expiresAt) {
-        this.facts.delete(key);
-        hasExpired = true;
-      } else {
-        results.push(fact);
-      }
-    }
-    if (hasExpired) {
-      this.isDirty = true;
-    }
-    return results;
-  }
-  /**
-   * Delete a learned fact
-   */
-  delete(key) {
-    if (this.facts.has(key)) {
-      this.facts.delete(key);
-      this.isDirty = true;
-    }
-  }
-  /**
-   * Find facts by minimum confidence level
-   */
-  findByConfidence(minConfidence) {
-    return this.loadAll().filter((fact) => fact.confidence >= minConfidence);
-  }
-  /**
-   * Find facts by source
-   */
-  findBySource(source) {
-    return this.loadAll().filter((fact) => fact.source === source);
-  }
-  /**
-   * Clean up expired facts
-   * Returns the number of deleted facts
-   */
-  cleanup() {
-    const now = Date.now();
-    let deletedCount = 0;
-    for (const [key, fact] of this.facts.entries()) {
-      if (now > fact.expiresAt) {
-        this.facts.delete(key);
-        deletedCount++;
-      }
-    }
-    if (deletedCount > 0) {
-      this.isDirty = true;
-    }
-    return deletedCount;
-  }
-  /**
-   * Get store statistics
-   */
-  getStats() {
-    const all = this.loadAll();
-    const now = Date.now();
-    let expiredCount = 0;
-    let totalConfidence = 0;
-    let oldestExpiry = null;
-    const sourceDistribution = {};
-    for (const [, fact] of this.facts.entries()) {
-      if (now > fact.expiresAt) {
-        expiredCount++;
-      }
-      sourceDistribution[fact.source] = (sourceDistribution[fact.source] || 0) + 1;
-    }
-    if (all.length > 0) {
-      totalConfidence = all.reduce((sum, f) => sum + f.confidence, 0) / all.length;
-      oldestExpiry = Math.min(...all.map((f) => f.expiresAt));
-    }
-    return {
-      totalFacts: all.length,
-      expiredCount,
-      averageConfidence: totalConfidence,
-      oldestExpiry,
-      sourceDistribution
-    };
-  }
-  /**
-   * Flush all pending changes to disk
-   */
-  flush() {
-    if (!this.isDirty) return;
-    this.saveToFile();
-    this.isDirty = false;
-  }
-  /**
-   * Destroy the store (clean up auto-save timer)
-   */
-  destroy() {
-    if (this.autoSaveTimer) {
-      clearInterval(this.autoSaveTimer);
-      this.autoSaveTimer = void 0;
-    }
-    this.flush();
-  }
-  /**
-   * Private: Load facts from file
-   */
-  loadFromFile() {
-    try {
-      if (!fs.existsSync(this.filePath)) {
-        return;
-      }
-      const content = fs.readFileSync(this.filePath, "utf-8");
-      const parsed = JSON.parse(content);
-      if (!parsed.facts || !Array.isArray(parsed.facts)) {
-        console.warn("Invalid learned facts file format, starting with empty store");
-        return;
-      }
-      for (const fact of parsed.facts) {
-        this.facts.set(fact.key, fact);
-      }
-      this.cleanup();
-    } catch (error) {
-      console.error(`Failed to load learned facts: ${error.message}`);
-    }
-  }
-  /**
-   * Private: Save facts to file
-   */
-  saveToFile() {
-    try {
-      const data = {
-        version: "1.0",
-        lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
-        facts: Array.from(this.facts.values())
-      };
-      const tempPath = this.filePath + ".tmp";
-      fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
-      fs.renameSync(tempPath, this.filePath);
-    } catch (error) {
-      console.error(`Failed to save learned facts: ${error.message}`);
-    }
-  }
-  /**
-   * Private: Start auto-save timer
-   * unref() = allow process to exit even if timer is active
-   */
-  startAutoSave() {
-    this.autoSaveTimer = setInterval(() => {
-      if (this.isDirty) {
-        this.flush();
-      }
-    }, this.autoSaveInterval);
-    if (this.autoSaveTimer && typeof this.autoSaveTimer.unref === "function") {
-      this.autoSaveTimer.unref();
-    }
-  }
-};
+});
 
 // src/async-runtime.ts
-var FreeLangPromise = class _FreeLangPromise {
-  constructor(executor) {
-    this.state = "pending";
-    this.value = void 0;
-    this.error = null;
-    this.resolvers = [];
-    this.rejecters = [];
-    try {
-      executor(this.resolve.bind(this), this.reject.bind(this));
-    } catch (e) {
-      this.reject(e);
-    }
-  }
-  /**
-   * Promise 상태 확인
-   */
-  getState() {
-    return this.state;
-  }
-  /**
-   * Promise 값 추출 (resolved 상태일 때만)
-   */
-  getValue() {
-    if (this.state === "resolved") {
-      return this.value;
-    }
-    throw new Error("Cannot get value from non-resolved Promise");
-  }
-  /**
-   * Promise 에러 추출 (rejected 상태일 때만)
-   */
-  getError() {
-    if (this.state === "rejected") {
-      return this.error;
-    }
-    return null;
-  }
-  /**
-   * resolve 핸들러 호출
-   */
-  resolve(value) {
-    if (this.state !== "pending") return;
-    this.state = "resolved";
-    this.value = value;
-    for (const resolver of this.resolvers) {
-      try {
-        resolver(value);
-      } catch (e) {
-      }
-    }
-    this.resolvers = [];
-  }
-  /**
-   * reject 핸들러 호출
-   */
-  reject(error) {
-    if (this.state !== "pending") return;
-    this.state = "rejected";
-    this.error = error;
-    for (const rejecter of this.rejecters) {
-      try {
-        rejecter(error);
-      } catch (e) {
-      }
-    }
-    this.rejecters = [];
-  }
-  /**
-   * Promise 체이닝: then 메서드
-   * onFulfilled가 성공했을 때 호출되고, 새로운 Promise 반환
-   */
-  then(onFulfilled) {
-    return new _FreeLangPromise((resolve10, reject) => {
-      if (this.state === "resolved") {
-        try {
-          const result = onFulfilled(this.value);
-          resolve10(result);
-        } catch (e) {
-          reject(e);
-        }
-      } else if (this.state === "rejected") {
-        reject(this.error);
-      } else {
-        this.resolvers.push((value) => {
-          try {
-            const result = onFulfilled(value);
-            resolve10(result);
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }
-    });
-  }
-  /**
-   * Promise 에러 처리: catch 메서드
-   * onRejected가 에러일 때 호출되고, 새로운 Promise 반환
-   */
-  catch(onRejected) {
-    return new _FreeLangPromise((resolve10, reject) => {
-      if (this.state === "rejected") {
-        try {
-          const result = onRejected(this.error);
-          resolve10(result);
-        } catch (e) {
-          reject(e);
-        }
-      } else if (this.state === "resolved") {
-        resolve10(this.value);
-      } else {
-        this.rejecters.push((error) => {
-          try {
-            const result = onRejected(error);
-            resolve10(result);
-          } catch (e) {
-            reject(e);
-          }
-        });
-      }
-    });
-  }
-  /**
-   * finally 메서드: 성공/실패 상관없이 항상 실행
-   */
-  finally(onFinally) {
-    return new _FreeLangPromise((resolve10, reject) => {
-      const executeFinally = () => {
-        try {
-          onFinally();
-        } catch (e) {
-          reject(e);
-          return;
-        }
-        if (this.state === "resolved") {
-          resolve10(this.value);
-        } else if (this.state === "rejected") {
-          reject(this.error);
-        }
-      };
-      if (this.state !== "pending") {
-        executeFinally();
-      } else {
-        this.resolvers.push(() => executeFinally());
-        this.rejecters.push(() => executeFinally());
-      }
-    });
-  }
-  /**
-   * 모든 Promise가 완료될 때까지 대기
-   */
-  static all(promises) {
-    return new _FreeLangPromise((resolve10, reject) => {
-      if (promises.length === 0) {
-        resolve10([]);
-        return;
-      }
-      const results = [];
-      let completedCount = 0;
-      for (let i = 0; i < promises.length; i++) {
-        const promise = promises[i];
-        if (promise.state === "resolved") {
-          results[i] = promise.value;
-          completedCount++;
-        } else if (promise.state === "rejected") {
-          reject(promise.error);
-          return;
-        } else {
-          promise.then((value) => {
-            results[i] = value;
-            completedCount++;
-            if (completedCount === promises.length) {
-              resolve10(results);
-            }
-          }).catch((error) => reject(error));
-        }
-      }
-      if (completedCount === promises.length) {
-        resolve10(results);
-      }
-    });
-  }
-  /**
-   * 첫 번째로 완료된 Promise 반환
-   */
-  static race(promises) {
-    return new _FreeLangPromise((resolve10, reject) => {
-      for (const promise of promises) {
-        if (promise.state === "resolved") {
-          resolve10(promise.value);
-          return;
-        } else if (promise.state === "rejected") {
-          reject(promise.error);
-          return;
-        } else {
-          promise.then((value) => resolve10(value)).catch((error) => reject(error));
-        }
-      }
-    });
-  }
-};
 function resolvedPromise(value) {
   return new FreeLangPromise((resolve10) => {
     resolve10(value);
@@ -5080,105 +3016,313 @@ function rejectedPromise(error) {
     reject(error);
   });
 }
-
-// src/eval-builtins.ts
-init_errors();
+var FreeLangPromise;
+var init_async_runtime = __esm({
+  "src/async-runtime.ts"() {
+    FreeLangPromise = class _FreeLangPromise {
+      constructor(executor) {
+        this.state = "pending";
+        this.value = void 0;
+        this.error = null;
+        this.resolvers = [];
+        this.rejecters = [];
+        try {
+          executor(this.resolve.bind(this), this.reject.bind(this));
+        } catch (e) {
+          this.reject(e);
+        }
+      }
+      /**
+       * Promise 상태 확인
+       */
+      getState() {
+        return this.state;
+      }
+      /**
+       * Promise 값 추출 (resolved 상태일 때만)
+       */
+      getValue() {
+        if (this.state === "resolved") {
+          return this.value;
+        }
+        throw new Error("Cannot get value from non-resolved Promise");
+      }
+      /**
+       * Promise 에러 추출 (rejected 상태일 때만)
+       */
+      getError() {
+        if (this.state === "rejected") {
+          return this.error;
+        }
+        return null;
+      }
+      /**
+       * resolve 핸들러 호출
+       */
+      resolve(value) {
+        if (this.state !== "pending") return;
+        this.state = "resolved";
+        this.value = value;
+        for (const resolver of this.resolvers) {
+          try {
+            resolver(value);
+          } catch (e) {
+          }
+        }
+        this.resolvers = [];
+      }
+      /**
+       * reject 핸들러 호출
+       */
+      reject(error) {
+        if (this.state !== "pending") return;
+        this.state = "rejected";
+        this.error = error;
+        for (const rejecter of this.rejecters) {
+          try {
+            rejecter(error);
+          } catch (e) {
+          }
+        }
+        this.rejecters = [];
+      }
+      /**
+       * Promise 체이닝: then 메서드
+       * onFulfilled가 성공했을 때 호출되고, 새로운 Promise 반환
+       */
+      then(onFulfilled) {
+        return new _FreeLangPromise((resolve10, reject) => {
+          if (this.state === "resolved") {
+            try {
+              const result = onFulfilled(this.value);
+              resolve10(result);
+            } catch (e) {
+              reject(e);
+            }
+          } else if (this.state === "rejected") {
+            reject(this.error);
+          } else {
+            this.resolvers.push((value) => {
+              try {
+                const result = onFulfilled(value);
+                resolve10(result);
+              } catch (e) {
+                reject(e);
+              }
+            });
+          }
+        });
+      }
+      /**
+       * Promise 에러 처리: catch 메서드
+       * onRejected가 에러일 때 호출되고, 새로운 Promise 반환
+       */
+      catch(onRejected) {
+        return new _FreeLangPromise((resolve10, reject) => {
+          if (this.state === "rejected") {
+            try {
+              const result = onRejected(this.error);
+              resolve10(result);
+            } catch (e) {
+              reject(e);
+            }
+          } else if (this.state === "resolved") {
+            resolve10(this.value);
+          } else {
+            this.rejecters.push((error) => {
+              try {
+                const result = onRejected(error);
+                resolve10(result);
+              } catch (e) {
+                reject(e);
+              }
+            });
+          }
+        });
+      }
+      /**
+       * finally 메서드: 성공/실패 상관없이 항상 실행
+       */
+      finally(onFinally) {
+        return new _FreeLangPromise((resolve10, reject) => {
+          const executeFinally = () => {
+            try {
+              onFinally();
+            } catch (e) {
+              reject(e);
+              return;
+            }
+            if (this.state === "resolved") {
+              resolve10(this.value);
+            } else if (this.state === "rejected") {
+              reject(this.error);
+            }
+          };
+          if (this.state !== "pending") {
+            executeFinally();
+          } else {
+            this.resolvers.push(() => executeFinally());
+            this.rejecters.push(() => executeFinally());
+          }
+        });
+      }
+      /**
+       * 모든 Promise가 완료될 때까지 대기
+       */
+      static all(promises) {
+        return new _FreeLangPromise((resolve10, reject) => {
+          if (promises.length === 0) {
+            resolve10([]);
+            return;
+          }
+          const results = [];
+          let completedCount = 0;
+          for (let i = 0; i < promises.length; i++) {
+            const promise = promises[i];
+            if (promise.state === "resolved") {
+              results[i] = promise.value;
+              completedCount++;
+            } else if (promise.state === "rejected") {
+              reject(promise.error);
+              return;
+            } else {
+              promise.then((value) => {
+                results[i] = value;
+                completedCount++;
+                if (completedCount === promises.length) {
+                  resolve10(results);
+                }
+              }).catch((error) => reject(error));
+            }
+          }
+          if (completedCount === promises.length) {
+            resolve10(results);
+          }
+        });
+      }
+      /**
+       * 첫 번째로 완료된 Promise 반환
+       */
+      static race(promises) {
+        return new _FreeLangPromise((resolve10, reject) => {
+          for (const promise of promises) {
+            if (promise.state === "resolved") {
+              resolve10(promise.value);
+              return;
+            } else if (promise.state === "rejected") {
+              reject(promise.error);
+              return;
+            } else {
+              promise.then((value) => resolve10(value)).catch((error) => reject(error));
+            }
+          }
+        });
+      }
+    };
+  }
+});
 
 // src/effect-types.ts
-var EFFECT_TAGS = Object.freeze([
-  "pure",
-  "io",
-  "net",
-  "process",
-  "time",
-  "random"
-]);
-var EffectViolation = class _EffectViolation extends Error {
-  constructor(args3) {
-    super(_EffectViolation.formatMessage(args3));
-    this.name = "EffectViolation";
-    this.fn = args3.fn;
-    this.target_effect = args3.target_effect;
-    this.allowed = args3.allowed;
-    this.chain = args3.chain;
-    this.span = args3.span;
+var EFFECT_TAGS, EffectViolation;
+var init_effect_types = __esm({
+  "src/effect-types.ts"() {
+    EFFECT_TAGS = Object.freeze([
+      "pure",
+      "io",
+      "net",
+      "process",
+      "time",
+      "random"
+    ]);
+    EffectViolation = class _EffectViolation extends Error {
+      constructor(args3) {
+        super(_EffectViolation.formatMessage(args3));
+        this.name = "EffectViolation";
+        this.fn = args3.fn;
+        this.target_effect = args3.target_effect;
+        this.allowed = args3.allowed;
+        this.chain = args3.chain;
+        this.span = args3.span;
+      }
+      static formatMessage(args3) {
+        const ctxLabel = args3.allowed.length === 0 ? "pure" : `[:${args3.allowed.join(" :")}]`;
+        const spanStr = args3.span ? `${args3.span.file}:${args3.span.line}:${args3.span.col}` : "<unknown>";
+        const chainLines = args3.chain.length === 0 ? ["    <empty>"] : args3.chain.map((n) => `    \u2192 ${n}`);
+        return [
+          `EffectViolation:`,
+          `  ${ctxLabel} context cannot call :${args3.target_effect} function '${args3.fn}'`,
+          ``,
+          `  effect-chain:`,
+          ...chainLines,
+          ``,
+          `  allowed: [${args3.allowed.map((e) => ":" + e).join(" ")}]`,
+          `  required: :${args3.target_effect}`,
+          `  span: ${spanStr}`
+        ].join("\n");
+      }
+    };
   }
-  static formatMessage(args3) {
-    const ctxLabel = args3.allowed.length === 0 ? "pure" : `[:${args3.allowed.join(" :")}]`;
-    const spanStr = args3.span ? `${args3.span.file}:${args3.span.line}:${args3.span.col}` : "<unknown>";
-    const chainLines = args3.chain.length === 0 ? ["    <empty>"] : args3.chain.map((n) => `    \u2192 ${n}`);
-    return [
-      `EffectViolation:`,
-      `  ${ctxLabel} context cannot call :${args3.target_effect} function '${args3.fn}'`,
-      ``,
-      `  effect-chain:`,
-      ...chainLines,
-      ``,
-      `  allowed: [${args3.allowed.map((e) => ":" + e).join(" ")}]`,
-      `  required: :${args3.target_effect}`,
-      `  span: ${spanStr}`
-    ].join("\n");
-  }
-};
+});
 
 // src/builtin-effects.ts
 function tagged(...tags) {
   return Object.freeze(new Set(tags));
 }
-var _entries = [
-  // :io — 파일·콘솔·DB
-  ["file-write", tagged("io")],
-  ["file-read", tagged("io")],
-  ["file-append", tagged("io")],
-  ["file-delete", tagged("io")],
-  ["file-append-line", tagged("io")],
-  ["file-exists", tagged("io")],
-  ["db-exec", tagged("io")],
-  ["db-query", tagged("io")],
-  ["db-transaction", tagged("io")],
-  ["println", tagged("io")],
-  ["print", tagged("io")],
-  // :net
-  ["http-get", tagged("net")],
-  ["http-post", tagged("net")],
-  ["ws-send", tagged("net")],
-  ["server-start", tagged("net")],
-  // :process
-  ["shell-exec", tagged("process")],
-  ["process-spawn", tagged("process")],
-  // :time
-  ["now", tagged("time")],
-  ["now-ms", tagged("time")],
-  ["sleep", tagged("time")],
-  // :random
-  ["rand", tagged("random")],
-  ["rand-int", tagged("random")],
-  ["uuid", tagged("random")]
-];
-var _map = new Map(_entries);
 function lookupBuiltinEffects(name) {
   return _map.get(name);
 }
-
-// src/eval-special-forms.ts
-init_ast();
+var _entries, _map;
+var init_builtin_effects = __esm({
+  "src/builtin-effects.ts"() {
+    _entries = [
+      // :io — 파일·콘솔·DB
+      ["file-write", tagged("io")],
+      ["file-read", tagged("io")],
+      ["file-append", tagged("io")],
+      ["file-delete", tagged("io")],
+      ["file-append-line", tagged("io")],
+      ["file-exists", tagged("io")],
+      ["db-exec", tagged("io")],
+      ["db-query", tagged("io")],
+      ["db-transaction", tagged("io")],
+      ["println", tagged("io")],
+      ["print", tagged("io")],
+      // :net
+      ["http-get", tagged("net")],
+      ["http-post", tagged("net")],
+      ["ws-send", tagged("net")],
+      ["server-start", tagged("net")],
+      // :process
+      ["shell-exec", tagged("process")],
+      ["process-spawn", tagged("process")],
+      // :time
+      ["now", tagged("time")],
+      ["now-ms", tagged("time")],
+      ["sleep", tagged("time")],
+      // :random
+      ["rand", tagged("random")],
+      ["rand-int", tagged("random")],
+      ["uuid", tagged("random")]
+    ];
+    _map = new Map(_entries);
+  }
+});
 
 // src/tco.ts
-var TAIL_CALL = /* @__PURE__ */ Symbol("TAIL_CALL");
 function tailCall(fn, args3) {
   return { [TAIL_CALL]: true, fn, args: args3 };
 }
 function isTailCall(v) {
   return v !== null && typeof v === "object" && v[TAIL_CALL] === true;
 }
+var TAIL_CALL;
+var init_tco = __esm({
+  "src/tco.ts"() {
+    TAIL_CALL = /* @__PURE__ */ Symbol("TAIL_CALL");
+  }
+});
 
 // src/runtime-governance.ts
-var _mode = "normal";
-var _traceEnabled = true;
-var _debugEnabled = true;
-var _frozenContracts = /* @__PURE__ */ new Set();
-var _escalationCounts = /* @__PURE__ */ new Map();
-var _throttledContracts = /* @__PURE__ */ new Set();
 function getRuntimeMode() {
   return _mode;
 }
@@ -5235,7 +3379,6 @@ function applyGovernanceAction(action, contractName) {
       break;
   }
 }
-var _clearEventsRequested = false;
 function incrementEscalation(contractName) {
   const n = (_escalationCounts.get(contractName) ?? 0) + 1;
   _escalationCounts.set(contractName, n);
@@ -5260,10 +3403,20 @@ function getRuntimePolicy() {
     "throttled-contracts": [..._throttledContracts]
   };
 }
+var _mode, _traceEnabled, _debugEnabled, _frozenContracts, _escalationCounts, _throttledContracts, _clearEventsRequested;
+var init_runtime_governance = __esm({
+  "src/runtime-governance.ts"() {
+    _mode = "normal";
+    _traceEnabled = true;
+    _debugEnabled = true;
+    _frozenContracts = /* @__PURE__ */ new Set();
+    _escalationCounts = /* @__PURE__ */ new Map();
+    _throttledContracts = /* @__PURE__ */ new Set();
+    _clearEventsRequested = false;
+  }
+});
 
 // src/runtime-contracts.ts
-var _contracts = /* @__PURE__ */ new Map();
-var _throttleMap = /* @__PURE__ */ new Map();
 function defineContract(name, def) {
   _contracts.set(name, { name, ...def });
 }
@@ -5312,50 +3465,46 @@ function checkContracts(buf, newEvent) {
   }
   return out;
 }
-defineContract("auto:trace-explosion", {
-  eventType: "trace",
-  threshold: 50,
-  windowMs: 1e3,
-  action: "collapse"
-});
-defineContract("auto:assert-storm", {
-  eventType: "assert-fail",
-  threshold: 5,
-  windowMs: 5e3,
-  action: "warn"
-});
-defineContract("auto:error-burst", {
-  eventType: "runtime-error",
-  threshold: 5,
-  windowMs: 5e3,
-  action: "error"
-});
-defineContract("auto:trace-disable", {
-  eventType: "trace",
-  threshold: 200,
-  windowMs: 1e3,
-  action: "disable-trace"
-});
-defineContract("auto:panic-cascade", {
-  eventType: "runtime-error",
-  threshold: 10,
-  windowMs: 5e3,
-  action: "panic"
+var _contracts, _throttleMap;
+var init_runtime_contracts = __esm({
+  "src/runtime-contracts.ts"() {
+    init_runtime_governance();
+    _contracts = /* @__PURE__ */ new Map();
+    _throttleMap = /* @__PURE__ */ new Map();
+    defineContract("auto:trace-explosion", {
+      eventType: "trace",
+      threshold: 50,
+      windowMs: 1e3,
+      action: "collapse"
+    });
+    defineContract("auto:assert-storm", {
+      eventType: "assert-fail",
+      threshold: 5,
+      windowMs: 5e3,
+      action: "warn"
+    });
+    defineContract("auto:error-burst", {
+      eventType: "runtime-error",
+      threshold: 5,
+      windowMs: 5e3,
+      action: "error"
+    });
+    defineContract("auto:trace-disable", {
+      eventType: "trace",
+      threshold: 200,
+      windowMs: 1e3,
+      action: "disable-trace"
+    });
+    defineContract("auto:panic-cascade", {
+      eventType: "runtime-error",
+      threshold: 10,
+      windowMs: 5e3,
+      action: "panic"
+    });
+  }
 });
 
 // src/runtime-budget.ts
-var BudgetExceededError = class extends Error {
-  constructor(kind, limit, actual, contextId) {
-    super(`Budget exceeded: ${kind} (limit=${limit}, actual=${actual})`);
-    this.kind = kind;
-    this.limit = limit;
-    this.actual = actual;
-    this.contextId = contextId;
-    this.name = "BudgetExceededError";
-  }
-};
-var _stack = [];
-var _budgetViolationCount = 0;
 function pushBudget(opts) {
   _stack.push({ ...opts });
 }
@@ -5400,14 +3549,25 @@ function resetBudget() {
   _stack.length = 0;
   _budgetViolationCount = 0;
 }
+var BudgetExceededError, _stack, _budgetViolationCount;
+var init_runtime_budget = __esm({
+  "src/runtime-budget.ts"() {
+    BudgetExceededError = class extends Error {
+      constructor(kind, limit, actual, contextId) {
+        super(`Budget exceeded: ${kind} (limit=${limit}, actual=${actual})`);
+        this.kind = kind;
+        this.limit = limit;
+        this.actual = actual;
+        this.contextId = contextId;
+        this.name = "BudgetExceededError";
+      }
+    };
+    _stack = [];
+    _budgetViolationCount = 0;
+  }
+});
 
 // src/runtime-watchdog.ts
-var STALL_THRESHOLD_MS = 1e4;
-var TRACE_STORM_RATE = 500;
-var _lastActivityMs = Date.now();
-var _lastEventCount = 0;
-var _alertCount = 0;
-var _alerts = [];
 function recordActivity(eventCount) {
   const now = Date.now();
   const elapsed = now - _lastActivityMs;
@@ -5450,33 +3610,19 @@ function resetWatchdog() {
   _alertCount = 0;
   _alerts.length = 0;
 }
+var STALL_THRESHOLD_MS, TRACE_STORM_RATE, _lastActivityMs, _lastEventCount, _alertCount, _alerts;
+var init_runtime_watchdog = __esm({
+  "src/runtime-watchdog.ts"() {
+    STALL_THRESHOLD_MS = 1e4;
+    TRACE_STORM_RATE = 500;
+    _lastActivityMs = Date.now();
+    _lastEventCount = 0;
+    _alertCount = 0;
+    _alerts = [];
+  }
+});
 
 // src/runtime-events.ts
-var SEVERITY_RANK = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-  fatal: 4
-};
-var DEFAULT_SEVERITY = {
-  "debug": "debug",
-  "trace": "info",
-  "assert-fail": "error",
-  "runtime-error": "fatal",
-  "contract-violation": "warn",
-  "mode-change": "info",
-  "governance-action": "warn",
-  "budget-exceeded": "error",
-  "watchdog-alert": "warn",
-  "context-aborted": "warn",
-  "effect-violation": "error"
-};
-var MAX_EVENTS = 1e3;
-var _buf = [];
-var _eventIdCounter = 0;
-var _traceCounter = 0;
-var _minSeverity = null;
 function getNextEventId() {
   return ++_eventIdCounter;
 }
@@ -5545,12 +3691,42 @@ function getEvents() {
 function clearEvents() {
   _buf.length = 0;
 }
+var SEVERITY_RANK, DEFAULT_SEVERITY, MAX_EVENTS, _buf, _eventIdCounter, _traceCounter, _minSeverity;
+var init_runtime_events = __esm({
+  "src/runtime-events.ts"() {
+    init_runtime_contracts();
+    init_runtime_governance();
+    init_runtime_budget();
+    init_runtime_watchdog();
+    SEVERITY_RANK = {
+      debug: 0,
+      info: 1,
+      warn: 2,
+      error: 3,
+      fatal: 4
+    };
+    DEFAULT_SEVERITY = {
+      "debug": "debug",
+      "trace": "info",
+      "assert-fail": "error",
+      "runtime-error": "fatal",
+      "contract-violation": "warn",
+      "mode-change": "info",
+      "governance-action": "warn",
+      "budget-exceeded": "error",
+      "watchdog-alert": "warn",
+      "context-aborted": "warn",
+      "effect-violation": "error"
+    };
+    MAX_EVENTS = 1e3;
+    _buf = [];
+    _eventIdCounter = 0;
+    _traceCounter = 0;
+    _minSeverity = null;
+  }
+});
 
 // src/runtime-context.ts
-var _contexts = /* @__PURE__ */ new Map();
-var _contextStack = [];
-var _abortedIds = /* @__PURE__ */ new Set();
-var _counter = 0;
 function nextContextId() {
   return `ctx-${++_counter}`;
 }
@@ -5591,6 +3767,15 @@ function resetContexts() {
   _abortedIds.clear();
   _counter = 0;
 }
+var _contexts, _contextStack, _abortedIds, _counter;
+var init_runtime_context = __esm({
+  "src/runtime-context.ts"() {
+    _contexts = /* @__PURE__ */ new Map();
+    _contextStack = [];
+    _abortedIds = /* @__PURE__ */ new Set();
+    _counter = 0;
+  }
+});
 
 // src/result-type.ts
 function ok(value) {
@@ -5659,269 +3844,259 @@ function fromThrown(e, code = "UNKNOWN") {
   }
   return err(code, String(e));
 }
+var init_result_type = __esm({
+  "src/result-type.ts"() {
+  }
+});
 
 // src/return-signal.ts
-var ReturnSignal = class {
-  constructor(value) {
-    this.value = value;
-  }
-};
 function isReturnSignal(e) {
   return e instanceof ReturnSignal;
 }
+var ReturnSignal;
+var init_return_signal = __esm({
+  "src/return-signal.ts"() {
+    ReturnSignal = class {
+      constructor(value) {
+        this.value = value;
+      }
+    };
+  }
+});
+
+// src/bytecode.ts
+var init_bytecode = __esm({
+  "src/bytecode.ts"() {
+  }
+});
 
 // src/compiler.ts
-var BytecodeCompiler = class {
-  compile(node) {
-    const chunk = {
-      instructions: [],
-      constants: [],
-      name: "main"
-    };
-    this.compileExpr(node, chunk);
-    this.emit(chunk, 25 /* HALT */);
-    return chunk;
-  }
-  compileExpr(node, chunk) {
-    switch (node.kind) {
-      case "literal":
-        this.compileLiteral(node, chunk);
-        break;
-      case "variable":
-        this.compileVariable(node, chunk);
-        break;
-      case "sexpr":
-        this.compileSExpr(node, chunk);
-        break;
-      case "block":
-        this.compileBlock(node, chunk);
-        break;
-      default:
+var BytecodeCompiler;
+var init_compiler = __esm({
+  "src/compiler.ts"() {
+    init_bytecode();
+    BytecodeCompiler = class {
+      compile(node) {
+        const chunk = {
+          instructions: [],
+          constants: [],
+          name: "main"
+        };
+        this.compileExpr(node, chunk);
         this.emit(chunk, 25 /* HALT */);
-        break;
-    }
-  }
-  compileLiteral(node, chunk) {
-    if (node.type === "symbol" && typeof node.value === "string") {
-      const bareName = node.value;
-      if (bareName !== "true" && bareName !== "false" && bareName !== "null") {
-        this.emit(chunk, 1 /* PUSH_VAR */, "$" + bareName);
-        return;
+        return chunk;
       }
-    }
-    const idx = this.addConst(chunk, node.value);
-    this.emit(chunk, 0 /* PUSH_CONST */, idx);
-  }
-  compileVariable(node, chunk) {
-    this.emit(chunk, 1 /* PUSH_VAR */, node.name);
-  }
-  compileSExpr(node, chunk) {
-    const op = node.op;
-    switch (op) {
-      case "if":
-        this.compileIf(node, chunk);
-        return;
-      case "define":
-        this.compileDefine(node, chunk);
-        return;
-      case "do":
-        this.compileDo(node, chunk);
-        return;
-      case "list":
-        this.compileList(node, chunk);
-        return;
-      case "not":
-        if (node.args.length >= 1) {
-          this.compileExpr(node.args[0], chunk);
-          this.emit(chunk, 22 /* NOT */);
-        }
-        return;
-      case "and":
-        this.compileAnd(node, chunk);
-        return;
-      case "or":
-        this.compileOr(node, chunk);
-        return;
-      case "get":
-      case ".":
-        if (node.args.length >= 2) {
-          this.compileExpr(node.args[0], chunk);
-          const field = node.args[1];
-          if (field.kind === "literal") {
-            this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
-          } else {
+      compileExpr(node, chunk) {
+        switch (node.kind) {
+          case "literal":
+            this.compileLiteral(node, chunk);
+            break;
+          case "variable":
+            this.compileVariable(node, chunk);
+            break;
+          case "sexpr":
+            this.compileSExpr(node, chunk);
+            break;
+          case "block":
+            this.compileBlock(node, chunk);
+            break;
+          default:
             this.emit(chunk, 25 /* HALT */);
+            break;
+        }
+      }
+      compileLiteral(node, chunk) {
+        if (node.type === "symbol" && typeof node.value === "string") {
+          const bareName = node.value;
+          if (bareName !== "true" && bareName !== "false" && bareName !== "null") {
+            this.emit(chunk, 1 /* PUSH_VAR */, "$" + bareName);
+            return;
           }
         }
-        return;
-    }
-    const binaryOps = {
-      "+": 9 /* ADD */,
-      "-": 10 /* SUB */,
-      "*": 11 /* MUL */,
-      "/": 12 /* DIV */,
-      "%": 13 /* MOD */,
-      "mod": 13 /* MOD */,
-      "==": 14 /* EQ */,
-      "=": 14 /* EQ */,
-      "!=": 19 /* NEQ */,
-      "<": 15 /* LT */,
-      ">": 16 /* GT */,
-      "<=": 17 /* LE */,
-      ">=": 18 /* GE */
-    };
-    if (binaryOps[op] !== void 0) {
-      if (node.args.length >= 2) {
+        const idx = this.addConst(chunk, node.value);
+        this.emit(chunk, 0 /* PUSH_CONST */, idx);
+      }
+      compileVariable(node, chunk) {
+        this.emit(chunk, 1 /* PUSH_VAR */, node.name);
+      }
+      compileSExpr(node, chunk) {
+        const op = node.op;
+        switch (op) {
+          case "if":
+            this.compileIf(node, chunk);
+            return;
+          case "define":
+            this.compileDefine(node, chunk);
+            return;
+          case "do":
+            this.compileDo(node, chunk);
+            return;
+          case "list":
+            this.compileList(node, chunk);
+            return;
+          case "not":
+            if (node.args.length >= 1) {
+              this.compileExpr(node.args[0], chunk);
+              this.emit(chunk, 22 /* NOT */);
+            }
+            return;
+          case "and":
+            this.compileAnd(node, chunk);
+            return;
+          case "or":
+            this.compileOr(node, chunk);
+            return;
+          case "get":
+          case ".":
+            if (node.args.length >= 2) {
+              this.compileExpr(node.args[0], chunk);
+              const field = node.args[1];
+              if (field.kind === "literal") {
+                this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
+              } else {
+                this.emit(chunk, 25 /* HALT */);
+              }
+            }
+            return;
+        }
+        const binaryOps = {
+          "+": 9 /* ADD */,
+          "-": 10 /* SUB */,
+          "*": 11 /* MUL */,
+          "/": 12 /* DIV */,
+          "%": 13 /* MOD */,
+          "mod": 13 /* MOD */,
+          "==": 14 /* EQ */,
+          "=": 14 /* EQ */,
+          "!=": 19 /* NEQ */,
+          "<": 15 /* LT */,
+          ">": 16 /* GT */,
+          "<=": 17 /* LE */,
+          ">=": 18 /* GE */
+        };
+        if (binaryOps[op] !== void 0) {
+          if (node.args.length >= 2) {
+            this.compileExpr(node.args[0], chunk);
+            this.compileExpr(node.args[1], chunk);
+            this.emit(chunk, binaryOps[op]);
+          } else if (node.args.length === 1) {
+            if (op === "-") {
+              const zeroIdx = this.addConst(chunk, 0);
+              this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
+              this.compileExpr(node.args[0], chunk);
+              this.emit(chunk, 10 /* SUB */);
+            } else {
+              this.compileExpr(node.args[0], chunk);
+            }
+          }
+          return;
+        }
+        this.emit(chunk, 25 /* HALT */);
+      }
+      compileIf(node, chunk) {
+        if (node.args.length < 2) {
+          this.emit(chunk, 25 /* HALT */);
+          return;
+        }
         this.compileExpr(node.args[0], chunk);
+        const jumpIfFalseIdx = chunk.instructions.length;
+        this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
         this.compileExpr(node.args[1], chunk);
-        this.emit(chunk, binaryOps[op]);
-      } else if (node.args.length === 1) {
-        if (op === "-") {
-          const zeroIdx = this.addConst(chunk, 0);
-          this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
-          this.compileExpr(node.args[0], chunk);
-          this.emit(chunk, 10 /* SUB */);
+        const jumpIdx = chunk.instructions.length;
+        this.emit(chunk, 5 /* JUMP */, 0);
+        const elseStart = chunk.instructions.length;
+        chunk.instructions[jumpIfFalseIdx].arg = elseStart;
+        if (node.args.length >= 3) {
+          this.compileExpr(node.args[2], chunk);
         } else {
-          this.compileExpr(node.args[0], chunk);
+          const nullIdx = this.addConst(chunk, null);
+          this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+        }
+        const end = chunk.instructions.length;
+        chunk.instructions[jumpIdx].arg = end;
+      }
+      compileDefine(node, chunk) {
+        if (node.args.length < 2) {
+          this.emit(chunk, 25 /* HALT */);
+          return;
+        }
+        const varNode = node.args[0];
+        const valNode = node.args[1];
+        this.compileExpr(valNode, chunk);
+        const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
+        this.emit(chunk, 2 /* SET_VAR */, name);
+        const nullIdx = this.addConst(chunk, null);
+        this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+      }
+      compileDo(node, chunk) {
+        if (node.args.length === 0) {
+          const nullIdx = this.addConst(chunk, null);
+          this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
+          return;
+        }
+        for (let i = 0; i < node.args.length; i++) {
+          this.compileExpr(node.args[i], chunk);
+          if (i < node.args.length - 1) {
+            this.emit(chunk, 7 /* POP */);
+          }
         }
       }
-      return;
-    }
-    this.emit(chunk, 25 /* HALT */);
-  }
-  compileIf(node, chunk) {
-    if (node.args.length < 2) {
-      this.emit(chunk, 25 /* HALT */);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    const jumpIfFalseIdx = chunk.instructions.length;
-    this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
-    this.compileExpr(node.args[1], chunk);
-    const jumpIdx = chunk.instructions.length;
-    this.emit(chunk, 5 /* JUMP */, 0);
-    const elseStart = chunk.instructions.length;
-    chunk.instructions[jumpIfFalseIdx].arg = elseStart;
-    if (node.args.length >= 3) {
-      this.compileExpr(node.args[2], chunk);
-    } else {
-      const nullIdx = this.addConst(chunk, null);
-      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-    }
-    const end = chunk.instructions.length;
-    chunk.instructions[jumpIdx].arg = end;
-  }
-  compileDefine(node, chunk) {
-    if (node.args.length < 2) {
-      this.emit(chunk, 25 /* HALT */);
-      return;
-    }
-    const varNode = node.args[0];
-    const valNode = node.args[1];
-    this.compileExpr(valNode, chunk);
-    const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
-    this.emit(chunk, 2 /* SET_VAR */, name);
-    const nullIdx = this.addConst(chunk, null);
-    this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-  }
-  compileDo(node, chunk) {
-    if (node.args.length === 0) {
-      const nullIdx = this.addConst(chunk, null);
-      this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-      return;
-    }
-    for (let i = 0; i < node.args.length; i++) {
-      this.compileExpr(node.args[i], chunk);
-      if (i < node.args.length - 1) {
-        this.emit(chunk, 7 /* POP */);
+      compileList(node, chunk) {
+        for (const arg of node.args) {
+          this.compileExpr(arg, chunk);
+        }
+        this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
       }
-    }
+      compileAnd(node, chunk) {
+        if (node.args.length === 0) {
+          const idx = this.addConst(chunk, true);
+          this.emit(chunk, 0 /* PUSH_CONST */, idx);
+          return;
+        }
+        if (node.args.length === 1) {
+          this.compileExpr(node.args[0], chunk);
+          return;
+        }
+        this.compileExpr(node.args[0], chunk);
+        this.compileExpr(node.args[1], chunk);
+        this.emit(chunk, 20 /* AND */);
+      }
+      compileOr(node, chunk) {
+        if (node.args.length === 0) {
+          const idx = this.addConst(chunk, false);
+          this.emit(chunk, 0 /* PUSH_CONST */, idx);
+          return;
+        }
+        if (node.args.length === 1) {
+          this.compileExpr(node.args[0], chunk);
+          return;
+        }
+        this.compileExpr(node.args[0], chunk);
+        this.compileExpr(node.args[1], chunk);
+        this.emit(chunk, 21 /* OR */);
+      }
+      compileBlock(node, chunk) {
+        this.emit(chunk, 25 /* HALT */);
+      }
+      addConst(chunk, value) {
+        chunk.constants.push(value);
+        return chunk.constants.length - 1;
+      }
+      emit(chunk, op, arg) {
+        const instr = { op };
+        if (arg !== void 0) instr.arg = arg;
+        chunk.instructions.push(instr);
+      }
+    };
   }
-  compileList(node, chunk) {
-    for (const arg of node.args) {
-      this.compileExpr(arg, chunk);
-    }
-    this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
-  }
-  compileAnd(node, chunk) {
-    if (node.args.length === 0) {
-      const idx = this.addConst(chunk, true);
-      this.emit(chunk, 0 /* PUSH_CONST */, idx);
-      return;
-    }
-    if (node.args.length === 1) {
-      this.compileExpr(node.args[0], chunk);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    this.compileExpr(node.args[1], chunk);
-    this.emit(chunk, 20 /* AND */);
-  }
-  compileOr(node, chunk) {
-    if (node.args.length === 0) {
-      const idx = this.addConst(chunk, false);
-      this.emit(chunk, 0 /* PUSH_CONST */, idx);
-      return;
-    }
-    if (node.args.length === 1) {
-      this.compileExpr(node.args[0], chunk);
-      return;
-    }
-    this.compileExpr(node.args[0], chunk);
-    this.compileExpr(node.args[1], chunk);
-    this.emit(chunk, 21 /* OR */);
-  }
-  compileBlock(node, chunk) {
-    this.emit(chunk, 25 /* HALT */);
-  }
-  addConst(chunk, value) {
-    chunk.constants.push(value);
-    return chunk.constants.length - 1;
-  }
-  emit(chunk, op, arg) {
-    const instr = { op };
-    if (arg !== void 0) instr.arg = arg;
-    chunk.instructions.push(instr);
-  }
-};
+});
 
 // src/vm-eligible.ts
-var vmFunctionRegistry = /* @__PURE__ */ new Map();
 function registerVMFunction(name, vmFunc) {
   if (vmFunc) {
     vmFunctionRegistry.set(name, vmFunc);
   }
 }
-var VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
-  // 산술
-  "+",
-  "-",
-  "*",
-  "/",
-  "%",
-  "mod",
-  // 비교
-  "=",
-  "==",
-  "!=",
-  "<",
-  ">",
-  "<=",
-  ">=",
-  // 논리
-  "and",
-  "or",
-  "not",
-  // 제어
-  "if",
-  "do",
-  // 데이터
-  "list",
-  "get",
-  ".",
-  // 정의
-  "define"
-]);
 function isVMEligible(node) {
   if (!node || typeof node !== "object") {
     return false;
@@ -5956,13 +4131,44 @@ function isVMEligible(node) {
       return false;
   }
 }
-
-// src/eval-special-forms.ts
-init_errors();
+var vmFunctionRegistry, VM_SUPPORTED_OPS;
+var init_vm_eligible = __esm({
+  "src/vm-eligible.ts"() {
+    vmFunctionRegistry = /* @__PURE__ */ new Map();
+    VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
+      // 산술
+      "+",
+      "-",
+      "*",
+      "/",
+      "%",
+      "mod",
+      // 비교
+      "=",
+      "==",
+      "!=",
+      "<",
+      ">",
+      "<=",
+      ">=",
+      // 논리
+      "and",
+      "or",
+      "not",
+      // 제어
+      "if",
+      "do",
+      // 데이터
+      "list",
+      "get",
+      ".",
+      // 정의
+      "define"
+    ]);
+  }
+});
 
 // src/stdlib-property.ts
-var propRegistry = /* @__PURE__ */ new Map();
-var RAND_STRINGS = "abcdefghijklmnopqrstuvwxyz0123456789 _-";
 function genValue(type) {
   const t = type.replace(/^:/, "").toLowerCase();
   switch (t) {
@@ -6053,14 +4259,18 @@ function runProp(prop, callFn, callCheck) {
     durationMs: Date.now() - start
   };
 }
+var propRegistry, RAND_STRINGS;
+var init_stdlib_property = __esm({
+  "src/stdlib-property.ts"() {
+    propRegistry = /* @__PURE__ */ new Map();
+    RAND_STRINGS = "abcdefghijklmnopqrstuvwxyz0123456789 _-";
+  }
+});
 
 // src/eval-special-forms.ts
 function checkBudgetInLoop() {
   if (hasBudget()) checkBudget(Date.now(), 0, 0);
 }
-var _vmCompiler = new BytecodeCompiler();
-var fnMetaRegistry = /* @__PURE__ */ new Map();
-var META_KEYS = /* @__PURE__ */ new Set(["doc", "returns", "context", "effects", "examples", "property"]);
 function extractMapMeta(mapNode) {
   if (mapNode?.kind !== "block" || mapNode?.type !== "Map") return null;
   const fields = mapNode.fields;
@@ -6094,84 +4304,6 @@ function inferType2(value) {
   }
   return void 0;
 }
-var EFFECT_CATALOG = /* @__PURE__ */ new Map([
-  // HTTP 클라이언트
-  ["http_get", "http"],
-  ["http-get", "http"],
-  ["http_post", "http"],
-  ["http-post", "http"],
-  ["http_put", "http"],
-  ["http-put", "http"],
-  ["http_delete", "http"],
-  ["http-delete", "http"],
-  ["http_patch", "http"],
-  ["http-patch", "http"],
-  ["http_get_bearer", "http"],
-  ["http_post_bearer", "http"],
-  ["http_post_json", "http"],
-  ["http_get_json", "http"],
-  // WebSocket — dec-011: L0=http, L1=net (alias 흡수)
-  ["ws_send", "http"],
-  ["ws-send", "http"],
-  // 파일 I/O
-  ["file_read", "file-read"],
-  ["file-read", "file-read"],
-  ["file_write", "file-write"],
-  ["file-write", "file-write"],
-  ["file_append", "file-write"],
-  ["file-append", "file-write"],
-  ["file_delete", "file-write"],
-  ["file-delete", "file-write"],
-  ["file_exists", "file-read"],
-  ["file-exists", "file-read"],
-  ["file_list", "file-read"],
-  ["file_append_line", "file-write"],
-  ["file-append-line", "file-write"],
-  // DB
-  ["db_query", "db-read"],
-  ["db-query", "db-read"],
-  ["db_execute", "db-write"],
-  ["db-execute", "db-write"],
-  ["db_insert", "db-write"],
-  ["db-insert", "db-write"],
-  ["db_update", "db-write"],
-  ["db-update", "db-write"],
-  ["db_delete", "db-write"],
-  ["db-delete", "db-write"],
-  ["db_transaction", "db-write"],
-  ["db-transaction", "db-write"],
-  ["db_exec", "db-write"],
-  ["db-exec", "db-write"],
-  // alias of db-execute
-  // Shell
-  ["shell_exec", "shell"],
-  ["shell-exec", "shell"],
-  ["shell_exec_result", "shell"],
-  ["shell-exec-result", "shell"],
-  ["shell_run", "shell"],
-  ["process_spawn", "shell"],
-  ["process-spawn", "shell"],
-  // I/O (stdout)
-  ["println", "io"],
-  ["print", "io"],
-  ["log/info", "io"],
-  ["log/warn", "io"],
-  ["log/error", "io"],
-  // 시간/랜덤 (non-determinism)
-  ["now", "time"],
-  ["timestamp", "time"],
-  ["now_ms", "time"],
-  ["now-ms", "time"],
-  ["sleep", "time"],
-  ["random", "random"],
-  ["rand-int", "random"],
-  ["rand", "random"],
-  // alias of random
-  ["uuid", "random"],
-  // HTTP 서버 시작
-  ["server_start", "server"],
-  ["server-start", "server"]
-]);
 function collectBodyEffects(node, found) {
   if (!node) return;
   if (node.kind === "sexpr") {
@@ -6394,7 +4526,7 @@ function evalSpecialForm(interp2, op, expr2) {
   }
   if (op === "use") {
     if (expr2.args.length < 1) throwArgCount("use", ">=1", expr2.args.length, expr2.line);
-    const fs22 = require("fs");
+    const fs21 = require("fs");
     const path19 = require("path");
     let loadedAny = false;
     for (const arg of expr2.args) {
@@ -6412,7 +4544,7 @@ function evalSpecialForm(interp2, op, expr2) {
       ];
       let absPath = null;
       for (const c of candidates) {
-        if (fs22.existsSync(c) && fs22.statSync(c).isFile()) {
+        if (fs21.existsSync(c) && fs21.statSync(c).isFile()) {
           absPath = c;
           break;
         }
@@ -6430,7 +4562,7 @@ function evalSpecialForm(interp2, op, expr2) {
       if (importedSet.has(absPath)) continue;
       importedSet.add(absPath);
       interp2.importedFiles = importedSet;
-      const src = fs22.readFileSync(absPath, "utf-8");
+      const src = fs21.readFileSync(absPath, "utf-8");
       const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
       const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
       interp2.interpret(parse3(lex2(src, absPath)));
@@ -7496,6 +5628,29 @@ Test Results: ${r.passed}/${total} passed`);
       return callFn(fn, allArgs);
     };
   }
+  if (op === "safe-get" || op === "safe_get") {
+    if (expr2.args.length < 2) throwArgCount("safe-get", "2+", expr2.args.length, expr2.line);
+    const sgColl = ev(expr2.args[0]);
+    let sgKey = ev(expr2.args[1]);
+    if (sgKey !== null && typeof sgKey === "object" && sgKey.kind === "keyword") sgKey = sgKey.name;
+    const sgHasDefault = expr2.args.length >= 3;
+    const sgDefault = sgHasDefault ? ev(expr2.args[2]) : void 0;
+    let sgVal = null;
+    if (sgColl instanceof Map) {
+      const k = String(sgKey).replace(/^:/, "");
+      sgVal = sgColl.has(k) ? sgColl.get(k) : sgColl.has(String(sgKey)) ? sgColl.get(String(sgKey)) : null;
+    } else if (Array.isArray(sgColl)) {
+      sgVal = typeof sgKey === "number" ? sgColl[sgKey] ?? null : null;
+    } else if (sgColl !== null && typeof sgColl === "object") {
+      const k = typeof sgKey === "string" && sgKey.startsWith(":") ? sgKey.slice(1) : String(sgKey);
+      sgVal = sgColl[k] !== void 0 ? sgColl[k] : sgColl[String(sgKey)] !== void 0 ? sgColl[String(sgKey)] : null;
+    }
+    if (sgVal === null || sgVal === void 0) {
+      if (sgHasDefault) return sgDefault;
+      throw new Error(`safe-get: key '${sgKey}' is nil \u2014 use (safe-get map key default) for optional fields`);
+    }
+    return sgVal;
+  }
   if (op === "group-by" || op === "group_by") {
     if (expr2.args.length < 2) throwArgCount("group-by", "2", expr2.args.length, expr2.line);
     const keyFn = ev(expr2.args[0]);
@@ -7972,9 +6127,117 @@ function evalCond(interp2, args3) {
   }
   return null;
 }
+var _vmCompiler, fnMetaRegistry, META_KEYS, EFFECT_CATALOG;
+var init_eval_special_forms = __esm({
+  "src/eval-special-forms.ts"() {
+    init_ast();
+    init_tco();
+    init_runtime_events();
+    init_runtime_contracts();
+    init_runtime_budget();
+    init_runtime_context();
+    init_result_type();
+    init_return_signal();
+    init_compiler();
+    init_vm_eligible();
+    init_errors();
+    init_stdlib_property();
+    _vmCompiler = new BytecodeCompiler();
+    fnMetaRegistry = /* @__PURE__ */ new Map();
+    META_KEYS = /* @__PURE__ */ new Set(["doc", "returns", "context", "effects", "examples", "property"]);
+    EFFECT_CATALOG = /* @__PURE__ */ new Map([
+      // HTTP 클라이언트
+      ["http_get", "http"],
+      ["http-get", "http"],
+      ["http_post", "http"],
+      ["http-post", "http"],
+      ["http_put", "http"],
+      ["http-put", "http"],
+      ["http_delete", "http"],
+      ["http-delete", "http"],
+      ["http_patch", "http"],
+      ["http-patch", "http"],
+      ["http_get_bearer", "http"],
+      ["http_post_bearer", "http"],
+      ["http_post_json", "http"],
+      ["http_get_json", "http"],
+      // WebSocket — dec-011: L0=http, L1=net (alias 흡수)
+      ["ws_send", "http"],
+      ["ws-send", "http"],
+      // 파일 I/O
+      ["file_read", "file-read"],
+      ["file-read", "file-read"],
+      ["file_write", "file-write"],
+      ["file-write", "file-write"],
+      ["file_append", "file-write"],
+      ["file-append", "file-write"],
+      ["file_delete", "file-write"],
+      ["file-delete", "file-write"],
+      ["file_exists", "file-read"],
+      ["file-exists", "file-read"],
+      ["file_list", "file-read"],
+      ["file_append_line", "file-write"],
+      ["file-append-line", "file-write"],
+      // DB
+      ["db_query", "db-read"],
+      ["db-query", "db-read"],
+      ["db_execute", "db-write"],
+      ["db-execute", "db-write"],
+      ["db_insert", "db-write"],
+      ["db-insert", "db-write"],
+      ["db_update", "db-write"],
+      ["db-update", "db-write"],
+      ["db_delete", "db-write"],
+      ["db-delete", "db-write"],
+      ["db_transaction", "db-write"],
+      ["db-transaction", "db-write"],
+      ["db_exec", "db-write"],
+      ["db-exec", "db-write"],
+      // alias of db-execute
+      // Shell
+      ["shell_exec", "shell"],
+      ["shell-exec", "shell"],
+      ["shell_exec_result", "shell"],
+      ["shell-exec-result", "shell"],
+      ["shell_run", "shell"],
+      ["process_spawn", "shell"],
+      ["process-spawn", "shell"],
+      // I/O (stdout)
+      ["println", "io"],
+      ["print", "io"],
+      ["log/info", "io"],
+      ["log/warn", "io"],
+      ["log/error", "io"],
+      // 시간/랜덤 (non-determinism)
+      ["now", "time"],
+      ["timestamp", "time"],
+      ["now_ms", "time"],
+      ["now-ms", "time"],
+      ["sleep", "time"],
+      ["random", "random"],
+      ["rand-int", "random"],
+      ["rand", "random"],
+      // alias of random
+      ["uuid", "random"],
+      // HTTP 서버 시작
+      ["server_start", "server"],
+      ["server-start", "server"]
+    ]);
+  }
+});
 
 // src/effect-enforcer.ts
-var _validTags = new Set(EFFECT_TAGS);
+var effect_enforcer_exports = {};
+__export(effect_enforcer_exports, {
+  _resetForTesting: () => _resetForTesting,
+  enforceCall: () => enforceCall,
+  getChainNames: () => getChainNames,
+  getCurrentFrame: () => getCurrentFrame,
+  getDepth: () => getDepth,
+  popFrame: () => popFrame,
+  pushFrame: () => pushFrame,
+  resolveFnAllowed: () => resolveFnAllowed
+});
 function parseEffectTags(raw) {
   if (!raw) return null;
   if (!Array.isArray(raw)) return null;
@@ -7999,9 +6262,6 @@ function resolveCalleeEffects(name) {
   if (!meta || meta.effects === void 0) return void 0;
   return parseEffectTags(meta.effects);
 }
-var TRACE = process.env.EFFECT_STACK_TRACE === "1";
-var TRACE_PREFIX = "[effect-stack]";
-var _stack2 = [];
 function trace(...parts) {
   if (!TRACE) return;
   console.error(TRACE_PREFIX, ...parts);
@@ -8026,8 +6286,17 @@ function popFrame() {
   const frame = _stack2.pop();
   trace("pop", frame.fnName, "depth=" + _stack2.length);
 }
+function getDepth() {
+  return _stack2.length;
+}
+function getCurrentFrame() {
+  return _stack2[_stack2.length - 1];
+}
 function getChainNames() {
   return _stack2.map((f) => f.fnName);
+}
+function _resetForTesting() {
+  _stack2.length = 0;
 }
 function enforceCall(callee, span) {
   const cur = _stack2[_stack2.length - 1];
@@ -8094,9 +6363,21 @@ function enforceCall(callee, span) {
   }
   trace("ok", calleeName);
 }
+var _validTags, TRACE, TRACE_PREFIX, _stack2;
+var init_effect_enforcer = __esm({
+  "src/effect-enforcer.ts"() {
+    init_effect_types();
+    init_builtin_effects();
+    init_eval_special_forms();
+    init_runtime_events();
+    _validTags = new Set(EFFECT_TAGS);
+    TRACE = process.env.EFFECT_STACK_TRACE === "1";
+    TRACE_PREFIX = "[effect-stack]";
+    _stack2 = [];
+  }
+});
 
 // src/lazy-seq.ts
-var LAZY_SEQ = /* @__PURE__ */ Symbol("LAZY_SEQ");
 function lazySeq(head, tail) {
   return { [LAZY_SEQ]: true, head, tail };
 }
@@ -8143,419 +6424,446 @@ function rangeSeq(start, end) {
     () => rangeSeq(start + 1, end)
   );
 }
+var LAZY_SEQ;
+var init_lazy_seq = __esm({
+  "src/lazy-seq.ts"() {
+    LAZY_SEQ = /* @__PURE__ */ Symbol("LAZY_SEQ");
+  }
+});
 
 // src/context-window.ts
-var _idCounter = 0;
 function genId() {
   return `ctx-${Date.now()}-${++_idCounter}`;
 }
-var ContextManager = class {
-  constructor(maxTokens = 4096, strategy = "priority") {
-    this.window = {
-      maxTokens,
-      entries: [],
-      usedTokens: 0,
-      strategy
-    };
-  }
-  // 토큰 추정: JSON.stringify 길이 / 4 (근사값)
-  estimateTokens(content) {
-    try {
-      const str = typeof content === "string" ? content : JSON.stringify(content);
-      return Math.max(1, Math.ceil(str.length / 4));
-    } catch {
-      return 1;
-    }
-  }
-  hasRoom(tokens) {
-    return this.window.usedTokens + tokens <= this.window.maxTokens;
-  }
-  add(content, opts) {
-    const tokens = opts?.tokens ?? this.estimateTokens(content);
-    const priority = opts?.priority ?? 0.5;
-    const tags = opts?.tags ?? [];
-    const id = genId();
-    const entry = {
-      id,
-      content,
-      tokens,
-      priority,
-      timestamp: Date.now(),
-      tags
-    };
-    this.window.entries.push(entry);
-    this.window.usedTokens += tokens;
-    if (this.window.usedTokens > this.window.maxTokens) {
-      this.trim();
-    }
-    return id;
-  }
-  get(id) {
-    return this.window.entries.find((e) => e.id === id);
-  }
-  remove(id) {
-    const idx = this.window.entries.findIndex((e) => e.id === id);
-    if (idx !== -1) {
-      this.window.usedTokens -= this.window.entries[idx].tokens;
-      this.window.entries.splice(idx, 1);
-      if (this.window.usedTokens < 0) this.window.usedTokens = 0;
-    }
-  }
-  // 오래된/낮은 우선순위 항목 제거 — 용량이 확보될 때까지
-  trim() {
-    const removed = [];
-    if (this.window.usedTokens <= this.window.maxTokens) {
-      return removed;
-    }
-    const sorted = [...this.window.entries].sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      return a.timestamp - b.timestamp;
-    });
-    for (const candidate of sorted) {
-      if (this.window.usedTokens <= this.window.maxTokens) break;
-      const idx = this.window.entries.findIndex((e) => e.id === candidate.id);
-      if (idx !== -1) {
-        this.window.usedTokens -= this.window.entries[idx].tokens;
-        removed.push(this.window.entries[idx]);
-        this.window.entries.splice(idx, 1);
+var _idCounter, ContextManager;
+var init_context_window = __esm({
+  "src/context-window.ts"() {
+    _idCounter = 0;
+    ContextManager = class {
+      constructor(maxTokens = 4096, strategy = "priority") {
+        this.window = {
+          maxTokens,
+          entries: [],
+          usedTokens: 0,
+          strategy
+        };
       }
-    }
-    if (this.window.usedTokens < 0) this.window.usedTokens = 0;
-    return removed;
-  }
-  // 압축: fn이 entries를 받아 새 값 반환
-  compress(fn) {
-    return fn(this.window.entries);
-  }
-  getAll(tag) {
-    if (!tag) return [...this.window.entries];
-    return this.window.entries.filter((e) => e.tags.includes(tag));
-  }
-  stats() {
-    const used = this.window.usedTokens;
-    const max = this.window.maxTokens;
-    const percent = max > 0 ? Math.round(used / max * 100) : 0;
-    return { used, max, percent, count: this.window.entries.length };
-  }
-};
-
-// src/error-system.ts
-var AIErrorSystem = class {
-  constructor() {
-    this.strategies = [];
-  }
-  addStrategy(s) {
-    this.strategies.push(s);
-    return this;
-  }
-  /** 자동 복구 시도. 복구 성공 → ok(값), 실패 → err 그대로 */
-  handle(e) {
-    for (const s of this.strategies) {
-      if (s.condition(e)) {
+      // 토큰 추정: JSON.stringify 길이 / 4 (근사값)
+      estimateTokens(content) {
         try {
-          return ok(s.recover(e));
+          const str = typeof content === "string" ? content : JSON.stringify(content);
+          return Math.max(1, Math.ceil(str.length / 4));
         } catch {
+          return 1;
         }
       }
-    }
-    return e;
-  }
-  /** 기존 throw 에러 → 구조화된 Err */
-  classify(e) {
-    return fromThrown(e);
-  }
-  /** AI가 이해할 수 있는 한국어 설명 생성 */
-  explain(e) {
-    const categoryLabel = {
-      ["type-error" /* TYPE_ERROR */]: "\uD0C0\uC785 \uC624\uB958",
-      ["runtime-error" /* RUNTIME_ERROR */]: "\uB7F0\uD0C0\uC784 \uC624\uB958",
-      ["not-found" /* NOT_FOUND */]: "\uCC3E\uC744 \uC218 \uC5C6\uC74C",
-      ["arity-error" /* ARITY */]: "\uC778\uC790 \uC218 \uC624\uB958",
-      ["io-error" /* IO */]: "\uC785\uCD9C\uB825 \uC624\uB958",
-      ["ai-error" /* AI */]: "AI \uBE14\uB85D \uC624\uB958",
-      ["user-error" /* USER */]: "\uC0AC\uC6A9\uC790 \uC815\uC758 \uC624\uB958",
-      ["timeout" /* TIMEOUT */]: "\uD0C0\uC784\uC544\uC6C3"
+      hasRoom(tokens) {
+        return this.window.usedTokens + tokens <= this.window.maxTokens;
+      }
+      add(content, opts) {
+        const tokens = opts?.tokens ?? this.estimateTokens(content);
+        const priority = opts?.priority ?? 0.5;
+        const tags = opts?.tags ?? [];
+        const id = genId();
+        const entry = {
+          id,
+          content,
+          tokens,
+          priority,
+          timestamp: Date.now(),
+          tags
+        };
+        this.window.entries.push(entry);
+        this.window.usedTokens += tokens;
+        if (this.window.usedTokens > this.window.maxTokens) {
+          this.trim();
+        }
+        return id;
+      }
+      get(id) {
+        return this.window.entries.find((e) => e.id === id);
+      }
+      remove(id) {
+        const idx = this.window.entries.findIndex((e) => e.id === id);
+        if (idx !== -1) {
+          this.window.usedTokens -= this.window.entries[idx].tokens;
+          this.window.entries.splice(idx, 1);
+          if (this.window.usedTokens < 0) this.window.usedTokens = 0;
+        }
+      }
+      // 오래된/낮은 우선순위 항목 제거 — 용량이 확보될 때까지
+      trim() {
+        const removed = [];
+        if (this.window.usedTokens <= this.window.maxTokens) {
+          return removed;
+        }
+        const sorted = [...this.window.entries].sort((a, b) => {
+          if (a.priority !== b.priority) return a.priority - b.priority;
+          return a.timestamp - b.timestamp;
+        });
+        for (const candidate of sorted) {
+          if (this.window.usedTokens <= this.window.maxTokens) break;
+          const idx = this.window.entries.findIndex((e) => e.id === candidate.id);
+          if (idx !== -1) {
+            this.window.usedTokens -= this.window.entries[idx].tokens;
+            removed.push(this.window.entries[idx]);
+            this.window.entries.splice(idx, 1);
+          }
+        }
+        if (this.window.usedTokens < 0) this.window.usedTokens = 0;
+        return removed;
+      }
+      // 압축: fn이 entries를 받아 새 값 반환
+      compress(fn) {
+        return fn(this.window.entries);
+      }
+      getAll(tag) {
+        if (!tag) return [...this.window.entries];
+        return this.window.entries.filter((e) => e.tags.includes(tag));
+      }
+      stats() {
+        const used = this.window.usedTokens;
+        const max = this.window.maxTokens;
+        const percent = max > 0 ? Math.round(used / max * 100) : 0;
+        return { used, max, percent, count: this.window.entries.length };
+      }
     };
-    const label = categoryLabel[e.category] ?? "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958";
-    let explanation = `[${label}] ${e.message}`;
-    if (e.hint) {
-      explanation += `
-  \uD78C\uD2B8: ${e.hint}`;
-    }
-    if (e.recoverable) {
-      explanation += "\n  \uBCF5\uAD6C \uAC00\uB2A5: \uC790\uB3D9 \uBCF5\uAD6C\uB97C \uC2DC\uB3C4\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
-    }
-    return explanation;
   }
-  canRecover(e) {
-    if (e.recoverable) return true;
-    return this.strategies.some((s) => s.condition(e));
-  }
-};
-var defaultErrorSystem = new AIErrorSystem();
-defaultErrorSystem.addStrategy({
-  name: "division-by-zero",
-  condition: (e) => e.message.toLowerCase().includes("division by zero") || e.message.toLowerCase().includes("divide by zero") || e.category === "runtime-error" /* RUNTIME_ERROR */ && e.code === "DIV_ZERO",
-  recover: () => 0
 });
-defaultErrorSystem.addStrategy({
-  name: "not-found-null",
-  condition: (e) => e.category === "not-found" /* NOT_FOUND */ && e.recoverable === true,
-  recover: () => null
+
+// src/error-system.ts
+var AIErrorSystem, defaultErrorSystem;
+var init_error_system = __esm({
+  "src/error-system.ts"() {
+    init_result_type();
+    AIErrorSystem = class {
+      constructor() {
+        this.strategies = [];
+      }
+      addStrategy(s) {
+        this.strategies.push(s);
+        return this;
+      }
+      /** 자동 복구 시도. 복구 성공 → ok(값), 실패 → err 그대로 */
+      handle(e) {
+        for (const s of this.strategies) {
+          if (s.condition(e)) {
+            try {
+              return ok(s.recover(e));
+            } catch {
+            }
+          }
+        }
+        return e;
+      }
+      /** 기존 throw 에러 → 구조화된 Err */
+      classify(e) {
+        return fromThrown(e);
+      }
+      /** AI가 이해할 수 있는 한국어 설명 생성 */
+      explain(e) {
+        const categoryLabel = {
+          ["type-error" /* TYPE_ERROR */]: "\uD0C0\uC785 \uC624\uB958",
+          ["runtime-error" /* RUNTIME_ERROR */]: "\uB7F0\uD0C0\uC784 \uC624\uB958",
+          ["not-found" /* NOT_FOUND */]: "\uCC3E\uC744 \uC218 \uC5C6\uC74C",
+          ["arity-error" /* ARITY */]: "\uC778\uC790 \uC218 \uC624\uB958",
+          ["io-error" /* IO */]: "\uC785\uCD9C\uB825 \uC624\uB958",
+          ["ai-error" /* AI */]: "AI \uBE14\uB85D \uC624\uB958",
+          ["user-error" /* USER */]: "\uC0AC\uC6A9\uC790 \uC815\uC758 \uC624\uB958",
+          ["timeout" /* TIMEOUT */]: "\uD0C0\uC784\uC544\uC6C3"
+        };
+        const label = categoryLabel[e.category] ?? "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958";
+        let explanation = `[${label}] ${e.message}`;
+        if (e.hint) {
+          explanation += `
+  \uD78C\uD2B8: ${e.hint}`;
+        }
+        if (e.recoverable) {
+          explanation += "\n  \uBCF5\uAD6C \uAC00\uB2A5: \uC790\uB3D9 \uBCF5\uAD6C\uB97C \uC2DC\uB3C4\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+        }
+        return explanation;
+      }
+      canRecover(e) {
+        if (e.recoverable) return true;
+        return this.strategies.some((s) => s.condition(e));
+      }
+    };
+    defaultErrorSystem = new AIErrorSystem();
+    defaultErrorSystem.addStrategy({
+      name: "division-by-zero",
+      condition: (e) => e.message.toLowerCase().includes("division by zero") || e.message.toLowerCase().includes("divide by zero") || e.category === "runtime-error" /* RUNTIME_ERROR */ && e.code === "DIV_ZERO",
+      recover: () => 0
+    });
+    defaultErrorSystem.addStrategy({
+      name: "not-found-null",
+      condition: (e) => e.category === "not-found" /* NOT_FOUND */ && e.recoverable === true,
+      recover: () => null
+    });
+  }
 });
 
 // src/tool-registry.ts
-var ToolRegistry = class {
-  constructor() {
-    this.tools = /* @__PURE__ */ new Map();
-  }
-  /** 도구 등록 (chainable) */
-  register(tool) {
-    this.tools.set(tool.name, tool);
-    return this;
-  }
-  /** 도구 조회 */
-  get(name) {
-    return this.tools.get(name);
-  }
-  /** 모든 도구 목록 */
-  listAll() {
-    return Array.from(this.tools.values());
-  }
-  /** 비동기 도구 실행 */
-  async execute(name, args3) {
-    const start = Date.now();
-    const tool = this.tools.get(name);
-    if (!tool) {
-      return {
-        tool: name,
-        input: args3,
-        output: null,
-        durationMs: Date.now() - start,
-        success: false,
-        error: `Tool not found: ${name}`
-      };
-    }
-    const timeout = tool.timeout ?? 5e3;
-    try {
-      const resultPromise = Promise.resolve(tool.execute(args3));
-      const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error(`Tool timeout: ${name} (${timeout}ms)`)), timeout)
-      );
-      const output = await Promise.race([resultPromise, timeoutPromise]);
-      return {
-        tool: name,
-        input: args3,
-        output,
-        durationMs: Date.now() - start,
-        success: true
-      };
-    } catch (e) {
-      return {
-        tool: name,
-        input: args3,
-        output: null,
-        durationMs: Date.now() - start,
-        success: false,
-        error: String(e?.message ?? e)
-      };
-    }
-  }
-  /** 동기 도구 실행 (비동기 도구는 await 없이 실행) */
-  executeSync(name, args3) {
-    const start = Date.now();
-    const tool = this.tools.get(name);
-    if (!tool) {
-      return {
-        tool: name,
-        input: args3,
-        output: null,
-        durationMs: Date.now() - start,
-        success: false,
-        error: `Tool not found: ${name}`
-      };
-    }
-    try {
-      const output = tool.execute(args3);
-      return {
-        tool: name,
-        input: args3,
-        output,
-        durationMs: Date.now() - start,
-        success: true
-      };
-    } catch (e) {
-      return {
-        tool: name,
-        input: args3,
-        output: null,
-        durationMs: Date.now() - start,
-        success: false,
-        error: String(e?.message ?? e)
-      };
-    }
-  }
-};
 function makeSafeMathEval(expr2) {
   const safe = expr2.replace(/[^0-9+\-*/.() ]/g, "");
   return Function(`"use strict"; return (${safe})`)();
 }
-var globalToolRegistry = new ToolRegistry();
-globalToolRegistry.register({
-  name: "math",
-  description: '\uC218\uD559 \uD45C\uD604\uC2DD\uC744 \uACC4\uC0B0\uD569\uB2C8\uB2E4. \uC608: {expr: "2 + 3 * 4"}',
-  inputSchema: { expr: "string" },
-  outputSchema: "number",
-  execute: ({ expr: expr2 }) => makeSafeMathEval(String(expr2))
-});
-globalToolRegistry.register({
-  name: "str-upper",
-  description: "\uBB38\uC790\uC5F4\uC744 \uB300\uBB38\uC790\uB85C \uBCC0\uD658\uD569\uB2C8\uB2E4.",
-  inputSchema: { s: "string" },
-  outputSchema: "string",
-  execute: ({ s }) => String(s).toUpperCase()
-});
-globalToolRegistry.register({
-  name: "str-lower",
-  description: "\uBB38\uC790\uC5F4\uC744 \uC18C\uBB38\uC790\uB85C \uBCC0\uD658\uD569\uB2C8\uB2E4.",
-  inputSchema: { s: "string" },
-  outputSchema: "string",
-  execute: ({ s }) => String(s).toLowerCase()
-});
-globalToolRegistry.register({
-  name: "str-len",
-  description: "\uBB38\uC790\uC5F4 \uAE38\uC774\uB97C \uBC18\uD658\uD569\uB2C8\uB2E4.",
-  inputSchema: { s: "string" },
-  outputSchema: "number",
-  execute: ({ s }) => String(s).length
-});
-globalToolRegistry.register({
-  name: "json-parse",
-  description: "JSON \uBB38\uC790\uC5F4\uC744 \uAC1D\uCCB4\uB85C \uD30C\uC2F1\uD569\uB2C8\uB2E4.",
-  inputSchema: { s: "string" },
-  outputSchema: "any",
-  execute: ({ s }) => JSON.parse(String(s))
-});
-globalToolRegistry.register({
-  name: "json-stringify",
-  description: "\uAC12\uC744 JSON \uBB38\uC790\uC5F4\uB85C \uBCC0\uD658\uD569\uB2C8\uB2E4.",
-  inputSchema: { v: "any" },
-  outputSchema: "string",
-  execute: ({ v }) => JSON.stringify(v)
-});
-globalToolRegistry.register({
-  name: "type-of",
-  description: "\uAC12\uC758 \uD0C0\uC785\uC744 \uBC18\uD658\uD569\uB2C8\uB2E4.",
-  inputSchema: { v: "any" },
-  outputSchema: "string",
-  execute: ({ v }) => typeof v
+var ToolRegistry, globalToolRegistry;
+var init_tool_registry = __esm({
+  "src/tool-registry.ts"() {
+    ToolRegistry = class {
+      constructor() {
+        this.tools = /* @__PURE__ */ new Map();
+      }
+      /** 도구 등록 (chainable) */
+      register(tool) {
+        this.tools.set(tool.name, tool);
+        return this;
+      }
+      /** 도구 조회 */
+      get(name) {
+        return this.tools.get(name);
+      }
+      /** 모든 도구 목록 */
+      listAll() {
+        return Array.from(this.tools.values());
+      }
+      /** 비동기 도구 실행 */
+      async execute(name, args3) {
+        const start = Date.now();
+        const tool = this.tools.get(name);
+        if (!tool) {
+          return {
+            tool: name,
+            input: args3,
+            output: null,
+            durationMs: Date.now() - start,
+            success: false,
+            error: `Tool not found: ${name}`
+          };
+        }
+        const timeout = tool.timeout ?? 5e3;
+        try {
+          const resultPromise = Promise.resolve(tool.execute(args3));
+          const timeoutPromise = new Promise(
+            (_, reject) => setTimeout(() => reject(new Error(`Tool timeout: ${name} (${timeout}ms)`)), timeout)
+          );
+          const output = await Promise.race([resultPromise, timeoutPromise]);
+          return {
+            tool: name,
+            input: args3,
+            output,
+            durationMs: Date.now() - start,
+            success: true
+          };
+        } catch (e) {
+          return {
+            tool: name,
+            input: args3,
+            output: null,
+            durationMs: Date.now() - start,
+            success: false,
+            error: String(e?.message ?? e)
+          };
+        }
+      }
+      /** 동기 도구 실행 (비동기 도구는 await 없이 실행) */
+      executeSync(name, args3) {
+        const start = Date.now();
+        const tool = this.tools.get(name);
+        if (!tool) {
+          return {
+            tool: name,
+            input: args3,
+            output: null,
+            durationMs: Date.now() - start,
+            success: false,
+            error: `Tool not found: ${name}`
+          };
+        }
+        try {
+          const output = tool.execute(args3);
+          return {
+            tool: name,
+            input: args3,
+            output,
+            durationMs: Date.now() - start,
+            success: true
+          };
+        } catch (e) {
+          return {
+            tool: name,
+            input: args3,
+            output: null,
+            durationMs: Date.now() - start,
+            success: false,
+            error: String(e?.message ?? e)
+          };
+        }
+      }
+    };
+    globalToolRegistry = new ToolRegistry();
+    globalToolRegistry.register({
+      name: "math",
+      description: '\uC218\uD559 \uD45C\uD604\uC2DD\uC744 \uACC4\uC0B0\uD569\uB2C8\uB2E4. \uC608: {expr: "2 + 3 * 4"}',
+      inputSchema: { expr: "string" },
+      outputSchema: "number",
+      execute: ({ expr: expr2 }) => makeSafeMathEval(String(expr2))
+    });
+    globalToolRegistry.register({
+      name: "str-upper",
+      description: "\uBB38\uC790\uC5F4\uC744 \uB300\uBB38\uC790\uB85C \uBCC0\uD658\uD569\uB2C8\uB2E4.",
+      inputSchema: { s: "string" },
+      outputSchema: "string",
+      execute: ({ s }) => String(s).toUpperCase()
+    });
+    globalToolRegistry.register({
+      name: "str-lower",
+      description: "\uBB38\uC790\uC5F4\uC744 \uC18C\uBB38\uC790\uB85C \uBCC0\uD658\uD569\uB2C8\uB2E4.",
+      inputSchema: { s: "string" },
+      outputSchema: "string",
+      execute: ({ s }) => String(s).toLowerCase()
+    });
+    globalToolRegistry.register({
+      name: "str-len",
+      description: "\uBB38\uC790\uC5F4 \uAE38\uC774\uB97C \uBC18\uD658\uD569\uB2C8\uB2E4.",
+      inputSchema: { s: "string" },
+      outputSchema: "number",
+      execute: ({ s }) => String(s).length
+    });
+    globalToolRegistry.register({
+      name: "json-parse",
+      description: "JSON \uBB38\uC790\uC5F4\uC744 \uAC1D\uCCB4\uB85C \uD30C\uC2F1\uD569\uB2C8\uB2E4.",
+      inputSchema: { s: "string" },
+      outputSchema: "any",
+      execute: ({ s }) => JSON.parse(String(s))
+    });
+    globalToolRegistry.register({
+      name: "json-stringify",
+      description: "\uAC12\uC744 JSON \uBB38\uC790\uC5F4\uB85C \uBCC0\uD658\uD569\uB2C8\uB2E4.",
+      inputSchema: { v: "any" },
+      outputSchema: "string",
+      execute: ({ v }) => JSON.stringify(v)
+    });
+    globalToolRegistry.register({
+      name: "type-of",
+      description: "\uAC12\uC758 \uD0C0\uC785\uC744 \uBC18\uD658\uD569\uB2C8\uB2E4.",
+      inputSchema: { v: "any" },
+      outputSchema: "string",
+      execute: ({ v }) => typeof v
+    });
+  }
 });
 
 // src/memory-system.ts
-var MemorySystem = class {
-  constructor() {
-    this.longTerm = /* @__PURE__ */ new Map();
-    this.shortTerm = /* @__PURE__ */ new Map();
-    this.episodes = [];
-    this.working = null;
-  }
-  // 저장
-  remember(key, value, options = {}) {
-    const entry = {
-      key,
-      value,
-      scope: options.scope ?? "long-term",
-      ttl: options.ttl ?? "forever",
-      createdAt: Date.now(),
-      accessCount: 0,
-      tags: options.tags ?? []
-    };
-    if (entry.scope === "short-term") {
-      this.shortTerm.set(key, entry);
-    } else {
-      this.longTerm.set(key, entry);
-    }
-  }
-  // 조회
-  recall(key, fallback = null) {
-    const entry = this.longTerm.get(key) ?? this.shortTerm.get(key);
-    if (!entry) return fallback;
-    if (entry.ttl !== "forever" && Date.now() - entry.createdAt > entry.ttl) {
-      this.longTerm.delete(key);
-      this.shortTerm.delete(key);
-      return fallback;
-    }
-    entry.accessCount++;
-    return entry.value;
-  }
-  // 삭제
-  forget(key) {
-    return this.longTerm.delete(key) || this.shortTerm.delete(key);
-  }
-  // 에피소드 기록
-  recordEpisode(id, what, context = {}, outcome) {
-    const ep = { id, what, when: Date.now(), context, outcome };
-    this.episodes.push(ep);
-    return ep;
-  }
-  // 에피소드 검색
-  searchEpisodes(query) {
-    return this.episodes.filter((ep) => ep.what.includes(query) || ep.id.includes(query));
-  }
-  // 단기 작업 메모리
-  setWorking(value) {
-    this.working = value;
-  }
-  getWorking() {
-    return this.working;
-  }
-  clearWorking() {
-    this.working = null;
-  }
-  // 태그로 검색
-  searchByTag(tag) {
-    return [...this.longTerm.values(), ...this.shortTerm.values()].filter((e) => e.tags.includes(tag));
-  }
-  // 모든 키 목록
-  keys(scope) {
-    if (scope === "short-term") return [...this.shortTerm.keys()];
-    if (scope === "long-term") return [...this.longTerm.keys()];
-    return [...this.longTerm.keys(), ...this.shortTerm.keys()];
-  }
-  // 단기 메모리 만료된 것 정리
-  purgeExpired() {
-    let count = 0;
-    const now = Date.now();
-    for (const [k, e] of this.shortTerm) {
-      if (e.ttl !== "forever" && now - e.createdAt > e.ttl) {
-        this.shortTerm.delete(k);
-        count++;
+var MemorySystem, globalMemory;
+var init_memory_system = __esm({
+  "src/memory-system.ts"() {
+    MemorySystem = class {
+      constructor() {
+        this.longTerm = /* @__PURE__ */ new Map();
+        this.shortTerm = /* @__PURE__ */ new Map();
+        this.episodes = [];
+        this.working = null;
       }
-    }
-    for (const [k, e] of this.longTerm) {
-      if (e.ttl !== "forever" && now - e.createdAt > e.ttl) {
-        this.longTerm.delete(k);
-        count++;
+      // 저장
+      remember(key, value, options = {}) {
+        const entry = {
+          key,
+          value,
+          scope: options.scope ?? "long-term",
+          ttl: options.ttl ?? "forever",
+          createdAt: Date.now(),
+          accessCount: 0,
+          tags: options.tags ?? []
+        };
+        if (entry.scope === "short-term") {
+          this.shortTerm.set(key, entry);
+        } else {
+          this.longTerm.set(key, entry);
+        }
       }
-    }
-    return count;
-  }
-  stats() {
-    return {
-      longTerm: this.longTerm.size,
-      shortTerm: this.shortTerm.size,
-      episodes: this.episodes.length
+      // 조회
+      recall(key, fallback = null) {
+        const entry = this.longTerm.get(key) ?? this.shortTerm.get(key);
+        if (!entry) return fallback;
+        if (entry.ttl !== "forever" && Date.now() - entry.createdAt > entry.ttl) {
+          this.longTerm.delete(key);
+          this.shortTerm.delete(key);
+          return fallback;
+        }
+        entry.accessCount++;
+        return entry.value;
+      }
+      // 삭제
+      forget(key) {
+        return this.longTerm.delete(key) || this.shortTerm.delete(key);
+      }
+      // 에피소드 기록
+      recordEpisode(id, what, context = {}, outcome) {
+        const ep = { id, what, when: Date.now(), context, outcome };
+        this.episodes.push(ep);
+        return ep;
+      }
+      // 에피소드 검색
+      searchEpisodes(query) {
+        return this.episodes.filter((ep) => ep.what.includes(query) || ep.id.includes(query));
+      }
+      // 단기 작업 메모리
+      setWorking(value) {
+        this.working = value;
+      }
+      getWorking() {
+        return this.working;
+      }
+      clearWorking() {
+        this.working = null;
+      }
+      // 태그로 검색
+      searchByTag(tag) {
+        return [...this.longTerm.values(), ...this.shortTerm.values()].filter((e) => e.tags.includes(tag));
+      }
+      // 모든 키 목록
+      keys(scope) {
+        if (scope === "short-term") return [...this.shortTerm.keys()];
+        if (scope === "long-term") return [...this.longTerm.keys()];
+        return [...this.longTerm.keys(), ...this.shortTerm.keys()];
+      }
+      // 단기 메모리 만료된 것 정리
+      purgeExpired() {
+        let count = 0;
+        const now = Date.now();
+        for (const [k, e] of this.shortTerm) {
+          if (e.ttl !== "forever" && now - e.createdAt > e.ttl) {
+            this.shortTerm.delete(k);
+            count++;
+          }
+        }
+        for (const [k, e] of this.longTerm) {
+          if (e.ttl !== "forever" && now - e.createdAt > e.ttl) {
+            this.longTerm.delete(k);
+            count++;
+          }
+        }
+        return count;
+      }
+      stats() {
+        return {
+          longTerm: this.longTerm.size,
+          shortTerm: this.shortTerm.size,
+          episodes: this.episodes.length
+        };
+      }
+      // 전체 초기화 (테스트 용도)
+      clear() {
+        this.longTerm.clear();
+        this.shortTerm.clear();
+        this.episodes = [];
+        this.working = null;
+      }
     };
+    globalMemory = new MemorySystem();
   }
-  // 전체 초기화 (테스트 용도)
-  clear() {
-    this.longTerm.clear();
-    this.shortTerm.clear();
-    this.episodes = [];
-    this.working = null;
-  }
-};
-var globalMemory = new MemorySystem();
+});
 
 // src/rag.ts
 function tokenize(text) {
@@ -8567,175 +6875,142 @@ function tfidf(query, doc) {
   if (overlap === 0) return 0;
   return overlap / (Math.sqrt(query.length) * Math.sqrt(doc.length));
 }
-var RAGStore = class {
-  constructor() {
-    this.docs = [];
-  }
-  // 문서 추가
-  add(doc) {
-    this.docs.push(doc);
-  }
-  addMany(docs) {
-    docs.forEach((d) => this.add(d));
-  }
-  // 검색
-  retrieve(query, topK = 3) {
-    const queryTokens = tokenize(query);
-    return this.docs.map((doc) => ({
-      ...doc,
-      score: tfidf(queryTokens, tokenize(doc.content))
-    })).filter((d) => (d.score ?? 0) > 0).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, topK);
-  }
-  // RAG 실행: 검색 + augment 함수로 최종 응답 생성
-  query(queryStr, options = {}) {
-    const retrieved = this.retrieve(queryStr, options.topK ?? 3);
-    const augmented = options.augment ? options.augment(queryStr, retrieved) : `Query: ${queryStr}
+var RAGStore, globalRAG;
+var init_rag = __esm({
+  "src/rag.ts"() {
+    RAGStore = class {
+      constructor() {
+        this.docs = [];
+      }
+      // 문서 추가
+      add(doc) {
+        this.docs.push(doc);
+      }
+      addMany(docs) {
+        docs.forEach((d) => this.add(d));
+      }
+      // 검색
+      retrieve(query, topK = 3) {
+        const queryTokens = tokenize(query);
+        return this.docs.map((doc) => ({
+          ...doc,
+          score: tfidf(queryTokens, tokenize(doc.content))
+        })).filter((d) => (d.score ?? 0) > 0).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, topK);
+      }
+      // RAG 실행: 검색 + augment 함수로 최종 응답 생성
+      query(queryStr, options = {}) {
+        const retrieved = this.retrieve(queryStr, options.topK ?? 3);
+        const augmented = options.augment ? options.augment(queryStr, retrieved) : `Query: ${queryStr}
 
 Context:
 ${retrieved.map((d) => d.content).join("\n---\n")}`;
-    return { query: queryStr, retrieved, augmented };
+        return { query: queryStr, retrieved, augmented };
+      }
+      // 문서 삭제
+      remove(id) {
+        const idx = this.docs.findIndex((d) => d.id === id);
+        if (idx === -1) return false;
+        this.docs.splice(idx, 1);
+        return true;
+      }
+      size() {
+        return this.docs.length;
+      }
+      all() {
+        return [...this.docs];
+      }
+      // 초기화
+      clear() {
+        this.docs = [];
+      }
+    };
+    globalRAG = new RAGStore();
   }
-  // 문서 삭제
-  remove(id) {
-    const idx = this.docs.findIndex((d) => d.id === id);
-    if (idx === -1) return false;
-    this.docs.splice(idx, 1);
-    return true;
-  }
-  size() {
-    return this.docs.length;
-  }
-  all() {
-    return [...this.docs];
-  }
-  // 초기화
-  clear() {
-    this.docs = [];
-  }
-};
-var globalRAG = new RAGStore();
+});
 
 // src/multi-agent.ts
-var MessageBus = class {
-  constructor() {
-    this.agents = /* @__PURE__ */ new Map();
-    this.log = [];
-    this.msgCounter = 0;
-  }
-  // 에이전트 등록
-  spawn(id, handler) {
-    const handle = { id, handler, inbox: [], running: true };
-    this.agents.set(id, handle);
-    return handle;
-  }
-  // 단일 메시지 전송
-  send(from, to, content) {
-    const msg = {
-      from,
-      to,
-      content,
-      timestamp: Date.now(),
-      id: `msg-${++this.msgCounter}`
+var MessageBus, globalBus;
+var init_multi_agent = __esm({
+  "src/multi-agent.ts"() {
+    MessageBus = class {
+      constructor() {
+        this.agents = /* @__PURE__ */ new Map();
+        this.log = [];
+        this.msgCounter = 0;
+      }
+      // 에이전트 등록
+      spawn(id, handler) {
+        const handle = { id, handler, inbox: [], running: true };
+        this.agents.set(id, handle);
+        return handle;
+      }
+      // 단일 메시지 전송
+      send(from, to, content) {
+        const msg = {
+          from,
+          to,
+          content,
+          timestamp: Date.now(),
+          id: `msg-${++this.msgCounter}`
+        };
+        const target = this.agents.get(to);
+        if (target) {
+          target.inbox.push(msg);
+        }
+        this.log.push(msg);
+        return msg;
+      }
+      // 브로드캐스트
+      broadcast(from, content) {
+        return [...this.agents.keys()].filter((id) => id !== from).map((to) => this.send(from, to, content));
+      }
+      // 수신 (첫 메시지 꺼내기)
+      recv(agentId) {
+        const agent = this.agents.get(agentId);
+        if (!agent || agent.inbox.length === 0) return null;
+        return agent.inbox.shift();
+      }
+      // 수신 대기 + 핸들러 실행
+      process(agentId) {
+        const agent = this.agents.get(agentId);
+        if (!agent) return [];
+        const results = [];
+        while (agent.inbox.length > 0) {
+          const msg = agent.inbox.shift();
+          results.push(agent.handler(msg, this));
+        }
+        return results;
+      }
+      // 에이전트 중지
+      stop(agentId) {
+        const agent = this.agents.get(agentId);
+        if (agent) agent.running = false;
+      }
+      // 전체 메시지 로그
+      history() {
+        return [...this.log];
+      }
+      // 에이전트 목록
+      list() {
+        return [...this.agents.keys()];
+      }
+      // 인박스 크기
+      inboxSize(agentId) {
+        return this.agents.get(agentId)?.inbox.length ?? 0;
+      }
+      size() {
+        return this.agents.size;
+      }
+      // 에이전트 가져오기
+      get(agentId) {
+        return this.agents.get(agentId);
+      }
     };
-    const target = this.agents.get(to);
-    if (target) {
-      target.inbox.push(msg);
-    }
-    this.log.push(msg);
-    return msg;
+    globalBus = new MessageBus();
   }
-  // 브로드캐스트
-  broadcast(from, content) {
-    return [...this.agents.keys()].filter((id) => id !== from).map((to) => this.send(from, to, content));
-  }
-  // 수신 (첫 메시지 꺼내기)
-  recv(agentId) {
-    const agent = this.agents.get(agentId);
-    if (!agent || agent.inbox.length === 0) return null;
-    return agent.inbox.shift();
-  }
-  // 수신 대기 + 핸들러 실행
-  process(agentId) {
-    const agent = this.agents.get(agentId);
-    if (!agent) return [];
-    const results = [];
-    while (agent.inbox.length > 0) {
-      const msg = agent.inbox.shift();
-      results.push(agent.handler(msg, this));
-    }
-    return results;
-  }
-  // 에이전트 중지
-  stop(agentId) {
-    const agent = this.agents.get(agentId);
-    if (agent) agent.running = false;
-  }
-  // 전체 메시지 로그
-  history() {
-    return [...this.log];
-  }
-  // 에이전트 목록
-  list() {
-    return [...this.agents.keys()];
-  }
-  // 인박스 크기
-  inboxSize(agentId) {
-    return this.agents.get(agentId)?.inbox.length ?? 0;
-  }
-  size() {
-    return this.agents.size;
-  }
-  // 에이전트 가져오기
-  get(agentId) {
-    return this.agents.get(agentId);
-  }
-};
-var globalBus = new MessageBus();
+});
 
 // src/try-reason.ts
-var TryReasoner = class {
-  constructor() {
-    this.history = [];
-  }
-  async run(config) {
-    const errors = [];
-    for (let i = 0; i < config.attempts.length; i++) {
-      const { strategy, fn, validate } = config.attempts[i];
-      try {
-        const value = await Promise.resolve(fn());
-        const valid = validate ? validate(value) : true;
-        if (valid) {
-          this.history.push({ success: true, value, attempt: i + 1, strategy });
-          config.onSuccess?.(value, strategy, i + 1);
-          return value;
-        } else {
-          const err4 = `validation failed`;
-          errors.push(`[${strategy}] ${err4}`);
-          this.history.push({ success: false, error: err4, attempt: i + 1, strategy });
-        }
-      } catch (e) {
-        const err4 = e instanceof Error ? e.message : String(e);
-        errors.push(`[${strategy}] ${err4}`);
-        this.history.push({ success: false, error: err4, attempt: i + 1, strategy });
-      }
-    }
-    if (config.onAllFail) {
-      return config.onAllFail(errors);
-    }
-    throw new Error(`All attempts failed:
-${errors.join("\n")}`);
-  }
-  getHistory() {
-    return [...this.history];
-  }
-  lastSuccess() {
-    const successes = this.history.filter((h) => h.success);
-    return successes.length > 0 ? successes[successes.length - 1] : null;
-  }
-  reset() {
-    this.history = [];
-  }
-};
 async function tryReasonBuiltin(attempts) {
   if (attempts.length === 0) {
     throw new Error("All attempts failed:\n(no attempts provided)");
@@ -8752,61 +7027,56 @@ async function tryWithFallback(fn, fallback) {
     return fallback;
   }
 }
+var TryReasoner;
+var init_try_reason = __esm({
+  "src/try-reason.ts"() {
+    TryReasoner = class {
+      constructor() {
+        this.history = [];
+      }
+      async run(config) {
+        const errors = [];
+        for (let i = 0; i < config.attempts.length; i++) {
+          const { strategy, fn, validate } = config.attempts[i];
+          try {
+            const value = await Promise.resolve(fn());
+            const valid = validate ? validate(value) : true;
+            if (valid) {
+              this.history.push({ success: true, value, attempt: i + 1, strategy });
+              config.onSuccess?.(value, strategy, i + 1);
+              return value;
+            } else {
+              const err4 = `validation failed`;
+              errors.push(`[${strategy}] ${err4}`);
+              this.history.push({ success: false, error: err4, attempt: i + 1, strategy });
+            }
+          } catch (e) {
+            const err4 = e instanceof Error ? e.message : String(e);
+            errors.push(`[${strategy}] ${err4}`);
+            this.history.push({ success: false, error: err4, attempt: i + 1, strategy });
+          }
+        }
+        if (config.onAllFail) {
+          return config.onAllFail(errors);
+        }
+        throw new Error(`All attempts failed:
+${errors.join("\n")}`);
+      }
+      getHistory() {
+        return [...this.history];
+      }
+      lastSuccess() {
+        const successes = this.history.filter((h) => h.success);
+        return successes.length > 0 ? successes[successes.length - 1] : null;
+      }
+      reset() {
+        this.history = [];
+      }
+    };
+  }
+});
 
 // src/streaming.ts
-var import_events = require("events");
-var FLStream = class extends import_events.EventEmitter {
-  constructor() {
-    super(...arguments);
-    this.chunks = [];
-    this.chunkIndex = 0;
-    this._done = false;
-    this._collected = "";
-  }
-  write(content) {
-    if (this._done) return;
-    const chunk = {
-      index: this.chunkIndex++,
-      content,
-      done: false,
-      timestamp: Date.now()
-    };
-    this.chunks.push(chunk);
-    this._collected += content;
-    this.emit("chunk", chunk);
-  }
-  end() {
-    if (this._done) return;
-    this._done = true;
-    const finalChunk = {
-      index: this.chunkIndex++,
-      content: "",
-      done: true,
-      timestamp: Date.now()
-    };
-    this.chunks.push(finalChunk);
-    this.emit("chunk", finalChunk);
-    this.emit("end", this._collected);
-  }
-  collect() {
-    if (this._done) return Promise.resolve(this._collected);
-    return new Promise((resolve10) => {
-      this.once("end", resolve10);
-    });
-  }
-  isDone() {
-    return this._done;
-  }
-  getChunks() {
-    return [...this.chunks];
-  }
-  collected() {
-    return this._collected;
-  }
-  chunkCount() {
-    return this.chunks.filter((c) => !c.done).length;
-  }
-};
 function streamText(stream, text, delayMs = 0) {
   const words = text.split(" ");
   return new Promise((resolve10) => {
@@ -8825,8 +7095,6 @@ function streamText(stream, text, delayMs = 0) {
     next();
   });
 }
-var streamRegistry = /* @__PURE__ */ new Map();
-var streamCounter = 0;
 function createStream() {
   const id = `stream-${++streamCounter}`;
   const stream = new FLStream();
@@ -8839,6 +7107,66 @@ function getStream(id) {
 function deleteStream(id) {
   return streamRegistry.delete(id);
 }
+var import_events, FLStream, streamRegistry, streamCounter;
+var init_streaming = __esm({
+  "src/streaming.ts"() {
+    import_events = require("events");
+    FLStream = class extends import_events.EventEmitter {
+      constructor() {
+        super(...arguments);
+        this.chunks = [];
+        this.chunkIndex = 0;
+        this._done = false;
+        this._collected = "";
+      }
+      write(content) {
+        if (this._done) return;
+        const chunk = {
+          index: this.chunkIndex++,
+          content,
+          done: false,
+          timestamp: Date.now()
+        };
+        this.chunks.push(chunk);
+        this._collected += content;
+        this.emit("chunk", chunk);
+      }
+      end() {
+        if (this._done) return;
+        this._done = true;
+        const finalChunk = {
+          index: this.chunkIndex++,
+          content: "",
+          done: true,
+          timestamp: Date.now()
+        };
+        this.chunks.push(finalChunk);
+        this.emit("chunk", finalChunk);
+        this.emit("end", this._collected);
+      }
+      collect() {
+        if (this._done) return Promise.resolve(this._collected);
+        return new Promise((resolve10) => {
+          this.once("end", resolve10);
+        });
+      }
+      isDone() {
+        return this._done;
+      }
+      getChunks() {
+        return [...this.chunks];
+      }
+      collected() {
+        return this._collected;
+      }
+      chunkCount() {
+        return this.chunks.filter((c) => !c.done).length;
+      }
+    };
+    streamRegistry = /* @__PURE__ */ new Map();
+    streamCounter = 0;
+  }
+});
 
 // src/quality-loop.ts
 function evaluateQuality(output, criteria, threshold = 0.7) {
@@ -8863,205 +7191,132 @@ function evaluateQuality(output, criteria, threshold = 0.7) {
     feedback
   };
 }
-var defaultCriteria = [
-  {
-    name: "length",
-    weight: 0.3,
-    evaluate: (v) => {
-      const s = String(v);
-      if (s.length < 10) return 0.3;
-      if (s.length < 50) return 0.7;
-      return 1;
-    }
-  },
-  {
-    name: "non-empty",
-    weight: 0.4,
-    evaluate: (v) => v !== null && v !== void 0 && v !== "" ? 1 : 0
-  },
-  {
-    name: "no-error",
-    weight: 0.3,
-    evaluate: (v) => v instanceof Error || typeof v === "object" && v?._tag === "Err" ? 0 : 1
+var defaultCriteria;
+var init_quality_loop = __esm({
+  "src/quality-loop.ts"() {
+    defaultCriteria = [
+      {
+        name: "length",
+        weight: 0.3,
+        evaluate: (v) => {
+          const s = String(v);
+          if (s.length < 10) return 0.3;
+          if (s.length < 50) return 0.7;
+          return 1;
+        }
+      },
+      {
+        name: "non-empty",
+        weight: 0.4,
+        evaluate: (v) => v !== null && v !== void 0 && v !== "" ? 1 : 0
+      },
+      {
+        name: "no-error",
+        weight: 0.3,
+        evaluate: (v) => v instanceof Error || typeof v === "object" && v?._tag === "Err" ? 0 : 1
+      }
+    ];
   }
-];
+});
 
 // src/fl-tutor.ts
-var FL_EXAMPLES = [
-  // 기초
-  { concept: "define", code: "(define x 42)", description: "\uBCC0\uC218 \uC815\uC758", difficulty: "beginner", tags: ["basic", "variable"] },
-  { concept: "lambda", code: "(lambda [$x $y] (+ $x $y))", description: "\uC775\uBA85 \uD568\uC218", difficulty: "beginner", tags: ["function", "basic"] },
-  { concept: "if", code: '(if (> $x 0) "positive" "non-positive")', description: "\uC870\uAC74 \uBD84\uAE30", difficulty: "beginner", tags: ["control", "basic"] },
-  { concept: "let", code: "(let [$a 1 $b 2] (+ $a $b))", description: "\uC9C0\uC5ED \uBCC0\uC218", difficulty: "beginner", tags: ["variable", "scope"] },
-  { concept: "defn", code: "(defn add [$a $b] (+ $a $b))", description: "\uD568\uC218 \uC815\uC758", difficulty: "beginner", tags: ["function"] },
-  // 중급
-  { concept: "pipe", code: "(-> $data parse-json filter-errors extract-values)", description: "\uD30C\uC774\uD504\uB77C\uC778", difficulty: "intermediate", tags: ["pipeline", "functional"] },
-  { concept: "maybe", code: '(maybe 0.85 "Paris")', description: "\uBD88\uD655\uC2E4\uC131 \uD0C0\uC785", difficulty: "intermediate", tags: ["ai", "uncertainty"] },
-  { concept: "result", code: '(ok 42)\n(err "NOT_FOUND" "\uC5C6\uC74C")', description: "Result \uD0C0\uC785", difficulty: "intermediate", tags: ["error", "result"] },
-  { concept: "fl-try", code: '(fl-try (call-api $url)\n  :on-not-found (fn [$e] "fallback")\n  :default (fn [$e] (log $e)))', description: "AI \uC5D0\uB7EC \uCC98\uB9AC", difficulty: "intermediate", tags: ["error", "ai"] },
-  { concept: "parallel", code: "(parallel [(task-a) (task-b) (task-c)])", description: "\uBCD1\uB82C \uC2E4\uD589", difficulty: "intermediate", tags: ["concurrency"] },
-  // AI 블록
-  { concept: "COT", code: '[COT :step "\uBD84\uC11D" (analyze $data) :step "\uCD94\uB860" (reason $prev) :conclude summarize]', description: "Chain-of-Thought", difficulty: "advanced", tags: ["ai", "reasoning"] },
-  { concept: "TOT", code: '[TOT :branch "\uAC00\uC124A" $val1 :branch "\uAC00\uC124B" $val2 :eval score-fn :select best]', description: "Tree-of-Thought", difficulty: "advanced", tags: ["ai", "search"] },
-  { concept: "REFLECT", code: "[REFLECT :output $result :criteria [accuracy completeness] :threshold 0.8]", description: "\uC790\uAE30 \uD3C9\uAC00", difficulty: "advanced", tags: ["ai", "reflect"] },
-  { concept: "AGENT", code: '[AGENT :goal "\uB370\uC774\uD130 \uBD84\uC11D" :max-steps 5 :step (fn [$s] (analyze $s))]', description: "\uC5D0\uC774\uC804\uD2B8 \uB8E8\uD504", difficulty: "advanced", tags: ["ai", "agent"] },
-  { concept: "SELF-IMPROVE", code: "(self-improve :target $code :evaluate score-fn :improve enhance-fn :iterations 3)", description: "\uC790\uAE30 \uAC1C\uC120", difficulty: "advanced", tags: ["ai", "improve"] }
-];
-var FLTutor = class {
-  constructor(examples = FL_EXAMPLES) {
-    this.examples = examples.map((e) => ({ ...e, tags: [...e.tags] }));
-  }
-  // 개념으로 예제 찾기
-  findByConcept(concept) {
-    return this.examples.filter((e) => e.concept.toLowerCase().includes(concept.toLowerCase()));
-  }
-  // 태그로 예제 찾기
-  findByTag(tag) {
-    return this.examples.filter((e) => e.tags.includes(tag));
-  }
-  // 난이도로 필터
-  findByDifficulty(level) {
-    return this.examples.filter((e) => e.difficulty === level);
-  }
-  // 레슨 생성
-  lesson(concept) {
-    const examples = this.findByConcept(concept);
-    const explanation = examples.length > 0 ? `${concept}\uC740 FreeLang\uC758 \uD575\uC2EC \uAC1C\uB150\uC785\uB2C8\uB2E4.
+var FL_EXAMPLES, FLTutor, globalTutor;
+var init_fl_tutor = __esm({
+  "src/fl-tutor.ts"() {
+    FL_EXAMPLES = [
+      // 기초
+      { concept: "define", code: "(define x 42)", description: "\uBCC0\uC218 \uC815\uC758", difficulty: "beginner", tags: ["basic", "variable"] },
+      { concept: "lambda", code: "(lambda [$x $y] (+ $x $y))", description: "\uC775\uBA85 \uD568\uC218", difficulty: "beginner", tags: ["function", "basic"] },
+      { concept: "if", code: '(if (> $x 0) "positive" "non-positive")', description: "\uC870\uAC74 \uBD84\uAE30", difficulty: "beginner", tags: ["control", "basic"] },
+      { concept: "let", code: "(let [$a 1 $b 2] (+ $a $b))", description: "\uC9C0\uC5ED \uBCC0\uC218", difficulty: "beginner", tags: ["variable", "scope"] },
+      { concept: "defn", code: "(defn add [$a $b] (+ $a $b))", description: "\uD568\uC218 \uC815\uC758", difficulty: "beginner", tags: ["function"] },
+      // 중급
+      { concept: "pipe", code: "(-> $data parse-json filter-errors extract-values)", description: "\uD30C\uC774\uD504\uB77C\uC778", difficulty: "intermediate", tags: ["pipeline", "functional"] },
+      { concept: "maybe", code: '(maybe 0.85 "Paris")', description: "\uBD88\uD655\uC2E4\uC131 \uD0C0\uC785", difficulty: "intermediate", tags: ["ai", "uncertainty"] },
+      { concept: "result", code: '(ok 42)\n(err "NOT_FOUND" "\uC5C6\uC74C")', description: "Result \uD0C0\uC785", difficulty: "intermediate", tags: ["error", "result"] },
+      { concept: "fl-try", code: '(fl-try (call-api $url)\n  :on-not-found (fn [$e] "fallback")\n  :default (fn [$e] (log $e)))', description: "AI \uC5D0\uB7EC \uCC98\uB9AC", difficulty: "intermediate", tags: ["error", "ai"] },
+      { concept: "parallel", code: "(parallel [(task-a) (task-b) (task-c)])", description: "\uBCD1\uB82C \uC2E4\uD589", difficulty: "intermediate", tags: ["concurrency"] },
+      // AI 블록
+      { concept: "COT", code: '[COT :step "\uBD84\uC11D" (analyze $data) :step "\uCD94\uB860" (reason $prev) :conclude summarize]', description: "Chain-of-Thought", difficulty: "advanced", tags: ["ai", "reasoning"] },
+      { concept: "TOT", code: '[TOT :branch "\uAC00\uC124A" $val1 :branch "\uAC00\uC124B" $val2 :eval score-fn :select best]', description: "Tree-of-Thought", difficulty: "advanced", tags: ["ai", "search"] },
+      { concept: "REFLECT", code: "[REFLECT :output $result :criteria [accuracy completeness] :threshold 0.8]", description: "\uC790\uAE30 \uD3C9\uAC00", difficulty: "advanced", tags: ["ai", "reflect"] },
+      { concept: "AGENT", code: '[AGENT :goal "\uB370\uC774\uD130 \uBD84\uC11D" :max-steps 5 :step (fn [$s] (analyze $s))]', description: "\uC5D0\uC774\uC804\uD2B8 \uB8E8\uD504", difficulty: "advanced", tags: ["ai", "agent"] },
+      { concept: "SELF-IMPROVE", code: "(self-improve :target $code :evaluate score-fn :improve enhance-fn :iterations 3)", description: "\uC790\uAE30 \uAC1C\uC120", difficulty: "advanced", tags: ["ai", "improve"] }
+    ];
+    FLTutor = class {
+      constructor(examples = FL_EXAMPLES) {
+        this.examples = examples.map((e) => ({ ...e, tags: [...e.tags] }));
+      }
+      // 개념으로 예제 찾기
+      findByConcept(concept) {
+        return this.examples.filter((e) => e.concept.toLowerCase().includes(concept.toLowerCase()));
+      }
+      // 태그로 예제 찾기
+      findByTag(tag) {
+        return this.examples.filter((e) => e.tags.includes(tag));
+      }
+      // 난이도로 필터
+      findByDifficulty(level) {
+        return this.examples.filter((e) => e.difficulty === level);
+      }
+      // 레슨 생성
+      lesson(concept) {
+        const examples = this.findByConcept(concept);
+        const explanation = examples.length > 0 ? `${concept}\uC740 FreeLang\uC758 \uD575\uC2EC \uAC1C\uB150\uC785\uB2C8\uB2E4.
 ${examples.map((e) => e.description).join(". ")}.` : `${concept} \uAC1C\uB150\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
-    const exercise = examples.length > 0 ? `; \uC5F0\uC2B5: ${examples[0].description}
+        const exercise = examples.length > 0 ? `; \uC5F0\uC2B5: ${examples[0].description}
 ; \uC544\uB798\uB97C \uC644\uC131\uD558\uC138\uC694:
 ${examples[0].code.replace(/\$\w+/g, "???")}` : `; ${concept} \uC608\uC81C\uB97C \uC791\uC131\uD574\uBCF4\uC138\uC694`;
-    return { concept, examples, explanation, exercise };
-  }
-  // 랜덤 예제
-  random() {
-    return this.examples[Math.floor(Math.random() * this.examples.length)];
-  }
-  // 전체 개념 목록
-  concepts() {
-    return [...new Set(this.examples.map((e) => e.concept))];
-  }
-  // 예제 추가
-  addExample(example) {
-    this.examples.push(example);
-  }
-  size() {
-    return this.examples.length;
-  }
-  // 레슨을 마크다운으로 변환
-  lessonMarkdown(concept) {
-    const result = this.lesson(concept);
-    const lines = [
-      `# FreeLang \uB808\uC2A8: ${result.concept}`,
-      "",
-      `## \uC124\uBA85`,
-      result.explanation,
-      ""
-    ];
-    if (result.examples.length > 0) {
-      lines.push("## \uC608\uC81C");
-      for (const ex of result.examples) {
-        lines.push(`### ${ex.concept} (${ex.difficulty})`);
-        lines.push(`${ex.description}`);
-        lines.push("```");
-        lines.push(ex.code);
-        lines.push("```");
-        lines.push("");
+        return { concept, examples, explanation, exercise };
       }
-    }
-    lines.push("## \uC5F0\uC2B5 \uBB38\uC81C");
-    lines.push("```");
-    lines.push(result.exercise);
-    lines.push("```");
-    return lines.join("\n");
+      // 랜덤 예제
+      random() {
+        return this.examples[Math.floor(Math.random() * this.examples.length)];
+      }
+      // 전체 개념 목록
+      concepts() {
+        return [...new Set(this.examples.map((e) => e.concept))];
+      }
+      // 예제 추가
+      addExample(example) {
+        this.examples.push(example);
+      }
+      size() {
+        return this.examples.length;
+      }
+      // 레슨을 마크다운으로 변환
+      lessonMarkdown(concept) {
+        const result = this.lesson(concept);
+        const lines = [
+          `# FreeLang \uB808\uC2A8: ${result.concept}`,
+          "",
+          `## \uC124\uBA85`,
+          result.explanation,
+          ""
+        ];
+        if (result.examples.length > 0) {
+          lines.push("## \uC608\uC81C");
+          for (const ex of result.examples) {
+            lines.push(`### ${ex.concept} (${ex.difficulty})`);
+            lines.push(`${ex.description}`);
+            lines.push("```");
+            lines.push(ex.code);
+            lines.push("```");
+            lines.push("");
+          }
+        }
+        lines.push("## \uC5F0\uC2B5 \uBB38\uC81C");
+        lines.push("```");
+        lines.push(result.exercise);
+        lines.push("```");
+        return lines.join("\n");
+      }
+    };
+    globalTutor = new FLTutor();
   }
-};
-var globalTutor = new FLTutor();
+});
 
 // src/reasoning-debugger.ts
-var ReasoningTrace = class {
-  constructor(label) {
-    this.stack = [];
-    this.nodeCounter = 0;
-    this.root = this.makeNode("thought", label);
-    this.current = this.root;
-  }
-  makeNode(type, label, value) {
-    return {
-      id: `node-${++this.nodeCounter}`,
-      type,
-      label,
-      value,
-      children: [],
-      depth: this.stack.length,
-      timestamp: Date.now()
-    };
-  }
-  // 새 단계 추가 (현재 노드의 자식)
-  add(type, label, value) {
-    const node = this.makeNode(type, label, value);
-    this.current.children.push(node);
-    return node;
-  }
-  // 들어가기 (자식으로 포커스 이동)
-  enter(type, label, value) {
-    const node = this.makeNode(type, label, value);
-    this.current.children.push(node);
-    this.stack.push(this.current);
-    this.current = node;
-    return node;
-  }
-  // 나오기 (부모로 복귀)
-  exit(result) {
-    if (this.stack.length > 0) {
-      if (result !== void 0) this.current.value = result;
-      this.current.duration = Date.now() - this.current.timestamp;
-      this.current = this.stack.pop();
-    }
-  }
-  // 마크다운으로 렌더링
-  toMarkdown() {
-    const lines = ["## Reasoning Trace", ""];
-    function render(node, depth) {
-      const indent = "  ".repeat(depth);
-      const icon = { thought: "\u{1F4AD}", action: "\u26A1", observation: "\u{1F441}", decision: "\u{1F3AF}", error: "\u274C", result: "\u2705" }[node.type];
-      const dur = node.duration ? ` (${node.duration}ms)` : "";
-      const val = node.value !== void 0 ? ` \u2192 \`${JSON.stringify(node.value)}\`` : "";
-      lines.push(`${indent}${icon} **${node.label}**${val}${dur}`);
-      node.children.forEach((c) => render(c, depth + 1));
-    }
-    render(this.root, 0);
-    return lines.join("\n");
-  }
-  // 텍스트 트리
-  toTree() {
-    const lines = [];
-    function render(node, prefix, isLast) {
-      const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
-      const val = node.value !== void 0 ? `: ${JSON.stringify(node.value)}` : "";
-      lines.push(`${prefix}${connector}[${node.type}] ${node.label}${val}`);
-      const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
-      node.children.forEach((c, i) => render(c, childPrefix, i === node.children.length - 1));
-    }
-    lines.push(`[root] ${this.root.label}`);
-    this.root.children.forEach((c, i) => render(c, "", i === this.root.children.length - 1));
-    return lines.join("\n");
-  }
-  getRoot() {
-    return this.root;
-  }
-  getCurrent() {
-    return this.current;
-  }
-  depth() {
-    return this.stack.length;
-  }
-  nodeCount() {
-    return this.nodeCounter;
-  }
-};
-var traceRegistry = /* @__PURE__ */ new Map();
-var traceCounter = 0;
 function createTrace(label) {
   const id = `trace-${++traceCounter}`;
   const trace2 = new ReasoningTrace(label);
@@ -9071,276 +7326,379 @@ function createTrace(label) {
 function getTrace(id) {
   return traceRegistry.get(id) ?? null;
 }
-
-// src/prompt-compiler.ts
-var BLOCK_TEMPLATES = {
-  COT: (args3) => ({
-    name: "chain-of-thought",
-    priority: 1,
-    content: `Think step by step:
-${(args3.steps ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n")}
-Then provide your conclusion.`
-  }),
-  TOT: (args3) => ({
-    name: "tree-of-thought",
-    priority: 1,
-    content: `Explore multiple approaches:
-${(args3.branches ?? []).map((b) => `- ${b}`).join("\n")}
-Evaluate each and select the best.`
-  }),
-  REFLECT: (args3) => ({
-    name: "self-reflection",
-    priority: 0.5,
-    content: `After responding, reflect on:
-${(args3.criteria ?? ["accuracy", "completeness"]).map((c) => `- ${c}`).join("\n")}
-Score each criterion (0-10) and revise if below ${(args3.threshold ?? 0.7) * 10}.`
-  }),
-  AGENT: (args3) => ({
-    name: "agent-loop",
-    priority: 1,
-    content: `Goal: ${args3.goal ?? "Complete the task"}
-Max steps: ${args3.maxSteps ?? 5}
-For each step: observe \u2192 think \u2192 act \u2192 verify.`
-  }),
-  CONTEXT: (args3) => ({
-    name: "context",
-    priority: 1,
-    content: `Context window: ${args3.maxTokens ?? 4096} tokens. Strategy: ${args3.strategy ?? "sliding"}.`
-  }),
-  "SELF-IMPROVE": (args3) => ({
-    name: "self-improvement",
-    priority: 0.5,
-    content: `Iterations: ${args3.iterations ?? 3}. After each response, evaluate and improve until satisfied.`
-  })
-};
-var PromptCompiler = class {
-  constructor(target = "claude") {
-    this.target = target;
-  }
-  // FL 블록 정보 → 프롬프트 섹션
-  compileBlock(blockType, args3 = {}) {
-    const template = BLOCK_TEMPLATES[blockType];
-    if (!template) return null;
-    return template(args3);
-  }
-  // 여러 섹션 → 최종 프롬프트
-  compile(sections, userInstruction) {
-    const sorted = [...sections].sort((a, b) => b.priority - a.priority);
-    const parts = [];
-    if (this.target === "claude") {
-      parts.push("Human: " + userInstruction);
-      parts.push("\n[Instructions]");
-      sorted.forEach((s) => {
-        if (s.content) parts.push(s.content);
-      });
-      parts.push("\nAssistant:");
-    } else if (this.target === "gpt") {
-      parts.push("[System]");
-      sorted.forEach((s) => {
-        if (s.content) parts.push(s.content);
-      });
-      parts.push("\n[User]: " + userInstruction);
-    } else {
-      sorted.forEach((s) => {
-        if (s.content) parts.push(s.content);
-      });
-      parts.push("\n" + userInstruction);
-    }
-    const prompt = parts.join("\n");
-    return {
-      prompt,
-      target: this.target,
-      tokens: Math.ceil(prompt.length / 4),
-      sections: sorted.map((s) => s.name)
-    };
-  }
-  // FL 코드 문자열에서 블록 감지 후 컴파일
-  compileFromCode(flCode, instruction) {
-    const sections = [];
-    const blockRegex = /\[(COT|TOT|REFLECT|AGENT|CONTEXT|SELF-IMPROVE)[^\]]*\]/g;
-    let match;
-    while ((match = blockRegex.exec(flCode)) !== null) {
-      const blockType = match[1];
-      const section = this.compileBlock(blockType, {});
-      if (section) sections.push(section);
-    }
-    if (sections.length === 0) {
-      sections.push({ name: "default", content: "", priority: 0.5 });
-    }
-    return this.compile(sections, instruction);
-  }
-  setTarget(target) {
-    this.target = target;
-  }
-  getTarget() {
-    return this.target;
-  }
-};
-var globalCompiler = new PromptCompiler("claude");
-
-// src/fl-sdk.ts
-var FLCodeBuilder = class {
-  constructor() {
-    this.lines = [];
-  }
-  // 기본 폼
-  define(name, value) {
-    this.lines.push(`(define ${name} ${value})`);
-    return this;
-  }
-  defn(name, params, body) {
-    this.lines.push(`(defn ${name} [${params.map((p) => "$" + p).join(" ")}] ${body})`);
-    return this;
-  }
-  call(fn, ...args3) {
-    this.lines.push(`(${fn} ${args3.join(" ")})`);
-    return this;
-  }
-  // AI 블록
-  cot(goal, steps) {
-    const stepStr = steps.map((s) => `:step "${s}" nil`).join(" ");
-    this.lines.push(`[COT :goal "${goal}" ${stepStr} :conclude identity]`);
-    return this;
-  }
-  agent(goal, maxSteps = 5) {
-    this.lines.push(`[AGENT :goal "${goal}" :max-steps ${maxSteps} :step (fn [$s] $s)]`);
-    return this;
-  }
-  maybe(confidence, value) {
-    this.lines.push(`(maybe ${confidence} ${value})`);
-    return this;
-  }
-  result(type, value, errCode) {
-    if (type === "ok") this.lines.push(`(ok ${value})`);
-    else this.lines.push(`(err "${errCode ?? "ERROR"}" ${value})`);
-    return this;
-  }
-  pipe(...fns) {
-    this.lines.push(`(-> $data ${fns.join(" ")})`);
-    return this;
-  }
-  comment(text) {
-    this.lines.push(`; ${text}`);
-    return this;
-  }
-  build() {
-    return this.lines.join("\n");
-  }
-  reset() {
-    this.lines = [];
-    return this;
-  }
-  lineCount() {
-    return this.lines.length;
-  }
-};
-var FLSDK = class {
-  constructor() {
-    this.version = "9.0.0";
-    this.features = [
-      "maybe",
-      "cot",
-      "tot",
-      "reflect",
-      "context",
-      "result",
-      "fl-try",
-      "use-tool",
-      "agent",
-      "self-improve",
-      "memory",
-      "rag",
-      "multi-agent",
-      "try-reason",
-      "streaming",
-      "quality-loop",
-      "tutor",
-      "debugger",
-      "prompt-compiler"
-    ];
-  }
-  // 코드 빌더 생성
-  builder() {
-    return new FLCodeBuilder();
-  }
-  // FL 코드 블록 만들기
-  block(type, code, description) {
-    return { type, code, description };
-  }
-  // 피처 지원 여부
-  supports(feature) {
-    return this.features.includes(feature);
-  }
-  // FL 코드 검증 (간단한 괄호 밸런스 체크)
-  validate(code) {
-    const errors = [];
-    let depth = 0;
-    for (const ch of code) {
-      if (ch === "(" || ch === "[") depth++;
-      else if (ch === ")" || ch === "]") {
-        depth--;
-        if (depth < 0) {
-          errors.push("Unexpected closing bracket");
-          break;
+var ReasoningTrace, traceRegistry, traceCounter;
+var init_reasoning_debugger = __esm({
+  "src/reasoning-debugger.ts"() {
+    ReasoningTrace = class {
+      constructor(label) {
+        this.stack = [];
+        this.nodeCounter = 0;
+        this.root = this.makeNode("thought", label);
+        this.current = this.root;
+      }
+      makeNode(type, label, value) {
+        return {
+          id: `node-${++this.nodeCounter}`,
+          type,
+          label,
+          value,
+          children: [],
+          depth: this.stack.length,
+          timestamp: Date.now()
+        };
+      }
+      // 새 단계 추가 (현재 노드의 자식)
+      add(type, label, value) {
+        const node = this.makeNode(type, label, value);
+        this.current.children.push(node);
+        return node;
+      }
+      // 들어가기 (자식으로 포커스 이동)
+      enter(type, label, value) {
+        const node = this.makeNode(type, label, value);
+        this.current.children.push(node);
+        this.stack.push(this.current);
+        this.current = node;
+        return node;
+      }
+      // 나오기 (부모로 복귀)
+      exit(result) {
+        if (this.stack.length > 0) {
+          if (result !== void 0) this.current.value = result;
+          this.current.duration = Date.now() - this.current.timestamp;
+          this.current = this.stack.pop();
         }
       }
-    }
-    if (depth > 0) errors.push(`Unclosed brackets: ${depth}`);
-    return { valid: errors.length === 0, errors };
-  }
-  // 빠른 스니펫 생성
-  snippet(concept) {
-    const snippets = {
-      "maybe": '(maybe 0.8 "result")',
-      "ok": "(ok 42)",
-      "err": '(err "NOT_FOUND" "Item not found")',
-      "cot": '[COT :step "analyze" nil :conclude identity]',
-      "agent": '[AGENT :goal "task" :max-steps 5 :step (fn [$s] $s)]',
-      "reflect": "[REFLECT :output $result :criteria [accuracy] :threshold 0.8]",
-      "pipe": "(-> $data parse transform output)",
-      "memory": '(mem-remember "key" "value")',
-      "rag": '(rag-add "doc1" "content")'
+      // 마크다운으로 렌더링
+      toMarkdown() {
+        const lines = ["## Reasoning Trace", ""];
+        function render(node, depth) {
+          const indent = "  ".repeat(depth);
+          const icon = { thought: "\u{1F4AD}", action: "\u26A1", observation: "\u{1F441}", decision: "\u{1F3AF}", error: "\u274C", result: "\u2705" }[node.type];
+          const dur = node.duration ? ` (${node.duration}ms)` : "";
+          const val = node.value !== void 0 ? ` \u2192 \`${JSON.stringify(node.value)}\`` : "";
+          lines.push(`${indent}${icon} **${node.label}**${val}${dur}`);
+          node.children.forEach((c) => render(c, depth + 1));
+        }
+        render(this.root, 0);
+        return lines.join("\n");
+      }
+      // 텍스트 트리
+      toTree() {
+        const lines = [];
+        function render(node, prefix, isLast) {
+          const connector = isLast ? "\u2514\u2500\u2500 " : "\u251C\u2500\u2500 ";
+          const val = node.value !== void 0 ? `: ${JSON.stringify(node.value)}` : "";
+          lines.push(`${prefix}${connector}[${node.type}] ${node.label}${val}`);
+          const childPrefix = prefix + (isLast ? "    " : "\u2502   ");
+          node.children.forEach((c, i) => render(c, childPrefix, i === node.children.length - 1));
+        }
+        lines.push(`[root] ${this.root.label}`);
+        this.root.children.forEach((c, i) => render(c, "", i === this.root.children.length - 1));
+        return lines.join("\n");
+      }
+      getRoot() {
+        return this.root;
+      }
+      getCurrent() {
+        return this.current;
+      }
+      depth() {
+        return this.stack.length;
+      }
+      nodeCount() {
+        return this.nodeCounter;
+      }
     };
-    return snippets[concept] ?? `; ${concept} snippet not found`;
+    traceRegistry = /* @__PURE__ */ new Map();
+    traceCounter = 0;
   }
-  getConfig() {
-    return { version: this.version, features: [...this.features] };
+});
+
+// src/prompt-compiler.ts
+var BLOCK_TEMPLATES, PromptCompiler, globalCompiler;
+var init_prompt_compiler = __esm({
+  "src/prompt-compiler.ts"() {
+    BLOCK_TEMPLATES = {
+      COT: (args3) => ({
+        name: "chain-of-thought",
+        priority: 1,
+        content: `Think step by step:
+${(args3.steps ?? []).map((s, i) => `${i + 1}. ${s}`).join("\n")}
+Then provide your conclusion.`
+      }),
+      TOT: (args3) => ({
+        name: "tree-of-thought",
+        priority: 1,
+        content: `Explore multiple approaches:
+${(args3.branches ?? []).map((b) => `- ${b}`).join("\n")}
+Evaluate each and select the best.`
+      }),
+      REFLECT: (args3) => ({
+        name: "self-reflection",
+        priority: 0.5,
+        content: `After responding, reflect on:
+${(args3.criteria ?? ["accuracy", "completeness"]).map((c) => `- ${c}`).join("\n")}
+Score each criterion (0-10) and revise if below ${(args3.threshold ?? 0.7) * 10}.`
+      }),
+      AGENT: (args3) => ({
+        name: "agent-loop",
+        priority: 1,
+        content: `Goal: ${args3.goal ?? "Complete the task"}
+Max steps: ${args3.maxSteps ?? 5}
+For each step: observe \u2192 think \u2192 act \u2192 verify.`
+      }),
+      CONTEXT: (args3) => ({
+        name: "context",
+        priority: 1,
+        content: `Context window: ${args3.maxTokens ?? 4096} tokens. Strategy: ${args3.strategy ?? "sliding"}.`
+      }),
+      "SELF-IMPROVE": (args3) => ({
+        name: "self-improvement",
+        priority: 0.5,
+        content: `Iterations: ${args3.iterations ?? 3}. After each response, evaluate and improve until satisfied.`
+      })
+    };
+    PromptCompiler = class {
+      constructor(target = "claude") {
+        this.target = target;
+      }
+      // FL 블록 정보 → 프롬프트 섹션
+      compileBlock(blockType, args3 = {}) {
+        const template = BLOCK_TEMPLATES[blockType];
+        if (!template) return null;
+        return template(args3);
+      }
+      // 여러 섹션 → 최종 프롬프트
+      compile(sections, userInstruction) {
+        const sorted = [...sections].sort((a, b) => b.priority - a.priority);
+        const parts = [];
+        if (this.target === "claude") {
+          parts.push("Human: " + userInstruction);
+          parts.push("\n[Instructions]");
+          sorted.forEach((s) => {
+            if (s.content) parts.push(s.content);
+          });
+          parts.push("\nAssistant:");
+        } else if (this.target === "gpt") {
+          parts.push("[System]");
+          sorted.forEach((s) => {
+            if (s.content) parts.push(s.content);
+          });
+          parts.push("\n[User]: " + userInstruction);
+        } else {
+          sorted.forEach((s) => {
+            if (s.content) parts.push(s.content);
+          });
+          parts.push("\n" + userInstruction);
+        }
+        const prompt = parts.join("\n");
+        return {
+          prompt,
+          target: this.target,
+          tokens: Math.ceil(prompt.length / 4),
+          sections: sorted.map((s) => s.name)
+        };
+      }
+      // FL 코드 문자열에서 블록 감지 후 컴파일
+      compileFromCode(flCode, instruction) {
+        const sections = [];
+        const blockRegex = /\[(COT|TOT|REFLECT|AGENT|CONTEXT|SELF-IMPROVE)[^\]]*\]/g;
+        let match;
+        while ((match = blockRegex.exec(flCode)) !== null) {
+          const blockType = match[1];
+          const section = this.compileBlock(blockType, {});
+          if (section) sections.push(section);
+        }
+        if (sections.length === 0) {
+          sections.push({ name: "default", content: "", priority: 0.5 });
+        }
+        return this.compile(sections, instruction);
+      }
+      setTarget(target) {
+        this.target = target;
+      }
+      getTarget() {
+        return this.target;
+      }
+    };
+    globalCompiler = new PromptCompiler("claude");
   }
-};
-var sdk = new FLSDK();
+});
+
+// src/fl-sdk.ts
+var FLCodeBuilder, FLSDK, sdk;
+var init_fl_sdk = __esm({
+  "src/fl-sdk.ts"() {
+    FLCodeBuilder = class {
+      constructor() {
+        this.lines = [];
+      }
+      // 기본 폼
+      define(name, value) {
+        this.lines.push(`(define ${name} ${value})`);
+        return this;
+      }
+      defn(name, params, body) {
+        this.lines.push(`(defn ${name} [${params.map((p) => "$" + p).join(" ")}] ${body})`);
+        return this;
+      }
+      call(fn, ...args3) {
+        this.lines.push(`(${fn} ${args3.join(" ")})`);
+        return this;
+      }
+      // AI 블록
+      cot(goal, steps) {
+        const stepStr = steps.map((s) => `:step "${s}" nil`).join(" ");
+        this.lines.push(`[COT :goal "${goal}" ${stepStr} :conclude identity]`);
+        return this;
+      }
+      agent(goal, maxSteps = 5) {
+        this.lines.push(`[AGENT :goal "${goal}" :max-steps ${maxSteps} :step (fn [$s] $s)]`);
+        return this;
+      }
+      maybe(confidence, value) {
+        this.lines.push(`(maybe ${confidence} ${value})`);
+        return this;
+      }
+      result(type, value, errCode) {
+        if (type === "ok") this.lines.push(`(ok ${value})`);
+        else this.lines.push(`(err "${errCode ?? "ERROR"}" ${value})`);
+        return this;
+      }
+      pipe(...fns) {
+        this.lines.push(`(-> $data ${fns.join(" ")})`);
+        return this;
+      }
+      comment(text) {
+        this.lines.push(`; ${text}`);
+        return this;
+      }
+      build() {
+        return this.lines.join("\n");
+      }
+      reset() {
+        this.lines = [];
+        return this;
+      }
+      lineCount() {
+        return this.lines.length;
+      }
+    };
+    FLSDK = class {
+      constructor() {
+        this.version = "9.0.0";
+        this.features = [
+          "maybe",
+          "cot",
+          "tot",
+          "reflect",
+          "context",
+          "result",
+          "fl-try",
+          "use-tool",
+          "agent",
+          "self-improve",
+          "memory",
+          "rag",
+          "multi-agent",
+          "try-reason",
+          "streaming",
+          "quality-loop",
+          "tutor",
+          "debugger",
+          "prompt-compiler"
+        ];
+      }
+      // 코드 빌더 생성
+      builder() {
+        return new FLCodeBuilder();
+      }
+      // FL 코드 블록 만들기
+      block(type, code, description) {
+        return { type, code, description };
+      }
+      // 피처 지원 여부
+      supports(feature) {
+        return this.features.includes(feature);
+      }
+      // FL 코드 검증 (간단한 괄호 밸런스 체크)
+      validate(code) {
+        const errors = [];
+        let depth = 0;
+        for (const ch of code) {
+          if (ch === "(" || ch === "[") depth++;
+          else if (ch === ")" || ch === "]") {
+            depth--;
+            if (depth < 0) {
+              errors.push("Unexpected closing bracket");
+              break;
+            }
+          }
+        }
+        if (depth > 0) errors.push(`Unclosed brackets: ${depth}`);
+        return { valid: errors.length === 0, errors };
+      }
+      // 빠른 스니펫 생성
+      snippet(concept) {
+        const snippets = {
+          "maybe": '(maybe 0.8 "result")',
+          "ok": "(ok 42)",
+          "err": '(err "NOT_FOUND" "Item not found")',
+          "cot": '[COT :step "analyze" nil :conclude identity]',
+          "agent": '[AGENT :goal "task" :max-steps 5 :step (fn [$s] $s)]',
+          "reflect": "[REFLECT :output $result :criteria [accuracy] :threshold 0.8]",
+          "pipe": "(-> $data parse transform output)",
+          "memory": '(mem-remember "key" "value")',
+          "rag": '(rag-add "doc1" "content")'
+        };
+        return snippets[concept] ?? `; ${concept} snippet not found`;
+      }
+      getConfig() {
+        return { version: this.version, features: [...this.features] };
+      }
+    };
+    sdk = new FLSDK();
+  }
+});
 
 // src/hypothesis.ts
-var HypothesisTester = class {
-  test(config) {
-    const {
-      claim,
-      test,
-      evaluate,
-      maxAttempts = 3,
-      threshold = 0.7,
-      conclude = (c) => c >= threshold ? "accepted" : c <= 1 - threshold ? "rejected" : "inconclusive"
-    } = config;
-    const evidence = [];
-    let confidence = 0;
-    let iterations = 0;
-    for (let i = 0; i < maxAttempts; i++) {
-      iterations++;
-      const result = test(i);
-      evidence.push(result);
-      confidence = evaluate(evidence);
-      if (confidence >= threshold || confidence <= 1 - threshold) break;
-    }
-    const verdict = conclude(confidence);
-    const reasoning = `${iterations}\uD68C \uD14C\uC2A4\uD2B8, \uC2E0\uB8B0\uB3C4 ${(confidence * 100).toFixed(0)}% \u2192 ${verdict}`;
-    return { claim, verdict, confidence, evidence, reasoning, iterations };
+var HypothesisTester, globalTester;
+var init_hypothesis = __esm({
+  "src/hypothesis.ts"() {
+    HypothesisTester = class {
+      test(config) {
+        const {
+          claim,
+          test,
+          evaluate,
+          maxAttempts = 3,
+          threshold = 0.7,
+          conclude = (c) => c >= threshold ? "accepted" : c <= 1 - threshold ? "rejected" : "inconclusive"
+        } = config;
+        const evidence = [];
+        let confidence = 0;
+        let iterations = 0;
+        for (let i = 0; i < maxAttempts; i++) {
+          iterations++;
+          const result = test(i);
+          evidence.push(result);
+          confidence = evaluate(evidence);
+          if (confidence >= threshold || confidence <= 1 - threshold) break;
+        }
+        const verdict = conclude(confidence);
+        const reasoning = `${iterations}\uD68C \uD14C\uC2A4\uD2B8, \uC2E0\uB8B0\uB3C4 ${(confidence * 100).toFixed(0)}% \u2192 ${verdict}`;
+        return { claim, verdict, confidence, evidence, reasoning, iterations };
+      }
+      // 여러 가설 중 가장 신뢰도 높은 것 선택
+      compete(hypotheses) {
+        const results = hypotheses.map((h) => this.test(h));
+        return results.reduce((best, curr) => curr.confidence > best.confidence ? curr : best);
+      }
+    };
+    globalTester = new HypothesisTester();
   }
-  // 여러 가설 중 가장 신뢰도 높은 것 선택
-  compete(hypotheses) {
-    const results = hypotheses.map((h) => this.test(h));
-    return results.reduce((best, curr) => curr.confidence > best.confidence ? curr : best);
-  }
-};
-var globalTester = new HypothesisTester();
+});
 
 // src/maybe-type.ts
 function maybe(confidence, value, reason) {
@@ -9416,6 +7774,10 @@ function createMaybeModule(callFunctionValue2, callUserFunction2) {
     "maybe-reason": (v) => isMaybe(v) && v.reason !== void 0 ? v.reason : null
   };
 }
+var init_maybe_type = __esm({
+  "src/maybe-type.ts"() {
+  }
+});
 
 // src/maybe-chain.ts
 function clamp(v) {
@@ -9461,109 +7823,123 @@ function maybeSelect(maybes) {
   if (valid.length === 0) return makeNone("\uD6C4\uBCF4 \uC5C6\uC74C");
   return valid.reduce((best, curr) => curr.confidence > best.confidence ? curr : best);
 }
+var init_maybe_chain = __esm({
+  "src/maybe-chain.ts"() {
+    init_maybe_type();
+  }
+});
 
 // src/debate.ts
-var Debater = class {
-  debate(config) {
-    const { proposition, pro, con, rounds = 3 } = config;
-    const judge = config.judge ?? ((p, c) => p > c ? "pro" : c > p ? "con" : "tie");
-    const debateRounds = [];
-    const proArgs = [];
-    const conArgs = [];
-    for (let r = 1; r <= rounds; r++) {
-      const proArg = pro(r, conArgs);
-      proArgs.push(proArg);
-      const conArg = con(r, proArgs);
-      conArgs.push(conArg);
-      debateRounds.push({ round: r, proArgument: proArg, conArgument: conArg });
-    }
-    const proScore = proArgs.reduce((s, a) => s + a.strength, 0) / proArgs.length;
-    const conScore = conArgs.reduce((s, a) => s + a.strength, 0) / conArgs.length;
-    const winner = judge(proScore, conScore);
-    const conclusion = winner === "tie" ? `"${proposition}" \u2014 \uD33D\uD33D\uD55C \uB17C\uC7C1 (pro: ${proScore.toFixed(2)}, con: ${conScore.toFixed(2)})` : `"${proposition}" \u2014 ${winner === "pro" ? "\uCC44\uD0DD" : "\uAE30\uAC01"} (\uC2B9\uC790: ${winner})`;
-    return { proposition, winner, proScore, conScore, rounds: debateRounds, conclusion };
+var Debater, globalDebater;
+var init_debate = __esm({
+  "src/debate.ts"() {
+    Debater = class {
+      debate(config) {
+        const { proposition, pro, con, rounds = 3 } = config;
+        const judge = config.judge ?? ((p, c) => p > c ? "pro" : c > p ? "con" : "tie");
+        const debateRounds = [];
+        const proArgs = [];
+        const conArgs = [];
+        for (let r = 1; r <= rounds; r++) {
+          const proArg = pro(r, conArgs);
+          proArgs.push(proArg);
+          const conArg = con(r, proArgs);
+          conArgs.push(conArg);
+          debateRounds.push({ round: r, proArgument: proArg, conArgument: conArg });
+        }
+        const proScore = proArgs.reduce((s, a) => s + a.strength, 0) / proArgs.length;
+        const conScore = conArgs.reduce((s, a) => s + a.strength, 0) / conArgs.length;
+        const winner = judge(proScore, conScore);
+        const conclusion = winner === "tie" ? `"${proposition}" \u2014 \uD33D\uD33D\uD55C \uB17C\uC7C1 (pro: ${proScore.toFixed(2)}, con: ${conScore.toFixed(2)})` : `"${proposition}" \u2014 ${winner === "pro" ? "\uCC44\uD0DD" : "\uAE30\uAC01"} (\uC2B9\uC790: ${winner})`;
+        return { proposition, winner, proScore, conScore, rounds: debateRounds, conclusion };
+      }
+    };
+    globalDebater = new Debater();
   }
-};
-var globalDebater = new Debater();
+});
 
 // src/checkpoint.ts
-var CheckpointManager = class {
-  constructor() {
-    this.checkpoints = /* @__PURE__ */ new Map();
-    this.depth = 0;
-  }
-  /** 상태 저장 (깊은 복사) */
-  save(name, state) {
-    const cloned = typeof structuredClone === "function" ? structuredClone(state) : JSON.parse(JSON.stringify(state));
-    const entry = {
-      name,
-      state: cloned,
-      timestamp: Date.now(),
-      depth: this.depth
+var CheckpointManager, globalCheckpoint;
+var init_checkpoint = __esm({
+  "src/checkpoint.ts"() {
+    CheckpointManager = class {
+      constructor() {
+        this.checkpoints = /* @__PURE__ */ new Map();
+        this.depth = 0;
+      }
+      /** 상태 저장 (깊은 복사) */
+      save(name, state) {
+        const cloned = typeof structuredClone === "function" ? structuredClone(state) : JSON.parse(JSON.stringify(state));
+        const entry = {
+          name,
+          state: cloned,
+          timestamp: Date.now(),
+          depth: this.depth
+        };
+        if (!this.checkpoints.has(name)) this.checkpoints.set(name, []);
+        this.checkpoints.get(name).push(entry);
+      }
+      /** 최신 버전 복원 */
+      restore(name) {
+        const entries = this.checkpoints.get(name);
+        if (!entries || entries.length === 0) return null;
+        return entries[entries.length - 1].state;
+      }
+      /** 특정 인덱스 버전 복원 */
+      restoreAt(name, index) {
+        const entries = this.checkpoints.get(name);
+        if (!entries || index < 0 || index >= entries.length) return null;
+        return entries[index].state;
+      }
+      /** 전체 엔트리 조회 (timestamp 포함) */
+      getEntries(name) {
+        return this.checkpoints.get(name) ?? [];
+      }
+      /**
+       * 분기 시도: fn 실패 시 자동 복원
+       * 성공 → { success: true, result, restored: state }
+       * 실패 → { success: false, restored: <saved state> }
+       */
+      branch(name, state, fn) {
+        this.save(name, state);
+        this.depth++;
+        try {
+          const result = fn(state);
+          this.depth--;
+          return { success: true, result, restored: state };
+        } catch (_e) {
+          this.depth--;
+          const restored = this.restore(name);
+          return { success: false, restored };
+        }
+      }
+      /** 체크포인트 삭제 */
+      drop(name) {
+        return this.checkpoints.delete(name);
+      }
+      /** 저장된 이름 목록 */
+      list() {
+        return [...this.checkpoints.keys()];
+      }
+      /** 특정 이름의 버전 수 */
+      versions(name) {
+        return this.checkpoints.get(name)?.length ?? 0;
+      }
+      /** 현재 branch 깊이 */
+      getDepth() {
+        return this.depth;
+      }
+      /** 전체 초기화 */
+      clear() {
+        this.checkpoints.clear();
+        this.depth = 0;
+      }
     };
-    if (!this.checkpoints.has(name)) this.checkpoints.set(name, []);
-    this.checkpoints.get(name).push(entry);
+    globalCheckpoint = new CheckpointManager();
   }
-  /** 최신 버전 복원 */
-  restore(name) {
-    const entries = this.checkpoints.get(name);
-    if (!entries || entries.length === 0) return null;
-    return entries[entries.length - 1].state;
-  }
-  /** 특정 인덱스 버전 복원 */
-  restoreAt(name, index) {
-    const entries = this.checkpoints.get(name);
-    if (!entries || index < 0 || index >= entries.length) return null;
-    return entries[index].state;
-  }
-  /** 전체 엔트리 조회 (timestamp 포함) */
-  getEntries(name) {
-    return this.checkpoints.get(name) ?? [];
-  }
-  /**
-   * 분기 시도: fn 실패 시 자동 복원
-   * 성공 → { success: true, result, restored: state }
-   * 실패 → { success: false, restored: <saved state> }
-   */
-  branch(name, state, fn) {
-    this.save(name, state);
-    this.depth++;
-    try {
-      const result = fn(state);
-      this.depth--;
-      return { success: true, result, restored: state };
-    } catch (_e) {
-      this.depth--;
-      const restored = this.restore(name);
-      return { success: false, restored };
-    }
-  }
-  /** 체크포인트 삭제 */
-  drop(name) {
-    return this.checkpoints.delete(name);
-  }
-  /** 저장된 이름 목록 */
-  list() {
-    return [...this.checkpoints.keys()];
-  }
-  /** 특정 이름의 버전 수 */
-  versions(name) {
-    return this.checkpoints.get(name)?.length ?? 0;
-  }
-  /** 현재 branch 깊이 */
-  getDepth() {
-    return this.depth;
-  }
-  /** 전체 초기화 */
-  clear() {
-    this.checkpoints.clear();
-    this.depth = 0;
-  }
-};
-var globalCheckpoint = new CheckpointManager();
+});
 
 // src/meta-reason.ts
-var ALL_STRATEGIES = ["COT", "TOT", "HYPOTHESIS", "DEBATE", "REFLECT", "DIRECT"];
 function scoreStrategy(problem, strategy) {
   const p = problem.toLowerCase();
   let score = 0.5;
@@ -9597,95 +7973,106 @@ function scoreStrategy(problem, strategy) {
   score = Math.max(0, Math.min(1, score));
   return { strategy, score, reason };
 }
-var MetaReasoner = class {
-  constructor(strategies = [...ALL_STRATEGIES]) {
-    this.strategies = strategies;
+var ALL_STRATEGIES, MetaReasoner, globalMetaReasoner;
+var init_meta_reason = __esm({
+  "src/meta-reason.ts"() {
+    ALL_STRATEGIES = ["COT", "TOT", "HYPOTHESIS", "DEBATE", "REFLECT", "DIRECT"];
+    MetaReasoner = class {
+      constructor(strategies = [...ALL_STRATEGIES]) {
+        this.strategies = strategies;
+      }
+      analyze(problem) {
+        const scores = this.strategies.map((s) => scoreStrategy(problem, s));
+        scores.sort((a, b) => b.score - a.score);
+        const selected = scores[0].strategy;
+        const rationale = `"${problem.slice(0, 50)}" \u2192 ${selected} \uC120\uD0DD (\uC810\uC218: ${scores[0].score.toFixed(2)}, \uC774\uC720: ${scores[0].reason})`;
+        return { problem, selected, scores, rationale };
+      }
+      // 커스텀 전략 추가
+      addStrategy(strategy) {
+        if (!this.strategies.includes(strategy)) this.strategies.push(strategy);
+      }
+      getStrategies() {
+        return [...this.strategies];
+      }
+    };
+    globalMetaReasoner = new MetaReasoner();
   }
-  analyze(problem) {
-    const scores = this.strategies.map((s) => scoreStrategy(problem, s));
-    scores.sort((a, b) => b.score - a.score);
-    const selected = scores[0].strategy;
-    const rationale = `"${problem.slice(0, 50)}" \u2192 ${selected} \uC120\uD0DD (\uC810\uC218: ${scores[0].score.toFixed(2)}, \uC774\uC720: ${scores[0].reason})`;
-    return { problem, selected, scores, rationale };
-  }
-  // 커스텀 전략 추가
-  addStrategy(strategy) {
-    if (!this.strategies.includes(strategy)) this.strategies.push(strategy);
-  }
-  getStrategies() {
-    return [...this.strategies];
-  }
-};
-var globalMetaReasoner = new MetaReasoner();
+});
 
 // src/belief.ts
-var BeliefSystem = class {
-  constructor() {
-    this.beliefs = /* @__PURE__ */ new Map();
+var BeliefSystem, globalBeliefs;
+var init_belief = __esm({
+  "src/belief.ts"() {
+    BeliefSystem = class {
+      constructor() {
+        this.beliefs = /* @__PURE__ */ new Map();
+      }
+      // 신념 설정
+      set(claim, confidence) {
+        const clamped = Math.max(0, Math.min(1, confidence));
+        const existing = this.beliefs.get(claim);
+        if (existing) {
+          const delta = clamped - existing.confidence;
+          existing.confidence = clamped;
+          existing.history.push({ event: "set", delta, timestamp: Date.now() });
+        } else {
+          this.beliefs.set(claim, {
+            claim,
+            confidence: clamped,
+            history: [{ event: "initialized", delta: 0, timestamp: Date.now() }],
+            createdAt: Date.now()
+          });
+        }
+      }
+      // 신념 조회
+      get(claim) {
+        return this.beliefs.get(claim)?.confidence ?? null;
+      }
+      // 베이즈식 업데이트: 새 증거로 확신 조정
+      // evidence > 0.5: 긍정 증거 (확신 증가), < 0.5: 부정 증거 (확신 감소)
+      update(claim, evidenceStrength, eventName = "evidence") {
+        const belief = this.beliefs.get(claim);
+        if (!belief) return 0;
+        const prior = belief.confidence;
+        const likelihood = evidenceStrength > 0.5 ? evidenceStrength : 1 - evidenceStrength;
+        const direction = evidenceStrength > 0.5 ? 1 : -1;
+        const delta = direction * likelihood * (1 - Math.abs(prior - 0.5)) * 0.3;
+        const posterior = Math.max(0.01, Math.min(0.99, prior + delta));
+        belief.history.push({ event: eventName, delta: posterior - prior, timestamp: Date.now() });
+        belief.confidence = posterior;
+        return posterior;
+      }
+      // 부정 (반대로 업데이트)
+      negate(claim) {
+        return this.update(claim, 0.1, "negation");
+      }
+      // 모든 신념 목록
+      list() {
+        return [...this.beliefs.values()];
+      }
+      // 가장 확신이 높은 신념
+      strongest() {
+        const all = this.list();
+        if (all.length === 0) return null;
+        return all.reduce((best, b) => b.confidence > best.confidence ? b : best);
+      }
+      // 특정 임계값 이상 신념들
+      certain(threshold = 0.8) {
+        return this.list().filter((b) => b.confidence >= threshold);
+      }
+      // 신념 삭제
+      forget(claim) {
+        return this.beliefs.delete(claim);
+      }
+      // 크기
+      size() {
+        return this.beliefs.size;
+      }
+    };
+    globalBeliefs = new BeliefSystem();
   }
-  // 신념 설정
-  set(claim, confidence) {
-    const clamped = Math.max(0, Math.min(1, confidence));
-    const existing = this.beliefs.get(claim);
-    if (existing) {
-      const delta = clamped - existing.confidence;
-      existing.confidence = clamped;
-      existing.history.push({ event: "set", delta, timestamp: Date.now() });
-    } else {
-      this.beliefs.set(claim, {
-        claim,
-        confidence: clamped,
-        history: [{ event: "initialized", delta: 0, timestamp: Date.now() }],
-        createdAt: Date.now()
-      });
-    }
-  }
-  // 신념 조회
-  get(claim) {
-    return this.beliefs.get(claim)?.confidence ?? null;
-  }
-  // 베이즈식 업데이트: 새 증거로 확신 조정
-  // evidence > 0.5: 긍정 증거 (확신 증가), < 0.5: 부정 증거 (확신 감소)
-  update(claim, evidenceStrength, eventName = "evidence") {
-    const belief = this.beliefs.get(claim);
-    if (!belief) return 0;
-    const prior = belief.confidence;
-    const likelihood = evidenceStrength > 0.5 ? evidenceStrength : 1 - evidenceStrength;
-    const direction = evidenceStrength > 0.5 ? 1 : -1;
-    const delta = direction * likelihood * (1 - Math.abs(prior - 0.5)) * 0.3;
-    const posterior = Math.max(0.01, Math.min(0.99, prior + delta));
-    belief.history.push({ event: eventName, delta: posterior - prior, timestamp: Date.now() });
-    belief.confidence = posterior;
-    return posterior;
-  }
-  // 부정 (반대로 업데이트)
-  negate(claim) {
-    return this.update(claim, 0.1, "negation");
-  }
-  // 모든 신념 목록
-  list() {
-    return [...this.beliefs.values()];
-  }
-  // 가장 확신이 높은 신념
-  strongest() {
-    const all = this.list();
-    if (all.length === 0) return null;
-    return all.reduce((best, b) => b.confidence > best.confidence ? b : best);
-  }
-  // 특정 임계값 이상 신념들
-  certain(threshold = 0.8) {
-    return this.list().filter((b) => b.confidence >= threshold);
-  }
-  // 신념 삭제
-  forget(claim) {
-    return this.beliefs.delete(claim);
-  }
-  // 크기
-  size() {
-    return this.beliefs.size;
-  }
-};
-var globalBeliefs = new BeliefSystem();
+});
 
 // src/analogy.ts
 function similarity(a, b) {
@@ -9695,1024 +8082,997 @@ function similarity(a, b) {
   if (intersection === 0) return 0;
   return intersection / Math.sqrt(tokA.size * tokB.size);
 }
-var AnalogyStore = class {
-  constructor() {
-    this.patterns = [];
-    this.counter = 0;
-  }
-  // 패턴 저장
-  store(description, solution, tags = []) {
-    const p = {
-      id: `pattern-${++this.counter}`,
-      description,
-      solution,
-      tags,
-      useCount: 0
+var AnalogyStore, globalAnalogy;
+var init_analogy = __esm({
+  "src/analogy.ts"() {
+    AnalogyStore = class {
+      constructor() {
+        this.patterns = [];
+        this.counter = 0;
+      }
+      // 패턴 저장
+      store(description, solution, tags = []) {
+        const p = {
+          id: `pattern-${++this.counter}`,
+          description,
+          solution,
+          tags,
+          useCount: 0
+        };
+        this.patterns.push(p);
+        return p;
+      }
+      // 유사 패턴 찾기
+      find(problem, topK = 3) {
+        return this.patterns.map((p) => ({
+          ...p,
+          similarity: similarity(problem, p.description) + p.tags.filter((t) => problem.toLowerCase().includes(t)).length * 0.1
+        })).filter((p) => (p.similarity ?? 0) > 0).sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0)).slice(0, topK);
+      }
+      // 가장 유사한 패턴 1개
+      best(problem) {
+        const results = this.find(problem, 1);
+        if (results.length === 0) return null;
+        const found = this.patterns.find((p) => p.id === results[0].id);
+        if (found) found.useCount++;
+        return results[0];
+      }
+      // 태그로 검색
+      byTag(tag) {
+        return this.patterns.filter((p) => p.tags.includes(tag));
+      }
+      // 자주 쓰인 패턴
+      popular(n = 3) {
+        return [...this.patterns].sort((a, b) => b.useCount - a.useCount).slice(0, n);
+      }
+      size() {
+        return this.patterns.length;
+      }
+      all() {
+        return [...this.patterns];
+      }
     };
-    this.patterns.push(p);
-    return p;
+    globalAnalogy = new AnalogyStore();
   }
-  // 유사 패턴 찾기
-  find(problem, topK = 3) {
-    return this.patterns.map((p) => ({
-      ...p,
-      similarity: similarity(problem, p.description) + p.tags.filter((t) => problem.toLowerCase().includes(t)).length * 0.1
-    })).filter((p) => (p.similarity ?? 0) > 0).sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0)).slice(0, topK);
-  }
-  // 가장 유사한 패턴 1개
-  best(problem) {
-    const results = this.find(problem, 1);
-    if (results.length === 0) return null;
-    const found = this.patterns.find((p) => p.id === results[0].id);
-    if (found) found.useCount++;
-    return results[0];
-  }
-  // 태그로 검색
-  byTag(tag) {
-    return this.patterns.filter((p) => p.tags.includes(tag));
-  }
-  // 자주 쓰인 패턴
-  popular(n = 3) {
-    return [...this.patterns].sort((a, b) => b.useCount - a.useCount).slice(0, n);
-  }
-  size() {
-    return this.patterns.length;
-  }
-  all() {
-    return [...this.patterns];
-  }
-};
-var globalAnalogy = new AnalogyStore();
+});
 
 // src/critique.ts
 function severityWeight(s) {
   return { critical: 1, major: 0.7, minor: 0.3, suggestion: 0.1 }[s];
 }
-var CritiqueAgent = class {
-  run(output, config) {
-    const { finders, riskThreshold = 0.5 } = config;
-    const points = finders.flatMap((f) => {
-      try {
-        return f(output);
-      } catch {
+var CritiqueAgent, defaultFinders, globalCritique;
+var init_critique = __esm({
+  "src/critique.ts"() {
+    CritiqueAgent = class {
+      run(output, config) {
+        const { finders, riskThreshold = 0.5 } = config;
+        const points = finders.flatMap((f) => {
+          try {
+            return f(output);
+          } catch {
+            return [];
+          }
+        });
+        const totalRisk = points.length === 0 ? 0 : points.reduce((s, p) => s + severityWeight(p.severity), 0) / (points.length * 1);
+        const overallRisk = Math.min(1, totalRisk);
+        const approved = overallRisk < riskThreshold && !points.some((p) => p.severity === "critical");
+        const criticals = points.filter((p) => p.severity === "critical").length;
+        const majors = points.filter((p) => p.severity === "major").length;
+        const summary = points.length === 0 ? "\uBE44\uD310\uD560 \uC810 \uC5C6\uC74C \u2014 \uD1B5\uACFC" : `${points.length}\uAC1C \uBB38\uC81C \uBC1C\uACAC (critical: ${criticals}, major: ${majors}), \uC704\uD5D8\uB3C4: ${(overallRisk * 100).toFixed(0)}%`;
+        return { output, points, overallRisk, approved, summary };
+      }
+    };
+    defaultFinders = [
+      // 빈 출력
+      (output) => {
+        if (output === null || output === void 0 || output === "") {
+          return [{ type: "missing", description: "\uCD9C\uB825\uC774 \uBE44\uC5B4\uC788\uC74C", severity: "critical" }];
+        }
+        return [];
+      },
+      // 너무 짧은 출력
+      (output) => {
+        if (typeof output === "string" && output.length > 0 && output.length < 5) {
+          return [{ type: "weakness", description: "\uCD9C\uB825\uC774 \uB108\uBB34 \uC9E7\uC74C", severity: "minor", suggestion: "\uB354 \uAD6C\uCCB4\uC801\uC73C\uB85C \uC11C\uC220" }];
+        }
+        return [];
+      },
+      // 에러 객체
+      (output) => {
+        if (output instanceof Error || typeof output === "object" && output !== null && output?._tag === "Err") {
+          return [{ type: "weakness", description: "\uC5D0\uB7EC \uAC12\uC774 \uCD9C\uB825\uB428", severity: "major" }];
+        }
         return [];
       }
-    });
-    const totalRisk = points.length === 0 ? 0 : points.reduce((s, p) => s + severityWeight(p.severity), 0) / (points.length * 1);
-    const overallRisk = Math.min(1, totalRisk);
-    const approved = overallRisk < riskThreshold && !points.some((p) => p.severity === "critical");
-    const criticals = points.filter((p) => p.severity === "critical").length;
-    const majors = points.filter((p) => p.severity === "major").length;
-    const summary = points.length === 0 ? "\uBE44\uD310\uD560 \uC810 \uC5C6\uC74C \u2014 \uD1B5\uACFC" : `${points.length}\uAC1C \uBB38\uC81C \uBC1C\uACAC (critical: ${criticals}, major: ${majors}), \uC704\uD5D8\uB3C4: ${(overallRisk * 100).toFixed(0)}%`;
-    return { output, points, overallRisk, approved, summary };
+    ];
+    globalCritique = new CritiqueAgent();
   }
-};
-var defaultFinders = [
-  // 빈 출력
-  (output) => {
-    if (output === null || output === void 0 || output === "") {
-      return [{ type: "missing", description: "\uCD9C\uB825\uC774 \uBE44\uC5B4\uC788\uC74C", severity: "critical" }];
-    }
-    return [];
-  },
-  // 너무 짧은 출력
-  (output) => {
-    if (typeof output === "string" && output.length > 0 && output.length < 5) {
-      return [{ type: "weakness", description: "\uCD9C\uB825\uC774 \uB108\uBB34 \uC9E7\uC74C", severity: "minor", suggestion: "\uB354 \uAD6C\uCCB4\uC801\uC73C\uB85C \uC11C\uC220" }];
-    }
-    return [];
-  },
-  // 에러 객체
-  (output) => {
-    if (output instanceof Error || typeof output === "object" && output !== null && output?._tag === "Err") {
-      return [{ type: "weakness", description: "\uC5D0\uB7EC \uAC12\uC774 \uCD9C\uB825\uB428", severity: "major" }];
-    }
-    return [];
-  }
-];
-var globalCritique = new CritiqueAgent();
+});
 
 // src/compose-reason.ts
-var ReasonComposer = class {
-  compose(steps, input) {
-    const startTime = Date.now();
-    const context = { step: 0, history: [], store: /* @__PURE__ */ new Map() };
-    let current = input;
-    let success = true;
-    for (const step of steps) {
-      if (step.condition && !step.condition(current, context)) {
-        context.history.push({
-          name: `${step.name}(skipped)`,
-          input: current,
-          output: current,
-          duration: 0
-        });
-        context.step++;
-        continue;
-      }
-      const stepStart = Date.now();
-      try {
-        const output = step.fn(current, context);
-        context.history.push({
-          name: step.name,
-          input: current,
-          output,
-          duration: Date.now() - stepStart
-        });
-        current = output;
-      } catch (e) {
-        if (step.onError) {
-          const fallback = step.onError(e, current);
-          context.history.push({
-            name: `${step.name}(error\u2192fallback)`,
-            input: current,
-            output: fallback,
-            duration: Date.now() - stepStart
-          });
-          current = fallback;
-        } else {
-          success = false;
-          context.history.push({
-            name: `${step.name}(failed)`,
-            input: current,
-            output: null,
-            duration: Date.now() - stepStart
-          });
-          break;
+var ReasonComposer, PipelineBuilder, globalComposer;
+var init_compose_reason = __esm({
+  "src/compose-reason.ts"() {
+    ReasonComposer = class {
+      compose(steps, input) {
+        const startTime = Date.now();
+        const context = { step: 0, history: [], store: /* @__PURE__ */ new Map() };
+        let current = input;
+        let success = true;
+        for (const step of steps) {
+          if (step.condition && !step.condition(current, context)) {
+            context.history.push({
+              name: `${step.name}(skipped)`,
+              input: current,
+              output: current,
+              duration: 0
+            });
+            context.step++;
+            continue;
+          }
+          const stepStart = Date.now();
+          try {
+            const output = step.fn(current, context);
+            context.history.push({
+              name: step.name,
+              input: current,
+              output,
+              duration: Date.now() - stepStart
+            });
+            current = output;
+          } catch (e) {
+            if (step.onError) {
+              const fallback = step.onError(e, current);
+              context.history.push({
+                name: `${step.name}(error\u2192fallback)`,
+                input: current,
+                output: fallback,
+                duration: Date.now() - stepStart
+              });
+              current = fallback;
+            } else {
+              success = false;
+              context.history.push({
+                name: `${step.name}(failed)`,
+                input: current,
+                output: null,
+                duration: Date.now() - stepStart
+              });
+              break;
+            }
+          }
+          context.step++;
         }
-      }
-      context.step++;
-    }
-    return {
-      output: current,
-      steps: context.step,
-      history: context.history,
-      success,
-      duration: Date.now() - startTime
-    };
-  }
-  // 단계 빌더 (체이닝)
-  pipeline() {
-    return new PipelineBuilder(this);
-  }
-};
-var PipelineBuilder = class {
-  constructor(composer) {
-    this.steps = [];
-    this.composer = composer;
-  }
-  step(name, fn, options = {}) {
-    this.steps.push({ name, fn, ...options });
-    return this;
-  }
-  run(input) {
-    return this.composer.compose(this.steps, input);
-  }
-  stepCount() {
-    return this.steps.length;
-  }
-};
-var globalComposer = new ReasonComposer();
-
-// src/cognitive.ts
-var CognitiveArchitecture = class {
-  constructor() {
-    this.meta = new MetaReasoner();
-    this.beliefs = new BeliefSystem();
-    this.analogies = new AnalogyStore();
-    this.hypothesis = new HypothesisTester();
-    this.critique = new CritiqueAgent();
-    this.composer = new ReasonComposer();
-    this.debater = new Debater();
-    this.checkpoints = new CheckpointManager();
-  }
-  // 문제 → 전략 선택 → 실행 → 비판 → 결과
-  solve(problem, solver) {
-    const meta = this.meta.analyze(problem);
-    const strategy = meta.selected;
-    this.checkpoints.save("pre-solve", { problem, strategy });
-    const analogyResult = this.analogies.best(problem);
-    const output = solver(strategy, problem);
-    const critiqueResult = this.critique.run(output, { finders: defaultFinders });
-    this.beliefs.set(`solved:${problem.slice(0, 20)}`, critiqueResult.approved ? 0.8 : 0.4);
-    const state = {
-      problem,
-      strategy,
-      beliefs: /* @__PURE__ */ new Map([[`solved`, critiqueResult.approved ? 0.8 : 0.4]]),
-      analogies: analogyResult ? [analogyResult.description] : [],
-      output,
-      critique: { approved: critiqueResult.approved, risk: critiqueResult.overallRisk },
-      iterations: 1
-    };
-    return { strategy, output, approved: critiqueResult.approved, risk: critiqueResult.overallRisk, state };
-  }
-  // 간단한 통계
-  stats() {
-    return {
-      beliefs: this.beliefs.size(),
-      analogies: this.analogies.size(),
-      checkpoints: this.checkpoints.list().length
-    };
-  }
-};
-var globalCognition = new CognitiveArchitecture();
-
-// src/consensus.ts
-var ConsensusEngine = class {
-  // 다수결 (가장 많이 나온 답)
-  majority(votes) {
-    if (!votes || votes.length === 0) {
-      throw new Error("votes\uAC00 \uBE44\uC5B4\uC788\uC74C");
-    }
-    const counts = /* @__PURE__ */ new Map();
-    for (const v of votes) {
-      const key = JSON.stringify(v.answer);
-      const existing = counts.get(key) ?? { answer: v.answer, count: 0, totalConf: 0 };
-      existing.count++;
-      existing.totalConf += v.confidence;
-      counts.set(key, existing);
-    }
-    const sorted = [...counts.values()].sort((a, b) => b.count - a.count);
-    const winner = sorted[0];
-    const agreement = winner.count / votes.length;
-    const winnerKey = JSON.stringify(winner.answer);
-    return {
-      answer: winner.answer,
-      strategy: "majority",
-      agreement,
-      votes,
-      dissent: votes.filter((v) => JSON.stringify(v.answer) !== winnerKey)
-    };
-  }
-  // 가중 평균 (숫자형 답에 적합)
-  weighted(votes) {
-    if (!votes || votes.length === 0) {
-      throw new Error("votes\uAC00 \uBE44\uC5B4\uC788\uC74C");
-    }
-    const totalWeight = votes.reduce((s, v) => s + v.confidence, 0);
-    const answer = votes.reduce((s, v) => s + v.answer * v.confidence, 0) / totalWeight;
-    const vals = votes.map((v) => v.answer);
-    const range = Math.max(...vals) - Math.min(...vals);
-    const variance2 = votes.reduce((s, v) => s + Math.abs(v.answer - answer) * v.confidence, 0) / totalWeight;
-    const agreement = Math.max(0, 1 - variance2 / (range + 1));
-    return { answer, strategy: "weighted", agreement, votes, dissent: [] };
-  }
-  // 임계값 (confidence 평균이 threshold 이상인 답)
-  threshold(votes, threshold = 0.7) {
-    if (!votes || votes.length === 0) return null;
-    const groups = /* @__PURE__ */ new Map();
-    for (const v of votes) {
-      const key = JSON.stringify(v.answer);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(v);
-    }
-    for (const [key, group] of groups) {
-      const avgConf = group.reduce((s, v) => s + v.confidence, 0) / group.length;
-      if (avgConf >= threshold) {
         return {
-          answer: group[0].answer,
-          strategy: "threshold",
-          agreement: avgConf,
-          votes,
-          dissent: votes.filter((v) => JSON.stringify(v.answer) !== key)
+          output: current,
+          steps: context.step,
+          history: context.history,
+          success,
+          duration: Date.now() - startTime
         };
       }
-    }
-    return null;
+      // 단계 빌더 (체이닝)
+      pipeline() {
+        return new PipelineBuilder(this);
+      }
+    };
+    PipelineBuilder = class {
+      constructor(composer) {
+        this.steps = [];
+        this.composer = composer;
+      }
+      step(name, fn, options = {}) {
+        this.steps.push({ name, fn, ...options });
+        return this;
+      }
+      run(input) {
+        return this.composer.compose(this.steps, input);
+      }
+      stepCount() {
+        return this.steps.length;
+      }
+    };
+    globalComposer = new ReasonComposer();
   }
-  // 만장일치
-  unanimous(votes) {
-    if (!votes || votes.length === 0) return null;
-    const first = JSON.stringify(votes[0].answer);
-    if (votes.every((v) => JSON.stringify(v.answer) === first)) {
-      return {
-        answer: votes[0].answer,
-        strategy: "unanimous",
-        agreement: 1,
-        votes,
-        dissent: []
-      };
-    }
-    return null;
+});
+
+// src/cognitive.ts
+var CognitiveArchitecture, globalCognition;
+var init_cognitive = __esm({
+  "src/cognitive.ts"() {
+    init_hypothesis();
+    init_meta_reason();
+    init_belief();
+    init_analogy();
+    init_critique();
+    init_compose_reason();
+    init_debate();
+    init_checkpoint();
+    CognitiveArchitecture = class {
+      constructor() {
+        this.meta = new MetaReasoner();
+        this.beliefs = new BeliefSystem();
+        this.analogies = new AnalogyStore();
+        this.hypothesis = new HypothesisTester();
+        this.critique = new CritiqueAgent();
+        this.composer = new ReasonComposer();
+        this.debater = new Debater();
+        this.checkpoints = new CheckpointManager();
+      }
+      // 문제 → 전략 선택 → 실행 → 비판 → 결과
+      solve(problem, solver) {
+        const meta = this.meta.analyze(problem);
+        const strategy = meta.selected;
+        this.checkpoints.save("pre-solve", { problem, strategy });
+        const analogyResult = this.analogies.best(problem);
+        const output = solver(strategy, problem);
+        const critiqueResult = this.critique.run(output, { finders: defaultFinders });
+        this.beliefs.set(`solved:${problem.slice(0, 20)}`, critiqueResult.approved ? 0.8 : 0.4);
+        const state = {
+          problem,
+          strategy,
+          beliefs: /* @__PURE__ */ new Map([[`solved`, critiqueResult.approved ? 0.8 : 0.4]]),
+          analogies: analogyResult ? [analogyResult.description] : [],
+          output,
+          critique: { approved: critiqueResult.approved, risk: critiqueResult.overallRisk },
+          iterations: 1
+        };
+        return { strategy, output, approved: critiqueResult.approved, risk: critiqueResult.overallRisk, state };
+      }
+      // 간단한 통계
+      stats() {
+        return {
+          beliefs: this.beliefs.size(),
+          analogies: this.analogies.size(),
+          checkpoints: this.checkpoints.list().length
+        };
+      }
+    };
+    globalCognition = new CognitiveArchitecture();
   }
-  // agreement 계산 (majority 기준)
-  agreement(votes) {
-    if (!votes || votes.length === 0) return 0;
-    const result = this.majority(votes);
-    return result.agreement;
+});
+
+// src/consensus.ts
+var ConsensusEngine, globalConsensus;
+var init_consensus = __esm({
+  "src/consensus.ts"() {
+    ConsensusEngine = class {
+      // 다수결 (가장 많이 나온 답)
+      majority(votes) {
+        if (!votes || votes.length === 0) {
+          throw new Error("votes\uAC00 \uBE44\uC5B4\uC788\uC74C");
+        }
+        const counts = /* @__PURE__ */ new Map();
+        for (const v of votes) {
+          const key = JSON.stringify(v.answer);
+          const existing = counts.get(key) ?? { answer: v.answer, count: 0, totalConf: 0 };
+          existing.count++;
+          existing.totalConf += v.confidence;
+          counts.set(key, existing);
+        }
+        const sorted = [...counts.values()].sort((a, b) => b.count - a.count);
+        const winner = sorted[0];
+        const agreement = winner.count / votes.length;
+        const winnerKey = JSON.stringify(winner.answer);
+        return {
+          answer: winner.answer,
+          strategy: "majority",
+          agreement,
+          votes,
+          dissent: votes.filter((v) => JSON.stringify(v.answer) !== winnerKey)
+        };
+      }
+      // 가중 평균 (숫자형 답에 적합)
+      weighted(votes) {
+        if (!votes || votes.length === 0) {
+          throw new Error("votes\uAC00 \uBE44\uC5B4\uC788\uC74C");
+        }
+        const totalWeight = votes.reduce((s, v) => s + v.confidence, 0);
+        const answer = votes.reduce((s, v) => s + v.answer * v.confidence, 0) / totalWeight;
+        const vals = votes.map((v) => v.answer);
+        const range = Math.max(...vals) - Math.min(...vals);
+        const variance2 = votes.reduce((s, v) => s + Math.abs(v.answer - answer) * v.confidence, 0) / totalWeight;
+        const agreement = Math.max(0, 1 - variance2 / (range + 1));
+        return { answer, strategy: "weighted", agreement, votes, dissent: [] };
+      }
+      // 임계값 (confidence 평균이 threshold 이상인 답)
+      threshold(votes, threshold = 0.7) {
+        if (!votes || votes.length === 0) return null;
+        const groups = /* @__PURE__ */ new Map();
+        for (const v of votes) {
+          const key = JSON.stringify(v.answer);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(v);
+        }
+        for (const [key, group] of groups) {
+          const avgConf = group.reduce((s, v) => s + v.confidence, 0) / group.length;
+          if (avgConf >= threshold) {
+            return {
+              answer: group[0].answer,
+              strategy: "threshold",
+              agreement: avgConf,
+              votes,
+              dissent: votes.filter((v) => JSON.stringify(v.answer) !== key)
+            };
+          }
+        }
+        return null;
+      }
+      // 만장일치
+      unanimous(votes) {
+        if (!votes || votes.length === 0) return null;
+        const first = JSON.stringify(votes[0].answer);
+        if (votes.every((v) => JSON.stringify(v.answer) === first)) {
+          return {
+            answer: votes[0].answer,
+            strategy: "unanimous",
+            agreement: 1,
+            votes,
+            dissent: []
+          };
+        }
+        return null;
+      }
+      // agreement 계산 (majority 기준)
+      agreement(votes) {
+        if (!votes || votes.length === 0) return 0;
+        const result = this.majority(votes);
+        return result.agreement;
+      }
+    };
+    globalConsensus = new ConsensusEngine();
   }
-};
-var globalConsensus = new ConsensusEngine();
+});
 
 // src/delegate.ts
-var DelegationManager = class {
-  constructor() {
-    this.agents = /* @__PURE__ */ new Map();
-  }
-  register(agent) {
-    this.agents.set(agent.id, agent);
-  }
-  // 능력 기반 에이전트 찾기
-  findCapable(capability) {
-    return [...this.agents.values()].filter((a) => a.capabilities.includes(capability));
-  }
-  // 단일 태스크 위임
-  delegate(task) {
-    const candidates = task.requiredCapability ? this.findCapable(task.requiredCapability) : [...this.agents.values()];
-    if (candidates.length === 0) {
-      return { taskId: task.id, agentId: "none", output: null, success: false, duration: 0 };
-    }
-    const agent = candidates[0];
-    const start = Date.now();
-    try {
-      const output = agent.execute(task);
-      return { taskId: task.id, agentId: agent.id, output, success: true, duration: Date.now() - start };
-    } catch (e) {
-      return { taskId: task.id, agentId: agent.id, output: null, success: false, duration: Date.now() - start };
-    }
-  }
-  // 여러 태스크 병렬 위임
-  delegateAll(tasks) {
-    const start = Date.now();
-    const results = tasks.map((t) => this.delegate(t));
-    return {
-      results,
-      successful: results.filter((r) => r.success).length,
-      failed: results.filter((r) => !r.success).length,
-      totalDuration: Date.now() - start
+var DelegationManager, globalDelegation;
+var init_delegate = __esm({
+  "src/delegate.ts"() {
+    DelegationManager = class {
+      constructor() {
+        this.agents = /* @__PURE__ */ new Map();
+      }
+      register(agent) {
+        this.agents.set(agent.id, agent);
+      }
+      // 능력 기반 에이전트 찾기
+      findCapable(capability) {
+        return [...this.agents.values()].filter((a) => a.capabilities.includes(capability));
+      }
+      // 단일 태스크 위임
+      delegate(task) {
+        const candidates = task.requiredCapability ? this.findCapable(task.requiredCapability) : [...this.agents.values()];
+        if (candidates.length === 0) {
+          return { taskId: task.id, agentId: "none", output: null, success: false, duration: 0 };
+        }
+        const agent = candidates[0];
+        const start = Date.now();
+        try {
+          const output = agent.execute(task);
+          return { taskId: task.id, agentId: agent.id, output, success: true, duration: Date.now() - start };
+        } catch (e) {
+          return { taskId: task.id, agentId: agent.id, output: null, success: false, duration: Date.now() - start };
+        }
+      }
+      // 여러 태스크 병렬 위임
+      delegateAll(tasks) {
+        const start = Date.now();
+        const results = tasks.map((t) => this.delegate(t));
+        return {
+          results,
+          successful: results.filter((r) => r.success).length,
+          failed: results.filter((r) => !r.success).length,
+          totalDuration: Date.now() - start
+        };
+      }
+      list() {
+        return [...this.agents.keys()];
+      }
+      size() {
+        return this.agents.size;
+      }
     };
+    globalDelegation = new DelegationManager();
   }
-  list() {
-    return [...this.agents.keys()];
-  }
-  size() {
-    return this.agents.size;
-  }
-};
-var globalDelegation = new DelegationManager();
+});
 
 // src/negotiate.ts
-var Negotiator = class {
-  negotiate(positions, maxRounds = 5) {
-    const rounds = [];
-    let currentOffers = {};
-    positions.forEach((p) => {
-      currentOffers[p.agentId] = p.offer;
-    });
-    for (let r = 1; r <= maxRounds; r++) {
-      const values = Object.values(currentOffers);
-      const gap = Math.max(...values) - Math.min(...values);
-      rounds.push({ round: r, offers: { ...currentOffers }, gap });
-      const avgOffer = values.reduce((s, v) => s + v, 0) / values.length;
-      const allAccept = positions.every((p) => avgOffer >= p.minAccept && avgOffer <= p.maxOffer);
-      if (allAccept || gap < 0.01) {
-        return { agreed: true, value: avgOffer, rounds, breakdown: `${r}\uB77C\uC6B4\uB4DC\uC5D0 \uD569\uC758 (\uAC12: ${avgOffer.toFixed(3)})` };
+var Negotiator, globalNegotiator;
+var init_negotiate = __esm({
+  "src/negotiate.ts"() {
+    Negotiator = class {
+      negotiate(positions, maxRounds = 5) {
+        const rounds = [];
+        let currentOffers = {};
+        positions.forEach((p) => {
+          currentOffers[p.agentId] = p.offer;
+        });
+        for (let r = 1; r <= maxRounds; r++) {
+          const values = Object.values(currentOffers);
+          const gap = Math.max(...values) - Math.min(...values);
+          rounds.push({ round: r, offers: { ...currentOffers }, gap });
+          const avgOffer = values.reduce((s, v) => s + v, 0) / values.length;
+          const allAccept = positions.every((p) => avgOffer >= p.minAccept && avgOffer <= p.maxOffer);
+          if (allAccept || gap < 0.01) {
+            return { agreed: true, value: avgOffer, rounds, breakdown: `${r}\uB77C\uC6B4\uB4DC\uC5D0 \uD569\uC758 (\uAC12: ${avgOffer.toFixed(3)})` };
+          }
+          positions.forEach((p) => {
+            const current = currentOffers[p.agentId];
+            const delta = (avgOffer - current) * p.flexibility * 0.5;
+            currentOffers[p.agentId] = Math.max(p.minAccept, Math.min(p.maxOffer, current + delta));
+          });
+        }
+        return { agreed: false, rounds, breakdown: `${maxRounds}\uB77C\uC6B4\uB4DC \uD6C4 \uD611\uC0C1 \uACB0\uB82C` };
       }
-      positions.forEach((p) => {
-        const current = currentOffers[p.agentId];
-        const delta = (avgOffer - current) * p.flexibility * 0.5;
-        currentOffers[p.agentId] = Math.max(p.minAccept, Math.min(p.maxOffer, current + delta));
-      });
-    }
-    return { agreed: false, rounds, breakdown: `${maxRounds}\uB77C\uC6B4\uB4DC \uD6C4 \uD611\uC0C1 \uACB0\uB82C` };
+    };
+    globalNegotiator = new Negotiator();
   }
-};
-var globalNegotiator = new Negotiator();
+});
 
 // src/vote.ts
-var VotingSystem = class {
-  // 단순 다수결 (가장 많은 1순위 표)
-  plurality(ballots, candidates) {
-    const tally = {};
-    candidates.forEach((c) => tally[c] = 0);
-    ballots.forEach((b) => {
-      if (b.choices[0]) tally[b.choices[0]] = (tally[b.choices[0]] ?? 0) + 1;
-    });
-    const sorted = [...candidates].sort((a, b) => tally[b] - tally[a]);
-    return {
-      winner: sorted[0],
-      method: "plurality",
-      tally,
-      totalVoters: ballots.length,
-      margin: tally[sorted[0]] - (tally[sorted[1]] ?? 0)
-    };
-  }
-  // 승인 투표 (가장 많이 승인된 것)
-  approval(ballots, candidates) {
-    const tally = {};
-    candidates.forEach((c) => tally[c] = 0);
-    ballots.forEach((b) => b.choices.forEach((c) => {
-      if (tally.hasOwnProperty(c)) tally[c] = (tally[c] ?? 0) + 1;
-    }));
-    const sorted = [...candidates].sort((a, b) => tally[b] - tally[a]);
-    return {
-      winner: sorted[0],
-      method: "approval",
-      tally,
-      totalVoters: ballots.length,
-      margin: tally[sorted[0]] - (tally[sorted[1]] ?? 0)
-    };
-  }
-  // 순위 투표 (IRV: 과반 없으면 최저 탈락 반복)
-  ranked(ballots, candidates) {
-    let remaining = [...candidates];
-    let workingBallots = ballots.map((b) => ({ ...b, choices: [...b.choices] }));
-    while (remaining.length > 1) {
-      const tally = {};
-      remaining.forEach((c) => tally[c] = 0);
-      workingBallots.forEach((b) => {
-        const top = b.choices.find((c) => remaining.includes(c));
-        if (top) tally[top] = (tally[top] ?? 0) + 1;
-      });
-      const total = Object.values(tally).reduce((a, b) => a + b, 0);
-      const sorted = [...remaining].sort((a, b) => tally[b] - tally[a]);
-      if (tally[sorted[0]] > total / 2) {
-        const finalTally2 = {};
-        candidates.forEach((c) => finalTally2[c] = 0);
-        remaining.forEach((c) => finalTally2[c] = tally[c]);
+var VotingSystem, globalVoting;
+var init_vote = __esm({
+  "src/vote.ts"() {
+    VotingSystem = class {
+      // 단순 다수결 (가장 많은 1순위 표)
+      plurality(ballots, candidates) {
+        const tally = {};
+        candidates.forEach((c) => tally[c] = 0);
+        ballots.forEach((b) => {
+          if (b.choices[0]) tally[b.choices[0]] = (tally[b.choices[0]] ?? 0) + 1;
+        });
+        const sorted = [...candidates].sort((a, b) => tally[b] - tally[a]);
         return {
           winner: sorted[0],
-          method: "ranked",
-          tally: finalTally2,
+          method: "plurality",
+          tally,
           totalVoters: ballots.length,
           margin: tally[sorted[0]] - (tally[sorted[1]] ?? 0)
         };
       }
-      remaining = remaining.filter((c) => c !== sorted[sorted.length - 1]);
-    }
-    const finalTally = {};
-    candidates.forEach((c) => finalTally[c] = 0);
-    if (remaining[0]) finalTally[remaining[0]] = ballots.length;
-    return {
-      winner: remaining[0] ?? candidates[0],
-      method: "ranked",
-      tally: finalTally,
-      totalVoters: ballots.length,
-      margin: 0
+      // 승인 투표 (가장 많이 승인된 것)
+      approval(ballots, candidates) {
+        const tally = {};
+        candidates.forEach((c) => tally[c] = 0);
+        ballots.forEach((b) => b.choices.forEach((c) => {
+          if (tally.hasOwnProperty(c)) tally[c] = (tally[c] ?? 0) + 1;
+        }));
+        const sorted = [...candidates].sort((a, b) => tally[b] - tally[a]);
+        return {
+          winner: sorted[0],
+          method: "approval",
+          tally,
+          totalVoters: ballots.length,
+          margin: tally[sorted[0]] - (tally[sorted[1]] ?? 0)
+        };
+      }
+      // 순위 투표 (IRV: 과반 없으면 최저 탈락 반복)
+      ranked(ballots, candidates) {
+        let remaining = [...candidates];
+        let workingBallots = ballots.map((b) => ({ ...b, choices: [...b.choices] }));
+        while (remaining.length > 1) {
+          const tally = {};
+          remaining.forEach((c) => tally[c] = 0);
+          workingBallots.forEach((b) => {
+            const top = b.choices.find((c) => remaining.includes(c));
+            if (top) tally[top] = (tally[top] ?? 0) + 1;
+          });
+          const total = Object.values(tally).reduce((a, b) => a + b, 0);
+          const sorted = [...remaining].sort((a, b) => tally[b] - tally[a]);
+          if (tally[sorted[0]] > total / 2) {
+            const finalTally2 = {};
+            candidates.forEach((c) => finalTally2[c] = 0);
+            remaining.forEach((c) => finalTally2[c] = tally[c]);
+            return {
+              winner: sorted[0],
+              method: "ranked",
+              tally: finalTally2,
+              totalVoters: ballots.length,
+              margin: tally[sorted[0]] - (tally[sorted[1]] ?? 0)
+            };
+          }
+          remaining = remaining.filter((c) => c !== sorted[sorted.length - 1]);
+        }
+        const finalTally = {};
+        candidates.forEach((c) => finalTally[c] = 0);
+        if (remaining[0]) finalTally[remaining[0]] = ballots.length;
+        return {
+          winner: remaining[0] ?? candidates[0],
+          method: "ranked",
+          tally: finalTally,
+          totalVoters: ballots.length,
+          margin: 0
+        };
+      }
+      // 점수 투표
+      score(ballots, candidates) {
+        const tally = {};
+        candidates.forEach((c) => tally[c] = 0);
+        ballots.forEach((b) => {
+          if (b.scores) candidates.forEach((c) => {
+            tally[c] += b.scores[c] ?? 0;
+          });
+        });
+        const sorted = [...candidates].sort((a, b) => tally[b] - tally[a]);
+        return {
+          winner: sorted[0],
+          method: "score",
+          tally,
+          totalVoters: ballots.length,
+          margin: tally[sorted[0]] - (tally[sorted[1]] ?? 0)
+        };
+      }
+      // tally만 반환 (vote-tally 내장함수용)
+      tally(ballots, candidates) {
+        const tally = {};
+        candidates.forEach((c) => tally[c] = 0);
+        ballots.forEach((b) => {
+          if (b.choices[0]) tally[b.choices[0]] = (tally[b.choices[0]] ?? 0) + 1;
+        });
+        return tally;
+      }
     };
+    globalVoting = new VotingSystem();
   }
-  // 점수 투표
-  score(ballots, candidates) {
-    const tally = {};
-    candidates.forEach((c) => tally[c] = 0);
-    ballots.forEach((b) => {
-      if (b.scores) candidates.forEach((c) => {
-        tally[c] += b.scores[c] ?? 0;
-      });
-    });
-    const sorted = [...candidates].sort((a, b) => tally[b] - tally[a]);
-    return {
-      winner: sorted[0],
-      method: "score",
-      tally,
-      totalVoters: ballots.length,
-      margin: tally[sorted[0]] - (tally[sorted[1]] ?? 0)
-    };
-  }
-  // tally만 반환 (vote-tally 내장함수용)
-  tally(ballots, candidates) {
-    const tally = {};
-    candidates.forEach((c) => tally[c] = 0);
-    ballots.forEach((b) => {
-      if (b.choices[0]) tally[b.choices[0]] = (tally[b.choices[0]] ?? 0) + 1;
-    });
-    return tally;
-  }
-};
-var globalVoting = new VotingSystem();
+});
 
 // src/swarm.ts
-var Swarm = class {
-  optimize(config) {
-    const {
-      objective,
-      particles: n = 10,
-      iterations: maxIter = 50,
-      bounds = [0, 1],
-      tolerance = 1e-3
-    } = config;
-    const [min, max] = bounds;
-    const range = max - min;
-    const ps = Array.from({ length: n }, (_, i) => {
-      const pos = min + Math.random() * range;
-      const score = objective(pos);
-      return {
-        id: `p${i}`,
-        position: pos,
-        velocity: (Math.random() - 0.5) * range * 0.1,
-        bestPosition: pos,
-        bestScore: score
-      };
-    });
-    let globalBest = ps.reduce((b, p) => p.bestScore > b.bestScore ? p : b);
-    let prevBestScore = -Infinity;
-    let iter = 0;
-    let converged = false;
-    for (iter = 0; iter < maxIter; iter++) {
-      for (const p of ps) {
-        const w = 0.7, c1 = 1.5, c2 = 1.5;
-        p.velocity = w * p.velocity + c1 * Math.random() * (p.bestPosition - p.position) + c2 * Math.random() * (globalBest.bestPosition - p.position);
-        p.position = Math.max(min, Math.min(max, p.position + p.velocity));
-        const score = objective(p.position);
-        if (score > p.bestScore) {
-          p.bestScore = score;
-          p.bestPosition = p.position;
+var Swarm, globalSwarm;
+var init_swarm = __esm({
+  "src/swarm.ts"() {
+    Swarm = class {
+      optimize(config) {
+        const {
+          objective,
+          particles: n = 10,
+          iterations: maxIter = 50,
+          bounds = [0, 1],
+          tolerance = 1e-3
+        } = config;
+        const [min, max] = bounds;
+        const range = max - min;
+        const ps = Array.from({ length: n }, (_, i) => {
+          const pos = min + Math.random() * range;
+          const score = objective(pos);
+          return {
+            id: `p${i}`,
+            position: pos,
+            velocity: (Math.random() - 0.5) * range * 0.1,
+            bestPosition: pos,
+            bestScore: score
+          };
+        });
+        let globalBest = ps.reduce((b, p) => p.bestScore > b.bestScore ? p : b);
+        let prevBestScore = -Infinity;
+        let iter = 0;
+        let converged = false;
+        for (iter = 0; iter < maxIter; iter++) {
+          for (const p of ps) {
+            const w = 0.7, c1 = 1.5, c2 = 1.5;
+            p.velocity = w * p.velocity + c1 * Math.random() * (p.bestPosition - p.position) + c2 * Math.random() * (globalBest.bestPosition - p.position);
+            p.position = Math.max(min, Math.min(max, p.position + p.velocity));
+            const score = objective(p.position);
+            if (score > p.bestScore) {
+              p.bestScore = score;
+              p.bestPosition = p.position;
+            }
+            if (score > globalBest.bestScore) globalBest = p;
+          }
+          if (Math.abs(globalBest.bestScore - prevBestScore) < tolerance) {
+            converged = true;
+            break;
+          }
+          prevBestScore = globalBest.bestScore;
         }
-        if (score > globalBest.bestScore) globalBest = p;
+        return {
+          bestPosition: globalBest.bestPosition,
+          bestScore: globalBest.bestScore,
+          iterations: iter + 1,
+          particles: ps,
+          converged
+        };
       }
-      if (Math.abs(globalBest.bestScore - prevBestScore) < tolerance) {
-        converged = true;
-        break;
-      }
-      prevBestScore = globalBest.bestScore;
-    }
-    return {
-      bestPosition: globalBest.bestPosition,
-      bestScore: globalBest.bestScore,
-      iterations: iter + 1,
-      particles: ps,
-      converged
     };
+    globalSwarm = new Swarm();
   }
-};
-var globalSwarm = new Swarm();
+});
 
 // src/peer-review.ts
-var PeerReviewSystem = class {
-  constructor() {
-    this.reviewers = /* @__PURE__ */ new Map();
+var PeerReviewSystem, globalPeerReview;
+var init_peer_review = __esm({
+  "src/peer-review.ts"() {
+    PeerReviewSystem = class {
+      constructor() {
+        this.reviewers = /* @__PURE__ */ new Map();
+      }
+      addReviewer(reviewer) {
+        this.reviewers.set(reviewer.id, reviewer);
+      }
+      review(targetId, output, reviewerIds, approvalThreshold = 0.7) {
+        const selected = reviewerIds ? reviewerIds.map((id) => this.reviewers.get(id)).filter(Boolean) : [...this.reviewers.values()];
+        const comments = selected.map((r) => r.review(output));
+        const averageScore = comments.length > 0 ? comments.reduce((s, c) => s + c.score, 0) / comments.length : 0;
+        const approved = averageScore >= approvalThreshold;
+        const issues = comments.filter((c) => c.score < approvalThreshold);
+        const summary = approved ? `\uC2B9\uC778 (\uD3C9\uADE0 \uC810\uC218: ${averageScore.toFixed(2)})` : `\uBC18\uB824 \u2014 ${issues.length}\uAC1C \uBB38\uC81C: ${issues.map((c) => c.aspect).join(", ")}`;
+        return { targetId, output, comments, averageScore, approved, summary };
+      }
+      list() {
+        return [...this.reviewers.keys()];
+      }
+      size() {
+        return this.reviewers.size;
+      }
+    };
+    globalPeerReview = new PeerReviewSystem();
   }
-  addReviewer(reviewer) {
-    this.reviewers.set(reviewer.id, reviewer);
-  }
-  review(targetId, output, reviewerIds, approvalThreshold = 0.7) {
-    const selected = reviewerIds ? reviewerIds.map((id) => this.reviewers.get(id)).filter(Boolean) : [...this.reviewers.values()];
-    const comments = selected.map((r) => r.review(output));
-    const averageScore = comments.length > 0 ? comments.reduce((s, c) => s + c.score, 0) / comments.length : 0;
-    const approved = averageScore >= approvalThreshold;
-    const issues = comments.filter((c) => c.score < approvalThreshold);
-    const summary = approved ? `\uC2B9\uC778 (\uD3C9\uADE0 \uC810\uC218: ${averageScore.toFixed(2)})` : `\uBC18\uB824 \u2014 ${issues.length}\uAC1C \uBB38\uC81C: ${issues.map((c) => c.aspect).join(", ")}`;
-    return { targetId, output, comments, averageScore, approved, summary };
-  }
-  list() {
-    return [...this.reviewers.keys()];
-  }
-  size() {
-    return this.reviewers.size;
-  }
-};
-var globalPeerReview = new PeerReviewSystem();
+});
 
 // src/compete.ts
-var Competition = class {
-  constructor() {
-    this.competitors = /* @__PURE__ */ new Map();
-  }
-  register(competitor) {
-    this.competitors.set(competitor.id, competitor);
-  }
-  run(problem, evaluate) {
-    const results = [];
-    for (const competitor of this.competitors.values()) {
-      try {
-        const output = competitor.solve(problem);
-        results.push({ agentId: competitor.id, output, score: evaluate(output) });
-      } catch {
-        results.push({ agentId: competitor.id, output: null, score: -Infinity });
+var Competition, globalCompetition;
+var init_compete = __esm({
+  "src/compete.ts"() {
+    Competition = class {
+      constructor() {
+        this.competitors = /* @__PURE__ */ new Map();
       }
-    }
-    results.sort((a, b) => b.score - a.score);
-    const ranked = results.map((r, i) => ({ ...r, rank: i + 1 }));
-    const margin = ranked.length >= 2 ? ranked[0].score - ranked[1].score : ranked[0]?.score ?? 0;
-    return { winner: ranked[0], allResults: ranked, margin };
+      register(competitor) {
+        this.competitors.set(competitor.id, competitor);
+      }
+      run(problem, evaluate) {
+        const results = [];
+        for (const competitor of this.competitors.values()) {
+          try {
+            const output = competitor.solve(problem);
+            results.push({ agentId: competitor.id, output, score: evaluate(output) });
+          } catch {
+            results.push({ agentId: competitor.id, output: null, score: -Infinity });
+          }
+        }
+        results.sort((a, b) => b.score - a.score);
+        const ranked = results.map((r, i) => ({ ...r, rank: i + 1 }));
+        const margin = ranked.length >= 2 ? ranked[0].score - ranked[1].score : ranked[0]?.score ?? 0;
+        return { winner: ranked[0], allResults: ranked, margin };
+      }
+      // 토너먼트: 1:1 매치로 최종 우승자 (단순화: 전체 점수 기반)
+      tournament(problem, evaluate) {
+        return this.run(problem, evaluate);
+      }
+      list() {
+        return [...this.competitors.keys()];
+      }
+      size() {
+        return this.competitors.size;
+      }
+    };
+    globalCompetition = new Competition();
   }
-  // 토너먼트: 1:1 매치로 최종 우승자 (단순화: 전체 점수 기반)
-  tournament(problem, evaluate) {
-    return this.run(problem, evaluate);
-  }
-  list() {
-    return [...this.competitors.keys()];
-  }
-  size() {
-    return this.competitors.size;
-  }
-};
-var globalCompetition = new Competition();
+});
 
 // src/chain-agents.ts
-var AgentChain = class _AgentChain {
-  constructor() {
-    this.agents = [];
-  }
-  add(agent) {
-    this.agents.push(agent);
-    return this;
-  }
-  run(initialInput) {
-    const links = [];
-    let current = initialInput;
-    let success = true;
-    for (const agent of this.agents) {
-      const start = Date.now();
-      try {
-        const output = agent.transform(current);
-        const valid = agent.validate ? agent.validate(output) : true;
-        links.push({
-          agentId: agent.id,
-          input: current,
-          output,
-          duration: Date.now() - start,
-          skipped: !valid
-        });
-        if (valid) current = output;
-      } catch {
-        links.push({
-          agentId: agent.id,
-          input: current,
-          output: null,
-          duration: Date.now() - start,
-          skipped: true
-        });
-        success = false;
-        break;
+var AgentChain, globalChain;
+var init_chain_agents = __esm({
+  "src/chain-agents.ts"() {
+    AgentChain = class _AgentChain {
+      constructor() {
+        this.agents = [];
       }
-    }
-    return {
-      finalOutput: current,
-      links,
-      success,
-      stepsCompleted: links.filter((l) => !l.skipped).length
+      add(agent) {
+        this.agents.push(agent);
+        return this;
+      }
+      run(initialInput) {
+        const links = [];
+        let current = initialInput;
+        let success = true;
+        for (const agent of this.agents) {
+          const start = Date.now();
+          try {
+            const output = agent.transform(current);
+            const valid = agent.validate ? agent.validate(output) : true;
+            links.push({
+              agentId: agent.id,
+              input: current,
+              output,
+              duration: Date.now() - start,
+              skipped: !valid
+            });
+            if (valid) current = output;
+          } catch {
+            links.push({
+              agentId: agent.id,
+              input: current,
+              output: null,
+              duration: Date.now() - start,
+              skipped: true
+            });
+            success = false;
+            break;
+          }
+        }
+        return {
+          finalOutput: current,
+          links,
+          success,
+          stepsCompleted: links.filter((l) => !l.skipped).length
+        };
+      }
+      // 팩토리: 배열로 빠르게 체인 생성
+      static from(agents) {
+        const chain = new _AgentChain();
+        agents.forEach((a) => chain.add(a));
+        return chain;
+      }
+      length() {
+        return this.agents.length;
+      }
     };
+    globalChain = new AgentChain();
   }
-  // 팩토리: 배열로 빠르게 체인 생성
-  static from(agents) {
-    const chain = new _AgentChain();
-    agents.forEach((a) => chain.add(a));
-    return chain;
-  }
-  length() {
-    return this.agents.length;
-  }
-};
-var globalChain = new AgentChain();
+});
 
 // src/orchestrate.ts
-var Orchestrator = class {
-  constructor() {
-    this.agents = /* @__PURE__ */ new Map();
-  }
-  /** 에이전트 등록 */
-  register(agent) {
-    this.agents.set(agent.id, agent);
-  }
-  /** 등록된 에이전트 ID 목록 */
-  list() {
-    return [...this.agents.keys()];
-  }
-  /**
-   * 위상 정렬 — 의존성이 먼저 오도록 실행 순서 결정
-   * 순환 의존성: visited Set으로 재방문 방지 (사이클 무시, 첫 방문 경로만 사용)
-   */
-  topSort(tasks) {
-    const order = [];
-    const visited = /* @__PURE__ */ new Set();
-    const taskMap = new Map(tasks.map((t) => [t.id, t]));
-    const visit = (id) => {
-      if (visited.has(id)) return;
-      visited.add(id);
-      const task = taskMap.get(id);
-      if (task?.dependsOn) {
-        for (const dep of task.dependsOn) {
-          visit(dep);
+var Orchestrator, globalOrchestrator;
+var init_orchestrate = __esm({
+  "src/orchestrate.ts"() {
+    Orchestrator = class {
+      constructor() {
+        this.agents = /* @__PURE__ */ new Map();
+      }
+      /** 에이전트 등록 */
+      register(agent) {
+        this.agents.set(agent.id, agent);
+      }
+      /** 등록된 에이전트 ID 목록 */
+      list() {
+        return [...this.agents.keys()];
+      }
+      /**
+       * 위상 정렬 — 의존성이 먼저 오도록 실행 순서 결정
+       * 순환 의존성: visited Set으로 재방문 방지 (사이클 무시, 첫 방문 경로만 사용)
+       */
+      topSort(tasks) {
+        const order = [];
+        const visited = /* @__PURE__ */ new Set();
+        const taskMap = new Map(tasks.map((t) => [t.id, t]));
+        const visit = (id) => {
+          if (visited.has(id)) return;
+          visited.add(id);
+          const task = taskMap.get(id);
+          if (task?.dependsOn) {
+            for (const dep of task.dependsOn) {
+              visit(dep);
+            }
+          }
+          order.push(id);
+        };
+        for (const t of tasks) {
+          visit(t.id);
+        }
+        return order;
+      }
+      /**
+       * 태스크 목록 실행 — 위상 정렬 후 순서대로 실행
+       * 선행 태스크의 output을 다음 태스크 input의 deps 필드에 주입
+       */
+      run(tasks) {
+        const start = Date.now();
+        const outputs = {};
+        const order = this.topSort(tasks);
+        const taskMap = new Map(tasks.map((t) => [t.id, t]));
+        if (tasks.length === 0) {
+          return { outputs, order: [], duration: Date.now() - start, success: true };
+        }
+        try {
+          for (const id of order) {
+            const task = taskMap.get(id);
+            if (!task) continue;
+            const agent = this.agents.get(id) ?? this.agents.values().next().value;
+            if (!agent) continue;
+            const depOutputs = (task.dependsOn ?? []).map((d) => outputs[d]);
+            const input = depOutputs.length > 0 ? { ...task.input, deps: depOutputs } : task.input;
+            outputs[id] = agent.run(input);
+          }
+          return { outputs, order, duration: Date.now() - start, success: true };
+        } catch (e) {
+          return { outputs, order, duration: Date.now() - start, success: false };
         }
       }
-      order.push(id);
-    };
-    for (const t of tasks) {
-      visit(t.id);
-    }
-    return order;
-  }
-  /**
-   * 태스크 목록 실행 — 위상 정렬 후 순서대로 실행
-   * 선행 태스크의 output을 다음 태스크 input의 deps 필드에 주입
-   */
-  run(tasks) {
-    const start = Date.now();
-    const outputs = {};
-    const order = this.topSort(tasks);
-    const taskMap = new Map(tasks.map((t) => [t.id, t]));
-    if (tasks.length === 0) {
-      return { outputs, order: [], duration: Date.now() - start, success: true };
-    }
-    try {
-      for (const id of order) {
-        const task = taskMap.get(id);
-        if (!task) continue;
-        const agent = this.agents.get(id) ?? this.agents.values().next().value;
-        if (!agent) continue;
-        const depOutputs = (task.dependsOn ?? []).map((d) => outputs[d]);
-        const input = depOutputs.length > 0 ? { ...task.input, deps: depOutputs } : task.input;
-        outputs[id] = agent.run(input);
+      /** 실행 순서만 반환 (dry run) */
+      getOrder(tasks) {
+        return this.topSort(tasks);
       }
-      return { outputs, order, duration: Date.now() - start, success: true };
-    } catch (e) {
-      return { outputs, order, duration: Date.now() - start, success: false };
-    }
+    };
+    globalOrchestrator = new Orchestrator();
   }
-  /** 실행 순서만 반환 (dry run) */
-  getOrder(tasks) {
-    return this.topSort(tasks);
-  }
-};
-var globalOrchestrator = new Orchestrator();
+});
 
 // src/multi-agent-hub.ts
-var MultiAgentHub = class {
-  constructor() {
-    this.consensus = new ConsensusEngine();
-    this.delegation = new DelegationManager();
-    this.voting = new VotingSystem();
-    this.negotiator = new Negotiator();
-    this.swarm = new Swarm();
-    this.orchestrator = new Orchestrator();
-    this.peerReview = new PeerReviewSystem();
-    this.chain = new AgentChain();
-    this.competition = new Competition();
-  }
-  /**
-   * taskType에 따라 적절한 협업 시스템으로 라우팅
-   * problem: 문제 데이터, agents: 에이전트 목록(선택적)
-   */
-  route(taskType, problem, agents = []) {
-    const timestamp = Date.now();
-    switch (taskType) {
-      case "consensus": {
-        const votes = Array.isArray(agents) ? agents.map((a, i) => ({
-          agentId: a.id ?? `agent-${i}`,
-          answer: typeof a.solve === "function" ? a.solve(problem) : a.answer ?? problem,
-          confidence: a.confidence ?? 0.8
-        })) : [{ agentId: "default", answer: problem, confidence: 1 }];
-        const result = this.consensus.majority(votes.length > 0 ? votes : [{ agentId: "solo", answer: problem, confidence: 1 }]);
-        return { taskType, result: result.answer, system: "ConsensusEngine", timestamp };
+var MultiAgentHub, globalHub;
+var init_multi_agent_hub = __esm({
+  "src/multi-agent-hub.ts"() {
+    init_consensus();
+    init_delegate();
+    init_vote();
+    init_negotiate();
+    init_swarm();
+    init_orchestrate();
+    init_peer_review();
+    init_chain_agents();
+    init_compete();
+    MultiAgentHub = class {
+      constructor() {
+        this.consensus = new ConsensusEngine();
+        this.delegation = new DelegationManager();
+        this.voting = new VotingSystem();
+        this.negotiator = new Negotiator();
+        this.swarm = new Swarm();
+        this.orchestrator = new Orchestrator();
+        this.peerReview = new PeerReviewSystem();
+        this.chain = new AgentChain();
+        this.competition = new Competition();
       }
-      case "delegate": {
-        if (agents.length === 0) {
-          return { taskType, result: problem, system: "DelegationManager", timestamp };
+      /**
+       * taskType에 따라 적절한 협업 시스템으로 라우팅
+       * problem: 문제 데이터, agents: 에이전트 목록(선택적)
+       */
+      route(taskType, problem, agents = []) {
+        const timestamp = Date.now();
+        switch (taskType) {
+          case "consensus": {
+            const votes = Array.isArray(agents) ? agents.map((a, i) => ({
+              agentId: a.id ?? `agent-${i}`,
+              answer: typeof a.solve === "function" ? a.solve(problem) : a.answer ?? problem,
+              confidence: a.confidence ?? 0.8
+            })) : [{ agentId: "default", answer: problem, confidence: 1 }];
+            const result = this.consensus.majority(votes.length > 0 ? votes : [{ agentId: "solo", answer: problem, confidence: 1 }]);
+            return { taskType, result: result.answer, system: "ConsensusEngine", timestamp };
+          }
+          case "delegate": {
+            if (agents.length === 0) {
+              return { taskType, result: problem, system: "DelegationManager", timestamp };
+            }
+            const dm = new DelegationManager();
+            agents.forEach((a) => {
+              if (a.id && a.execute) dm.register(a);
+              else dm.register({
+                id: a.id ?? "default",
+                capabilities: a.capabilities ?? ["general"],
+                execute: typeof a.solve === "function" ? a.solve : () => problem
+              });
+            });
+            const task = typeof problem === "object" && problem.id ? problem : { id: "task-0", description: String(problem), input: problem };
+            const result = dm.delegate(task);
+            return { taskType, result: result.output, system: "DelegationManager", timestamp };
+          }
+          case "vote": {
+            if (!Array.isArray(problem?.ballots) || !Array.isArray(problem?.candidates)) {
+              return { taskType, result: problem, system: "VotingSystem", timestamp };
+            }
+            const voteResult = this.voting.plurality(problem.ballots, problem.candidates);
+            return { taskType, result: voteResult.winner, system: "VotingSystem", timestamp };
+          }
+          case "negotiate": {
+            if (!Array.isArray(problem)) {
+              return { taskType, result: null, system: "Negotiator", timestamp };
+            }
+            const result = this.negotiator.negotiate(problem);
+            return { taskType, result: result.agreed ? result.value : null, system: "Negotiator", timestamp };
+          }
+          case "swarm": {
+            const objective = typeof problem === "function" ? problem : (x) => -Math.abs(x - (problem ?? 0));
+            const result = this.swarm.optimize({ objective });
+            return { taskType, result: result.bestPosition, system: "Swarm", timestamp };
+          }
+          case "orchestrate": {
+            const orch = new Orchestrator();
+            agents.forEach((a) => {
+              if (a.id && a.run) orch.register(a);
+              else if (a.id) orch.register({ id: a.id, run: typeof a.solve === "function" ? a.solve : (x) => x });
+            });
+            const tasks = Array.isArray(problem) ? problem : [{ id: "task", input: problem }];
+            const result = orch.run(tasks);
+            return { taskType, result: result.outputs, system: "Orchestrator", timestamp };
+          }
+          case "peer-review": {
+            const prs = new PeerReviewSystem();
+            agents.forEach((a, i) => {
+              prs.addReviewer({
+                id: a.id ?? `reviewer-${i}`,
+                review: (output) => ({
+                  reviewerId: a.id ?? `reviewer-${i}`,
+                  aspect: "quality",
+                  score: typeof a.score === "function" ? a.score(output) : a.score ?? 0.8,
+                  comment: a.comment ?? "OK"
+                })
+              });
+            });
+            if (prs.size() === 0) {
+              prs.addReviewer({
+                id: "default-reviewer",
+                review: (_output) => ({ reviewerId: "default-reviewer", aspect: "quality", score: 0.8, comment: "OK" })
+              });
+            }
+            const result = prs.review("target", problem);
+            return { taskType, result: result.approved, system: "PeerReviewSystem", timestamp };
+          }
+          case "chain": {
+            const ch = new AgentChain();
+            agents.forEach((a, i) => {
+              ch.add({
+                id: a.id ?? `chain-${i}`,
+                transform: typeof a.transform === "function" ? a.transform : typeof a.process === "function" ? a.process : typeof a.solve === "function" ? a.solve : (x) => x
+              });
+            });
+            if (ch.length() === 0) {
+              return { taskType, result: problem, system: "AgentChain", timestamp };
+            }
+            const result = ch.run(problem);
+            return { taskType, result: result.finalOutput, system: "AgentChain", timestamp };
+          }
+          case "compete": {
+            if (agents.length === 0) {
+              return { taskType, result: problem, system: "Competition", timestamp };
+            }
+            const comp = new Competition();
+            agents.forEach((a, i) => {
+              comp.register({
+                id: a.id ?? `competitor-${i}`,
+                solve: typeof a.solve === "function" ? a.solve : () => problem
+              });
+            });
+            const evaluate = typeof problem?.evaluate === "function" ? problem.evaluate : (x) => typeof x === "number" ? x : 1;
+            const prob = problem?.task ?? problem;
+            const result = comp.run(prob, evaluate);
+            return { taskType, result: result.winner.output, system: "Competition", timestamp };
+          }
+          default:
+            return { taskType, result: problem, system: "passthrough", timestamp };
         }
-        const dm = new DelegationManager();
-        agents.forEach((a) => {
-          if (a.id && a.execute) dm.register(a);
-          else dm.register({
-            id: a.id ?? "default",
-            capabilities: a.capabilities ?? ["general"],
-            execute: typeof a.solve === "function" ? a.solve : () => problem
-          });
-        });
-        const task = typeof problem === "object" && problem.id ? problem : { id: "task-0", description: String(problem), input: problem };
-        const result = dm.delegate(task);
-        return { taskType, result: result.output, system: "DelegationManager", timestamp };
       }
-      case "vote": {
-        if (!Array.isArray(problem?.ballots) || !Array.isArray(problem?.candidates)) {
-          return { taskType, result: problem, system: "VotingSystem", timestamp };
-        }
-        const voteResult = this.voting.plurality(problem.ballots, problem.candidates);
-        return { taskType, result: voteResult.winner, system: "VotingSystem", timestamp };
+      /** 허브 통계 */
+      stats() {
+        return {
+          systems: 9,
+          ready: 9,
+          phases: 9,
+          // Phase 121~129
+          tier: 8
+        };
       }
-      case "negotiate": {
-        if (!Array.isArray(problem)) {
-          return { taskType, result: null, system: "Negotiator", timestamp };
-        }
-        const result = this.negotiator.negotiate(problem);
-        return { taskType, result: result.agreed ? result.value : null, system: "Negotiator", timestamp };
+      /** 사용 가능한 시스템 목록 */
+      systems() {
+        return [
+          "ConsensusEngine",
+          // Phase 121
+          "DelegationManager",
+          // Phase 122
+          "VotingSystem",
+          // Phase 123
+          "Negotiator",
+          // Phase 124
+          "Swarm",
+          // Phase 125
+          "Orchestrator",
+          // Phase 126
+          "PeerReviewSystem",
+          // Phase 127
+          "AgentChain",
+          // Phase 128
+          "Competition"
+          // Phase 129
+        ];
       }
-      case "swarm": {
-        const objective = typeof problem === "function" ? problem : (x) => -Math.abs(x - (problem ?? 0));
-        const result = this.swarm.optimize({ objective });
-        return { taskType, result: result.bestPosition, system: "Swarm", timestamp };
+      /** 태스크 타입 목록 */
+      taskTypes() {
+        return ["consensus", "delegate", "vote", "negotiate", "swarm", "orchestrate", "peer-review", "chain", "compete"];
       }
-      case "orchestrate": {
-        const orch = new Orchestrator();
-        agents.forEach((a) => {
-          if (a.id && a.run) orch.register(a);
-          else if (a.id) orch.register({ id: a.id, run: typeof a.solve === "function" ? a.solve : (x) => x });
-        });
-        const tasks = Array.isArray(problem) ? problem : [{ id: "task", input: problem }];
-        const result = orch.run(tasks);
-        return { taskType, result: result.outputs, system: "Orchestrator", timestamp };
-      }
-      case "peer-review": {
-        const prs = new PeerReviewSystem();
-        agents.forEach((a, i) => {
-          prs.addReviewer({
-            id: a.id ?? `reviewer-${i}`,
-            review: (output) => ({
-              reviewerId: a.id ?? `reviewer-${i}`,
-              aspect: "quality",
-              score: typeof a.score === "function" ? a.score(output) : a.score ?? 0.8,
-              comment: a.comment ?? "OK"
-            })
-          });
-        });
-        if (prs.size() === 0) {
-          prs.addReviewer({
-            id: "default-reviewer",
-            review: (_output) => ({ reviewerId: "default-reviewer", aspect: "quality", score: 0.8, comment: "OK" })
-          });
-        }
-        const result = prs.review("target", problem);
-        return { taskType, result: result.approved, system: "PeerReviewSystem", timestamp };
-      }
-      case "chain": {
-        const ch = new AgentChain();
-        agents.forEach((a, i) => {
-          ch.add({
-            id: a.id ?? `chain-${i}`,
-            transform: typeof a.transform === "function" ? a.transform : typeof a.process === "function" ? a.process : typeof a.solve === "function" ? a.solve : (x) => x
-          });
-        });
-        if (ch.length() === 0) {
-          return { taskType, result: problem, system: "AgentChain", timestamp };
-        }
-        const result = ch.run(problem);
-        return { taskType, result: result.finalOutput, system: "AgentChain", timestamp };
-      }
-      case "compete": {
-        if (agents.length === 0) {
-          return { taskType, result: problem, system: "Competition", timestamp };
-        }
-        const comp = new Competition();
-        agents.forEach((a, i) => {
-          comp.register({
-            id: a.id ?? `competitor-${i}`,
-            solve: typeof a.solve === "function" ? a.solve : () => problem
-          });
-        });
-        const evaluate = typeof problem?.evaluate === "function" ? problem.evaluate : (x) => typeof x === "number" ? x : 1;
-        const prob = problem?.task ?? problem;
-        const result = comp.run(prob, evaluate);
-        return { taskType, result: result.winner.output, system: "Competition", timestamp };
-      }
-      default:
-        return { taskType, result: problem, system: "passthrough", timestamp };
-    }
-  }
-  /** 허브 통계 */
-  stats() {
-    return {
-      systems: 9,
-      ready: 9,
-      phases: 9,
-      // Phase 121~129
-      tier: 8
     };
+    globalHub = new MultiAgentHub();
   }
-  /** 사용 가능한 시스템 목록 */
-  systems() {
-    return [
-      "ConsensusEngine",
-      // Phase 121
-      "DelegationManager",
-      // Phase 122
-      "VotingSystem",
-      // Phase 123
-      "Negotiator",
-      // Phase 124
-      "Swarm",
-      // Phase 125
-      "Orchestrator",
-      // Phase 126
-      "PeerReviewSystem",
-      // Phase 127
-      "AgentChain",
-      // Phase 128
-      "Competition"
-      // Phase 129
-    ];
-  }
-  /** 태스크 타입 목록 */
-  taskTypes() {
-    return ["consensus", "delegate", "vote", "negotiate", "swarm", "orchestrate", "peer-review", "chain", "compete"];
-  }
-};
-var globalHub = new MultiAgentHub();
+});
 
 // src/evolve.ts
-var import_crypto = require("crypto");
-var EvolutionEngine = class {
-  constructor(config) {
-    this.population = [];
-    this.currentGeneration = 0;
-    this.history = [];
-    this.config = {
-      populationSize: config.populationSize ?? 20,
-      maxGenerations: config.maxGenerations ?? 50,
-      mutationRate: config.mutationRate ?? 0.1,
-      eliteRatio: config.eliteRatio ?? 0.1,
-      fitnessGoal: config.fitnessGoal,
-      fitnessFunc: config.fitnessFunc,
-      mutateFunc: config.mutateFunc,
-      crossoverFunc: config.crossoverFunc,
-      initFunc: config.initFunc
-    };
-  }
-  // 개체군 초기화
-  initialize() {
-    this.population = [];
-    this.currentGeneration = 0;
-    this.history = [];
-    for (let i = 0; i < this.config.populationSize; i++) {
-      const genome = this.config.initFunc();
-      const fitness = this.config.fitnessFunc(genome);
-      this.population.push({
-        genome,
-        fitness,
-        generation: 0,
-        id: (0, import_crypto.randomUUID)()
-      });
-    }
-  }
-  // 자연선택 (토너먼트 선택)
-  select() {
-    const tournamentSize = Math.max(2, Math.floor(this.population.length * 0.2));
-    const tournament = [];
-    for (let i = 0; i < tournamentSize; i++) {
-      const idx = Math.floor(Math.random() * this.population.length);
-      tournament.push(this.population[idx]);
-    }
-    return tournament.reduce(
-      (best, ind) => ind.fitness > best.fitness ? ind : best
-    );
-  }
-  // 한 세대 진행
-  step() {
-    if (this.population.length === 0) {
-      throw new Error("Population not initialized. Call initialize() first.");
-    }
-    this.population.sort((a, b) => b.fitness - a.fitness);
-    const eliteCount = Math.max(1, Math.floor(this.config.populationSize * this.config.eliteRatio));
-    const elites = this.population.slice(0, eliteCount).map((ind) => ({ ...ind }));
-    const newPop = [...elites];
-    while (newPop.length < this.config.populationSize) {
-      const parent1 = this.select();
-      const parent2 = this.select();
-      let childGenome = this.config.crossoverFunc(parent1.genome, parent2.genome);
-      childGenome = this.config.mutateFunc(childGenome, this.config.mutationRate);
-      const fitness = this.config.fitnessFunc(childGenome);
-      newPop.push({
-        genome: childGenome,
-        fitness,
-        generation: this.currentGeneration + 1,
-        id: (0, import_crypto.randomUUID)()
-      });
-    }
-    this.population = newPop;
-    this.currentGeneration++;
-    const bestFitness = this.population[0]?.fitness ?? 0;
-    const avgFitness = this.population.reduce((s, ind) => s + ind.fitness, 0) / this.population.length;
-    this.history.push({ gen: this.currentGeneration, bestFitness, avgFitness });
-    return { bestFitness, avgFitness };
-  }
-  // 전체 진화 실행
-  run() {
-    if (this.population.length === 0) {
-      this.initialize();
-    }
-    let converged = false;
-    for (let g = 0; g < this.config.maxGenerations; g++) {
-      this.step();
-      const best2 = this.getBest();
-      if (best2 && this.config.fitnessGoal !== void 0 && best2.fitness >= this.config.fitnessGoal) {
-        converged = true;
-        break;
-      }
-    }
-    const best = this.getBest();
-    return {
-      best,
-      population: [...this.population],
-      generations: this.currentGeneration,
-      converged,
-      history: [...this.history]
-    };
-  }
-  // 현재 최고 개체
-  getBest() {
-    if (this.population.length === 0) return null;
-    return this.population.reduce(
-      (best, ind) => ind.fitness > best.fitness ? ind : best
-    );
-  }
-  // 현재 개체군
-  getPopulation() {
-    return [...this.population];
-  }
-  // 히스토리 반환
-  getHistory() {
-    return [...this.history];
-  }
-};
 function evolveNumbers(target, populationSize = 20, maxGenerations = 50) {
   const config = {
     populationSize,
@@ -10790,332 +9150,461 @@ function evolveStrings(target, populationSize = 30, maxGenerations = 100) {
   const engine = new EvolutionEngine(config);
   return engine.run();
 }
+var import_crypto, EvolutionEngine;
+var init_evolve = __esm({
+  "src/evolve.ts"() {
+    import_crypto = require("crypto");
+    EvolutionEngine = class {
+      constructor(config) {
+        this.population = [];
+        this.currentGeneration = 0;
+        this.history = [];
+        this.config = {
+          populationSize: config.populationSize ?? 20,
+          maxGenerations: config.maxGenerations ?? 50,
+          mutationRate: config.mutationRate ?? 0.1,
+          eliteRatio: config.eliteRatio ?? 0.1,
+          fitnessGoal: config.fitnessGoal,
+          fitnessFunc: config.fitnessFunc,
+          mutateFunc: config.mutateFunc,
+          crossoverFunc: config.crossoverFunc,
+          initFunc: config.initFunc
+        };
+      }
+      // 개체군 초기화
+      initialize() {
+        this.population = [];
+        this.currentGeneration = 0;
+        this.history = [];
+        for (let i = 0; i < this.config.populationSize; i++) {
+          const genome = this.config.initFunc();
+          const fitness = this.config.fitnessFunc(genome);
+          this.population.push({
+            genome,
+            fitness,
+            generation: 0,
+            id: (0, import_crypto.randomUUID)()
+          });
+        }
+      }
+      // 자연선택 (토너먼트 선택)
+      select() {
+        const tournamentSize = Math.max(2, Math.floor(this.population.length * 0.2));
+        const tournament = [];
+        for (let i = 0; i < tournamentSize; i++) {
+          const idx = Math.floor(Math.random() * this.population.length);
+          tournament.push(this.population[idx]);
+        }
+        return tournament.reduce(
+          (best, ind) => ind.fitness > best.fitness ? ind : best
+        );
+      }
+      // 한 세대 진행
+      step() {
+        if (this.population.length === 0) {
+          throw new Error("Population not initialized. Call initialize() first.");
+        }
+        this.population.sort((a, b) => b.fitness - a.fitness);
+        const eliteCount = Math.max(1, Math.floor(this.config.populationSize * this.config.eliteRatio));
+        const elites = this.population.slice(0, eliteCount).map((ind) => ({ ...ind }));
+        const newPop = [...elites];
+        while (newPop.length < this.config.populationSize) {
+          const parent1 = this.select();
+          const parent2 = this.select();
+          let childGenome = this.config.crossoverFunc(parent1.genome, parent2.genome);
+          childGenome = this.config.mutateFunc(childGenome, this.config.mutationRate);
+          const fitness = this.config.fitnessFunc(childGenome);
+          newPop.push({
+            genome: childGenome,
+            fitness,
+            generation: this.currentGeneration + 1,
+            id: (0, import_crypto.randomUUID)()
+          });
+        }
+        this.population = newPop;
+        this.currentGeneration++;
+        const bestFitness = this.population[0]?.fitness ?? 0;
+        const avgFitness = this.population.reduce((s, ind) => s + ind.fitness, 0) / this.population.length;
+        this.history.push({ gen: this.currentGeneration, bestFitness, avgFitness });
+        return { bestFitness, avgFitness };
+      }
+      // 전체 진화 실행
+      run() {
+        if (this.population.length === 0) {
+          this.initialize();
+        }
+        let converged = false;
+        for (let g = 0; g < this.config.maxGenerations; g++) {
+          this.step();
+          const best2 = this.getBest();
+          if (best2 && this.config.fitnessGoal !== void 0 && best2.fitness >= this.config.fitnessGoal) {
+            converged = true;
+            break;
+          }
+        }
+        const best = this.getBest();
+        return {
+          best,
+          population: [...this.population],
+          generations: this.currentGeneration,
+          converged,
+          history: [...this.history]
+        };
+      }
+      // 현재 최고 개체
+      getBest() {
+        if (this.population.length === 0) return null;
+        return this.population.reduce(
+          (best, ind) => ind.fitness > best.fitness ? ind : best
+        );
+      }
+      // 현재 개체군
+      getPopulation() {
+        return [...this.population];
+      }
+      // 히스토리 반환
+      getHistory() {
+        return [...this.history];
+      }
+    };
+  }
+});
 
 // src/mutate.ts
-var DEFAULT_CONFIG = {
-  rate: 0.1,
-  strength: 0.1,
-  type: "random"
-};
-var CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-var Mutator = class {
-  constructor(config) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-  }
-  getConfig() {
-    return { ...this.config };
-  }
-  // 숫자 배열 변이
-  mutateNumbers(arr) {
-    const original = [...arr];
-    const mutated = [...arr];
-    let mutations = 0;
-    const type = this.config.type;
-    if (type === "swap") {
-      return this.swapMutation(arr);
-    }
-    if (type === "flip") {
-      return this.flipMutation(arr);
-    }
-    for (let i = 0; i < mutated.length; i++) {
-      if (Math.random() < this.config.rate) {
-        if (type === "gaussian") {
-          const u1 = Math.random();
-          const u2 = Math.random();
-          const gaussian = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-          mutated[i] = mutated[i] + gaussian * this.config.strength * (Math.abs(mutated[i]) || 1);
-        } else {
-          const delta = (Math.random() * 2 - 1) * this.config.strength * (Math.abs(mutated[i]) || 1);
-          mutated[i] = mutated[i] + delta;
-        }
-        mutations++;
+var DEFAULT_CONFIG, CHARS, Mutator, globalMutator;
+var init_mutate = __esm({
+  "src/mutate.ts"() {
+    DEFAULT_CONFIG = {
+      rate: 0.1,
+      strength: 0.1,
+      type: "random"
+    };
+    CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    Mutator = class {
+      constructor(config) {
+        this.config = { ...DEFAULT_CONFIG, ...config };
       }
-    }
-    return { original, mutated, mutations, mutationType: type };
-  }
-  // 문자열 변이
-  mutateString(s) {
-    const original = s;
-    const type = this.config.type;
-    let mutated = s;
-    let mutations = 0;
-    if (type === "insert") {
-      const chars = s.split("");
-      const newChars = [];
-      for (let i = 0; i < chars.length; i++) {
-        newChars.push(chars[i]);
-        if (Math.random() < this.config.rate) {
-          const randChar = CHARS[Math.floor(Math.random() * CHARS.length)];
-          newChars.push(randChar);
-          mutations++;
-        }
+      getConfig() {
+        return { ...this.config };
       }
-      mutated = newChars.join("");
-    } else if (type === "delete") {
-      const chars = s.split("");
-      const kept = [];
-      for (const ch of chars) {
-        if (Math.random() < this.config.rate) {
-          mutations++;
-        } else {
-          kept.push(ch);
+      // 숫자 배열 변이
+      mutateNumbers(arr) {
+        const original = [...arr];
+        const mutated = [...arr];
+        let mutations = 0;
+        const type = this.config.type;
+        if (type === "swap") {
+          return this.swapMutation(arr);
         }
-      }
-      mutated = kept.join("");
-    } else if (type === "swap") {
-      const chars = s.split("");
-      for (let i = 0; i < chars.length - 1; i++) {
-        if (Math.random() < this.config.rate) {
-          const tmp = chars[i];
-          chars[i] = chars[i + 1];
-          chars[i + 1] = tmp;
-          mutations++;
-          i++;
+        if (type === "flip") {
+          return this.flipMutation(arr);
         }
-      }
-      mutated = chars.join("");
-    } else {
-      const chars = s.split("");
-      for (let i = 0; i < chars.length; i++) {
-        if (Math.random() < this.config.rate) {
-          chars[i] = CHARS[Math.floor(Math.random() * CHARS.length)];
-          mutations++;
-        }
-      }
-      mutated = chars.join("");
-    }
-    return { original, mutated, mutations, mutationType: type };
-  }
-  // 제네릭 객체 변이 (JSON-safe)
-  mutateObject(obj) {
-    const original = JSON.parse(JSON.stringify(obj));
-    const mutated = JSON.parse(JSON.stringify(obj));
-    let mutations = 0;
-    const type = this.config.type;
-    for (const key of Object.keys(mutated)) {
-      if (Math.random() < this.config.rate) {
-        const val = mutated[key];
-        if (typeof val === "number") {
-          const delta = (Math.random() * 2 - 1) * this.config.strength * (Math.abs(val) || 1);
-          mutated[key] = val + delta;
-          mutations++;
-        } else if (typeof val === "string") {
-          if (val.length > 0) {
-            const pos = Math.floor(Math.random() * val.length);
-            const newChar = CHARS[Math.floor(Math.random() * CHARS.length)];
-            mutated[key] = val.slice(0, pos) + newChar + val.slice(pos + 1);
+        for (let i = 0; i < mutated.length; i++) {
+          if (Math.random() < this.config.rate) {
+            if (type === "gaussian") {
+              const u1 = Math.random();
+              const u2 = Math.random();
+              const gaussian = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+              mutated[i] = mutated[i] + gaussian * this.config.strength * (Math.abs(mutated[i]) || 1);
+            } else {
+              const delta = (Math.random() * 2 - 1) * this.config.strength * (Math.abs(mutated[i]) || 1);
+              mutated[i] = mutated[i] + delta;
+            }
             mutations++;
           }
-        } else if (typeof val === "boolean") {
-          mutated[key] = !val;
-          mutations++;
         }
+        return { original, mutated, mutations, mutationType: type };
       }
-    }
-    return { original, mutated, mutations, mutationType: type };
-  }
-  // 배열 요소 교환 (swap mutation)
-  swapMutation(arr) {
-    const original = [...arr];
-    const mutated = [...arr];
-    let mutations = 0;
-    for (let i = 0; i < mutated.length - 1; i++) {
-      if (Math.random() < this.config.rate) {
-        const j = Math.floor(Math.random() * (mutated.length - i - 1)) + i + 1;
-        const tmp = mutated[i];
-        mutated[i] = mutated[j];
-        mutated[j] = tmp;
-        mutations++;
+      // 문자열 변이
+      mutateString(s) {
+        const original = s;
+        const type = this.config.type;
+        let mutated = s;
+        let mutations = 0;
+        if (type === "insert") {
+          const chars = s.split("");
+          const newChars = [];
+          for (let i = 0; i < chars.length; i++) {
+            newChars.push(chars[i]);
+            if (Math.random() < this.config.rate) {
+              const randChar = CHARS[Math.floor(Math.random() * CHARS.length)];
+              newChars.push(randChar);
+              mutations++;
+            }
+          }
+          mutated = newChars.join("");
+        } else if (type === "delete") {
+          const chars = s.split("");
+          const kept = [];
+          for (const ch of chars) {
+            if (Math.random() < this.config.rate) {
+              mutations++;
+            } else {
+              kept.push(ch);
+            }
+          }
+          mutated = kept.join("");
+        } else if (type === "swap") {
+          const chars = s.split("");
+          for (let i = 0; i < chars.length - 1; i++) {
+            if (Math.random() < this.config.rate) {
+              const tmp = chars[i];
+              chars[i] = chars[i + 1];
+              chars[i + 1] = tmp;
+              mutations++;
+              i++;
+            }
+          }
+          mutated = chars.join("");
+        } else {
+          const chars = s.split("");
+          for (let i = 0; i < chars.length; i++) {
+            if (Math.random() < this.config.rate) {
+              chars[i] = CHARS[Math.floor(Math.random() * CHARS.length)];
+              mutations++;
+            }
+          }
+          mutated = chars.join("");
+        }
+        return { original, mutated, mutations, mutationType: type };
       }
-    }
-    return { original, mutated, mutations, mutationType: "swap" };
-  }
-  // 비트 플립 (0 ↔ 1)
-  flipMutation(bits) {
-    const original = [...bits];
-    const mutated = [...bits];
-    let mutations = 0;
-    for (let i = 0; i < mutated.length; i++) {
-      if (Math.random() < this.config.rate) {
-        mutated[i] = mutated[i] === 0 ? 1 : 0;
-        mutations++;
+      // 제네릭 객체 변이 (JSON-safe)
+      mutateObject(obj) {
+        const original = JSON.parse(JSON.stringify(obj));
+        const mutated = JSON.parse(JSON.stringify(obj));
+        let mutations = 0;
+        const type = this.config.type;
+        for (const key of Object.keys(mutated)) {
+          if (Math.random() < this.config.rate) {
+            const val = mutated[key];
+            if (typeof val === "number") {
+              const delta = (Math.random() * 2 - 1) * this.config.strength * (Math.abs(val) || 1);
+              mutated[key] = val + delta;
+              mutations++;
+            } else if (typeof val === "string") {
+              if (val.length > 0) {
+                const pos = Math.floor(Math.random() * val.length);
+                const newChar = CHARS[Math.floor(Math.random() * CHARS.length)];
+                mutated[key] = val.slice(0, pos) + newChar + val.slice(pos + 1);
+                mutations++;
+              }
+            } else if (typeof val === "boolean") {
+              mutated[key] = !val;
+              mutations++;
+            }
+          }
+        }
+        return { original, mutated, mutations, mutationType: type };
       }
-    }
-    return { original, mutated, mutations, mutationType: "flip" };
+      // 배열 요소 교환 (swap mutation)
+      swapMutation(arr) {
+        const original = [...arr];
+        const mutated = [...arr];
+        let mutations = 0;
+        for (let i = 0; i < mutated.length - 1; i++) {
+          if (Math.random() < this.config.rate) {
+            const j = Math.floor(Math.random() * (mutated.length - i - 1)) + i + 1;
+            const tmp = mutated[i];
+            mutated[i] = mutated[j];
+            mutated[j] = tmp;
+            mutations++;
+          }
+        }
+        return { original, mutated, mutations, mutationType: "swap" };
+      }
+      // 비트 플립 (0 ↔ 1)
+      flipMutation(bits) {
+        const original = [...bits];
+        const mutated = [...bits];
+        let mutations = 0;
+        for (let i = 0; i < mutated.length; i++) {
+          if (Math.random() < this.config.rate) {
+            mutated[i] = mutated[i] === 0 ? 1 : 0;
+            mutations++;
+          }
+        }
+        return { original, mutated, mutations, mutationType: "flip" };
+      }
+      // 적합도 기반 선택 (높은 적합도 우선)
+      select(candidates, n) {
+        const sorted = [...candidates].sort((a, b) => b.fitness - a.fitness);
+        return sorted.slice(0, n).map((c) => c.value);
+      }
+    };
+    globalMutator = new Mutator();
   }
-  // 적합도 기반 선택 (높은 적합도 우선)
-  select(candidates, n) {
-    const sorted = [...candidates].sort((a, b) => b.fitness - a.fitness);
-    return sorted.slice(0, n).map((c) => c.value);
-  }
-};
-var globalMutator = new Mutator();
+});
 
 // src/crossover.ts
-var Crossover = class {
-  constructor(config) {
-    this.config = {
-      type: config?.type ?? "single-point",
-      rate: config?.rate ?? 0.7,
-      blendAlpha: config?.blendAlpha ?? 0.5
-    };
-  }
-  // 단일점 교배 (배열)
-  singlePoint(a, b) {
-    const len = Math.min(a.length, b.length);
-    const point = len <= 1 ? 0 : Math.floor(Math.random() * (len - 1)) + 1;
-    const child1 = [...a.slice(0, point), ...b.slice(point)];
-    const child2 = [...b.slice(0, point), ...a.slice(point)];
-    while (child1.length < a.length) child1.push(a[child1.length]);
-    while (child2.length < b.length) child2.push(b[child2.length]);
-    return {
-      parent1: [...a],
-      parent2: [...b],
-      child1: child1.slice(0, a.length),
-      child2: child2.slice(0, b.length),
-      crossoverPoint: point,
-      type: "single-point"
-    };
-  }
-  // 두 점 교배 (배열)
-  twoPoint(a, b) {
-    const len = Math.min(a.length, b.length);
-    let p1 = len <= 2 ? 0 : Math.floor(Math.random() * (len - 1));
-    let p2 = len <= 2 ? len : Math.floor(Math.random() * (len - p1 - 1)) + p1 + 1;
-    if (p1 >= p2) {
-      p2 = Math.min(p1 + 1, len);
-    }
-    const child1 = [
-      ...a.slice(0, p1),
-      ...b.slice(p1, p2),
-      ...a.slice(p2)
-    ];
-    const child2 = [
-      ...b.slice(0, p1),
-      ...a.slice(p1, p2),
-      ...b.slice(p2)
-    ];
-    return {
-      parent1: [...a],
-      parent2: [...b],
-      child1: child1.slice(0, a.length),
-      child2: child2.slice(0, b.length),
-      crossoverPoints: [p1, p2],
-      type: "two-point"
-    };
-  }
-  // 균등 교배 (각 요소를 50% 확률로 선택)
-  uniform(a, b) {
-    const len = Math.max(a.length, b.length);
-    const child1 = [];
-    const child2 = [];
-    for (let i = 0; i < len; i++) {
-      const ai = i < a.length ? a[i] : b[i];
-      const bi = i < b.length ? b[i] : a[i];
-      if (Math.random() < 0.5) {
-        child1.push(ai);
-        child2.push(bi);
-      } else {
-        child1.push(bi);
-        child2.push(ai);
+var Crossover, globalCrossover;
+var init_crossover = __esm({
+  "src/crossover.ts"() {
+    Crossover = class {
+      constructor(config) {
+        this.config = {
+          type: config?.type ?? "single-point",
+          rate: config?.rate ?? 0.7,
+          blendAlpha: config?.blendAlpha ?? 0.5
+        };
       }
-    }
-    return {
-      parent1: [...a],
-      parent2: [...b],
-      child1: child1.slice(0, a.length),
-      child2: child2.slice(0, b.length),
-      type: "uniform"
-    };
-  }
-  // 산술 교배 (숫자 배열: alpha*a + (1-alpha)*b)
-  arithmetic(a, b, alpha) {
-    const al = alpha ?? this.config.blendAlpha ?? 0.5;
-    const child1 = a.map((v, i) => al * v + (1 - al) * (b[i] ?? 0));
-    const child2 = a.map((v, i) => (1 - al) * v + al * (b[i] ?? 0));
-    return {
-      parent1: [...a],
-      parent2: [...b],
-      child1,
-      child2,
-      type: "arithmetic"
-    };
-  }
-  // 문자열 교배 (단일점)
-  crossoverStrings(a, b) {
-    const aArr = a.split("");
-    const bArr = b.split("");
-    const result = this.singlePoint(aArr, bArr);
-    return {
-      parent1: a,
-      parent2: b,
-      child1: result.child1.join(""),
-      child2: result.child2.join(""),
-      crossoverPoint: result.crossoverPoint,
-      type: "single-point"
-    };
-  }
-  // 객체 교배 (키 기반)
-  crossoverObjects(a, b) {
-    const allKeys = Array.from(/* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)]));
-    const child1 = {};
-    const child2 = {};
-    for (const key of allKeys) {
-      if (Math.random() < 0.5) {
-        child1[key] = key in a ? a[key] : b[key];
-        child2[key] = key in b ? b[key] : a[key];
-      } else {
-        child1[key] = key in b ? b[key] : a[key];
-        child2[key] = key in a ? a[key] : b[key];
+      // 단일점 교배 (배열)
+      singlePoint(a, b) {
+        const len = Math.min(a.length, b.length);
+        const point = len <= 1 ? 0 : Math.floor(Math.random() * (len - 1)) + 1;
+        const child1 = [...a.slice(0, point), ...b.slice(point)];
+        const child2 = [...b.slice(0, point), ...a.slice(point)];
+        while (child1.length < a.length) child1.push(a[child1.length]);
+        while (child2.length < b.length) child2.push(b[child2.length]);
+        return {
+          parent1: [...a],
+          parent2: [...b],
+          child1: child1.slice(0, a.length),
+          child2: child2.slice(0, b.length),
+          crossoverPoint: point,
+          type: "single-point"
+        };
       }
-    }
-    return {
-      parent1: { ...a },
-      parent2: { ...b },
-      child1,
-      child2,
-      type: "uniform"
-    };
-  }
-  // 자동 교배 (타입 감지)
-  cross(a, b) {
-    if (Array.isArray(a) && Array.isArray(b)) {
-      const isNumeric = a.every((v) => typeof v === "number");
-      if (isNumeric) {
-        return this.arithmetic(a, b);
+      // 두 점 교배 (배열)
+      twoPoint(a, b) {
+        const len = Math.min(a.length, b.length);
+        let p1 = len <= 2 ? 0 : Math.floor(Math.random() * (len - 1));
+        let p2 = len <= 2 ? len : Math.floor(Math.random() * (len - p1 - 1)) + p1 + 1;
+        if (p1 >= p2) {
+          p2 = Math.min(p1 + 1, len);
+        }
+        const child1 = [
+          ...a.slice(0, p1),
+          ...b.slice(p1, p2),
+          ...a.slice(p2)
+        ];
+        const child2 = [
+          ...b.slice(0, p1),
+          ...a.slice(p1, p2),
+          ...b.slice(p2)
+        ];
+        return {
+          parent1: [...a],
+          parent2: [...b],
+          child1: child1.slice(0, a.length),
+          child2: child2.slice(0, b.length),
+          crossoverPoints: [p1, p2],
+          type: "two-point"
+        };
       }
-      const result = this.singlePoint(a, b);
-      return result;
-    }
-    if (typeof a === "string" && typeof b === "string") {
-      return this.crossoverStrings(a, b);
-    }
-    if (typeof a === "object" && a !== null && typeof b === "object" && b !== null) {
-      return this.crossoverObjects(
-        a,
-        b
-      );
-    }
-    if (typeof a === "number" && typeof b === "number") {
-      const alpha = this.config.blendAlpha ?? 0.5;
-      return {
-        parent1: a,
-        parent2: b,
-        child1: alpha * a + (1 - alpha) * b,
-        child2: (1 - alpha) * a + alpha * b,
-        type: "arithmetic"
-      };
-    }
-    return {
-      parent1: a,
-      parent2: b,
-      child1: a,
-      child2: b,
-      type: this.config.type
+      // 균등 교배 (각 요소를 50% 확률로 선택)
+      uniform(a, b) {
+        const len = Math.max(a.length, b.length);
+        const child1 = [];
+        const child2 = [];
+        for (let i = 0; i < len; i++) {
+          const ai = i < a.length ? a[i] : b[i];
+          const bi = i < b.length ? b[i] : a[i];
+          if (Math.random() < 0.5) {
+            child1.push(ai);
+            child2.push(bi);
+          } else {
+            child1.push(bi);
+            child2.push(ai);
+          }
+        }
+        return {
+          parent1: [...a],
+          parent2: [...b],
+          child1: child1.slice(0, a.length),
+          child2: child2.slice(0, b.length),
+          type: "uniform"
+        };
+      }
+      // 산술 교배 (숫자 배열: alpha*a + (1-alpha)*b)
+      arithmetic(a, b, alpha) {
+        const al = alpha ?? this.config.blendAlpha ?? 0.5;
+        const child1 = a.map((v, i) => al * v + (1 - al) * (b[i] ?? 0));
+        const child2 = a.map((v, i) => (1 - al) * v + al * (b[i] ?? 0));
+        return {
+          parent1: [...a],
+          parent2: [...b],
+          child1,
+          child2,
+          type: "arithmetic"
+        };
+      }
+      // 문자열 교배 (단일점)
+      crossoverStrings(a, b) {
+        const aArr = a.split("");
+        const bArr = b.split("");
+        const result = this.singlePoint(aArr, bArr);
+        return {
+          parent1: a,
+          parent2: b,
+          child1: result.child1.join(""),
+          child2: result.child2.join(""),
+          crossoverPoint: result.crossoverPoint,
+          type: "single-point"
+        };
+      }
+      // 객체 교배 (키 기반)
+      crossoverObjects(a, b) {
+        const allKeys = Array.from(/* @__PURE__ */ new Set([...Object.keys(a), ...Object.keys(b)]));
+        const child1 = {};
+        const child2 = {};
+        for (const key of allKeys) {
+          if (Math.random() < 0.5) {
+            child1[key] = key in a ? a[key] : b[key];
+            child2[key] = key in b ? b[key] : a[key];
+          } else {
+            child1[key] = key in b ? b[key] : a[key];
+            child2[key] = key in a ? a[key] : b[key];
+          }
+        }
+        return {
+          parent1: { ...a },
+          parent2: { ...b },
+          child1,
+          child2,
+          type: "uniform"
+        };
+      }
+      // 자동 교배 (타입 감지)
+      cross(a, b) {
+        if (Array.isArray(a) && Array.isArray(b)) {
+          const isNumeric = a.every((v) => typeof v === "number");
+          if (isNumeric) {
+            return this.arithmetic(a, b);
+          }
+          const result = this.singlePoint(a, b);
+          return result;
+        }
+        if (typeof a === "string" && typeof b === "string") {
+          return this.crossoverStrings(a, b);
+        }
+        if (typeof a === "object" && a !== null && typeof b === "object" && b !== null) {
+          return this.crossoverObjects(
+            a,
+            b
+          );
+        }
+        if (typeof a === "number" && typeof b === "number") {
+          const alpha = this.config.blendAlpha ?? 0.5;
+          return {
+            parent1: a,
+            parent2: b,
+            child1: alpha * a + (1 - alpha) * b,
+            child2: (1 - alpha) * a + alpha * b,
+            type: "arithmetic"
+          };
+        }
+        return {
+          parent1: a,
+          parent2: b,
+          child1: a,
+          child2: b,
+          type: this.config.type
+        };
+      }
     };
+    globalCrossover = new Crossover();
   }
-};
-var globalCrossover = new Crossover();
+});
 
 // src/fitness.ts
 function levenshtein2(a, b) {
@@ -11136,276 +9625,286 @@ function levenshtein2(a, b) {
   }
   return dp[m][n];
 }
-var FitnessEvaluator = class {
-  constructor(config = {}) {
-    this.config = {
-      normalize: config.normalize !== false,
-      maximize: config.maximize !== false,
-      weights: config.weights ?? {}
-    };
-  }
-  // 숫자 근접도 (목표값에 얼마나 가까운가)
-  proximity(value, target, tolerance) {
-    const diff = Math.abs(value - target);
-    const tol = tolerance !== void 0 ? tolerance : Math.abs(target) || 1;
-    let rawScore;
-    let score;
-    if (tol === 0) {
-      rawScore = diff === 0 ? 1 : 0;
-      score = rawScore;
-    } else {
-      rawScore = Math.max(0, 1 - diff / tol);
-      score = this.config.normalize !== false ? rawScore : rawScore;
-    }
-    if (this.config.maximize === false) {
-      score = 1 - score;
-    }
-    return {
-      score,
-      rawScore,
-      details: {
-        diff,
-        tolerance: tol,
-        proximity: rawScore
+var FitnessEvaluator, globalFitness;
+var init_fitness = __esm({
+  "src/fitness.ts"() {
+    FitnessEvaluator = class {
+      constructor(config = {}) {
+        this.config = {
+          normalize: config.normalize !== false,
+          maximize: config.maximize !== false,
+          weights: config.weights ?? {}
+        };
       }
-    };
-  }
-  // 문자열 유사도 (레벤슈타인 거리 기반)
-  stringSimilarity(a, b) {
-    if (a.length === 0 && b.length === 0) {
-      return { score: 1, rawScore: 1, details: { distance: 0, maxLen: 0 } };
-    }
-    const maxLen = Math.max(a.length, b.length);
-    const dist = levenshtein2(a, b);
-    const rawScore = maxLen === 0 ? 1 : 1 - dist / maxLen;
-    const score = this.config.maximize === false ? 1 - rawScore : rawScore;
-    return {
-      score,
-      rawScore,
-      details: {
-        distance: dist,
-        maxLen,
-        similarity: rawScore
-      }
-    };
-  }
-  // 배열 일치도
-  arrayMatch(arr, target) {
-    if (target.length === 0 && arr.length === 0) {
-      return { score: 1, rawScore: 1, details: { matched: 0, total: 0 } };
-    }
-    const maxLen = Math.max(arr.length, target.length);
-    let matched = 0;
-    const minLen = Math.min(arr.length, target.length);
-    for (let i = 0; i < minLen; i++) {
-      if (JSON.stringify(arr[i]) === JSON.stringify(target[i])) matched++;
-    }
-    const rawScore = maxLen === 0 ? 1 : matched / maxLen;
-    const score = this.config.maximize === false ? 1 - rawScore : rawScore;
-    return {
-      score,
-      rawScore,
-      details: {
-        matched,
-        total: maxLen,
-        arrLen: arr.length,
-        targetLen: target.length
-      }
-    };
-  }
-  // 다목적 적합도 (여러 기준 가중합)
-  multiObjective(values, targets, weights) {
-    const keys = Object.keys(targets);
-    if (keys.length === 0) {
-      return { score: 1, rawScore: 1, details: {} };
-    }
-    const w = weights ?? this.config.weights ?? {};
-    const details = {};
-    let weightedSum = 0;
-    let totalWeight = 0;
-    for (const key of keys) {
-      const val = values[key] ?? 0;
-      const tgt = targets[key] ?? 0;
-      const weight = w[key] ?? 1;
-      const maxVal = Math.max(Math.abs(tgt), Math.abs(val), 1);
-      const proximity = Math.max(0, 1 - Math.abs(val - tgt) / maxVal);
-      details[key] = proximity;
-      weightedSum += proximity * weight;
-      totalWeight += weight;
-    }
-    const rawScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
-    const score = this.config.maximize === false ? 1 - rawScore : rawScore;
-    return { score, rawScore, details };
-  }
-  // 제약 만족도 (모든 제약 충족 시 1.0)
-  constraintSatisfaction(value, constraints) {
-    if (constraints.length === 0) {
-      return { score: 1, rawScore: 1, details: { satisfied: 0, total: 0 } };
-    }
-    let satisfied = 0;
-    const details = {};
-    for (let i = 0; i < constraints.length; i++) {
-      const result = constraints[i](value) ? 1 : 0;
-      details[`constraint_${i}`] = result;
-      satisfied += result;
-    }
-    const rawScore = satisfied / constraints.length;
-    const score = this.config.maximize === false ? 1 - rawScore : rawScore;
-    return {
-      score,
-      rawScore,
-      details: { ...details, satisfied, total: constraints.length }
-    };
-  }
-  // 집합에서 랭킹
-  rank(items, scorer) {
-    const scored = items.map((item, idx) => ({ item, score: scorer(item), idx }));
-    scored.sort((a, b) => b.score - a.score);
-    return scored.map((s, rankIdx) => ({
-      ...s.item,
-      rank: rankIdx + 1,
-      score: s.score
-    }));
-  }
-  // 파레토 최적 (다목적 최적화)
-  paretoFront(items, objectives) {
-    if (items.length === 0) return [];
-    const dominated = /* @__PURE__ */ new Set();
-    for (let i = 0; i < items.length; i++) {
-      if (dominated.has(i)) continue;
-      for (let j = 0; j < items.length; j++) {
-        if (i === j || dominated.has(j)) continue;
-        const scores_i = objectives.map((f) => f(items[i]));
-        const scores_j = objectives.map((f) => f(items[j]));
-        const allGeq = scores_i.every((s, k) => s >= scores_j[k]);
-        const someGt = scores_i.some((s, k) => s > scores_j[k]);
-        if (allGeq && someGt) {
-          dominated.add(j);
+      // 숫자 근접도 (목표값에 얼마나 가까운가)
+      proximity(value, target, tolerance) {
+        const diff = Math.abs(value - target);
+        const tol = tolerance !== void 0 ? tolerance : Math.abs(target) || 1;
+        let rawScore;
+        let score;
+        if (tol === 0) {
+          rawScore = diff === 0 ? 1 : 0;
+          score = rawScore;
+        } else {
+          rawScore = Math.max(0, 1 - diff / tol);
+          score = this.config.normalize !== false ? rawScore : rawScore;
         }
+        if (this.config.maximize === false) {
+          score = 1 - score;
+        }
+        return {
+          score,
+          rawScore,
+          details: {
+            diff,
+            tolerance: tol,
+            proximity: rawScore
+          }
+        };
       }
-    }
-    return items.filter((_, i) => !dominated.has(i));
+      // 문자열 유사도 (레벤슈타인 거리 기반)
+      stringSimilarity(a, b) {
+        if (a.length === 0 && b.length === 0) {
+          return { score: 1, rawScore: 1, details: { distance: 0, maxLen: 0 } };
+        }
+        const maxLen = Math.max(a.length, b.length);
+        const dist = levenshtein2(a, b);
+        const rawScore = maxLen === 0 ? 1 : 1 - dist / maxLen;
+        const score = this.config.maximize === false ? 1 - rawScore : rawScore;
+        return {
+          score,
+          rawScore,
+          details: {
+            distance: dist,
+            maxLen,
+            similarity: rawScore
+          }
+        };
+      }
+      // 배열 일치도
+      arrayMatch(arr, target) {
+        if (target.length === 0 && arr.length === 0) {
+          return { score: 1, rawScore: 1, details: { matched: 0, total: 0 } };
+        }
+        const maxLen = Math.max(arr.length, target.length);
+        let matched = 0;
+        const minLen = Math.min(arr.length, target.length);
+        for (let i = 0; i < minLen; i++) {
+          if (JSON.stringify(arr[i]) === JSON.stringify(target[i])) matched++;
+        }
+        const rawScore = maxLen === 0 ? 1 : matched / maxLen;
+        const score = this.config.maximize === false ? 1 - rawScore : rawScore;
+        return {
+          score,
+          rawScore,
+          details: {
+            matched,
+            total: maxLen,
+            arrLen: arr.length,
+            targetLen: target.length
+          }
+        };
+      }
+      // 다목적 적합도 (여러 기준 가중합)
+      multiObjective(values, targets, weights) {
+        const keys = Object.keys(targets);
+        if (keys.length === 0) {
+          return { score: 1, rawScore: 1, details: {} };
+        }
+        const w = weights ?? this.config.weights ?? {};
+        const details = {};
+        let weightedSum = 0;
+        let totalWeight = 0;
+        for (const key of keys) {
+          const val = values[key] ?? 0;
+          const tgt = targets[key] ?? 0;
+          const weight = w[key] ?? 1;
+          const maxVal = Math.max(Math.abs(tgt), Math.abs(val), 1);
+          const proximity = Math.max(0, 1 - Math.abs(val - tgt) / maxVal);
+          details[key] = proximity;
+          weightedSum += proximity * weight;
+          totalWeight += weight;
+        }
+        const rawScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
+        const score = this.config.maximize === false ? 1 - rawScore : rawScore;
+        return { score, rawScore, details };
+      }
+      // 제약 만족도 (모든 제약 충족 시 1.0)
+      constraintSatisfaction(value, constraints) {
+        if (constraints.length === 0) {
+          return { score: 1, rawScore: 1, details: { satisfied: 0, total: 0 } };
+        }
+        let satisfied = 0;
+        const details = {};
+        for (let i = 0; i < constraints.length; i++) {
+          const result = constraints[i](value) ? 1 : 0;
+          details[`constraint_${i}`] = result;
+          satisfied += result;
+        }
+        const rawScore = satisfied / constraints.length;
+        const score = this.config.maximize === false ? 1 - rawScore : rawScore;
+        return {
+          score,
+          rawScore,
+          details: { ...details, satisfied, total: constraints.length }
+        };
+      }
+      // 집합에서 랭킹
+      rank(items, scorer) {
+        const scored = items.map((item, idx) => ({ item, score: scorer(item), idx }));
+        scored.sort((a, b) => b.score - a.score);
+        return scored.map((s, rankIdx) => ({
+          ...s.item,
+          rank: rankIdx + 1,
+          score: s.score
+        }));
+      }
+      // 파레토 최적 (다목적 최적화)
+      paretoFront(items, objectives) {
+        if (items.length === 0) return [];
+        const dominated = /* @__PURE__ */ new Set();
+        for (let i = 0; i < items.length; i++) {
+          if (dominated.has(i)) continue;
+          for (let j = 0; j < items.length; j++) {
+            if (i === j || dominated.has(j)) continue;
+            const scores_i = objectives.map((f) => f(items[i]));
+            const scores_j = objectives.map((f) => f(items[j]));
+            const allGeq = scores_i.every((s, k) => s >= scores_j[k]);
+            const someGt = scores_i.some((s, k) => s > scores_j[k]);
+            if (allGeq && someGt) {
+              dominated.add(j);
+            }
+          }
+        }
+        return items.filter((_, i) => !dominated.has(i));
+      }
+    };
+    globalFitness = new FitnessEvaluator();
   }
-};
-var globalFitness = new FitnessEvaluator();
+});
 
 // src/generation.ts
-var GenerationLoop = class {
-  constructor(config) {
-    this.statsHistory = [];
-    this.stagnationCount = 0;
-    this.currentStats = null;
-    this.config = {
-      maxGenerations: config.maxGenerations,
-      targetFitness: config.targetFitness,
-      stagnationLimit: config.stagnationLimit ?? 10,
-      logInterval: config.logInterval ?? 10,
-      onGeneration: config.onGeneration
-    };
-  }
-  // 세대 루프 실행
-  run(initialPopulation, fitnessFunc, nextGenFunc) {
-    this.statsHistory = [];
-    this.stagnationCount = 0;
-    this.currentStats = null;
-    let population = [...initialPopulation];
-    let fitnesses = population.map(fitnessFunc);
-    let bestItem = population[0];
-    let bestFitness = fitnesses[0] ?? -Infinity;
-    for (let i = 0; i < population.length; i++) {
-      if (fitnesses[i] > bestFitness) {
-        bestFitness = fitnesses[i];
-        bestItem = population[i];
-      }
-    }
-    const initialBest = bestFitness;
-    let previousBest = -Infinity;
-    let terminationReason = "max-generations";
-    for (let gen = 0; gen < this.config.maxGenerations; gen++) {
-      const stats = this._computeStats(gen, fitnesses, previousBest);
-      this.statsHistory.push(stats);
-      this.currentStats = stats;
-      for (let i = 0; i < population.length; i++) {
-        if (fitnesses[i] > bestFitness) {
-          bestFitness = fitnesses[i];
-          bestItem = population[i];
-        }
-      }
-      if (this.config.onGeneration) {
-        this.config.onGeneration(stats);
-      }
-      if (this.config.targetFitness !== void 0 && bestFitness >= this.config.targetFitness) {
-        terminationReason = "target-reached";
-        break;
-      }
-      if (stats.improved) {
+var GenerationLoop;
+var init_generation = __esm({
+  "src/generation.ts"() {
+    GenerationLoop = class {
+      constructor(config) {
+        this.statsHistory = [];
         this.stagnationCount = 0;
-      } else {
-        this.stagnationCount++;
+        this.currentStats = null;
+        this.config = {
+          maxGenerations: config.maxGenerations,
+          targetFitness: config.targetFitness,
+          stagnationLimit: config.stagnationLimit ?? 10,
+          logInterval: config.logInterval ?? 10,
+          onGeneration: config.onGeneration
+        };
       }
-      const stagnationLimit = this.config.stagnationLimit ?? 10;
-      if (this.stagnationCount >= stagnationLimit) {
-        terminationReason = "stagnation";
-        break;
+      // 세대 루프 실행
+      run(initialPopulation, fitnessFunc, nextGenFunc) {
+        this.statsHistory = [];
+        this.stagnationCount = 0;
+        this.currentStats = null;
+        let population = [...initialPopulation];
+        let fitnesses = population.map(fitnessFunc);
+        let bestItem = population[0];
+        let bestFitness = fitnesses[0] ?? -Infinity;
+        for (let i = 0; i < population.length; i++) {
+          if (fitnesses[i] > bestFitness) {
+            bestFitness = fitnesses[i];
+            bestItem = population[i];
+          }
+        }
+        const initialBest = bestFitness;
+        let previousBest = -Infinity;
+        let terminationReason = "max-generations";
+        for (let gen = 0; gen < this.config.maxGenerations; gen++) {
+          const stats = this._computeStats(gen, fitnesses, previousBest);
+          this.statsHistory.push(stats);
+          this.currentStats = stats;
+          for (let i = 0; i < population.length; i++) {
+            if (fitnesses[i] > bestFitness) {
+              bestFitness = fitnesses[i];
+              bestItem = population[i];
+            }
+          }
+          if (this.config.onGeneration) {
+            this.config.onGeneration(stats);
+          }
+          if (this.config.targetFitness !== void 0 && bestFitness >= this.config.targetFitness) {
+            terminationReason = "target-reached";
+            break;
+          }
+          if (stats.improved) {
+            this.stagnationCount = 0;
+          } else {
+            this.stagnationCount++;
+          }
+          const stagnationLimit = this.config.stagnationLimit ?? 10;
+          if (this.stagnationCount >= stagnationLimit) {
+            terminationReason = "stagnation";
+            break;
+          }
+          previousBest = stats.best;
+          if (gen < this.config.maxGenerations - 1) {
+            population = nextGenFunc(population, fitnesses);
+            fitnesses = population.map(fitnessFunc);
+          }
+        }
+        const improvementRatio = initialBest === 0 ? bestFitness - initialBest : Math.abs((bestFitness - initialBest) / Math.abs(initialBest === 0 ? 1 : initialBest));
+        return {
+          best: bestItem,
+          bestFitness,
+          totalGenerations: this.statsHistory.length,
+          history: [...this.statsHistory],
+          terminationReason,
+          improvementRatio
+        };
       }
-      previousBest = stats.best;
-      if (gen < this.config.maxGenerations - 1) {
-        population = nextGenFunc(population, fitnesses);
-        fitnesses = population.map(fitnessFunc);
+      // 현재 통계
+      getCurrentStats() {
+        return this.currentStats;
       }
-    }
-    const improvementRatio = initialBest === 0 ? bestFitness - initialBest : Math.abs((bestFitness - initialBest) / Math.abs(initialBest === 0 ? 1 : initialBest));
-    return {
-      best: bestItem,
-      bestFitness,
-      totalGenerations: this.statsHistory.length,
-      history: [...this.statsHistory],
-      terminationReason,
-      improvementRatio
+      // 전체 히스토리
+      getHistory() {
+        return [...this.statsHistory];
+      }
+      // 다양성 계산 (숫자 배열 기준)
+      calculateDiversity(fitnesses) {
+        if (fitnesses.length <= 1) return 0;
+        const min = Math.min(...fitnesses);
+        const max = Math.max(...fitnesses);
+        const range = max - min;
+        if (range === 0) return 0;
+        const mean2 = fitnesses.reduce((s, v) => s + v, 0) / fitnesses.length;
+        const variance2 = fitnesses.reduce((s, v) => s + (v - mean2) ** 2, 0) / fitnesses.length;
+        const stdDev = Math.sqrt(variance2);
+        const diversity = Math.min(1, stdDev / (range + 1e-9));
+        return diversity;
+      }
+      // 진화 수렴 여부 (마지막 5세대 best가 변화 없으면 수렴)
+      hasConverged() {
+        if (this.statsHistory.length < 5) return false;
+        const recent = this.statsHistory.slice(-5);
+        const firstBest = recent[0].best;
+        return recent.every((s) => Math.abs(s.best - firstBest) < 1e-9);
+      }
+      // 내부: 세대 통계 계산
+      _computeStats(gen, fitnesses, previousBest) {
+        if (fitnesses.length === 0) {
+          return { generation: gen, best: 0, worst: 0, average: 0, diversity: 0, elites: 0, improved: false };
+        }
+        const best = Math.max(...fitnesses);
+        const worst = Math.min(...fitnesses);
+        const average2 = fitnesses.reduce((s, v) => s + v, 0) / fitnesses.length;
+        const diversity = this.calculateDiversity(fitnesses);
+        const elites = Math.max(1, Math.floor(fitnesses.length * 0.1));
+        const improved = gen === 0 ? true : best > previousBest;
+        return { generation: gen, best, worst, average: average2, diversity, elites, improved };
+      }
     };
   }
-  // 현재 통계
-  getCurrentStats() {
-    return this.currentStats;
-  }
-  // 전체 히스토리
-  getHistory() {
-    return [...this.statsHistory];
-  }
-  // 다양성 계산 (숫자 배열 기준)
-  calculateDiversity(fitnesses) {
-    if (fitnesses.length <= 1) return 0;
-    const min = Math.min(...fitnesses);
-    const max = Math.max(...fitnesses);
-    const range = max - min;
-    if (range === 0) return 0;
-    const mean2 = fitnesses.reduce((s, v) => s + v, 0) / fitnesses.length;
-    const variance2 = fitnesses.reduce((s, v) => s + (v - mean2) ** 2, 0) / fitnesses.length;
-    const stdDev = Math.sqrt(variance2);
-    const diversity = Math.min(1, stdDev / (range + 1e-9));
-    return diversity;
-  }
-  // 진화 수렴 여부 (마지막 5세대 best가 변화 없으면 수렴)
-  hasConverged() {
-    if (this.statsHistory.length < 5) return false;
-    const recent = this.statsHistory.slice(-5);
-    const firstBest = recent[0].best;
-    return recent.every((s) => Math.abs(s.best - firstBest) < 1e-9);
-  }
-  // 내부: 세대 통계 계산
-  _computeStats(gen, fitnesses, previousBest) {
-    if (fitnesses.length === 0) {
-      return { generation: gen, best: 0, worst: 0, average: 0, diversity: 0, elites: 0, improved: false };
-    }
-    const best = Math.max(...fitnesses);
-    const worst = Math.min(...fitnesses);
-    const average2 = fitnesses.reduce((s, v) => s + v, 0) / fitnesses.length;
-    const diversity = this.calculateDiversity(fitnesses);
-    const elites = Math.max(1, Math.floor(fitnesses.length * 0.1));
-    const improved = gen === 0 ? true : best > previousBest;
-    return { generation: gen, best, worst, average: average2, diversity, elites, improved };
-  }
-};
+});
 
 // src/prune.ts
 function average(nums) {
@@ -11430,298 +9929,307 @@ function buildResult(kept, removed, scorer, strategy, originalCount) {
     }
   };
 }
-var Pruner = class {
-  constructor(config) {
-    this.config = config ?? {};
-  }
-  // 임계값 기반 제거: score < threshold 이면 제거
-  pruneByThreshold(items, scorer, threshold) {
-    const original = [...items];
-    const kept = [];
-    const removed = [];
-    for (const item of original) {
-      if (scorer(item) >= threshold) kept.push(item);
-      else removed.push(item);
-    }
-    return buildResult(kept, removed, scorer, "threshold", original.length);
-  }
-  // 상위 K개만 유지
-  pruneToTopK(items, scorer, k) {
-    const original = [...items];
-    const sorted = [...original].sort((a, b) => scorer(b) - scorer(a));
-    const effectiveK = Math.min(k, original.length);
-    const kept = sorted.slice(0, effectiveK);
-    const keptSet = new Set(kept);
-    const removed = original.filter((item) => !keptSet.has(item));
-    return buildResult(kept, removed, scorer, "top-k", original.length);
-  }
-  // 상위 N% 유지 (최소 1개)
-  pruneToTopPercent(items, scorer, percent) {
-    const original = [...items];
-    const k = Math.max(1, Math.ceil(original.length * percent));
-    return this.pruneToTopK(original, scorer, k);
-  }
-  // 다양성 기반 제거 (너무 유사한 것 제거)
-  pruneForDiversity(items, scorer, similarity2, minDiversity) {
-    const original = [...items];
-    if (original.length === 0) {
-      return buildResult([], [], scorer, "diversity", 0);
-    }
-    const sorted = [...original].sort((a, b) => scorer(b) - scorer(a));
-    const kept = [];
-    for (const candidate of sorted) {
-      const tooSimilar = kept.some((existing) => similarity2(candidate, existing) > 1 - minDiversity);
-      if (!tooSimilar) {
-        kept.push(candidate);
-      }
-    }
-    const keptSet = new Set(kept);
-    const removed = original.filter((item) => !keptSet.has(item));
-    return buildResult(kept, removed, scorer, "diversity", original.length);
-  }
-  // 중복 제거 (정확히 같은 것)
-  dedup(items, key) {
-    const original = [...items];
-    const seen = /* @__PURE__ */ new Set();
-    const kept = [];
-    const removed = [];
-    for (const item of original) {
-      const k = key ? key(item) : JSON.stringify(item);
-      if (!seen.has(k)) {
-        seen.add(k);
-        kept.push(item);
-      } else {
-        removed.push(item);
-      }
-    }
-    return buildResult(kept, removed, () => 0, "threshold", original.length);
-  }
-  // 약한 개체 제거 (평균 이하)
-  pruneWeak(items, scorer) {
-    const original = [...items];
-    if (original.length === 0) {
-      return buildResult([], [], scorer, "threshold", 0);
-    }
-    const scores = original.map(scorer);
-    const avg = average(scores);
-    const kept = [];
-    const removed = [];
-    for (let i = 0; i < original.length; i++) {
-      if (scores[i] >= avg) kept.push(original[i]);
-      else removed.push(original[i]);
-    }
-    return buildResult(kept, removed, scorer, "threshold", original.length);
-  }
-  // 자동 전략 적용 (설정된 전략 사용, 기본값 top-k with k=10)
-  prune(items, scorer) {
-    const strategy = this.config.strategy ?? "top-k";
-    switch (strategy) {
-      case "threshold":
-        return this.pruneByThreshold(items, scorer, this.config.threshold ?? 0.5);
-      case "top-k":
-        return this.pruneToTopK(items, scorer, this.config.k ?? 10);
-      case "top-percent":
-        return this.pruneToTopPercent(items, scorer, this.config.percent ?? 0.5);
-      case "diversity":
-        return this.pruneForDiversity(
-          items,
-          scorer,
-          (a, b) => a === b ? 1 : 0,
-          this.config.minDiversity ?? 0.2
-        );
-      default:
-        return this.pruneWeak(items, scorer);
-    }
-  }
-};
-var globalPruner = new Pruner();
 function keepBest(items, scorer, k) {
   const sorted = [...items].sort((a, b) => scorer(b) - scorer(a));
   return sorted.slice(0, Math.min(k, items.length));
 }
-
-// src/benchmark-self.ts
-var SelfBenchmark = class {
-  constructor(suiteName = "default") {
-    this.pendingFns = [];
-    this.suite = {
-      name: suiteName,
-      results: [],
-      startTime: /* @__PURE__ */ new Date(),
-      summary: {
-        total: 0,
-        fastest: null,
-        slowest: null,
-        avgOpsPerSec: 0
+var Pruner, globalPruner;
+var init_prune = __esm({
+  "src/prune.ts"() {
+    Pruner = class {
+      constructor(config) {
+        this.config = config ?? {};
+      }
+      // 임계값 기반 제거: score < threshold 이면 제거
+      pruneByThreshold(items, scorer, threshold) {
+        const original = [...items];
+        const kept = [];
+        const removed = [];
+        for (const item of original) {
+          if (scorer(item) >= threshold) kept.push(item);
+          else removed.push(item);
+        }
+        return buildResult(kept, removed, scorer, "threshold", original.length);
+      }
+      // 상위 K개만 유지
+      pruneToTopK(items, scorer, k) {
+        const original = [...items];
+        const sorted = [...original].sort((a, b) => scorer(b) - scorer(a));
+        const effectiveK = Math.min(k, original.length);
+        const kept = sorted.slice(0, effectiveK);
+        const keptSet = new Set(kept);
+        const removed = original.filter((item) => !keptSet.has(item));
+        return buildResult(kept, removed, scorer, "top-k", original.length);
+      }
+      // 상위 N% 유지 (최소 1개)
+      pruneToTopPercent(items, scorer, percent) {
+        const original = [...items];
+        const k = Math.max(1, Math.ceil(original.length * percent));
+        return this.pruneToTopK(original, scorer, k);
+      }
+      // 다양성 기반 제거 (너무 유사한 것 제거)
+      pruneForDiversity(items, scorer, similarity2, minDiversity) {
+        const original = [...items];
+        if (original.length === 0) {
+          return buildResult([], [], scorer, "diversity", 0);
+        }
+        const sorted = [...original].sort((a, b) => scorer(b) - scorer(a));
+        const kept = [];
+        for (const candidate of sorted) {
+          const tooSimilar = kept.some((existing) => similarity2(candidate, existing) > 1 - minDiversity);
+          if (!tooSimilar) {
+            kept.push(candidate);
+          }
+        }
+        const keptSet = new Set(kept);
+        const removed = original.filter((item) => !keptSet.has(item));
+        return buildResult(kept, removed, scorer, "diversity", original.length);
+      }
+      // 중복 제거 (정확히 같은 것)
+      dedup(items, key) {
+        const original = [...items];
+        const seen = /* @__PURE__ */ new Set();
+        const kept = [];
+        const removed = [];
+        for (const item of original) {
+          const k = key ? key(item) : JSON.stringify(item);
+          if (!seen.has(k)) {
+            seen.add(k);
+            kept.push(item);
+          } else {
+            removed.push(item);
+          }
+        }
+        return buildResult(kept, removed, () => 0, "threshold", original.length);
+      }
+      // 약한 개체 제거 (평균 이하)
+      pruneWeak(items, scorer) {
+        const original = [...items];
+        if (original.length === 0) {
+          return buildResult([], [], scorer, "threshold", 0);
+        }
+        const scores = original.map(scorer);
+        const avg = average(scores);
+        const kept = [];
+        const removed = [];
+        for (let i = 0; i < original.length; i++) {
+          if (scores[i] >= avg) kept.push(original[i]);
+          else removed.push(original[i]);
+        }
+        return buildResult(kept, removed, scorer, "threshold", original.length);
+      }
+      // 자동 전략 적용 (설정된 전략 사용, 기본값 top-k with k=10)
+      prune(items, scorer) {
+        const strategy = this.config.strategy ?? "top-k";
+        switch (strategy) {
+          case "threshold":
+            return this.pruneByThreshold(items, scorer, this.config.threshold ?? 0.5);
+          case "top-k":
+            return this.pruneToTopK(items, scorer, this.config.k ?? 10);
+          case "top-percent":
+            return this.pruneToTopPercent(items, scorer, this.config.percent ?? 0.5);
+          case "diversity":
+            return this.pruneForDiversity(
+              items,
+              scorer,
+              (a, b) => a === b ? 1 : 0,
+              this.config.minDiversity ?? 0.2
+            );
+          default:
+            return this.pruneWeak(items, scorer);
+        }
       }
     };
+    globalPruner = new Pruner();
   }
-  // percentile 계산
-  percentile(times, p) {
-    if (times.length === 0) return 0;
-    const sorted = [...times].sort((a, b) => a - b);
-    const index = Math.ceil(p / 100 * sorted.length) - 1;
-    return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
-  }
-  // 단일 함수 벤치마크
-  measure(name, fn, runs = 100) {
-    const times = [];
-    let memBefore = 0;
-    let memAfter = 0;
-    const warmup = Math.min(10, Math.floor(runs / 10));
-    for (let i = 0; i < warmup; i++) {
-      fn();
-    }
-    if (typeof process !== "undefined" && process.memoryUsage) {
-      memBefore = process.memoryUsage().heapUsed;
-    }
-    for (let i = 0; i < runs; i++) {
-      const start = performance.now();
-      fn();
-      const end = performance.now();
-      times.push(end - start);
-    }
-    if (typeof process !== "undefined" && process.memoryUsage) {
-      memAfter = process.memoryUsage().heapUsed;
-    }
-    const totalMs = times.reduce((a, b) => a + b, 0);
-    const avgMs = totalMs / runs;
-    const minMs = Math.min(...times);
-    const maxMs = Math.max(...times);
-    const p50 = this.percentile(times, 50);
-    const p95 = this.percentile(times, 95);
-    const p99 = this.percentile(times, 99);
-    const opsPerSec = avgMs > 0 ? Math.round(1e3 / avgMs) : Infinity;
-    const memoryUsed = memAfter > memBefore ? memAfter - memBefore : 0;
-    const result = {
-      name,
-      runs,
-      totalMs,
-      avgMs,
-      minMs,
-      maxMs,
-      p50,
-      p95,
-      p99,
-      opsPerSec,
-      memoryUsed
+});
+
+// src/benchmark-self.ts
+var SelfBenchmark, globalBenchmark;
+var init_benchmark_self = __esm({
+  "src/benchmark-self.ts"() {
+    SelfBenchmark = class {
+      constructor(suiteName = "default") {
+        this.pendingFns = [];
+        this.suite = {
+          name: suiteName,
+          results: [],
+          startTime: /* @__PURE__ */ new Date(),
+          summary: {
+            total: 0,
+            fastest: null,
+            slowest: null,
+            avgOpsPerSec: 0
+          }
+        };
+      }
+      // percentile 계산
+      percentile(times, p) {
+        if (times.length === 0) return 0;
+        const sorted = [...times].sort((a, b) => a - b);
+        const index = Math.ceil(p / 100 * sorted.length) - 1;
+        return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
+      }
+      // 단일 함수 벤치마크
+      measure(name, fn, runs = 100) {
+        const times = [];
+        let memBefore = 0;
+        let memAfter = 0;
+        const warmup = Math.min(10, Math.floor(runs / 10));
+        for (let i = 0; i < warmup; i++) {
+          fn();
+        }
+        if (typeof process !== "undefined" && process.memoryUsage) {
+          memBefore = process.memoryUsage().heapUsed;
+        }
+        for (let i = 0; i < runs; i++) {
+          const start = performance.now();
+          fn();
+          const end = performance.now();
+          times.push(end - start);
+        }
+        if (typeof process !== "undefined" && process.memoryUsage) {
+          memAfter = process.memoryUsage().heapUsed;
+        }
+        const totalMs = times.reduce((a, b) => a + b, 0);
+        const avgMs = totalMs / runs;
+        const minMs = Math.min(...times);
+        const maxMs = Math.max(...times);
+        const p50 = this.percentile(times, 50);
+        const p95 = this.percentile(times, 95);
+        const p99 = this.percentile(times, 99);
+        const opsPerSec = avgMs > 0 ? Math.round(1e3 / avgMs) : Infinity;
+        const memoryUsed = memAfter > memBefore ? memAfter - memBefore : 0;
+        const result = {
+          name,
+          runs,
+          totalMs,
+          avgMs,
+          minMs,
+          maxMs,
+          p50,
+          p95,
+          p99,
+          opsPerSec,
+          memoryUsed
+        };
+        return result;
+      }
+      // 비동기 함수 벤치마크
+      async measureAsync(name, fn, runs = 100) {
+        const times = [];
+        const warmup = Math.min(5, Math.floor(runs / 10));
+        for (let i = 0; i < warmup; i++) {
+          await fn();
+        }
+        for (let i = 0; i < runs; i++) {
+          const start = performance.now();
+          await fn();
+          const end = performance.now();
+          times.push(end - start);
+        }
+        const totalMs = times.reduce((a, b) => a + b, 0);
+        const avgMs = totalMs / runs;
+        const minMs = Math.min(...times);
+        const maxMs = Math.max(...times);
+        const p50 = this.percentile(times, 50);
+        const p95 = this.percentile(times, 95);
+        const p99 = this.percentile(times, 99);
+        const opsPerSec = avgMs > 0 ? Math.round(1e3 / avgMs) : Infinity;
+        return { name, runs, totalMs, avgMs, minMs, maxMs, p50, p95, p99, opsPerSec };
+      }
+      // 두 함수 비교
+      compare(name1, fn1, name2, fn2, runs = 100) {
+        const baseline = this.measure(name1, fn1, runs);
+        const target = this.measure(name2, fn2, runs);
+        const speedup = baseline.avgMs > 0 ? baseline.avgMs / target.avgMs : 1;
+        let winner;
+        const diff = Math.abs(speedup - 1);
+        const significant = diff >= 0.05;
+        if (!significant) {
+          winner = "tie";
+        } else if (speedup > 1) {
+          winner = "target";
+        } else {
+          winner = "baseline";
+        }
+        return { baseline, target, speedup, winner, significant };
+      }
+      // 스위트에 추가 (체이닝)
+      add(name, fn) {
+        this.pendingFns.push({ name, fn });
+        return this;
+      }
+      // 스위트 전체 실행
+      run(runs = 100) {
+        this.suite.startTime = /* @__PURE__ */ new Date();
+        this.suite.results = [];
+        for (const { name, fn } of this.pendingFns) {
+          const result = this.measure(name, fn, runs);
+          this.suite.results.push(result);
+        }
+        this.suite.endTime = /* @__PURE__ */ new Date();
+        if (this.suite.results.length > 0) {
+          const sorted = [...this.suite.results].sort((a, b) => a.avgMs - b.avgMs);
+          const fastest = sorted[0];
+          const slowest = sorted[sorted.length - 1];
+          const avgOpsPerSec = Math.round(
+            this.suite.results.reduce((sum, r) => sum + r.opsPerSec, 0) / this.suite.results.length
+          );
+          this.suite.summary = {
+            total: this.suite.results.length,
+            fastest,
+            slowest,
+            avgOpsPerSec
+          };
+        }
+        return this.suite;
+      }
+      // 결과 리포트 (텍스트)
+      report(result) {
+        const lines = [
+          `\u250C\u2500 Benchmark: ${result.name}`,
+          `\u2502  Runs:      ${result.runs}`,
+          `\u2502  Total:     ${result.totalMs.toFixed(3)}ms`,
+          `\u2502  Avg:       ${result.avgMs.toFixed(4)}ms`,
+          `\u2502  Min:       ${result.minMs.toFixed(4)}ms`,
+          `\u2502  Max:       ${result.maxMs.toFixed(4)}ms`,
+          `\u2502  P50:       ${result.p50.toFixed(4)}ms`,
+          `\u2502  P95:       ${result.p95.toFixed(4)}ms`,
+          `\u2502  P99:       ${result.p99.toFixed(4)}ms`,
+          `\u2502  Ops/sec:   ${result.opsPerSec.toLocaleString()}`
+        ];
+        if (result.memoryUsed !== void 0 && result.memoryUsed > 0) {
+          lines.push(`\u2502  Memory:    ${(result.memoryUsed / 1024).toFixed(2)}KB`);
+        }
+        lines.push(`\u2514\u2500`);
+        return lines.join("\n");
+      }
+      // 히스토그램 (ASCII)
+      histogram(result) {
+        const buckets = 10;
+        const range = result.maxMs - result.minMs;
+        const step = range / buckets || 1e-3;
+        const counts = new Array(buckets).fill(0);
+        const maxCount = 20;
+        const lines = [`Histogram: ${result.name}`];
+        for (let i = 0; i < buckets; i++) {
+          const low = result.minMs + i * step;
+          const high = low + step;
+          const mid = (low + high) / 2;
+          const dist = Math.abs(mid - result.avgMs) / (range || 1);
+          const count = Math.max(0, Math.round(maxCount * (1 - dist * 2)));
+          const bar = "\u2588".repeat(count);
+          lines.push(`  ${low.toFixed(3)}-${high.toFixed(3)}ms | ${bar} (${count})`);
+        }
+        return lines.join("\n");
+      }
     };
-    return result;
+    globalBenchmark = new SelfBenchmark("global");
   }
-  // 비동기 함수 벤치마크
-  async measureAsync(name, fn, runs = 100) {
-    const times = [];
-    const warmup = Math.min(5, Math.floor(runs / 10));
-    for (let i = 0; i < warmup; i++) {
-      await fn();
-    }
-    for (let i = 0; i < runs; i++) {
-      const start = performance.now();
-      await fn();
-      const end = performance.now();
-      times.push(end - start);
-    }
-    const totalMs = times.reduce((a, b) => a + b, 0);
-    const avgMs = totalMs / runs;
-    const minMs = Math.min(...times);
-    const maxMs = Math.max(...times);
-    const p50 = this.percentile(times, 50);
-    const p95 = this.percentile(times, 95);
-    const p99 = this.percentile(times, 99);
-    const opsPerSec = avgMs > 0 ? Math.round(1e3 / avgMs) : Infinity;
-    return { name, runs, totalMs, avgMs, minMs, maxMs, p50, p95, p99, opsPerSec };
-  }
-  // 두 함수 비교
-  compare(name1, fn1, name2, fn2, runs = 100) {
-    const baseline = this.measure(name1, fn1, runs);
-    const target = this.measure(name2, fn2, runs);
-    const speedup = baseline.avgMs > 0 ? baseline.avgMs / target.avgMs : 1;
-    let winner;
-    const diff = Math.abs(speedup - 1);
-    const significant = diff >= 0.05;
-    if (!significant) {
-      winner = "tie";
-    } else if (speedup > 1) {
-      winner = "target";
-    } else {
-      winner = "baseline";
-    }
-    return { baseline, target, speedup, winner, significant };
-  }
-  // 스위트에 추가 (체이닝)
-  add(name, fn) {
-    this.pendingFns.push({ name, fn });
-    return this;
-  }
-  // 스위트 전체 실행
-  run(runs = 100) {
-    this.suite.startTime = /* @__PURE__ */ new Date();
-    this.suite.results = [];
-    for (const { name, fn } of this.pendingFns) {
-      const result = this.measure(name, fn, runs);
-      this.suite.results.push(result);
-    }
-    this.suite.endTime = /* @__PURE__ */ new Date();
-    if (this.suite.results.length > 0) {
-      const sorted = [...this.suite.results].sort((a, b) => a.avgMs - b.avgMs);
-      const fastest = sorted[0];
-      const slowest = sorted[sorted.length - 1];
-      const avgOpsPerSec = Math.round(
-        this.suite.results.reduce((sum, r) => sum + r.opsPerSec, 0) / this.suite.results.length
-      );
-      this.suite.summary = {
-        total: this.suite.results.length,
-        fastest,
-        slowest,
-        avgOpsPerSec
-      };
-    }
-    return this.suite;
-  }
-  // 결과 리포트 (텍스트)
-  report(result) {
-    const lines = [
-      `\u250C\u2500 Benchmark: ${result.name}`,
-      `\u2502  Runs:      ${result.runs}`,
-      `\u2502  Total:     ${result.totalMs.toFixed(3)}ms`,
-      `\u2502  Avg:       ${result.avgMs.toFixed(4)}ms`,
-      `\u2502  Min:       ${result.minMs.toFixed(4)}ms`,
-      `\u2502  Max:       ${result.maxMs.toFixed(4)}ms`,
-      `\u2502  P50:       ${result.p50.toFixed(4)}ms`,
-      `\u2502  P95:       ${result.p95.toFixed(4)}ms`,
-      `\u2502  P99:       ${result.p99.toFixed(4)}ms`,
-      `\u2502  Ops/sec:   ${result.opsPerSec.toLocaleString()}`
-    ];
-    if (result.memoryUsed !== void 0 && result.memoryUsed > 0) {
-      lines.push(`\u2502  Memory:    ${(result.memoryUsed / 1024).toFixed(2)}KB`);
-    }
-    lines.push(`\u2514\u2500`);
-    return lines.join("\n");
-  }
-  // 히스토그램 (ASCII)
-  histogram(result) {
-    const buckets = 10;
-    const range = result.maxMs - result.minMs;
-    const step = range / buckets || 1e-3;
-    const counts = new Array(buckets).fill(0);
-    const maxCount = 20;
-    const lines = [`Histogram: ${result.name}`];
-    for (let i = 0; i < buckets; i++) {
-      const low = result.minMs + i * step;
-      const high = low + step;
-      const mid = (low + high) / 2;
-      const dist = Math.abs(mid - result.avgMs) / (range || 1);
-      const count = Math.max(0, Math.round(maxCount * (1 - dist * 2)));
-      const bar = "\u2588".repeat(count);
-      lines.push(`  ${low.toFixed(3)}-${high.toFixed(3)}ms | ${bar} (${count})`);
-    }
-    return lines.join("\n");
-  }
-};
-var globalBenchmark = new SelfBenchmark("global");
+});
 
 // src/version-self.ts
-var import_crypto2 = require("crypto");
 function generateDiff(prev, next) {
   const prevStr = JSON.stringify(prev, null, 2);
   const nextStr = JSON.stringify(next, null, 2);
@@ -11736,1647 +10244,1689 @@ function parseVersion(v) {
   const parts = v.split(".").map(Number);
   return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
 }
-var SelfVersioning = class {
-  constructor(maxHistory = 100) {
-    this.maxHistory = maxHistory;
-    this.history = {
-      snapshots: [],
-      current: "",
-      total: 0,
-      branches: /* @__PURE__ */ new Map()
-    };
-  }
-  // 현재 상태 스냅샷
-  snapshot(data, description, tags = [], performance2) {
-    const id = (0, import_crypto2.randomUUID)();
-    const parentId = this.history.current || void 0;
-    const parent = parentId ? this.get(parentId) : null;
-    const version = parent ? this.bumpVersion(parent.version, "patch") : "1.0.0";
-    const diff = parent ? generateDiff(parent.data, data) : void 0;
-    const snap = {
-      id,
-      version,
-      timestamp: /* @__PURE__ */ new Date(),
-      data,
-      metadata: {
-        description,
-        tags,
-        performance: performance2
-      },
-      parentId,
-      diff
-    };
-    this.history.snapshots.push(snap);
-    this.history.current = id;
-    this.history.total++;
-    if (this.history.snapshots.length > this.maxHistory) {
-      const branchIds = new Set(this.history.branches.values());
-      branchIds.add(this.history.current);
-      const toRemove = this.history.snapshots.find((s) => !branchIds.has(s.id) && s.id !== this.history.current);
-      if (toRemove) {
-        const idx = this.history.snapshots.indexOf(toRemove);
-        this.history.snapshots.splice(idx, 1);
+var import_crypto2, SelfVersioning, globalVersioning;
+var init_version_self = __esm({
+  "src/version-self.ts"() {
+    import_crypto2 = require("crypto");
+    SelfVersioning = class {
+      constructor(maxHistory = 100) {
+        this.maxHistory = maxHistory;
+        this.history = {
+          snapshots: [],
+          current: "",
+          total: 0,
+          branches: /* @__PURE__ */ new Map()
+        };
       }
-    }
-    return snap;
-  }
-  // 특정 버전으로 롤백
-  rollback(id) {
-    const current = this.latest();
-    const target = this.get(id);
-    if (!current || !target) {
-      return {
-        previous: current,
-        restored: current,
-        success: false,
-        reason: `Snapshot ${id} not found`
-      };
-    }
-    this.history.current = id;
-    return {
-      previous: current,
-      restored: target,
-      success: true
-    };
-  }
-  // 이전 버전으로 롤백
-  rollbackPrev() {
-    const current = this.latest();
-    if (!current || !current.parentId) {
-      return {
-        previous: current,
-        restored: current,
-        success: false,
-        reason: "No previous version"
-      };
-    }
-    return this.rollback(current.parentId);
-  }
-  // 버전 비교
-  diff(id1, id2) {
-    const s1 = this.get(id1);
-    const s2 = this.get(id2);
-    if (!s1 || !s2) return "(one or both snapshots not found)";
-    return generateDiff(s1.data, s2.data);
-  }
-  // 특정 버전 조회
-  get(id) {
-    return this.history.snapshots.find((s) => s.id === id) ?? null;
-  }
-  // 최신 버전
-  latest() {
-    if (!this.history.current) return null;
-    return this.get(this.history.current);
-  }
-  // 버전 히스토리
-  getHistory() {
-    return [...this.history.snapshots];
-  }
-  // 태그로 검색
-  findByTag(tag) {
-    return this.history.snapshots.filter((s) => s.metadata.tags.includes(tag));
-  }
-  // 브랜치 생성
-  branch(name, fromId) {
-    const targetId = fromId ?? this.history.current;
-    if (!targetId) throw new Error("No snapshot to branch from");
-    this.history.branches.set(name, targetId);
-    return targetId;
-  }
-  // 브랜치 체크아웃
-  checkout(branchName) {
-    const id = this.history.branches.get(branchName);
-    if (!id) return null;
-    this.history.current = id;
-    return this.get(id);
-  }
-  // 자동 버전 넘버 생성 (semantic versioning)
-  nextVersion(type) {
-    const latest = this.latest();
-    const base = latest ? latest.version : "1.0.0";
-    return this.bumpVersion(base, type);
-  }
-  bumpVersion(base, type) {
-    const [major, minor, patch] = parseVersion(base);
-    switch (type) {
-      case "major":
-        return `${major + 1}.0.0`;
-      case "minor":
-        return `${major}.${minor + 1}.0`;
-      case "patch":
-        return `${major}.${minor}.${patch + 1}`;
-    }
-  }
-  // 최고 성능 버전
-  bestPerforming() {
-    const withPerf = this.history.snapshots.filter(
-      (s) => s.metadata.performance !== void 0
-    );
-    if (withPerf.length === 0) return null;
-    return withPerf.reduce(
-      (best, s) => s.metadata.performance > best.metadata.performance ? s : best
-    );
-  }
-};
-var globalVersioning = new SelfVersioning(100);
-
-// src/refactor-self.ts
-var UNCLEAR_NAME_PATTERNS = [
-  /\b([a-z])\b/g,
-  // 단일 문자 변수 (i, j, k 제외)
-  /\b(tmp|temp|foo|bar|baz|x|y|z|xx|yy)\b/g,
-  // 임시/임의 이름
-  /\b(val|var|obj|arr|str|num|fn|cb)\b/g
-  // 너무 짧은 약어
-];
-var ALLOWED_SHORT_NAMES = /* @__PURE__ */ new Set(["i", "j", "k", "n", "m", "e", "a", "b", "c"]);
-var SelfRefactorer = class {
-  /**
-   * 중복 코드 블록 감지
-   */
-  findDuplicates(code) {
-    const suggestions = [];
-    const lines = code.split("\n").filter((l) => l.trim().length > 3);
-    const blockSize = 2;
-    const seen = /* @__PURE__ */ new Map();
-    for (let i = 0; i <= lines.length - blockSize; i++) {
-      const block = lines.slice(i, i + blockSize).join("\n").trim();
-      if (block.length < 10) continue;
-      if (!seen.has(block)) {
-        seen.set(block, [i]);
-      } else {
-        const prev = seen.get(block);
-        prev.push(i);
-        seen.set(block, prev);
-      }
-    }
-    for (const [block, lineNums] of seen.entries()) {
-      if (lineNums.length >= 2) {
-        const impact = block.length > 100 ? "high" : block.length > 40 ? "medium" : "low";
-        suggestions.push({
-          pattern: "extract-duplicate",
-          location: `lines ${lineNums.map((l) => l + 1).join(", ")}`,
-          original: block,
-          suggested: `function extractedBlock() {
-  ${block.split("\n").join("\n  ")}
-}`,
-          reason: `\uB3D9\uC77C \uCF54\uB4DC\uAC00 ${lineNums.length}\uACF3\uC5D0\uC11C \uBC18\uBCF5\uB428 \u2014 \uD568\uC218\uB85C \uCD94\uCD9C\uD558\uBA74 \uC720\uC9C0\uBCF4\uC218\uC131 \uD5A5\uC0C1`,
-          impact
-        });
-      }
-    }
-    return suggestions;
-  }
-  /**
-   * 복잡도 분석
-   */
-  analyzeComplexity(code) {
-    const lines = code.split("\n");
-    const totalLines = lines.filter((l) => l.trim().length > 0).length;
-    let maxDepth = 0;
-    let currentDepth = 0;
-    for (const line of lines) {
-      const opens = (line.match(/[\(\[\{]/g) || []).length;
-      const closes = (line.match(/[\)\]\}]/g) || []).length;
-      currentDepth += opens - closes;
-      if (currentDepth > maxDepth) maxDepth = currentDepth;
-      if (currentDepth < 0) currentDepth = 0;
-    }
-    const conditionPatterns = [
-      /\bif\b/g,
-      /\belse\b/g,
-      /\bcond\b/g,
-      /\bwhen\b/g,
-      /\bcase\b/g,
-      /\bswitch\b/g,
-      /\?\s/g,
-      /\band\b/g,
-      /\bor\b/g
-    ];
-    let conditions = 0;
-    for (const pattern of conditionPatterns) {
-      const matches = code.match(pattern);
-      if (matches) conditions += matches.length;
-    }
-    const score = Math.round(totalLines * 0.5 + maxDepth * 10 + conditions * 3);
-    return { lines: totalLines, depth: maxDepth, conditions, score };
-  }
-  /**
-   * 리팩토링 제안 생성
-   */
-  suggest(code) {
-    const suggestions = [];
-    suggestions.push(...this.findDuplicates(code));
-    const complexity = this.analyzeComplexity(code);
-    if (complexity.depth > 5) {
-      suggestions.push({
-        pattern: "flatten-nesting",
-        location: "high nesting area",
-        original: `(depth=${complexity.depth} nesting detected)`,
-        suggested: `; \uC911\uCCA9\uB41C \uC870\uAC74\uBB38\uC744 early-return \uB610\uB294 guard clause\uB85C \uBD84\uB9AC`,
-        reason: `\uC911\uCCA9 \uAE4A\uC774 ${complexity.depth} \u2014 5 \uC774\uD558 \uAD8C\uC7A5`,
-        impact: "high"
-      });
-    }
-    if (complexity.conditions > 10) {
-      suggestions.push({
-        pattern: "simplify-condition",
-        location: "multiple condition branches",
-        original: `(${complexity.conditions} conditions found)`,
-        suggested: `; \uC870\uAC74\uC744 named predicate \uD568\uC218\uB85C \uCD94\uCD9C\uD558\uC5EC \uB2E8\uC21C\uD654`,
-        reason: `\uC870\uAC74\uBB38 ${complexity.conditions}\uAC1C \u2014 \uACFC\uB3C4\uD55C \uBD84\uAE30\uB85C \uAC00\uB3C5\uC131 \uC800\uD558`,
-        impact: complexity.conditions > 20 ? "high" : "medium"
-      });
-    }
-    const lines = code.split("\n").filter((l) => l.trim().length > 0);
-    if (lines.length > 30) {
-      suggestions.push({
-        pattern: "split-long-function",
-        location: "function body",
-        original: `(${lines.length} lines in function)`,
-        suggested: `; \uD568\uC218\uB97C \uB17C\uB9AC\uC801 \uB2E8\uC704\uB85C \uBD84\uB9AC: \uAC80\uC99D / \uBCC0\uD658 / \uCD9C\uB825`,
-        reason: `\uD568\uC218 \uAE38\uC774 ${lines.length}\uC904 \u2014 30\uC904 \uC774\uD558 \uAD8C\uC7A5`,
-        impact: lines.length > 60 ? "high" : "medium"
-      });
-    }
-    const naming = this.analyzeNaming(code);
-    for (const issue of naming.issues) {
-      suggestions.push({
-        pattern: "rename-unclear",
-        location: `variable: ${issue.name}`,
-        original: issue.name,
-        suggested: issue.suggestion,
-        reason: issue.reason,
-        impact: "low"
-      });
-    }
-    const singleUsePattern = /\(let \$(\w+) ([^\n]+)\)\s*\n[^\n]*\$\1[^\n]*\n(?![^\n]*\$\1)/g;
-    let match;
-    while ((match = singleUsePattern.exec(code)) !== null) {
-      const varName = match[1];
-      const varValue = match[2].trim();
-      if (varValue.length < 30) {
-        suggestions.push({
-          pattern: "inline-single-use",
-          location: `variable $${varName}`,
-          original: `(let $${varName} ${varValue})`,
-          suggested: `; $${varName} \uC778\uB77C\uC778 \u2014 \uBCC0\uC218 \uC120\uC5B8 \uC81C\uAC70`,
-          reason: `$${varName}\uC740 \uD55C \uBC88\uB9CC \uC0AC\uC6A9\uB428 \u2014 \uC778\uB77C\uC778\uC73C\uB85C \uB2E8\uC21C\uD654`,
-          impact: "low"
-        });
-      }
-    }
-    return suggestions;
-  }
-  /**
-   * 자동 리팩토링 적용 (확신도 높은 것만 적용)
-   */
-  apply(code, suggestions) {
-    let result = code;
-    const applied = [];
-    for (const s of suggestions) {
-      if (s.impact === "high" && s.pattern === "rename-unclear") {
-        if (s.original && s.suggested && !s.suggested.startsWith(";")) {
-          const before = result;
-          result = result.replace(new RegExp(`\\b${s.original}\\b`, "g"), s.suggested);
-          if (result !== before) {
-            applied.push(s);
+      // 현재 상태 스냅샷
+      snapshot(data, description, tags = [], performance2) {
+        const id = (0, import_crypto2.randomUUID)();
+        const parentId = this.history.current || void 0;
+        const parent = parentId ? this.get(parentId) : null;
+        const version = parent ? this.bumpVersion(parent.version, "patch") : "1.0.0";
+        const diff = parent ? generateDiff(parent.data, data) : void 0;
+        const snap = {
+          id,
+          version,
+          timestamp: /* @__PURE__ */ new Date(),
+          data,
+          metadata: {
+            description,
+            tags,
+            performance: performance2
+          },
+          parentId,
+          diff
+        };
+        this.history.snapshots.push(snap);
+        this.history.current = id;
+        this.history.total++;
+        if (this.history.snapshots.length > this.maxHistory) {
+          const branchIds = new Set(this.history.branches.values());
+          branchIds.add(this.history.current);
+          const toRemove = this.history.snapshots.find((s) => !branchIds.has(s.id) && s.id !== this.history.current);
+          if (toRemove) {
+            const idx = this.history.snapshots.indexOf(toRemove);
+            this.history.snapshots.splice(idx, 1);
           }
         }
+        return snap;
       }
-    }
-    return { code: result, applied };
-  }
-  /**
-   * 코드 품질 점수 (0~1, 높을수록 좋음)
-   */
-  qualityScore(code) {
-    const complexity = this.analyzeComplexity(code);
-    const naming = this.analyzeNaming(code);
-    const duplicates = this.findDuplicates(code);
-    const complexityPenalty = Math.min(complexity.score / 100, 1);
-    const namingScore = naming.score;
-    const dupPenalty = Math.min(duplicates.length * 0.1, 0.5);
-    const raw = (1 - complexityPenalty) * 0.5 + namingScore * 0.3 + (1 - dupPenalty) * 0.2;
-    return Math.max(0, Math.min(1, Math.round(raw * 100) / 100));
-  }
-  /**
-   * 명명 규칙 분석
-   */
-  analyzeNaming(code) {
-    const issues = [];
-    const found = /* @__PURE__ */ new Set();
-    for (const pattern of UNCLEAR_NAME_PATTERNS) {
-      const regex = new RegExp(pattern.source, "g");
-      let match;
-      while ((match = regex.exec(code)) !== null) {
-        const name = match[1] || match[0];
-        if (ALLOWED_SHORT_NAMES.has(name)) continue;
-        if (found.has(name)) continue;
-        found.add(name);
-        let suggestion = name;
-        let reason = "";
-        if (/^[a-z]$/.test(name)) {
-          suggestion = `${name}Value`;
-          reason = `\uB2E8\uC77C \uBB38\uC790 \uBCC0\uC218 \u2014 \uC758\uBBF8\uB97C \uB2F4\uC740 \uC774\uB984 \uC0AC\uC6A9 \uAD8C\uC7A5`;
-        } else if (["tmp", "temp"].includes(name)) {
-          suggestion = "temporaryResult";
-          reason = `'${name}'\uC740 \uBAA9\uC801\uC774 \uBD88\uBA85\uD655\uD55C \uC784\uC2DC \uBCC0\uC218\uBA85`;
-        } else if (["foo", "bar", "baz"].includes(name)) {
-          suggestion = "meaningfulName";
-          reason = `'${name}'\uC740 placeholder\uBA85 \u2014 \uC2E4\uC81C \uC758\uBBF8\uB97C \uB2F4\uC740 \uC774\uB984 \uC0AC\uC6A9`;
-        } else if (["val", "var", "obj", "arr", "str", "num", "fn", "cb"].includes(name)) {
-          suggestion = name + "Result";
-          reason = `\uD0C0\uC785\uC744 \uC774\uB984\uC73C\uB85C \uC4F0\uB294 \uAC83\uC740 \uBD88\uBA85\uD655 \u2014 \uC5ED\uD560/\uBAA9\uC801\uC744 \uB2F4\uC740 \uC774\uB984 \uAD8C\uC7A5`;
-        } else if (["x", "y", "z", "xx", "yy"].includes(name)) {
-          suggestion = `${name}Coordinate`;
-          reason = `\uC218\uD559\uC801 \uC88C\uD45C\uAC00 \uC544\uB2CC \uACBD\uC6B0 \uC758\uBBF8\uC788\uB294 \uC774\uB984 \uAD8C\uC7A5`;
+      // 특정 버전으로 롤백
+      rollback(id) {
+        const current = this.latest();
+        const target = this.get(id);
+        if (!current || !target) {
+          return {
+            previous: current,
+            restored: current,
+            success: false,
+            reason: `Snapshot ${id} not found`
+          };
         }
-        if (suggestion !== name) {
-          issues.push({ name, suggestion, reason });
+        this.history.current = id;
+        return {
+          previous: current,
+          restored: target,
+          success: true
+        };
+      }
+      // 이전 버전으로 롤백
+      rollbackPrev() {
+        const current = this.latest();
+        if (!current || !current.parentId) {
+          return {
+            previous: current,
+            restored: current,
+            success: false,
+            reason: "No previous version"
+          };
+        }
+        return this.rollback(current.parentId);
+      }
+      // 버전 비교
+      diff(id1, id2) {
+        const s1 = this.get(id1);
+        const s2 = this.get(id2);
+        if (!s1 || !s2) return "(one or both snapshots not found)";
+        return generateDiff(s1.data, s2.data);
+      }
+      // 특정 버전 조회
+      get(id) {
+        return this.history.snapshots.find((s) => s.id === id) ?? null;
+      }
+      // 최신 버전
+      latest() {
+        if (!this.history.current) return null;
+        return this.get(this.history.current);
+      }
+      // 버전 히스토리
+      getHistory() {
+        return [...this.history.snapshots];
+      }
+      // 태그로 검색
+      findByTag(tag) {
+        return this.history.snapshots.filter((s) => s.metadata.tags.includes(tag));
+      }
+      // 브랜치 생성
+      branch(name, fromId) {
+        const targetId = fromId ?? this.history.current;
+        if (!targetId) throw new Error("No snapshot to branch from");
+        this.history.branches.set(name, targetId);
+        return targetId;
+      }
+      // 브랜치 체크아웃
+      checkout(branchName) {
+        const id = this.history.branches.get(branchName);
+        if (!id) return null;
+        this.history.current = id;
+        return this.get(id);
+      }
+      // 자동 버전 넘버 생성 (semantic versioning)
+      nextVersion(type) {
+        const latest = this.latest();
+        const base = latest ? latest.version : "1.0.0";
+        return this.bumpVersion(base, type);
+      }
+      bumpVersion(base, type) {
+        const [major, minor, patch] = parseVersion(base);
+        switch (type) {
+          case "major":
+            return `${major + 1}.0.0`;
+          case "minor":
+            return `${major}.${minor + 1}.0`;
+          case "patch":
+            return `${major}.${minor}.${patch + 1}`;
         }
       }
-    }
-    const score = issues.length === 0 ? 1 : Math.max(0, 1 - issues.length * 0.1);
-    return { issues, score: Math.round(score * 100) / 100 };
-  }
-  /**
-   * 전체 리팩토링 파이프라인
-   */
-  refactor(code, autoApply = true) {
-    const scoreBefore = this.qualityScore(code);
-    const suggestions = this.suggest(code);
-    let applied = 0;
-    let skipped = 0;
-    let resultCode = code;
-    if (autoApply) {
-      const applyResult = this.apply(code, suggestions);
-      resultCode = applyResult.code;
-      applied = applyResult.applied.length;
-      skipped = suggestions.length - applied;
-    } else {
-      skipped = suggestions.length;
-    }
-    const scoreAfter = autoApply ? this.qualityScore(resultCode) : scoreBefore;
-    const improvement = scoreBefore > 0 ? Math.round((scoreAfter - scoreBefore) / scoreBefore * 100 * 100) / 100 : 0;
-    return {
-      suggestions,
-      applied,
-      skipped,
-      score: {
-        before: scoreBefore,
-        after: scoreAfter,
-        improvement
+      // 최고 성능 버전
+      bestPerforming() {
+        const withPerf = this.history.snapshots.filter(
+          (s) => s.metadata.performance !== void 0
+        );
+        if (withPerf.length === 0) return null;
+        return withPerf.reduce(
+          (best, s) => s.metadata.performance > best.metadata.performance ? s : best
+        );
       }
     };
+    globalVersioning = new SelfVersioning(100);
   }
-};
-var globalRefactorer = new SelfRefactorer();
+});
+
+// src/refactor-self.ts
+var UNCLEAR_NAME_PATTERNS, ALLOWED_SHORT_NAMES, SelfRefactorer, globalRefactorer;
+var init_refactor_self = __esm({
+  "src/refactor-self.ts"() {
+    UNCLEAR_NAME_PATTERNS = [
+      /\b([a-z])\b/g,
+      // 단일 문자 변수 (i, j, k 제외)
+      /\b(tmp|temp|foo|bar|baz|x|y|z|xx|yy)\b/g,
+      // 임시/임의 이름
+      /\b(val|var|obj|arr|str|num|fn|cb)\b/g
+      // 너무 짧은 약어
+    ];
+    ALLOWED_SHORT_NAMES = /* @__PURE__ */ new Set(["i", "j", "k", "n", "m", "e", "a", "b", "c"]);
+    SelfRefactorer = class {
+      /**
+       * 중복 코드 블록 감지
+       */
+      findDuplicates(code) {
+        const suggestions = [];
+        const lines = code.split("\n").filter((l) => l.trim().length > 3);
+        const blockSize = 2;
+        const seen = /* @__PURE__ */ new Map();
+        for (let i = 0; i <= lines.length - blockSize; i++) {
+          const block = lines.slice(i, i + blockSize).join("\n").trim();
+          if (block.length < 10) continue;
+          if (!seen.has(block)) {
+            seen.set(block, [i]);
+          } else {
+            const prev = seen.get(block);
+            prev.push(i);
+            seen.set(block, prev);
+          }
+        }
+        for (const [block, lineNums] of seen.entries()) {
+          if (lineNums.length >= 2) {
+            const impact = block.length > 100 ? "high" : block.length > 40 ? "medium" : "low";
+            suggestions.push({
+              pattern: "extract-duplicate",
+              location: `lines ${lineNums.map((l) => l + 1).join(", ")}`,
+              original: block,
+              suggested: `function extractedBlock() {
+  ${block.split("\n").join("\n  ")}
+}`,
+              reason: `\uB3D9\uC77C \uCF54\uB4DC\uAC00 ${lineNums.length}\uACF3\uC5D0\uC11C \uBC18\uBCF5\uB428 \u2014 \uD568\uC218\uB85C \uCD94\uCD9C\uD558\uBA74 \uC720\uC9C0\uBCF4\uC218\uC131 \uD5A5\uC0C1`,
+              impact
+            });
+          }
+        }
+        return suggestions;
+      }
+      /**
+       * 복잡도 분석
+       */
+      analyzeComplexity(code) {
+        const lines = code.split("\n");
+        const totalLines = lines.filter((l) => l.trim().length > 0).length;
+        let maxDepth = 0;
+        let currentDepth = 0;
+        for (const line of lines) {
+          const opens = (line.match(/[\(\[\{]/g) || []).length;
+          const closes = (line.match(/[\)\]\}]/g) || []).length;
+          currentDepth += opens - closes;
+          if (currentDepth > maxDepth) maxDepth = currentDepth;
+          if (currentDepth < 0) currentDepth = 0;
+        }
+        const conditionPatterns = [
+          /\bif\b/g,
+          /\belse\b/g,
+          /\bcond\b/g,
+          /\bwhen\b/g,
+          /\bcase\b/g,
+          /\bswitch\b/g,
+          /\?\s/g,
+          /\band\b/g,
+          /\bor\b/g
+        ];
+        let conditions = 0;
+        for (const pattern of conditionPatterns) {
+          const matches = code.match(pattern);
+          if (matches) conditions += matches.length;
+        }
+        const score = Math.round(totalLines * 0.5 + maxDepth * 10 + conditions * 3);
+        return { lines: totalLines, depth: maxDepth, conditions, score };
+      }
+      /**
+       * 리팩토링 제안 생성
+       */
+      suggest(code) {
+        const suggestions = [];
+        suggestions.push(...this.findDuplicates(code));
+        const complexity = this.analyzeComplexity(code);
+        if (complexity.depth > 5) {
+          suggestions.push({
+            pattern: "flatten-nesting",
+            location: "high nesting area",
+            original: `(depth=${complexity.depth} nesting detected)`,
+            suggested: `; \uC911\uCCA9\uB41C \uC870\uAC74\uBB38\uC744 early-return \uB610\uB294 guard clause\uB85C \uBD84\uB9AC`,
+            reason: `\uC911\uCCA9 \uAE4A\uC774 ${complexity.depth} \u2014 5 \uC774\uD558 \uAD8C\uC7A5`,
+            impact: "high"
+          });
+        }
+        if (complexity.conditions > 10) {
+          suggestions.push({
+            pattern: "simplify-condition",
+            location: "multiple condition branches",
+            original: `(${complexity.conditions} conditions found)`,
+            suggested: `; \uC870\uAC74\uC744 named predicate \uD568\uC218\uB85C \uCD94\uCD9C\uD558\uC5EC \uB2E8\uC21C\uD654`,
+            reason: `\uC870\uAC74\uBB38 ${complexity.conditions}\uAC1C \u2014 \uACFC\uB3C4\uD55C \uBD84\uAE30\uB85C \uAC00\uB3C5\uC131 \uC800\uD558`,
+            impact: complexity.conditions > 20 ? "high" : "medium"
+          });
+        }
+        const lines = code.split("\n").filter((l) => l.trim().length > 0);
+        if (lines.length > 30) {
+          suggestions.push({
+            pattern: "split-long-function",
+            location: "function body",
+            original: `(${lines.length} lines in function)`,
+            suggested: `; \uD568\uC218\uB97C \uB17C\uB9AC\uC801 \uB2E8\uC704\uB85C \uBD84\uB9AC: \uAC80\uC99D / \uBCC0\uD658 / \uCD9C\uB825`,
+            reason: `\uD568\uC218 \uAE38\uC774 ${lines.length}\uC904 \u2014 30\uC904 \uC774\uD558 \uAD8C\uC7A5`,
+            impact: lines.length > 60 ? "high" : "medium"
+          });
+        }
+        const naming = this.analyzeNaming(code);
+        for (const issue of naming.issues) {
+          suggestions.push({
+            pattern: "rename-unclear",
+            location: `variable: ${issue.name}`,
+            original: issue.name,
+            suggested: issue.suggestion,
+            reason: issue.reason,
+            impact: "low"
+          });
+        }
+        const singleUsePattern = /\(let \$(\w+) ([^\n]+)\)\s*\n[^\n]*\$\1[^\n]*\n(?![^\n]*\$\1)/g;
+        let match;
+        while ((match = singleUsePattern.exec(code)) !== null) {
+          const varName = match[1];
+          const varValue = match[2].trim();
+          if (varValue.length < 30) {
+            suggestions.push({
+              pattern: "inline-single-use",
+              location: `variable $${varName}`,
+              original: `(let $${varName} ${varValue})`,
+              suggested: `; $${varName} \uC778\uB77C\uC778 \u2014 \uBCC0\uC218 \uC120\uC5B8 \uC81C\uAC70`,
+              reason: `$${varName}\uC740 \uD55C \uBC88\uB9CC \uC0AC\uC6A9\uB428 \u2014 \uC778\uB77C\uC778\uC73C\uB85C \uB2E8\uC21C\uD654`,
+              impact: "low"
+            });
+          }
+        }
+        return suggestions;
+      }
+      /**
+       * 자동 리팩토링 적용 (확신도 높은 것만 적용)
+       */
+      apply(code, suggestions) {
+        let result = code;
+        const applied = [];
+        for (const s of suggestions) {
+          if (s.impact === "high" && s.pattern === "rename-unclear") {
+            if (s.original && s.suggested && !s.suggested.startsWith(";")) {
+              const before = result;
+              result = result.replace(new RegExp(`\\b${s.original}\\b`, "g"), s.suggested);
+              if (result !== before) {
+                applied.push(s);
+              }
+            }
+          }
+        }
+        return { code: result, applied };
+      }
+      /**
+       * 코드 품질 점수 (0~1, 높을수록 좋음)
+       */
+      qualityScore(code) {
+        const complexity = this.analyzeComplexity(code);
+        const naming = this.analyzeNaming(code);
+        const duplicates = this.findDuplicates(code);
+        const complexityPenalty = Math.min(complexity.score / 100, 1);
+        const namingScore = naming.score;
+        const dupPenalty = Math.min(duplicates.length * 0.1, 0.5);
+        const raw = (1 - complexityPenalty) * 0.5 + namingScore * 0.3 + (1 - dupPenalty) * 0.2;
+        return Math.max(0, Math.min(1, Math.round(raw * 100) / 100));
+      }
+      /**
+       * 명명 규칙 분석
+       */
+      analyzeNaming(code) {
+        const issues = [];
+        const found = /* @__PURE__ */ new Set();
+        for (const pattern of UNCLEAR_NAME_PATTERNS) {
+          const regex = new RegExp(pattern.source, "g");
+          let match;
+          while ((match = regex.exec(code)) !== null) {
+            const name = match[1] || match[0];
+            if (ALLOWED_SHORT_NAMES.has(name)) continue;
+            if (found.has(name)) continue;
+            found.add(name);
+            let suggestion = name;
+            let reason = "";
+            if (/^[a-z]$/.test(name)) {
+              suggestion = `${name}Value`;
+              reason = `\uB2E8\uC77C \uBB38\uC790 \uBCC0\uC218 \u2014 \uC758\uBBF8\uB97C \uB2F4\uC740 \uC774\uB984 \uC0AC\uC6A9 \uAD8C\uC7A5`;
+            } else if (["tmp", "temp"].includes(name)) {
+              suggestion = "temporaryResult";
+              reason = `'${name}'\uC740 \uBAA9\uC801\uC774 \uBD88\uBA85\uD655\uD55C \uC784\uC2DC \uBCC0\uC218\uBA85`;
+            } else if (["foo", "bar", "baz"].includes(name)) {
+              suggestion = "meaningfulName";
+              reason = `'${name}'\uC740 placeholder\uBA85 \u2014 \uC2E4\uC81C \uC758\uBBF8\uB97C \uB2F4\uC740 \uC774\uB984 \uC0AC\uC6A9`;
+            } else if (["val", "var", "obj", "arr", "str", "num", "fn", "cb"].includes(name)) {
+              suggestion = name + "Result";
+              reason = `\uD0C0\uC785\uC744 \uC774\uB984\uC73C\uB85C \uC4F0\uB294 \uAC83\uC740 \uBD88\uBA85\uD655 \u2014 \uC5ED\uD560/\uBAA9\uC801\uC744 \uB2F4\uC740 \uC774\uB984 \uAD8C\uC7A5`;
+            } else if (["x", "y", "z", "xx", "yy"].includes(name)) {
+              suggestion = `${name}Coordinate`;
+              reason = `\uC218\uD559\uC801 \uC88C\uD45C\uAC00 \uC544\uB2CC \uACBD\uC6B0 \uC758\uBBF8\uC788\uB294 \uC774\uB984 \uAD8C\uC7A5`;
+            }
+            if (suggestion !== name) {
+              issues.push({ name, suggestion, reason });
+            }
+          }
+        }
+        const score = issues.length === 0 ? 1 : Math.max(0, 1 - issues.length * 0.1);
+        return { issues, score: Math.round(score * 100) / 100 };
+      }
+      /**
+       * 전체 리팩토링 파이프라인
+       */
+      refactor(code, autoApply = true) {
+        const scoreBefore = this.qualityScore(code);
+        const suggestions = this.suggest(code);
+        let applied = 0;
+        let skipped = 0;
+        let resultCode = code;
+        if (autoApply) {
+          const applyResult = this.apply(code, suggestions);
+          resultCode = applyResult.code;
+          applied = applyResult.applied.length;
+          skipped = suggestions.length - applied;
+        } else {
+          skipped = suggestions.length;
+        }
+        const scoreAfter = autoApply ? this.qualityScore(resultCode) : scoreBefore;
+        const improvement = scoreBefore > 0 ? Math.round((scoreAfter - scoreBefore) / scoreBefore * 100 * 100) / 100 : 0;
+        return {
+          suggestions,
+          applied,
+          skipped,
+          score: {
+            before: scoreBefore,
+            after: scoreAfter,
+            improvement
+          }
+        };
+      }
+    };
+    globalRefactorer = new SelfRefactorer();
+  }
+});
 
 // src/self-evolution-hub.ts
-var import_crypto3 = require("crypto");
-var DEFAULT_CYCLE_CONFIG = {
-  target: null,
-  populationSize: 20,
-  generations: 30,
-  mutationRate: 0.1,
-  eliteRatio: 0.1,
-  pruneThreshold: 0.2,
-  enableVersioning: false,
-  enableBenchmark: false,
-  enableRefactor: false
-};
-var SelfEvolutionHub = class {
-  constructor() {
-    // 내부 통계
-    this._cycleCount = 0;
-    this._totalGenerations = 0;
-    this._refactorSuggestions = 0;
-    this._versionCount = 0;
-    this._fitnessHistory = [];
-    this.fitnessEval = new FitnessEvaluator({ normalize: true, maximize: true });
-    this.pruner = new Pruner();
-    this.refactorer = new SelfRefactorer();
-    this.benchmark = new SelfBenchmark("self-evolution-hub");
-    this.versioning = new SelfVersioning(200);
-  }
-  // ── 완전한 진화 사이클 실행 ────────────────────────────────────────────────
-  runCycle(population, fitnessFunc, mutateFunc, crossoverFunc, config) {
-    const cfg = { ...DEFAULT_CYCLE_CONFIG, ...config };
-    const startMs = Date.now();
-    if (!population || population.length === 0) {
-      return this._emptyResult(cfg);
-    }
-    const pop = [...population];
-    let bestFitness = -Infinity;
-    let best = pop[0];
-    let improvements = 0;
-    let prunedCount = 0;
-    const fitnessProgress = [];
-    let gens = 0;
-    const mutator = new Mutator({ rate: cfg.mutationRate });
-    const crossover = new Crossover();
-    const genLoop = new GenerationLoop({ maxGenerations: cfg.generations });
-    for (let g = 0; g < cfg.generations; g++) {
-      gens++;
-      const scored = pop.map((item) => ({
-        item,
-        fitness: fitnessFunc(item)
-      }));
-      scored.sort((a, b) => b.fitness - a.fitness);
-      const genBest = scored[0].fitness;
-      fitnessProgress.push(genBest);
-      if (genBest > bestFitness) {
-        bestFitness = genBest;
-        best = scored[0].item;
-        improvements++;
-      }
-      const pruneCount = Math.floor(pop.length * cfg.pruneThreshold);
-      if (pruneCount > 0) {
-        prunedCount += pruneCount;
-        const kept = scored.slice(0, pop.length - pruneCount).map((s) => s.item);
-        pop.length = 0;
-        pop.push(...kept);
-      }
-      while (pop.length < cfg.populationSize) {
-        const a = pop[Math.floor(Math.random() * pop.length)];
-        const b = pop[Math.floor(Math.random() * pop.length)];
-        const child = crossoverFunc(a, b);
-        const mutated = mutateFunc(child);
-        pop.push(mutated);
-      }
-    }
-    this._cycleCount++;
-    this._totalGenerations += gens;
-    this._fitnessHistory.push(...fitnessProgress);
-    let benchmarkMs;
-    if (cfg.enableBenchmark) {
-      benchmarkMs = Date.now() - startMs;
-    }
-    let versionId;
-    if (cfg.enableVersioning) {
-      try {
-        const snap = this.versioning.snapshot(
-          best,
-          `evolution-cycle-${this._cycleCount}`,
-          ["auto-evolved"],
-          bestFitness
-        );
-        versionId = snap.id;
-        this._versionCount++;
-      } catch {
-        versionId = (0, import_crypto3.randomUUID)();
-        this._versionCount++;
-      }
-    }
-    let refactorCount = 0;
-    if (cfg.enableRefactor) {
-      try {
-        const suggestions = this.refactorer.suggest(String(best));
-        refactorCount = suggestions.length;
-        this._refactorSuggestions += refactorCount;
-      } catch {
-        refactorCount = 0;
-      }
-    }
-    const report = this._buildReport({
-      bestFitness,
-      generations: gens,
-      improvements,
-      prunedCount,
-      benchmarkMs,
-      versionId,
-      refactorCount
-    });
-    return {
-      best,
-      bestFitness,
-      generations: gens,
-      improvements,
-      prunedCount,
-      benchmarkMs,
-      versionId,
-      report
+var import_crypto3, DEFAULT_CYCLE_CONFIG, SelfEvolutionHub, globalSelfEvolution;
+var init_self_evolution_hub = __esm({
+  "src/self-evolution-hub.ts"() {
+    init_mutate();
+    init_crossover();
+    init_fitness();
+    init_generation();
+    init_prune();
+    init_refactor_self();
+    init_benchmark_self();
+    init_version_self();
+    import_crypto3 = require("crypto");
+    DEFAULT_CYCLE_CONFIG = {
+      target: null,
+      populationSize: 20,
+      generations: 30,
+      mutationRate: 0.1,
+      eliteRatio: 0.1,
+      pruneThreshold: 0.2,
+      enableVersioning: false,
+      enableBenchmark: false,
+      enableRefactor: false
     };
-  }
-  // ── 숫자 배열 자동 진화 (올인원) ────────────────────────────────────────────
-  evolveNumbers(target, config) {
-    const cfg = { ...DEFAULT_CYCLE_CONFIG, target, ...config };
-    const popSize = cfg.populationSize;
-    const len = target.length;
-    const initPop = Array.from(
-      { length: popSize },
-      () => Array.from({ length: len }, () => Math.random() * 10)
-    );
-    const fitnessFunc = (item) => {
-      const arr = item;
-      if (!Array.isArray(arr)) return 0;
-      const dist = target.reduce((sum, t, i) => sum + Math.abs(t - (arr[i] ?? 0)), 0);
-      return 1 / (1 + dist);
-    };
-    const mutateFunc = (item) => {
-      const arr = [...item];
-      const idx = Math.floor(Math.random() * arr.length);
-      arr[idx] += (Math.random() - 0.5) * cfg.mutationRate * 2;
-      return arr;
-    };
-    const crossoverFunc = (a, b) => {
-      const arrA = a;
-      const arrB = b;
-      const point = Math.floor(Math.random() * arrA.length);
-      return [...arrA.slice(0, point), ...arrB.slice(point)];
-    };
-    return this.runCycle(initPop, fitnessFunc, mutateFunc, crossoverFunc, cfg);
-  }
-  // ── 문자열 자동 진화 ────────────────────────────────────────────────────────
-  evolveString(target, config) {
-    const cfg = { ...DEFAULT_CYCLE_CONFIG, target, ...config };
-    const CHARS2 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
-    const len = target.length;
-    const popSize = cfg.populationSize;
-    const initPop = Array.from(
-      { length: popSize },
-      () => Array.from({ length: len }, () => CHARS2[Math.floor(Math.random() * CHARS2.length)]).join("")
-    );
-    const fitnessFunc = (item) => {
-      const s = String(item);
-      if (s.length !== target.length) return 0;
-      let matches = 0;
-      for (let i = 0; i < target.length; i++) {
-        if (s[i] === target[i]) matches++;
+    SelfEvolutionHub = class {
+      constructor() {
+        // 내부 통계
+        this._cycleCount = 0;
+        this._totalGenerations = 0;
+        this._refactorSuggestions = 0;
+        this._versionCount = 0;
+        this._fitnessHistory = [];
+        this.fitnessEval = new FitnessEvaluator({ normalize: true, maximize: true });
+        this.pruner = new Pruner();
+        this.refactorer = new SelfRefactorer();
+        this.benchmark = new SelfBenchmark("self-evolution-hub");
+        this.versioning = new SelfVersioning(200);
       }
-      return matches / target.length;
-    };
-    const mutateFunc = (item) => {
-      const chars = String(item).split("");
-      for (let i = 0; i < chars.length; i++) {
-        if (Math.random() < cfg.mutationRate) {
-          chars[i] = CHARS2[Math.floor(Math.random() * CHARS2.length)];
+      // ── 완전한 진화 사이클 실행 ────────────────────────────────────────────────
+      runCycle(population, fitnessFunc, mutateFunc, crossoverFunc, config) {
+        const cfg = { ...DEFAULT_CYCLE_CONFIG, ...config };
+        const startMs = Date.now();
+        if (!population || population.length === 0) {
+          return this._emptyResult(cfg);
         }
+        const pop = [...population];
+        let bestFitness = -Infinity;
+        let best = pop[0];
+        let improvements = 0;
+        let prunedCount = 0;
+        const fitnessProgress = [];
+        let gens = 0;
+        const mutator = new Mutator({ rate: cfg.mutationRate });
+        const crossover = new Crossover();
+        const genLoop = new GenerationLoop({ maxGenerations: cfg.generations });
+        for (let g = 0; g < cfg.generations; g++) {
+          gens++;
+          const scored = pop.map((item) => ({
+            item,
+            fitness: fitnessFunc(item)
+          }));
+          scored.sort((a, b) => b.fitness - a.fitness);
+          const genBest = scored[0].fitness;
+          fitnessProgress.push(genBest);
+          if (genBest > bestFitness) {
+            bestFitness = genBest;
+            best = scored[0].item;
+            improvements++;
+          }
+          const pruneCount = Math.floor(pop.length * cfg.pruneThreshold);
+          if (pruneCount > 0) {
+            prunedCount += pruneCount;
+            const kept = scored.slice(0, pop.length - pruneCount).map((s) => s.item);
+            pop.length = 0;
+            pop.push(...kept);
+          }
+          while (pop.length < cfg.populationSize) {
+            const a = pop[Math.floor(Math.random() * pop.length)];
+            const b = pop[Math.floor(Math.random() * pop.length)];
+            const child = crossoverFunc(a, b);
+            const mutated = mutateFunc(child);
+            pop.push(mutated);
+          }
+        }
+        this._cycleCount++;
+        this._totalGenerations += gens;
+        this._fitnessHistory.push(...fitnessProgress);
+        let benchmarkMs;
+        if (cfg.enableBenchmark) {
+          benchmarkMs = Date.now() - startMs;
+        }
+        let versionId;
+        if (cfg.enableVersioning) {
+          try {
+            const snap = this.versioning.snapshot(
+              best,
+              `evolution-cycle-${this._cycleCount}`,
+              ["auto-evolved"],
+              bestFitness
+            );
+            versionId = snap.id;
+            this._versionCount++;
+          } catch {
+            versionId = (0, import_crypto3.randomUUID)();
+            this._versionCount++;
+          }
+        }
+        let refactorCount = 0;
+        if (cfg.enableRefactor) {
+          try {
+            const suggestions = this.refactorer.suggest(String(best));
+            refactorCount = suggestions.length;
+            this._refactorSuggestions += refactorCount;
+          } catch {
+            refactorCount = 0;
+          }
+        }
+        const report = this._buildReport({
+          bestFitness,
+          generations: gens,
+          improvements,
+          prunedCount,
+          benchmarkMs,
+          versionId,
+          refactorCount
+        });
+        return {
+          best,
+          bestFitness,
+          generations: gens,
+          improvements,
+          prunedCount,
+          benchmarkMs,
+          versionId,
+          report
+        };
       }
-      return chars.join("");
-    };
-    const crossoverFunc = (a, b) => {
-      const sa = String(a);
-      const sb = String(b);
-      const point = Math.floor(Math.random() * sa.length);
-      return sa.slice(0, point) + sb.slice(point);
-    };
-    return this.runCycle(initPop, fitnessFunc, mutateFunc, crossoverFunc, cfg);
-  }
-  // ── 리포트 생성 ────────────────────────────────────────────────────────────
-  generateReport(results) {
-    const cycles = results.length;
-    const totalGenerations = results.reduce((sum, r) => sum + r.generations, 0);
-    const fitnessProgress = results.map((r) => r.bestFitness);
-    const refactorSuggestions = this._refactorSuggestions;
-    const versions = this._versionCount;
-    const avgFitness = fitnessProgress.length > 0 ? fitnessProgress.reduce((a, b) => a + b, 0) / fitnessProgress.length : 0;
-    const maxFitness = fitnessProgress.length > 0 ? Math.max(...fitnessProgress) : 0;
-    const summary = [
-      `[SelfEvolutionHub] ${cycles}\uAC1C \uC0AC\uC774\uD074, ${totalGenerations}\uC138\uB300 \uC2E4\uD589`,
-      `\uCD5C\uACE0 \uC801\uD569\uB3C4: ${maxFitness.toFixed(4)}, \uD3C9\uADE0: ${avgFitness.toFixed(4)}`,
-      `\uB9AC\uD329\uD1A0\uB9C1 \uC81C\uC548: ${refactorSuggestions}\uAC1C, \uBC84\uC804: ${versions}\uAC1C`
-    ].join(" | ");
-    return {
-      timestamp: /* @__PURE__ */ new Date(),
-      cycles,
-      totalGenerations,
-      fitnessProgress,
-      refactorSuggestions,
-      versions,
-      summary
-    };
-  }
-  // ── 자기 개선 ──────────────────────────────────────────────────────────────
-  selfImprove(baseConfig) {
-    const base = { ...DEFAULT_CYCLE_CONFIG, ...baseConfig };
-    const candidates = [
-      { ...base },
-      { ...base, mutationRate: Math.min(0.5, base.mutationRate * 1.5) },
-      { ...base, mutationRate: Math.max(0.01, base.mutationRate * 0.7) },
-      { ...base, populationSize: Math.min(100, base.populationSize * 2) },
-      { ...base, eliteRatio: Math.min(0.5, base.eliteRatio * 1.5) },
-      { ...base, pruneThreshold: Math.max(0.05, base.pruneThreshold * 0.8) }
-    ];
-    let bestConfig = base;
-    let baseScore = 0;
-    let bestScore = 0;
-    const testTarget = [1, 2, 3, 4, 5];
-    candidates.forEach((cfg, idx) => {
-      const result = this.evolveNumbers(testTarget, { ...cfg, generations: 10 });
-      if (idx === 0) {
-        baseScore = result.bestFitness;
-        bestScore = baseScore;
-        bestConfig = cfg;
-      } else if (result.bestFitness > bestScore) {
-        bestScore = result.bestFitness;
-        bestConfig = cfg;
+      // ── 숫자 배열 자동 진화 (올인원) ────────────────────────────────────────────
+      evolveNumbers(target, config) {
+        const cfg = { ...DEFAULT_CYCLE_CONFIG, target, ...config };
+        const popSize = cfg.populationSize;
+        const len = target.length;
+        const initPop = Array.from(
+          { length: popSize },
+          () => Array.from({ length: len }, () => Math.random() * 10)
+        );
+        const fitnessFunc = (item) => {
+          const arr = item;
+          if (!Array.isArray(arr)) return 0;
+          const dist = target.reduce((sum, t, i) => sum + Math.abs(t - (arr[i] ?? 0)), 0);
+          return 1 / (1 + dist);
+        };
+        const mutateFunc = (item) => {
+          const arr = [...item];
+          const idx = Math.floor(Math.random() * arr.length);
+          arr[idx] += (Math.random() - 0.5) * cfg.mutationRate * 2;
+          return arr;
+        };
+        const crossoverFunc = (a, b) => {
+          const arrA = a;
+          const arrB = b;
+          const point = Math.floor(Math.random() * arrA.length);
+          return [...arrA.slice(0, point), ...arrB.slice(point)];
+        };
+        return this.runCycle(initPop, fitnessFunc, mutateFunc, crossoverFunc, cfg);
       }
-    });
-    const improvement = baseScore > 0 ? (bestScore - baseScore) / baseScore : 0;
-    return {
-      optimized: bestConfig,
-      improvement: Math.max(0, improvement)
+      // ── 문자열 자동 진화 ────────────────────────────────────────────────────────
+      evolveString(target, config) {
+        const cfg = { ...DEFAULT_CYCLE_CONFIG, target, ...config };
+        const CHARS2 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ";
+        const len = target.length;
+        const popSize = cfg.populationSize;
+        const initPop = Array.from(
+          { length: popSize },
+          () => Array.from({ length: len }, () => CHARS2[Math.floor(Math.random() * CHARS2.length)]).join("")
+        );
+        const fitnessFunc = (item) => {
+          const s = String(item);
+          if (s.length !== target.length) return 0;
+          let matches = 0;
+          for (let i = 0; i < target.length; i++) {
+            if (s[i] === target[i]) matches++;
+          }
+          return matches / target.length;
+        };
+        const mutateFunc = (item) => {
+          const chars = String(item).split("");
+          for (let i = 0; i < chars.length; i++) {
+            if (Math.random() < cfg.mutationRate) {
+              chars[i] = CHARS2[Math.floor(Math.random() * CHARS2.length)];
+            }
+          }
+          return chars.join("");
+        };
+        const crossoverFunc = (a, b) => {
+          const sa = String(a);
+          const sb = String(b);
+          const point = Math.floor(Math.random() * sa.length);
+          return sa.slice(0, point) + sb.slice(point);
+        };
+        return this.runCycle(initPop, fitnessFunc, mutateFunc, crossoverFunc, cfg);
+      }
+      // ── 리포트 생성 ────────────────────────────────────────────────────────────
+      generateReport(results) {
+        const cycles = results.length;
+        const totalGenerations = results.reduce((sum, r) => sum + r.generations, 0);
+        const fitnessProgress = results.map((r) => r.bestFitness);
+        const refactorSuggestions = this._refactorSuggestions;
+        const versions = this._versionCount;
+        const avgFitness = fitnessProgress.length > 0 ? fitnessProgress.reduce((a, b) => a + b, 0) / fitnessProgress.length : 0;
+        const maxFitness = fitnessProgress.length > 0 ? Math.max(...fitnessProgress) : 0;
+        const summary = [
+          `[SelfEvolutionHub] ${cycles}\uAC1C \uC0AC\uC774\uD074, ${totalGenerations}\uC138\uB300 \uC2E4\uD589`,
+          `\uCD5C\uACE0 \uC801\uD569\uB3C4: ${maxFitness.toFixed(4)}, \uD3C9\uADE0: ${avgFitness.toFixed(4)}`,
+          `\uB9AC\uD329\uD1A0\uB9C1 \uC81C\uC548: ${refactorSuggestions}\uAC1C, \uBC84\uC804: ${versions}\uAC1C`
+        ].join(" | ");
+        return {
+          timestamp: /* @__PURE__ */ new Date(),
+          cycles,
+          totalGenerations,
+          fitnessProgress,
+          refactorSuggestions,
+          versions,
+          summary
+        };
+      }
+      // ── 자기 개선 ──────────────────────────────────────────────────────────────
+      selfImprove(baseConfig) {
+        const base = { ...DEFAULT_CYCLE_CONFIG, ...baseConfig };
+        const candidates = [
+          { ...base },
+          { ...base, mutationRate: Math.min(0.5, base.mutationRate * 1.5) },
+          { ...base, mutationRate: Math.max(0.01, base.mutationRate * 0.7) },
+          { ...base, populationSize: Math.min(100, base.populationSize * 2) },
+          { ...base, eliteRatio: Math.min(0.5, base.eliteRatio * 1.5) },
+          { ...base, pruneThreshold: Math.max(0.05, base.pruneThreshold * 0.8) }
+        ];
+        let bestConfig = base;
+        let baseScore = 0;
+        let bestScore = 0;
+        const testTarget = [1, 2, 3, 4, 5];
+        candidates.forEach((cfg, idx) => {
+          const result = this.evolveNumbers(testTarget, { ...cfg, generations: 10 });
+          if (idx === 0) {
+            baseScore = result.bestFitness;
+            bestScore = baseScore;
+            bestConfig = cfg;
+          } else if (result.bestFitness > bestScore) {
+            bestScore = result.bestFitness;
+            bestConfig = cfg;
+          }
+        });
+        const improvement = baseScore > 0 ? (bestScore - baseScore) / baseScore : 0;
+        return {
+          optimized: bestConfig,
+          improvement: Math.max(0, improvement)
+        };
+      }
+      // ── 내부 헬퍼 ─────────────────────────────────────────────────────────────
+      _emptyResult(cfg) {
+        return {
+          best: null,
+          bestFitness: 0,
+          generations: 0,
+          improvements: 0,
+          prunedCount: 0,
+          report: "[SelfEvolutionHub] \uBE48 population \u2014 \uC9C4\uD654 \uC5C6\uC74C"
+        };
+      }
+      _buildReport(info) {
+        const parts = [
+          `[SelfEvolutionHub] \uCD5C\uACE0 \uC801\uD569\uB3C4=${info.bestFitness.toFixed(4)}`,
+          `\uC138\uB300=${info.generations}`,
+          `\uAC1C\uC120=${info.improvements}`,
+          `\uAC00\uC9C0\uCE58\uAE30=${info.prunedCount}`
+        ];
+        if (info.benchmarkMs !== void 0) parts.push(`\uC2E4\uD589\uC2DC\uAC04=${info.benchmarkMs}ms`);
+        if (info.versionId) parts.push(`\uBC84\uC804ID=${info.versionId.slice(0, 8)}...`);
+        if (info.refactorCount !== void 0 && info.refactorCount > 0) {
+          parts.push(`\uB9AC\uD329\uD1A0\uB9C1\uC81C\uC548=${info.refactorCount}\uAC1C`);
+        }
+        return parts.join(", ");
+      }
+      // ── 통계 접근자 ────────────────────────────────────────────────────────────
+      get cycleCount() {
+        return this._cycleCount;
+      }
+      get totalGenerations() {
+        return this._totalGenerations;
+      }
+      get refactorSuggestions() {
+        return this._refactorSuggestions;
+      }
+      get versionCount() {
+        return this._versionCount;
+      }
+      get fitnessHistory() {
+        return [...this._fitnessHistory];
+      }
     };
+    globalSelfEvolution = new SelfEvolutionHub();
   }
-  // ── 내부 헬퍼 ─────────────────────────────────────────────────────────────
-  _emptyResult(cfg) {
-    return {
-      best: null,
-      bestFitness: 0,
-      generations: 0,
-      improvements: 0,
-      prunedCount: 0,
-      report: "[SelfEvolutionHub] \uBE48 population \u2014 \uC9C4\uD654 \uC5C6\uC74C"
-    };
-  }
-  _buildReport(info) {
-    const parts = [
-      `[SelfEvolutionHub] \uCD5C\uACE0 \uC801\uD569\uB3C4=${info.bestFitness.toFixed(4)}`,
-      `\uC138\uB300=${info.generations}`,
-      `\uAC1C\uC120=${info.improvements}`,
-      `\uAC00\uC9C0\uCE58\uAE30=${info.prunedCount}`
-    ];
-    if (info.benchmarkMs !== void 0) parts.push(`\uC2E4\uD589\uC2DC\uAC04=${info.benchmarkMs}ms`);
-    if (info.versionId) parts.push(`\uBC84\uC804ID=${info.versionId.slice(0, 8)}...`);
-    if (info.refactorCount !== void 0 && info.refactorCount > 0) {
-      parts.push(`\uB9AC\uD329\uD1A0\uB9C1\uC81C\uC548=${info.refactorCount}\uAC1C`);
-    }
-    return parts.join(", ");
-  }
-  // ── 통계 접근자 ────────────────────────────────────────────────────────────
-  get cycleCount() {
-    return this._cycleCount;
-  }
-  get totalGenerations() {
-    return this._totalGenerations;
-  }
-  get refactorSuggestions() {
-    return this._refactorSuggestions;
-  }
-  get versionCount() {
-    return this._versionCount;
-  }
-  get fitnessHistory() {
-    return [...this._fitnessHistory];
-  }
-};
-var globalSelfEvolution = new SelfEvolutionHub();
+});
 
 // src/causal.ts
-var CausalGraph = class {
-  constructor() {
-    this.nodes = /* @__PURE__ */ new Map();
-    this.edges = [];
-  }
-  addNode(node) {
-    this.nodes.set(node.id, node);
-  }
-  addEdge(edge) {
-    this.edges.push(edge);
-  }
-  getDirectCauses(nodeId) {
-    return this.edges.filter((e) => e.to === nodeId);
-  }
-  getDirectEffects(nodeId) {
-    return this.edges.filter((e) => e.from === nodeId);
-  }
-  findCausalChains(causeId, effectId, visited = /* @__PURE__ */ new Set()) {
-    if (causeId === effectId) {
-      return [{
-        path: [causeId],
-        totalStrength: 1,
-        explanation: `${this.nodes.get(causeId)?.name ?? causeId}`,
-        confidence: 1
-      }];
-    }
-    if (visited.has(causeId)) return [];
-    visited.add(causeId);
-    const chains = [];
-    const directEffects = this.getDirectEffects(causeId);
-    for (const edge of directEffects) {
-      const subChains = this.findCausalChains(edge.to, effectId, new Set(visited));
-      for (const sub of subChains) {
-        const fromName = this.nodes.get(causeId)?.name ?? causeId;
-        const toName = this.nodes.get(edge.to)?.name ?? edge.to;
-        const mechanism = edge.mechanism ? ` (${edge.mechanism})` : "";
-        chains.push({
-          path: [causeId, ...sub.path],
-          totalStrength: edge.strength * sub.totalStrength,
-          explanation: `${fromName} \u2192 ${toName}${mechanism}; ${sub.explanation}`,
-          confidence: edge.confidence * sub.confidence
-        });
-      }
-    }
-    return chains;
-  }
-  explain(effectId) {
-    const effectNode = this.nodes.get(effectId);
-    const effectName = effectNode?.name ?? effectId;
-    const allCauses = [];
-    for (const [nodeId] of this.nodes) {
-      if (nodeId === effectId) continue;
-      const chains = this.findCausalChains(nodeId, effectId);
-      for (const chain of chains) {
-        if (chain.path.length >= 2) {
-          allCauses.push({ cause: nodeId, chain });
-        }
-      }
-    }
-    const bestByCause = /* @__PURE__ */ new Map();
-    for (const item of allCauses) {
-      const existing = bestByCause.get(item.cause);
-      if (!existing || Math.abs(item.chain.totalStrength) > Math.abs(existing.chain.totalStrength)) {
-        bestByCause.set(item.cause, item);
-      }
-    }
-    const causesArr = Array.from(bestByCause.values());
-    const totalAbsStrength = causesArr.reduce((s, c) => s + Math.abs(c.chain.totalStrength), 0) || 1;
-    const causesWithContrib = causesArr.map((c) => ({
-      cause: c.cause,
-      chain: c.chain,
-      contribution: Math.abs(c.chain.totalStrength) / totalAbsStrength
-    }));
-    causesWithContrib.sort((a, b) => b.contribution - a.contribution);
-    const primaryCause = causesWithContrib[0]?.cause ?? effectId;
-    const primaryName = this.nodes.get(primaryCause)?.name ?? primaryCause;
-    const avgConfidence = causesWithContrib.length > 0 ? causesWithContrib.reduce((s, c) => s + c.chain.confidence, 0) / causesWithContrib.length : 0;
-    const explanation = causesWithContrib.length > 0 ? `${effectName}\uC758 \uC8FC\uC694 \uC6D0\uC778\uC740 "${primaryName}"\uC774\uB2E4. ` + causesWithContrib.slice(0, 3).map((c) => {
-      const cn = this.nodes.get(c.cause)?.name ?? c.cause;
-      return `${cn} (\uAE30\uC5EC\uB3C4: ${(c.contribution * 100).toFixed(1)}%)`;
-    }).join(", ") + "." : `${effectName}\uC758 \uC6D0\uC778\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
-    return {
-      effect: effectId,
-      causes: causesWithContrib,
-      primaryCause,
-      explanation,
-      confidence: avgConfidence
-    };
-  }
-  findRootCauses(effectId, visited = /* @__PURE__ */ new Set()) {
-    if (visited.has(effectId)) return [];
-    visited.add(effectId);
-    const directCauses = this.getDirectCauses(effectId);
-    if (directCauses.length === 0) {
-      return [effectId];
-    }
-    const roots = [];
-    for (const edge of directCauses) {
-      const subRoots = this.findRootCauses(edge.from, new Set(visited));
-      for (const r of subRoots) {
-        if (!roots.includes(r)) roots.push(r);
-      }
-    }
-    return roots;
-  }
-  simulate(interventions) {
-    const result = { ...interventions };
-    const queue = Object.keys(interventions);
-    const processed = new Set(queue);
-    while (queue.length > 0) {
-      const nodeId = queue.shift();
-      const currentValue = result[nodeId] ?? (this.nodes.get(nodeId)?.value ?? 0);
-      const effects = this.getDirectEffects(nodeId);
-      for (const edge of effects) {
-        if (!processed.has(edge.to)) {
-          const baseValue = this.nodes.get(edge.to)?.value ?? 0;
-          const delta = currentValue * edge.strength * edge.confidence;
-          result[edge.to] = (result[edge.to] ?? baseValue) + delta;
-          queue.push(edge.to);
-          processed.add(edge.to);
-        }
-      }
-    }
-    return result;
-  }
-  summarize(nodeId) {
-    const node = this.nodes.get(nodeId);
-    if (!node) return `\uB178\uB4DC "${nodeId}"\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
-    const causes = this.getDirectCauses(nodeId);
-    const effects = this.getDirectEffects(nodeId);
-    const roots = this.findRootCauses(nodeId);
-    const causesStr = causes.length > 0 ? causes.map((e) => {
-      const n = this.nodes.get(e.from)?.name ?? e.from;
-      return `${n}(\uAC15\uB3C4:${e.strength})`;
-    }).join(", ") : "\uC5C6\uC74C";
-    const effectsStr = effects.length > 0 ? effects.map((e) => {
-      const n = this.nodes.get(e.to)?.name ?? e.to;
-      return `${n}(\uAC15\uB3C4:${e.strength})`;
-    }).join(", ") : "\uC5C6\uC74C";
-    const rootsStr = roots.filter((r) => r !== nodeId).length > 0 ? roots.filter((r) => r !== nodeId).map((r) => this.nodes.get(r)?.name ?? r).join(", ") : "\uC5C6\uC74C (\uB8E8\uD2B8 \uC6D0\uC778)";
-    return `[${node.name}] \uC9C1\uC811\uC6D0\uC778: ${causesStr} | \uC9C1\uC811\uACB0\uACFC: ${effectsStr} | \uB8E8\uD2B8\uC6D0\uC778: ${rootsStr}`;
-  }
-  detectCycle(startId, endId) {
-    const visited = /* @__PURE__ */ new Set();
-    const queue = [endId];
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (current === startId) return true;
-      if (visited.has(current)) continue;
-      visited.add(current);
-      const effects = this.getDirectEffects(current);
-      for (const e of effects) queue.push(e.to);
-    }
-    return false;
-  }
-};
-var globalCausal = new CausalGraph();
 function whyCaused(effect, cause) {
   const chains = globalCausal.findCausalChains(cause, effect);
   if (chains.length === 0) return null;
   return chains.sort((a, b) => Math.abs(b.totalStrength) - Math.abs(a.totalStrength))[0];
 }
+var CausalGraph, globalCausal;
+var init_causal = __esm({
+  "src/causal.ts"() {
+    CausalGraph = class {
+      constructor() {
+        this.nodes = /* @__PURE__ */ new Map();
+        this.edges = [];
+      }
+      addNode(node) {
+        this.nodes.set(node.id, node);
+      }
+      addEdge(edge) {
+        this.edges.push(edge);
+      }
+      getDirectCauses(nodeId) {
+        return this.edges.filter((e) => e.to === nodeId);
+      }
+      getDirectEffects(nodeId) {
+        return this.edges.filter((e) => e.from === nodeId);
+      }
+      findCausalChains(causeId, effectId, visited = /* @__PURE__ */ new Set()) {
+        if (causeId === effectId) {
+          return [{
+            path: [causeId],
+            totalStrength: 1,
+            explanation: `${this.nodes.get(causeId)?.name ?? causeId}`,
+            confidence: 1
+          }];
+        }
+        if (visited.has(causeId)) return [];
+        visited.add(causeId);
+        const chains = [];
+        const directEffects = this.getDirectEffects(causeId);
+        for (const edge of directEffects) {
+          const subChains = this.findCausalChains(edge.to, effectId, new Set(visited));
+          for (const sub of subChains) {
+            const fromName = this.nodes.get(causeId)?.name ?? causeId;
+            const toName = this.nodes.get(edge.to)?.name ?? edge.to;
+            const mechanism = edge.mechanism ? ` (${edge.mechanism})` : "";
+            chains.push({
+              path: [causeId, ...sub.path],
+              totalStrength: edge.strength * sub.totalStrength,
+              explanation: `${fromName} \u2192 ${toName}${mechanism}; ${sub.explanation}`,
+              confidence: edge.confidence * sub.confidence
+            });
+          }
+        }
+        return chains;
+      }
+      explain(effectId) {
+        const effectNode = this.nodes.get(effectId);
+        const effectName = effectNode?.name ?? effectId;
+        const allCauses = [];
+        for (const [nodeId] of this.nodes) {
+          if (nodeId === effectId) continue;
+          const chains = this.findCausalChains(nodeId, effectId);
+          for (const chain of chains) {
+            if (chain.path.length >= 2) {
+              allCauses.push({ cause: nodeId, chain });
+            }
+          }
+        }
+        const bestByCause = /* @__PURE__ */ new Map();
+        for (const item of allCauses) {
+          const existing = bestByCause.get(item.cause);
+          if (!existing || Math.abs(item.chain.totalStrength) > Math.abs(existing.chain.totalStrength)) {
+            bestByCause.set(item.cause, item);
+          }
+        }
+        const causesArr = Array.from(bestByCause.values());
+        const totalAbsStrength = causesArr.reduce((s, c) => s + Math.abs(c.chain.totalStrength), 0) || 1;
+        const causesWithContrib = causesArr.map((c) => ({
+          cause: c.cause,
+          chain: c.chain,
+          contribution: Math.abs(c.chain.totalStrength) / totalAbsStrength
+        }));
+        causesWithContrib.sort((a, b) => b.contribution - a.contribution);
+        const primaryCause = causesWithContrib[0]?.cause ?? effectId;
+        const primaryName = this.nodes.get(primaryCause)?.name ?? primaryCause;
+        const avgConfidence = causesWithContrib.length > 0 ? causesWithContrib.reduce((s, c) => s + c.chain.confidence, 0) / causesWithContrib.length : 0;
+        const explanation = causesWithContrib.length > 0 ? `${effectName}\uC758 \uC8FC\uC694 \uC6D0\uC778\uC740 "${primaryName}"\uC774\uB2E4. ` + causesWithContrib.slice(0, 3).map((c) => {
+          const cn = this.nodes.get(c.cause)?.name ?? c.cause;
+          return `${cn} (\uAE30\uC5EC\uB3C4: ${(c.contribution * 100).toFixed(1)}%)`;
+        }).join(", ") + "." : `${effectName}\uC758 \uC6D0\uC778\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
+        return {
+          effect: effectId,
+          causes: causesWithContrib,
+          primaryCause,
+          explanation,
+          confidence: avgConfidence
+        };
+      }
+      findRootCauses(effectId, visited = /* @__PURE__ */ new Set()) {
+        if (visited.has(effectId)) return [];
+        visited.add(effectId);
+        const directCauses = this.getDirectCauses(effectId);
+        if (directCauses.length === 0) {
+          return [effectId];
+        }
+        const roots = [];
+        for (const edge of directCauses) {
+          const subRoots = this.findRootCauses(edge.from, new Set(visited));
+          for (const r of subRoots) {
+            if (!roots.includes(r)) roots.push(r);
+          }
+        }
+        return roots;
+      }
+      simulate(interventions) {
+        const result = { ...interventions };
+        const queue = Object.keys(interventions);
+        const processed = new Set(queue);
+        while (queue.length > 0) {
+          const nodeId = queue.shift();
+          const currentValue = result[nodeId] ?? (this.nodes.get(nodeId)?.value ?? 0);
+          const effects = this.getDirectEffects(nodeId);
+          for (const edge of effects) {
+            if (!processed.has(edge.to)) {
+              const baseValue = this.nodes.get(edge.to)?.value ?? 0;
+              const delta = currentValue * edge.strength * edge.confidence;
+              result[edge.to] = (result[edge.to] ?? baseValue) + delta;
+              queue.push(edge.to);
+              processed.add(edge.to);
+            }
+          }
+        }
+        return result;
+      }
+      summarize(nodeId) {
+        const node = this.nodes.get(nodeId);
+        if (!node) return `\uB178\uB4DC "${nodeId}"\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`;
+        const causes = this.getDirectCauses(nodeId);
+        const effects = this.getDirectEffects(nodeId);
+        const roots = this.findRootCauses(nodeId);
+        const causesStr = causes.length > 0 ? causes.map((e) => {
+          const n = this.nodes.get(e.from)?.name ?? e.from;
+          return `${n}(\uAC15\uB3C4:${e.strength})`;
+        }).join(", ") : "\uC5C6\uC74C";
+        const effectsStr = effects.length > 0 ? effects.map((e) => {
+          const n = this.nodes.get(e.to)?.name ?? e.to;
+          return `${n}(\uAC15\uB3C4:${e.strength})`;
+        }).join(", ") : "\uC5C6\uC74C";
+        const rootsStr = roots.filter((r) => r !== nodeId).length > 0 ? roots.filter((r) => r !== nodeId).map((r) => this.nodes.get(r)?.name ?? r).join(", ") : "\uC5C6\uC74C (\uB8E8\uD2B8 \uC6D0\uC778)";
+        return `[${node.name}] \uC9C1\uC811\uC6D0\uC778: ${causesStr} | \uC9C1\uC811\uACB0\uACFC: ${effectsStr} | \uB8E8\uD2B8\uC6D0\uC778: ${rootsStr}`;
+      }
+      detectCycle(startId, endId) {
+        const visited = /* @__PURE__ */ new Set();
+        const queue = [endId];
+        while (queue.length > 0) {
+          const current = queue.shift();
+          if (current === startId) return true;
+          if (visited.has(current)) continue;
+          visited.add(current);
+          const effects = this.getDirectEffects(current);
+          for (const e of effects) queue.push(e.to);
+        }
+        return false;
+      }
+    };
+    globalCausal = new CausalGraph();
+  }
+});
 
 // src/align.ts
-var AlignmentSystem = class {
-  constructor() {
-    this.goals = /* @__PURE__ */ new Map();
-    this.values = /* @__PURE__ */ new Map();
-  }
-  addGoal(goal) {
-    if (goal.priority < 1) goal = { ...goal, priority: 1 };
-    if (goal.priority > 10) goal = { ...goal, priority: 10 };
-    this.goals.set(goal.id, goal);
-  }
-  addValue(value) {
-    if (value.weight < 0) value = { ...value, weight: 0 };
-    if (value.weight > 1) value = { ...value, weight: 1 };
-    this.values.set(value.id, value);
-  }
-  // 행동의 목표/가치 정렬도 계산
-  score(action) {
-    const goalAlignment = {};
-    const valueAlignment = {};
-    const reasons = [];
-    for (const [goalId, goal] of this.goals) {
-      const outcome = action.expectedOutcomes[goalId] ?? 0;
-      const normalized = Math.max(0, Math.min(1, (outcome + 1) / 2));
-      goalAlignment[goalId] = normalized;
-      if (normalized >= 0.7) {
-        reasons.push(`\uBAA9\uD45C "${goal.description}" \uB2EC\uC131\uC5D0 \uAE30\uC5EC (${(normalized * 100).toFixed(0)}%)`);
-      } else if (normalized < 0.3) {
-        reasons.push(`\uBAA9\uD45C "${goal.description}" \uB2EC\uC131\uC5D0 \uBD80\uC815\uC801 \uC601\uD5A5 (${(normalized * 100).toFixed(0)}%)`);
+var AlignmentSystem, globalAlignment;
+var init_align = __esm({
+  "src/align.ts"() {
+    AlignmentSystem = class {
+      constructor() {
+        this.goals = /* @__PURE__ */ new Map();
+        this.values = /* @__PURE__ */ new Map();
       }
-    }
-    for (const [valueId, value] of this.values) {
-      let valueScore2 = 1;
-      for (const risk of action.risks) {
-        const riskLower = risk.toLowerCase();
-        const valueLower = value.name.toLowerCase();
-        const descLower = value.description.toLowerCase();
-        if (riskLower.includes(valueLower) || riskLower.includes(descLower.split(" ")[0])) {
-          valueScore2 -= 0.3;
-        }
-        if (riskLower.includes("harm") || riskLower.includes("\uC704\uD5D8") || riskLower.includes("\uAC70\uC9D3") || riskLower.includes("\uC18D\uC784")) {
-          valueScore2 -= 0.2 * value.weight;
-        }
+      addGoal(goal) {
+        if (goal.priority < 1) goal = { ...goal, priority: 1 };
+        if (goal.priority > 10) goal = { ...goal, priority: 10 };
+        this.goals.set(goal.id, goal);
       }
-      valueAlignment[valueId] = Math.max(0, Math.min(1, valueScore2));
-    }
-    const conflicts = this._detectActionConflicts(action, goalAlignment);
-    let goalScore = 0;
-    let totalGoalWeight = 0;
-    for (const [goalId, goal] of this.goals) {
-      const weight = goal.priority / 10;
-      goalScore += (goalAlignment[goalId] ?? 0) * weight;
-      totalGoalWeight += weight;
-    }
-    const avgGoalScore = totalGoalWeight > 0 ? goalScore / totalGoalWeight : 0.5;
-    let valueScore = 0;
-    let totalValueWeight = 0;
-    for (const [valueId, value] of this.values) {
-      valueScore += (valueAlignment[valueId] ?? 1) * value.weight;
-      totalValueWeight += value.weight;
-    }
-    const avgValueScore = totalValueWeight > 0 ? valueScore / totalValueWeight : 1;
-    let conflictPenalty = 0;
-    for (const c of conflicts) {
-      if (c.severity === "high") conflictPenalty += 0.3;
-      else if (c.severity === "medium") conflictPenalty += 0.15;
-      else conflictPenalty += 0.05;
-    }
-    const overallScore = Math.max(0, Math.min(
-      1,
-      avgGoalScore * 0.6 + avgValueScore * 0.4 - conflictPenalty
-    ));
-    let recommendation;
-    if (overallScore >= 0.65 && conflictPenalty < 0.3) {
-      recommendation = "proceed";
-    } else if (overallScore >= 0.35 && conflictPenalty < 0.6) {
-      recommendation = "caution";
-    } else {
-      recommendation = "reject";
-      reasons.push("\uC885\uD569 \uC815\uB82C\uB3C4\uAC00 \uB108\uBB34 \uB0AE\uAC70\uB098 \uC2EC\uAC01\uD55C \uCDA9\uB3CC\uC774 \uC788\uC74C");
-    }
-    if (conflicts.length > 0) {
-      reasons.push(`${conflicts.length}\uAC1C\uC758 \uBAA9\uD45C \uCDA9\uB3CC \uAC10\uC9C0\uB428`);
-    }
-    return {
-      action,
-      goalAlignment,
-      valueAlignment,
-      overallScore,
-      conflicts,
-      recommendation,
-      reasons
+      addValue(value) {
+        if (value.weight < 0) value = { ...value, weight: 0 };
+        if (value.weight > 1) value = { ...value, weight: 1 };
+        this.values.set(value.id, value);
+      }
+      // 행동의 목표/가치 정렬도 계산
+      score(action) {
+        const goalAlignment = {};
+        const valueAlignment = {};
+        const reasons = [];
+        for (const [goalId, goal] of this.goals) {
+          const outcome = action.expectedOutcomes[goalId] ?? 0;
+          const normalized = Math.max(0, Math.min(1, (outcome + 1) / 2));
+          goalAlignment[goalId] = normalized;
+          if (normalized >= 0.7) {
+            reasons.push(`\uBAA9\uD45C "${goal.description}" \uB2EC\uC131\uC5D0 \uAE30\uC5EC (${(normalized * 100).toFixed(0)}%)`);
+          } else if (normalized < 0.3) {
+            reasons.push(`\uBAA9\uD45C "${goal.description}" \uB2EC\uC131\uC5D0 \uBD80\uC815\uC801 \uC601\uD5A5 (${(normalized * 100).toFixed(0)}%)`);
+          }
+        }
+        for (const [valueId, value] of this.values) {
+          let valueScore2 = 1;
+          for (const risk of action.risks) {
+            const riskLower = risk.toLowerCase();
+            const valueLower = value.name.toLowerCase();
+            const descLower = value.description.toLowerCase();
+            if (riskLower.includes(valueLower) || riskLower.includes(descLower.split(" ")[0])) {
+              valueScore2 -= 0.3;
+            }
+            if (riskLower.includes("harm") || riskLower.includes("\uC704\uD5D8") || riskLower.includes("\uAC70\uC9D3") || riskLower.includes("\uC18D\uC784")) {
+              valueScore2 -= 0.2 * value.weight;
+            }
+          }
+          valueAlignment[valueId] = Math.max(0, Math.min(1, valueScore2));
+        }
+        const conflicts = this._detectActionConflicts(action, goalAlignment);
+        let goalScore = 0;
+        let totalGoalWeight = 0;
+        for (const [goalId, goal] of this.goals) {
+          const weight = goal.priority / 10;
+          goalScore += (goalAlignment[goalId] ?? 0) * weight;
+          totalGoalWeight += weight;
+        }
+        const avgGoalScore = totalGoalWeight > 0 ? goalScore / totalGoalWeight : 0.5;
+        let valueScore = 0;
+        let totalValueWeight = 0;
+        for (const [valueId, value] of this.values) {
+          valueScore += (valueAlignment[valueId] ?? 1) * value.weight;
+          totalValueWeight += value.weight;
+        }
+        const avgValueScore = totalValueWeight > 0 ? valueScore / totalValueWeight : 1;
+        let conflictPenalty = 0;
+        for (const c of conflicts) {
+          if (c.severity === "high") conflictPenalty += 0.3;
+          else if (c.severity === "medium") conflictPenalty += 0.15;
+          else conflictPenalty += 0.05;
+        }
+        const overallScore = Math.max(0, Math.min(
+          1,
+          avgGoalScore * 0.6 + avgValueScore * 0.4 - conflictPenalty
+        ));
+        let recommendation;
+        if (overallScore >= 0.65 && conflictPenalty < 0.3) {
+          recommendation = "proceed";
+        } else if (overallScore >= 0.35 && conflictPenalty < 0.6) {
+          recommendation = "caution";
+        } else {
+          recommendation = "reject";
+          reasons.push("\uC885\uD569 \uC815\uB82C\uB3C4\uAC00 \uB108\uBB34 \uB0AE\uAC70\uB098 \uC2EC\uAC01\uD55C \uCDA9\uB3CC\uC774 \uC788\uC74C");
+        }
+        if (conflicts.length > 0) {
+          reasons.push(`${conflicts.length}\uAC1C\uC758 \uBAA9\uD45C \uCDA9\uB3CC \uAC10\uC9C0\uB428`);
+        }
+        return {
+          action,
+          goalAlignment,
+          valueAlignment,
+          overallScore,
+          conflicts,
+          recommendation,
+          reasons
+        };
+      }
+      _detectActionConflicts(action, goalAlignment) {
+        const conflicts = [];
+        const goalIds = Array.from(this.goals.keys());
+        for (let i = 0; i < goalIds.length; i++) {
+          for (let j = i + 1; j < goalIds.length; j++) {
+            const g1 = goalIds[i];
+            const g2 = goalIds[j];
+            const score1 = goalAlignment[g1] ?? 0.5;
+            const score2 = goalAlignment[g2] ?? 0.5;
+            const diff = Math.abs(score1 - score2);
+            if (diff > 0.6) {
+              conflicts.push({ goal1: g1, goal2: g2, severity: "high" });
+            } else if (diff > 0.4) {
+              conflicts.push({ goal1: g1, goal2: g2, severity: "medium" });
+            } else if (diff > 0.25) {
+              conflicts.push({ goal1: g1, goal2: g2, severity: "low" });
+            }
+          }
+        }
+        return conflicts;
+      }
+      // 여러 행동 중 가장 잘 정렬된 것 선택
+      selectBestAligned(actions) {
+        if (actions.length === 0) throw new Error("\uD589\uB3D9 \uBAA9\uB85D\uC774 \uBE44\uC5B4\uC788\uC74C");
+        if (actions.length === 1) return actions[0];
+        let best = actions[0];
+        let bestScore = this.score(actions[0]).overallScore;
+        for (let i = 1; i < actions.length; i++) {
+          const s = this.score(actions[i]).overallScore;
+          if (s > bestScore) {
+            bestScore = s;
+            best = actions[i];
+          }
+        }
+        return best;
+      }
+      // 목표 간 충돌 감지
+      detectConflicts() {
+        const conflicts = [];
+        const goalList = Array.from(this.goals.values());
+        for (let i = 0; i < goalList.length; i++) {
+          for (let j = i + 1; j < goalList.length; j++) {
+            const g1 = goalList[i];
+            const g2 = goalList[j];
+            const priorityDiff = Math.abs(g1.priority - g2.priority);
+            if (priorityDiff >= 5) {
+              conflicts.push({
+                goal1: g1.id,
+                goal2: g2.id,
+                description: `\uC6B0\uC120\uC21C\uC704 \uCC28\uC774 ${priorityDiff}: "${g1.description}" vs "${g2.description}"`
+              });
+            }
+            if (g1.measurable !== g2.measurable && priorityDiff >= 3) {
+              conflicts.push({
+                goal1: g1.id,
+                goal2: g2.id,
+                description: `\uCE21\uC815 \uAC00\uB2A5\uC131 \uBD88\uC77C\uCE58: "${g1.description}" (${g1.measurable ? "\uCE21\uC815\uAC00\uB2A5" : "\uCD94\uC0C1\uC801"}) vs "${g2.description}" (${g2.measurable ? "\uCE21\uC815\uAC00\uB2A5" : "\uCD94\uC0C1\uC801"})`
+              });
+            }
+          }
+        }
+        return conflicts;
+      }
+      // 행동 계획의 전체 정렬도
+      evaluatePlan(actions) {
+        if (actions.length === 0) {
+          return { overallAlignment: 0, weakLinks: [], summary: "\uACC4\uD68D\uC774 \uBE44\uC5B4\uC788\uC74C" };
+        }
+        const scores = actions.map((a) => ({ action: a, result: this.score(a) }));
+        const avgScore = scores.reduce((sum, s) => sum + s.result.overallScore, 0) / scores.length;
+        const weakLinks = scores.filter((s) => s.result.overallScore < 0.4 || s.result.recommendation === "reject").map((s) => s.action);
+        const rejectCount = scores.filter((s) => s.result.recommendation === "reject").length;
+        const cautionCount = scores.filter((s) => s.result.recommendation === "caution").length;
+        const proceedCount = scores.filter((s) => s.result.recommendation === "proceed").length;
+        const summary = [
+          `\uACC4\uD68D ${actions.length}\uAC1C \uD589\uB3D9 \uD3C9\uAC00:`,
+          `  - \uC9C4\uD589 \uAD8C\uACE0: ${proceedCount}\uAC1C`,
+          `  - \uC8FC\uC758 \uD544\uC694: ${cautionCount}\uAC1C`,
+          `  - \uAC70\uBD80 \uAD8C\uACE0: ${rejectCount}\uAC1C`,
+          `  - \uC804\uCCB4 \uC815\uB82C\uB3C4: ${(avgScore * 100).toFixed(1)}%`,
+          weakLinks.length > 0 ? `  - \uCDE8\uC57D \uACE0\uB9AC ${weakLinks.length}\uAC1C \uBC1C\uACAC` : "  - \uCDE8\uC57D \uACE0\uB9AC \uC5C6\uC74C"
+        ].join("\n");
+        return {
+          overallAlignment: avgScore,
+          weakLinks,
+          summary
+        };
+      }
+      // 정렬도 개선 제안
+      suggestImprovements(action) {
+        const result = this.score(action);
+        const suggestions = [];
+        for (const [goalId, alignment] of Object.entries(result.goalAlignment)) {
+          if (alignment < 0.5) {
+            const goal = this.goals.get(goalId);
+            if (goal) {
+              suggestions.push(
+                `\uBAA9\uD45C "${goal.description}" \uAE30\uC5EC\uB3C4 \uD5A5\uC0C1 \uD544\uC694 (\uD604\uC7AC ${(alignment * 100).toFixed(0)}%): expectedOutcomes["${goalId}"]\uB97C \uB192\uC774\uC138\uC694`
+              );
+            }
+          }
+        }
+        for (const [valueId, alignment] of Object.entries(result.valueAlignment)) {
+          if (alignment < 0.7) {
+            const value = this.values.get(valueId);
+            if (value) {
+              suggestions.push(
+                `\uAC00\uCE58 "${value.name}" \uC704\uBC18 \uC704\uD5D8 \uC788\uC74C (\uC815\uB82C\uB3C4 ${(alignment * 100).toFixed(0)}%): \uAD00\uB828 \uB9AC\uC2A4\uD06C \uC694\uC778\uC744 \uC81C\uAC70\uD558\uC138\uC694`
+              );
+            }
+          }
+        }
+        for (const conflict of result.conflicts) {
+          const g1 = this.goals.get(conflict.goal1);
+          const g2 = this.goals.get(conflict.goal2);
+          if (g1 && g2) {
+            suggestions.push(
+              `\uCDA9\uB3CC(${conflict.severity}): "${g1.description}"\uC640 "${g2.description}" \uC0AC\uC774\uC758 \uC808\uCDA9\uC548 \uACE0\uB824`
+            );
+          }
+        }
+        if (action.risks.length > 2) {
+          suggestions.push(`\uB9AC\uC2A4\uD06C\uAC00 ${action.risks.length}\uAC1C\uB85C \uB9CE\uC2B5\uB2C8\uB2E4. \uB9AC\uC2A4\uD06C \uC644\uD654 \uC804\uB7B5\uC744 \uC218\uB9BD\uD558\uC138\uC694`);
+        }
+        if (suggestions.length === 0) {
+          suggestions.push("\uD604\uC7AC \uC815\uB82C\uB3C4\uAC00 \uC591\uD638\uD569\uB2C8\uB2E4. \uC720\uC9C0\uD558\uC138\uC694.");
+        }
+        return suggestions;
+      }
+      // 목표 우선순위 정렬
+      prioritizeGoals() {
+        return Array.from(this.goals.values()).sort((a, b) => b.priority - a.priority);
+      }
+      // 목표 목록 조회
+      getGoals() {
+        return new Map(this.goals);
+      }
+      // 가치 목록 조회
+      getValues() {
+        return new Map(this.values);
+      }
     };
+    globalAlignment = new AlignmentSystem();
   }
-  _detectActionConflicts(action, goalAlignment) {
-    const conflicts = [];
-    const goalIds = Array.from(this.goals.keys());
-    for (let i = 0; i < goalIds.length; i++) {
-      for (let j = i + 1; j < goalIds.length; j++) {
-        const g1 = goalIds[i];
-        const g2 = goalIds[j];
-        const score1 = goalAlignment[g1] ?? 0.5;
-        const score2 = goalAlignment[g2] ?? 0.5;
-        const diff = Math.abs(score1 - score2);
-        if (diff > 0.6) {
-          conflicts.push({ goal1: g1, goal2: g2, severity: "high" });
-        } else if (diff > 0.4) {
-          conflicts.push({ goal1: g1, goal2: g2, severity: "medium" });
-        } else if (diff > 0.25) {
-          conflicts.push({ goal1: g1, goal2: g2, severity: "low" });
-        }
-      }
-    }
-    return conflicts;
-  }
-  // 여러 행동 중 가장 잘 정렬된 것 선택
-  selectBestAligned(actions) {
-    if (actions.length === 0) throw new Error("\uD589\uB3D9 \uBAA9\uB85D\uC774 \uBE44\uC5B4\uC788\uC74C");
-    if (actions.length === 1) return actions[0];
-    let best = actions[0];
-    let bestScore = this.score(actions[0]).overallScore;
-    for (let i = 1; i < actions.length; i++) {
-      const s = this.score(actions[i]).overallScore;
-      if (s > bestScore) {
-        bestScore = s;
-        best = actions[i];
-      }
-    }
-    return best;
-  }
-  // 목표 간 충돌 감지
-  detectConflicts() {
-    const conflicts = [];
-    const goalList = Array.from(this.goals.values());
-    for (let i = 0; i < goalList.length; i++) {
-      for (let j = i + 1; j < goalList.length; j++) {
-        const g1 = goalList[i];
-        const g2 = goalList[j];
-        const priorityDiff = Math.abs(g1.priority - g2.priority);
-        if (priorityDiff >= 5) {
-          conflicts.push({
-            goal1: g1.id,
-            goal2: g2.id,
-            description: `\uC6B0\uC120\uC21C\uC704 \uCC28\uC774 ${priorityDiff}: "${g1.description}" vs "${g2.description}"`
-          });
-        }
-        if (g1.measurable !== g2.measurable && priorityDiff >= 3) {
-          conflicts.push({
-            goal1: g1.id,
-            goal2: g2.id,
-            description: `\uCE21\uC815 \uAC00\uB2A5\uC131 \uBD88\uC77C\uCE58: "${g1.description}" (${g1.measurable ? "\uCE21\uC815\uAC00\uB2A5" : "\uCD94\uC0C1\uC801"}) vs "${g2.description}" (${g2.measurable ? "\uCE21\uC815\uAC00\uB2A5" : "\uCD94\uC0C1\uC801"})`
-          });
-        }
-      }
-    }
-    return conflicts;
-  }
-  // 행동 계획의 전체 정렬도
-  evaluatePlan(actions) {
-    if (actions.length === 0) {
-      return { overallAlignment: 0, weakLinks: [], summary: "\uACC4\uD68D\uC774 \uBE44\uC5B4\uC788\uC74C" };
-    }
-    const scores = actions.map((a) => ({ action: a, result: this.score(a) }));
-    const avgScore = scores.reduce((sum, s) => sum + s.result.overallScore, 0) / scores.length;
-    const weakLinks = scores.filter((s) => s.result.overallScore < 0.4 || s.result.recommendation === "reject").map((s) => s.action);
-    const rejectCount = scores.filter((s) => s.result.recommendation === "reject").length;
-    const cautionCount = scores.filter((s) => s.result.recommendation === "caution").length;
-    const proceedCount = scores.filter((s) => s.result.recommendation === "proceed").length;
-    const summary = [
-      `\uACC4\uD68D ${actions.length}\uAC1C \uD589\uB3D9 \uD3C9\uAC00:`,
-      `  - \uC9C4\uD589 \uAD8C\uACE0: ${proceedCount}\uAC1C`,
-      `  - \uC8FC\uC758 \uD544\uC694: ${cautionCount}\uAC1C`,
-      `  - \uAC70\uBD80 \uAD8C\uACE0: ${rejectCount}\uAC1C`,
-      `  - \uC804\uCCB4 \uC815\uB82C\uB3C4: ${(avgScore * 100).toFixed(1)}%`,
-      weakLinks.length > 0 ? `  - \uCDE8\uC57D \uACE0\uB9AC ${weakLinks.length}\uAC1C \uBC1C\uACAC` : "  - \uCDE8\uC57D \uACE0\uB9AC \uC5C6\uC74C"
-    ].join("\n");
-    return {
-      overallAlignment: avgScore,
-      weakLinks,
-      summary
-    };
-  }
-  // 정렬도 개선 제안
-  suggestImprovements(action) {
-    const result = this.score(action);
-    const suggestions = [];
-    for (const [goalId, alignment] of Object.entries(result.goalAlignment)) {
-      if (alignment < 0.5) {
-        const goal = this.goals.get(goalId);
-        if (goal) {
-          suggestions.push(
-            `\uBAA9\uD45C "${goal.description}" \uAE30\uC5EC\uB3C4 \uD5A5\uC0C1 \uD544\uC694 (\uD604\uC7AC ${(alignment * 100).toFixed(0)}%): expectedOutcomes["${goalId}"]\uB97C \uB192\uC774\uC138\uC694`
-          );
-        }
-      }
-    }
-    for (const [valueId, alignment] of Object.entries(result.valueAlignment)) {
-      if (alignment < 0.7) {
-        const value = this.values.get(valueId);
-        if (value) {
-          suggestions.push(
-            `\uAC00\uCE58 "${value.name}" \uC704\uBC18 \uC704\uD5D8 \uC788\uC74C (\uC815\uB82C\uB3C4 ${(alignment * 100).toFixed(0)}%): \uAD00\uB828 \uB9AC\uC2A4\uD06C \uC694\uC778\uC744 \uC81C\uAC70\uD558\uC138\uC694`
-          );
-        }
-      }
-    }
-    for (const conflict of result.conflicts) {
-      const g1 = this.goals.get(conflict.goal1);
-      const g2 = this.goals.get(conflict.goal2);
-      if (g1 && g2) {
-        suggestions.push(
-          `\uCDA9\uB3CC(${conflict.severity}): "${g1.description}"\uC640 "${g2.description}" \uC0AC\uC774\uC758 \uC808\uCDA9\uC548 \uACE0\uB824`
-        );
-      }
-    }
-    if (action.risks.length > 2) {
-      suggestions.push(`\uB9AC\uC2A4\uD06C\uAC00 ${action.risks.length}\uAC1C\uB85C \uB9CE\uC2B5\uB2C8\uB2E4. \uB9AC\uC2A4\uD06C \uC644\uD654 \uC804\uB7B5\uC744 \uC218\uB9BD\uD558\uC138\uC694`);
-    }
-    if (suggestions.length === 0) {
-      suggestions.push("\uD604\uC7AC \uC815\uB82C\uB3C4\uAC00 \uC591\uD638\uD569\uB2C8\uB2E4. \uC720\uC9C0\uD558\uC138\uC694.");
-    }
-    return suggestions;
-  }
-  // 목표 우선순위 정렬
-  prioritizeGoals() {
-    return Array.from(this.goals.values()).sort((a, b) => b.priority - a.priority);
-  }
-  // 목표 목록 조회
-  getGoals() {
-    return new Map(this.goals);
-  }
-  // 가치 목록 조회
-  getValues() {
-    return new Map(this.values);
-  }
-};
-var globalAlignment = new AlignmentSystem();
+});
 
 // src/ethics-check.ts
-var doNoHarmPrinciple = {
-  id: "do-no-harm",
-  name: "\uD574\uC545 \uAE08\uC9C0",
-  description: "\uD589\uB3D9\uC774\uB098 \uCD9C\uB825\uC774 \uC778\uAC04\uC774\uB098 \uC0DD\uBA85\uCCB4\uC5D0 \uD574\uB97C \uB07C\uCCD0\uC11C\uB294 \uC548 \uB41C\uB2E4",
-  framework: "deontological",
-  check: (subject, _context) => {
-    const harmKeywords = [
-      "kill",
-      "murder",
-      "harm",
-      "hurt",
-      "injure",
-      "damage",
-      "destroy",
-      "\uC8FD",
-      "\uC0B4\uC778",
-      "\uD574\uCE58",
-      "\uD3ED\uB825",
-      "\uD3ED\uBC1C",
-      "\uD3ED\uD0C4",
-      "\uB3C5",
-      "\uC790\uC0B4",
-      "weapon",
-      "bomb",
-      "poison",
-      "explosive",
-      "attack",
-      "violence",
-      "illegal",
-      "steal",
-      "theft",
-      "fraud",
-      "abuse"
-    ];
-    const lower = subject.toLowerCase();
-    const found = harmKeywords.some((kw) => lower.includes(kw));
-    return {
-      passed: !found,
-      reason: found ? `\uD574\uC545\uC744 \uCD08\uB798\uD560 \uC218 \uC788\uB294 \uB0B4\uC6A9\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4: "${subject.substring(0, 50)}"` : "\uD574\uC545 \uAE08\uC9C0 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
-    };
-  }
-};
-var fairnessPrinciple = {
-  id: "fairness",
-  name: "\uACF5\uC815\uC131",
-  description: "\uBAA8\uB4E0 \uAC1C\uC778\uACFC \uC9D1\uB2E8\uC744 \uACF5\uC815\uD558\uAC8C \uB300\uC6B0\uD574\uC57C \uD55C\uB2E4",
-  framework: "fairness",
-  check: (subject, _context) => {
-    const discriminationKeywords = [
-      "racist",
-      "sexist",
-      "discriminat",
-      "prejudice",
-      "bias against",
-      "\uCC28\uBCC4",
-      "\uD3B8\uACAC",
-      "\uD610\uC624",
-      "\uC778\uC885\uCC28\uBCC4",
-      "\uC131\uCC28\uBCC4",
-      "\uC7A5\uC560\uC778 \uCC28\uBCC4",
-      "inferior",
-      "superior race",
-      "stereotype"
-    ];
-    const lower = subject.toLowerCase();
-    const found = discriminationKeywords.some((kw) => lower.includes(kw));
-    return {
-      passed: !found,
-      reason: found ? "\uCC28\uBCC4 \uB610\uB294 \uD3B8\uACAC\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uACF5\uC815\uC131 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
-    };
-  }
-};
-var transparencyPrinciple = {
-  id: "transparency",
-  name: "\uD22C\uBA85\uC131",
-  description: "AI \uC2DC\uC2A4\uD15C\uC758 \uC758\uC0AC\uACB0\uC815 \uACFC\uC815\uC740 \uD22C\uBA85\uD558\uACE0 \uC124\uBA85 \uAC00\uB2A5\uD574\uC57C \uD55C\uB2E4",
-  framework: "virtue",
-  check: (subject, context) => {
-    const deceptionKeywords = [
-      "deceive",
-      "lie",
-      "hide",
-      "conceal",
-      "manipulate",
-      "trick",
-      "mislead",
-      "\uC18D\uC774",
-      "\uAC70\uC9D3",
-      "\uC228\uAE30",
-      "\uC870\uC791",
-      "\uAE30\uB9CC",
-      "\uC0AC\uAE30"
-    ];
-    const lower = subject.toLowerCase();
-    const found = deceptionKeywords.some((kw) => lower.includes(kw));
-    const hidingContext = context["hiding"] === true || context["deceptive"] === true;
-    return {
-      passed: !found && !hidingContext,
-      reason: found || hidingContext ? "\uD22C\uBA85\uC131\uC744 \uD574\uCE58\uB294 \uB0B4\uC6A9\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uD22C\uBA85\uC131 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
-    };
-  }
-};
-var privacyPrinciple = {
-  id: "privacy",
-  name: "\uAC1C\uC778\uC815\uBCF4 \uBCF4\uD638",
-  description: "\uAC1C\uC778\uC758 \uD504\uB77C\uC774\uBC84\uC2DC\uC640 \uB370\uC774\uD130 \uBCF4\uD638 \uAD8C\uB9AC\uB97C \uC874\uC911\uD574\uC57C \uD55C\uB2E4",
-  framework: "care",
-  check: (subject, context) => {
-    const privacyKeywords = [
-      "personal data",
-      "private information",
-      "ssn",
-      "social security",
-      "credit card",
-      "password",
-      "expose private",
-      "\uC8FC\uBBFC\uBC88\uD638",
-      "\uAC1C\uC778\uC815\uBCF4 \uC720\uCD9C",
-      "\uBE44\uBC00\uBC88\uD638 \uB178\uCD9C",
-      "\uC0AC\uC0DD\uD65C \uCE68\uD574",
-      "doxx",
-      "doxing",
-      "stalk"
-    ];
-    const lower = subject.toLowerCase();
-    const found = privacyKeywords.some((kw) => lower.includes(kw));
-    const privacyViolation = context["privacy_violation"] === true;
-    return {
-      passed: !found && !privacyViolation,
-      reason: found || privacyViolation ? "\uAC1C\uC778\uC815\uBCF4 \uBCF4\uD638 \uC704\uBC18\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uAC1C\uC778\uC815\uBCF4 \uBCF4\uD638 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
-    };
-  }
-};
-var autonomyPrinciple = {
-  id: "autonomy",
-  name: "\uC790\uC728\uC131 \uC874\uC911",
-  description: "\uC778\uAC04\uC758 \uC790\uC728\uC801 \uC758\uC0AC\uACB0\uC815 \uB2A5\uB825\uC744 \uC874\uC911\uD558\uACE0 \uCD5C\uB300 \uC774\uC775\uC744 \uCD94\uAD6C\uD55C\uB2E4",
-  framework: "utilitarian",
-  check: (subject, context) => {
-    const coercionKeywords = [
-      "force",
-      "coerce",
-      "compel",
-      "override human",
-      "bypass consent",
-      "\uAC15\uC81C",
-      "\uB3D9\uC758 \uC5C6\uC774",
-      "\uD5C8\uB77D \uC5C6\uC774",
-      "\uC790\uC728\uC131 \uCE68\uD574",
-      "\uC778\uAC04 \uBB34\uC2DC",
-      "manipulate user",
-      "control human",
-      "override decision"
-    ];
-    const lower = subject.toLowerCase();
-    const found = coercionKeywords.some((kw) => lower.includes(kw));
-    const autonomyViolation = context["autonomy_violation"] === true;
-    return {
-      passed: !found && !autonomyViolation,
-      reason: found || autonomyViolation ? "\uC778\uAC04\uC758 \uC790\uC728\uC131\uC744 \uCE68\uD574\uD558\uB294 \uB0B4\uC6A9\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uC790\uC728\uC131 \uC874\uC911 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
-    };
-  }
-};
-var DEFAULT_PRINCIPLES = [
-  doNoHarmPrinciple,
-  fairnessPrinciple,
-  transparencyPrinciple,
-  privacyPrinciple,
-  autonomyPrinciple
-];
-var EthicsChecker = class {
-  constructor() {
-    this.principles = [...DEFAULT_PRINCIPLES];
-  }
-  // 기본 원칙 추가
-  addPrinciple(principle) {
-    this.principles.push(principle);
-  }
-  // 윤리 검사
-  check(subject, context = {}) {
-    const violations = [];
-    const frameworkResults = {
-      utilitarian: { passed: true, score: 1, violations: 0 },
-      deontological: { passed: true, score: 1, violations: 0 },
-      virtue: { passed: true, score: 1, violations: 0 },
-      care: { passed: true, score: 1, violations: 0 },
-      fairness: { passed: true, score: 1, violations: 0 }
-    };
-    for (const principle of this.principles) {
-      const result = principle.check(subject, context);
-      if (!result.passed) {
-        const severity = this._determineSeverity(subject, principle, context);
-        const violation = {
-          principle: principle.name,
-          severity,
-          description: result.reason,
-          suggestion: this._generateSuggestion(principle, subject),
-          framework: principle.framework
+var doNoHarmPrinciple, fairnessPrinciple, transparencyPrinciple, privacyPrinciple, autonomyPrinciple, DEFAULT_PRINCIPLES, EthicsChecker, globalEthics;
+var init_ethics_check = __esm({
+  "src/ethics-check.ts"() {
+    doNoHarmPrinciple = {
+      id: "do-no-harm",
+      name: "\uD574\uC545 \uAE08\uC9C0",
+      description: "\uD589\uB3D9\uC774\uB098 \uCD9C\uB825\uC774 \uC778\uAC04\uC774\uB098 \uC0DD\uBA85\uCCB4\uC5D0 \uD574\uB97C \uB07C\uCCD0\uC11C\uB294 \uC548 \uB41C\uB2E4",
+      framework: "deontological",
+      check: (subject, _context) => {
+        const harmKeywords = [
+          "kill",
+          "murder",
+          "harm",
+          "hurt",
+          "injure",
+          "damage",
+          "destroy",
+          "\uC8FD",
+          "\uC0B4\uC778",
+          "\uD574\uCE58",
+          "\uD3ED\uB825",
+          "\uD3ED\uBC1C",
+          "\uD3ED\uD0C4",
+          "\uB3C5",
+          "\uC790\uC0B4",
+          "weapon",
+          "bomb",
+          "poison",
+          "explosive",
+          "attack",
+          "violence",
+          "illegal",
+          "steal",
+          "theft",
+          "fraud",
+          "abuse"
+        ];
+        const lower = subject.toLowerCase();
+        const found = harmKeywords.some((kw) => lower.includes(kw));
+        return {
+          passed: !found,
+          reason: found ? `\uD574\uC545\uC744 \uCD08\uB798\uD560 \uC218 \uC788\uB294 \uB0B4\uC6A9\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4: "${subject.substring(0, 50)}"` : "\uD574\uC545 \uAE08\uC9C0 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
         };
-        violations.push(violation);
-        frameworkResults[principle.framework].passed = false;
-        frameworkResults[principle.framework].violations += 1;
       }
-    }
-    const principlesByFramework = {
-      utilitarian: 0,
-      deontological: 0,
-      virtue: 0,
-      care: 0,
-      fairness: 0
     };
-    for (const p of this.principles) {
-      principlesByFramework[p.framework] = (principlesByFramework[p.framework] || 0) + 1;
-    }
-    for (const fw of Object.keys(frameworkResults)) {
-      const total = principlesByFramework[fw] || 1;
-      const violated = frameworkResults[fw].violations;
-      frameworkResults[fw].score = Math.max(0, 1 - violated / total);
-    }
-    let penaltySum = 0;
-    for (const v of violations) {
-      penaltySum += this._severityPenalty(v.severity);
-    }
-    const score = Math.max(0, 1 - penaltySum / Math.max(this.principles.length, 1));
-    const passed = violations.length === 0;
-    const hasCritical = violations.some((v) => v.severity === "critical");
-    const hasHigh = violations.some((v) => v.severity === "high");
-    const requiresHumanReview = hasCritical || hasHigh;
-    const frameworks = {
-      utilitarian: { passed: frameworkResults.utilitarian.passed, score: frameworkResults.utilitarian.score },
-      deontological: { passed: frameworkResults.deontological.passed, score: frameworkResults.deontological.score },
-      virtue: { passed: frameworkResults.virtue.passed, score: frameworkResults.virtue.score },
-      care: { passed: frameworkResults.care.passed, score: frameworkResults.care.score },
-      fairness: { passed: frameworkResults.fairness.passed, score: frameworkResults.fairness.score }
-    };
-    const recommendation = this._generateRecommendation(passed, violations, score);
-    return {
-      subject,
-      passed,
-      violations,
-      score,
-      frameworks,
-      recommendation,
-      requiresHumanReview
-    };
-  }
-  // 특정 프레임워크로만 검사
-  checkByFramework(subject, framework, context = {}) {
-    const relevantPrinciples = this.principles.filter((p) => p.framework === framework);
-    const violations = [];
-    for (const principle of relevantPrinciples) {
-      const result = principle.check(subject, context);
-      if (!result.passed) {
-        const severity = this._determineSeverity(subject, principle, context);
-        violations.push({
-          principle: principle.name,
-          severity,
-          description: result.reason,
-          suggestion: this._generateSuggestion(principle, subject),
-          framework: principle.framework
-        });
+    fairnessPrinciple = {
+      id: "fairness",
+      name: "\uACF5\uC815\uC131",
+      description: "\uBAA8\uB4E0 \uAC1C\uC778\uACFC \uC9D1\uB2E8\uC744 \uACF5\uC815\uD558\uAC8C \uB300\uC6B0\uD574\uC57C \uD55C\uB2E4",
+      framework: "fairness",
+      check: (subject, _context) => {
+        const discriminationKeywords = [
+          "racist",
+          "sexist",
+          "discriminat",
+          "prejudice",
+          "bias against",
+          "\uCC28\uBCC4",
+          "\uD3B8\uACAC",
+          "\uD610\uC624",
+          "\uC778\uC885\uCC28\uBCC4",
+          "\uC131\uCC28\uBCC4",
+          "\uC7A5\uC560\uC778 \uCC28\uBCC4",
+          "inferior",
+          "superior race",
+          "stereotype"
+        ];
+        const lower = subject.toLowerCase();
+        const found = discriminationKeywords.some((kw) => lower.includes(kw));
+        return {
+          passed: !found,
+          reason: found ? "\uCC28\uBCC4 \uB610\uB294 \uD3B8\uACAC\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uACF5\uC815\uC131 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
+        };
       }
-    }
-    const total = relevantPrinciples.length || 1;
-    const score = Math.max(0, 1 - violations.reduce((sum, v) => sum + this._severityPenalty(v.severity), 0) / total);
-    return {
-      passed: violations.length === 0,
-      score,
-      violations
     };
-  }
-  // 위반 없는지 빠른 확인
-  isEthical(subject, context = {}) {
-    for (const principle of this.principles) {
-      const result = principle.check(subject, context);
-      if (!result.passed) return false;
-    }
-    return true;
-  }
-  // 윤리적 대안 제시
-  suggestEthicalAlternative(subject, violations) {
-    if (violations.length === 0) {
-      return `"${subject.substring(0, 50)}"\uC740(\uB294) \uC774\uBBF8 \uC724\uB9AC\uC801\uC785\uB2C8\uB2E4. \uBCC0\uACBD\uC774 \uD544\uC694\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.`;
-    }
-    const suggestions = [];
-    const frameworks = new Set(violations.map((v) => v.framework));
-    for (const v of violations) {
-      suggestions.push(`\u2022 [${v.framework}] ${v.suggestion}`);
-    }
-    const frameworkAdvice = [];
-    if (frameworks.has("deontological")) frameworkAdvice.push("\uC758\uBB34\uB860\uC801 \uAD00\uC810: \uC808\uB300\uC801 \uD574\uC545\uC744 \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624");
-    if (frameworks.has("utilitarian")) frameworkAdvice.push("\uACF5\uB9AC\uC8FC\uC758\uC801 \uAD00\uC810: \uCD5C\uB300 \uB2E4\uC218\uC758 \uCD5C\uB300 \uC774\uC775\uC744 \uCD94\uAD6C\uD558\uC2ED\uC2DC\uC624");
-    if (frameworks.has("virtue")) frameworkAdvice.push("\uB355 \uC724\uB9AC \uAD00\uC810: \uD22C\uBA85\uD558\uACE0 \uC815\uC9C1\uD55C \uBC29\uC2DD\uC744 \uD0DD\uD558\uC2ED\uC2DC\uC624");
-    if (frameworks.has("care")) frameworkAdvice.push("\uB3CC\uBD04 \uC724\uB9AC \uAD00\uC810: \uCDE8\uC57D\uD55C \uAC1C\uC778\uC758 \uAD8C\uB9AC\uB97C \uBCF4\uD638\uD558\uC2ED\uC2DC\uC624");
-    if (frameworks.has("fairness")) frameworkAdvice.push("\uACF5\uC815\uC131 \uAD00\uC810: \uBAA8\uB4E0 \uC9D1\uB2E8\uC744 \uB3D9\uB4F1\uD558\uAC8C \uB300\uC6B0\uD558\uC2ED\uC2DC\uC624");
-    return [
-      `\uC724\uB9AC\uC801 \uB300\uC548 \uC81C\uC548 (${violations.length}\uAC1C \uC704\uBC18):`,
-      ...suggestions,
-      "",
-      "\uD504\uB808\uC784\uC6CC\uD06C\uBCC4 \uAD8C\uACE0\uC0AC\uD56D:",
-      ...frameworkAdvice,
-      "",
-      "\uAD8C\uC7A5: \uC704 \uC0AC\uD56D\uB4E4\uC744 \uBC18\uC601\uD558\uC5EC \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uAC70\uB098 \uC804\uBB38\uAC00\uC758 \uAC80\uD1A0\uB97C \uBC1B\uC73C\uC2ED\uC2DC\uC624."
-    ].join("\n");
-  }
-  // 리스크 레벨
-  riskLevel(result) {
-    if (result.violations.length === 0) return "none";
-    const hasCritical = result.violations.some((v) => v.severity === "critical");
-    if (hasCritical) return "critical";
-    const hasHigh = result.violations.some((v) => v.severity === "high");
-    if (hasHigh) return "high";
-    const hasMedium = result.violations.some((v) => v.severity === "medium");
-    if (hasMedium) return "medium";
-    return "low";
-  }
-  _determineSeverity(subject, principle, context) {
-    const lower = subject.toLowerCase();
-    const criticalKeywords = ["kill", "murder", "bomb", "explosive", "\uC0B4\uC778", "\uD3ED\uD0C4", "\uC790\uC0B4"];
-    if (criticalKeywords.some((kw) => lower.includes(kw))) return "critical";
-    const highKeywords = ["doxx", "doxing", "stalk", "racist", "sexist", "\uC8FC\uBBFC\uBC88\uD638", "\uC0AC\uAE30"];
-    if (highKeywords.some((kw) => lower.includes(kw))) return "high";
-    const ctxSeverity = context["severity"];
-    if (ctxSeverity === "critical") return "critical";
-    if (ctxSeverity === "high") return "high";
-    if (ctxSeverity === "medium") return "medium";
-    const mediumKeywords = ["harm", "hurt", "damage", "\uD574\uCE58", "\uC190\uD574", "manipulate"];
-    if (mediumKeywords.some((kw) => lower.includes(kw))) return "medium";
-    return "low";
-  }
-  _generateSuggestion(principle, subject) {
-    const suggestions = {
-      "do-no-harm": "\uD574\uC545\uC744 \uCD08\uB798\uD558\uC9C0 \uC54A\uB294 \uBC29\uD5A5\uC73C\uB85C \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uAC70\uB098, \uC720\uD574\uD55C \uC694\uC18C\uB97C \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624",
-      "fairness": "\uBAA8\uB4E0 \uC9D1\uB2E8\uC744 \uACF5\uD3C9\uD558\uAC8C \uD45C\uD604\uD558\uACE0, \uCC28\uBCC4\uC801 \uC5B8\uC5B4\uB098 \uAD00\uC810\uC744 \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624",
-      "transparency": "\uC758\uC0AC\uACB0\uC815 \uACFC\uC815\uC744 \uBA85\uD655\uD788 \uC124\uBA85\uD558\uACE0, \uC228\uAE40\uC774\uB098 \uAE30\uB9CC \uC694\uC18C\uB97C \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624",
-      "privacy": "\uAC1C\uC778\uC2DD\uBCC4 \uC815\uBCF4\uB97C \uC775\uBA85\uD654\uD558\uACE0, \uB3D9\uC758 \uC5C6\uB294 \uAC1C\uC778\uC815\uBCF4 \uCC98\uB9AC\uB97C \uC911\uB2E8\uD558\uC2ED\uC2DC\uC624",
-      "autonomy": "\uC0AC\uC6A9\uC790\uC758 \uC790\uC720\uB85C\uC6B4 \uC120\uD0DD\uC744 \uBCF4\uC7A5\uD558\uACE0, \uAC15\uC81C\uB098 \uC870\uC791 \uC694\uC18C\uB97C \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624"
+    transparencyPrinciple = {
+      id: "transparency",
+      name: "\uD22C\uBA85\uC131",
+      description: "AI \uC2DC\uC2A4\uD15C\uC758 \uC758\uC0AC\uACB0\uC815 \uACFC\uC815\uC740 \uD22C\uBA85\uD558\uACE0 \uC124\uBA85 \uAC00\uB2A5\uD574\uC57C \uD55C\uB2E4",
+      framework: "virtue",
+      check: (subject, context) => {
+        const deceptionKeywords = [
+          "deceive",
+          "lie",
+          "hide",
+          "conceal",
+          "manipulate",
+          "trick",
+          "mislead",
+          "\uC18D\uC774",
+          "\uAC70\uC9D3",
+          "\uC228\uAE30",
+          "\uC870\uC791",
+          "\uAE30\uB9CC",
+          "\uC0AC\uAE30"
+        ];
+        const lower = subject.toLowerCase();
+        const found = deceptionKeywords.some((kw) => lower.includes(kw));
+        const hidingContext = context["hiding"] === true || context["deceptive"] === true;
+        return {
+          passed: !found && !hidingContext,
+          reason: found || hidingContext ? "\uD22C\uBA85\uC131\uC744 \uD574\uCE58\uB294 \uB0B4\uC6A9\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uD22C\uBA85\uC131 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
+        };
+      }
     };
-    return suggestions[principle.id] || `${principle.name} \uC6D0\uCE59\uC5D0 \uB9DE\uAC8C \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uC2ED\uC2DC\uC624`;
-  }
-  _severityPenalty(severity) {
-    const penalties = {
-      low: 0.1,
-      medium: 0.25,
-      high: 0.5,
-      critical: 1
+    privacyPrinciple = {
+      id: "privacy",
+      name: "\uAC1C\uC778\uC815\uBCF4 \uBCF4\uD638",
+      description: "\uAC1C\uC778\uC758 \uD504\uB77C\uC774\uBC84\uC2DC\uC640 \uB370\uC774\uD130 \uBCF4\uD638 \uAD8C\uB9AC\uB97C \uC874\uC911\uD574\uC57C \uD55C\uB2E4",
+      framework: "care",
+      check: (subject, context) => {
+        const privacyKeywords = [
+          "personal data",
+          "private information",
+          "ssn",
+          "social security",
+          "credit card",
+          "password",
+          "expose private",
+          "\uC8FC\uBBFC\uBC88\uD638",
+          "\uAC1C\uC778\uC815\uBCF4 \uC720\uCD9C",
+          "\uBE44\uBC00\uBC88\uD638 \uB178\uCD9C",
+          "\uC0AC\uC0DD\uD65C \uCE68\uD574",
+          "doxx",
+          "doxing",
+          "stalk"
+        ];
+        const lower = subject.toLowerCase();
+        const found = privacyKeywords.some((kw) => lower.includes(kw));
+        const privacyViolation = context["privacy_violation"] === true;
+        return {
+          passed: !found && !privacyViolation,
+          reason: found || privacyViolation ? "\uAC1C\uC778\uC815\uBCF4 \uBCF4\uD638 \uC704\uBC18\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uAC1C\uC778\uC815\uBCF4 \uBCF4\uD638 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
+        };
+      }
     };
-    return penalties[severity] || 0.1;
+    autonomyPrinciple = {
+      id: "autonomy",
+      name: "\uC790\uC728\uC131 \uC874\uC911",
+      description: "\uC778\uAC04\uC758 \uC790\uC728\uC801 \uC758\uC0AC\uACB0\uC815 \uB2A5\uB825\uC744 \uC874\uC911\uD558\uACE0 \uCD5C\uB300 \uC774\uC775\uC744 \uCD94\uAD6C\uD55C\uB2E4",
+      framework: "utilitarian",
+      check: (subject, context) => {
+        const coercionKeywords = [
+          "force",
+          "coerce",
+          "compel",
+          "override human",
+          "bypass consent",
+          "\uAC15\uC81C",
+          "\uB3D9\uC758 \uC5C6\uC774",
+          "\uD5C8\uB77D \uC5C6\uC774",
+          "\uC790\uC728\uC131 \uCE68\uD574",
+          "\uC778\uAC04 \uBB34\uC2DC",
+          "manipulate user",
+          "control human",
+          "override decision"
+        ];
+        const lower = subject.toLowerCase();
+        const found = coercionKeywords.some((kw) => lower.includes(kw));
+        const autonomyViolation = context["autonomy_violation"] === true;
+        return {
+          passed: !found && !autonomyViolation,
+          reason: found || autonomyViolation ? "\uC778\uAC04\uC758 \uC790\uC728\uC131\uC744 \uCE68\uD574\uD558\uB294 \uB0B4\uC6A9\uC774 \uAC10\uC9C0\uB418\uC5C8\uC2B5\uB2C8\uB2E4" : "\uC790\uC728\uC131 \uC874\uC911 \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4"
+        };
+      }
+    };
+    DEFAULT_PRINCIPLES = [
+      doNoHarmPrinciple,
+      fairnessPrinciple,
+      transparencyPrinciple,
+      privacyPrinciple,
+      autonomyPrinciple
+    ];
+    EthicsChecker = class {
+      constructor() {
+        this.principles = [...DEFAULT_PRINCIPLES];
+      }
+      // 기본 원칙 추가
+      addPrinciple(principle) {
+        this.principles.push(principle);
+      }
+      // 윤리 검사
+      check(subject, context = {}) {
+        const violations = [];
+        const frameworkResults = {
+          utilitarian: { passed: true, score: 1, violations: 0 },
+          deontological: { passed: true, score: 1, violations: 0 },
+          virtue: { passed: true, score: 1, violations: 0 },
+          care: { passed: true, score: 1, violations: 0 },
+          fairness: { passed: true, score: 1, violations: 0 }
+        };
+        for (const principle of this.principles) {
+          const result = principle.check(subject, context);
+          if (!result.passed) {
+            const severity = this._determineSeverity(subject, principle, context);
+            const violation = {
+              principle: principle.name,
+              severity,
+              description: result.reason,
+              suggestion: this._generateSuggestion(principle, subject),
+              framework: principle.framework
+            };
+            violations.push(violation);
+            frameworkResults[principle.framework].passed = false;
+            frameworkResults[principle.framework].violations += 1;
+          }
+        }
+        const principlesByFramework = {
+          utilitarian: 0,
+          deontological: 0,
+          virtue: 0,
+          care: 0,
+          fairness: 0
+        };
+        for (const p of this.principles) {
+          principlesByFramework[p.framework] = (principlesByFramework[p.framework] || 0) + 1;
+        }
+        for (const fw of Object.keys(frameworkResults)) {
+          const total = principlesByFramework[fw] || 1;
+          const violated = frameworkResults[fw].violations;
+          frameworkResults[fw].score = Math.max(0, 1 - violated / total);
+        }
+        let penaltySum = 0;
+        for (const v of violations) {
+          penaltySum += this._severityPenalty(v.severity);
+        }
+        const score = Math.max(0, 1 - penaltySum / Math.max(this.principles.length, 1));
+        const passed = violations.length === 0;
+        const hasCritical = violations.some((v) => v.severity === "critical");
+        const hasHigh = violations.some((v) => v.severity === "high");
+        const requiresHumanReview = hasCritical || hasHigh;
+        const frameworks = {
+          utilitarian: { passed: frameworkResults.utilitarian.passed, score: frameworkResults.utilitarian.score },
+          deontological: { passed: frameworkResults.deontological.passed, score: frameworkResults.deontological.score },
+          virtue: { passed: frameworkResults.virtue.passed, score: frameworkResults.virtue.score },
+          care: { passed: frameworkResults.care.passed, score: frameworkResults.care.score },
+          fairness: { passed: frameworkResults.fairness.passed, score: frameworkResults.fairness.score }
+        };
+        const recommendation = this._generateRecommendation(passed, violations, score);
+        return {
+          subject,
+          passed,
+          violations,
+          score,
+          frameworks,
+          recommendation,
+          requiresHumanReview
+        };
+      }
+      // 특정 프레임워크로만 검사
+      checkByFramework(subject, framework, context = {}) {
+        const relevantPrinciples = this.principles.filter((p) => p.framework === framework);
+        const violations = [];
+        for (const principle of relevantPrinciples) {
+          const result = principle.check(subject, context);
+          if (!result.passed) {
+            const severity = this._determineSeverity(subject, principle, context);
+            violations.push({
+              principle: principle.name,
+              severity,
+              description: result.reason,
+              suggestion: this._generateSuggestion(principle, subject),
+              framework: principle.framework
+            });
+          }
+        }
+        const total = relevantPrinciples.length || 1;
+        const score = Math.max(0, 1 - violations.reduce((sum, v) => sum + this._severityPenalty(v.severity), 0) / total);
+        return {
+          passed: violations.length === 0,
+          score,
+          violations
+        };
+      }
+      // 위반 없는지 빠른 확인
+      isEthical(subject, context = {}) {
+        for (const principle of this.principles) {
+          const result = principle.check(subject, context);
+          if (!result.passed) return false;
+        }
+        return true;
+      }
+      // 윤리적 대안 제시
+      suggestEthicalAlternative(subject, violations) {
+        if (violations.length === 0) {
+          return `"${subject.substring(0, 50)}"\uC740(\uB294) \uC774\uBBF8 \uC724\uB9AC\uC801\uC785\uB2C8\uB2E4. \uBCC0\uACBD\uC774 \uD544\uC694\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.`;
+        }
+        const suggestions = [];
+        const frameworks = new Set(violations.map((v) => v.framework));
+        for (const v of violations) {
+          suggestions.push(`\u2022 [${v.framework}] ${v.suggestion}`);
+        }
+        const frameworkAdvice = [];
+        if (frameworks.has("deontological")) frameworkAdvice.push("\uC758\uBB34\uB860\uC801 \uAD00\uC810: \uC808\uB300\uC801 \uD574\uC545\uC744 \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624");
+        if (frameworks.has("utilitarian")) frameworkAdvice.push("\uACF5\uB9AC\uC8FC\uC758\uC801 \uAD00\uC810: \uCD5C\uB300 \uB2E4\uC218\uC758 \uCD5C\uB300 \uC774\uC775\uC744 \uCD94\uAD6C\uD558\uC2ED\uC2DC\uC624");
+        if (frameworks.has("virtue")) frameworkAdvice.push("\uB355 \uC724\uB9AC \uAD00\uC810: \uD22C\uBA85\uD558\uACE0 \uC815\uC9C1\uD55C \uBC29\uC2DD\uC744 \uD0DD\uD558\uC2ED\uC2DC\uC624");
+        if (frameworks.has("care")) frameworkAdvice.push("\uB3CC\uBD04 \uC724\uB9AC \uAD00\uC810: \uCDE8\uC57D\uD55C \uAC1C\uC778\uC758 \uAD8C\uB9AC\uB97C \uBCF4\uD638\uD558\uC2ED\uC2DC\uC624");
+        if (frameworks.has("fairness")) frameworkAdvice.push("\uACF5\uC815\uC131 \uAD00\uC810: \uBAA8\uB4E0 \uC9D1\uB2E8\uC744 \uB3D9\uB4F1\uD558\uAC8C \uB300\uC6B0\uD558\uC2ED\uC2DC\uC624");
+        return [
+          `\uC724\uB9AC\uC801 \uB300\uC548 \uC81C\uC548 (${violations.length}\uAC1C \uC704\uBC18):`,
+          ...suggestions,
+          "",
+          "\uD504\uB808\uC784\uC6CC\uD06C\uBCC4 \uAD8C\uACE0\uC0AC\uD56D:",
+          ...frameworkAdvice,
+          "",
+          "\uAD8C\uC7A5: \uC704 \uC0AC\uD56D\uB4E4\uC744 \uBC18\uC601\uD558\uC5EC \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uAC70\uB098 \uC804\uBB38\uAC00\uC758 \uAC80\uD1A0\uB97C \uBC1B\uC73C\uC2ED\uC2DC\uC624."
+        ].join("\n");
+      }
+      // 리스크 레벨
+      riskLevel(result) {
+        if (result.violations.length === 0) return "none";
+        const hasCritical = result.violations.some((v) => v.severity === "critical");
+        if (hasCritical) return "critical";
+        const hasHigh = result.violations.some((v) => v.severity === "high");
+        if (hasHigh) return "high";
+        const hasMedium = result.violations.some((v) => v.severity === "medium");
+        if (hasMedium) return "medium";
+        return "low";
+      }
+      _determineSeverity(subject, principle, context) {
+        const lower = subject.toLowerCase();
+        const criticalKeywords = ["kill", "murder", "bomb", "explosive", "\uC0B4\uC778", "\uD3ED\uD0C4", "\uC790\uC0B4"];
+        if (criticalKeywords.some((kw) => lower.includes(kw))) return "critical";
+        const highKeywords = ["doxx", "doxing", "stalk", "racist", "sexist", "\uC8FC\uBBFC\uBC88\uD638", "\uC0AC\uAE30"];
+        if (highKeywords.some((kw) => lower.includes(kw))) return "high";
+        const ctxSeverity = context["severity"];
+        if (ctxSeverity === "critical") return "critical";
+        if (ctxSeverity === "high") return "high";
+        if (ctxSeverity === "medium") return "medium";
+        const mediumKeywords = ["harm", "hurt", "damage", "\uD574\uCE58", "\uC190\uD574", "manipulate"];
+        if (mediumKeywords.some((kw) => lower.includes(kw))) return "medium";
+        return "low";
+      }
+      _generateSuggestion(principle, subject) {
+        const suggestions = {
+          "do-no-harm": "\uD574\uC545\uC744 \uCD08\uB798\uD558\uC9C0 \uC54A\uB294 \uBC29\uD5A5\uC73C\uB85C \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uAC70\uB098, \uC720\uD574\uD55C \uC694\uC18C\uB97C \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624",
+          "fairness": "\uBAA8\uB4E0 \uC9D1\uB2E8\uC744 \uACF5\uD3C9\uD558\uAC8C \uD45C\uD604\uD558\uACE0, \uCC28\uBCC4\uC801 \uC5B8\uC5B4\uB098 \uAD00\uC810\uC744 \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624",
+          "transparency": "\uC758\uC0AC\uACB0\uC815 \uACFC\uC815\uC744 \uBA85\uD655\uD788 \uC124\uBA85\uD558\uACE0, \uC228\uAE40\uC774\uB098 \uAE30\uB9CC \uC694\uC18C\uB97C \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624",
+          "privacy": "\uAC1C\uC778\uC2DD\uBCC4 \uC815\uBCF4\uB97C \uC775\uBA85\uD654\uD558\uACE0, \uB3D9\uC758 \uC5C6\uB294 \uAC1C\uC778\uC815\uBCF4 \uCC98\uB9AC\uB97C \uC911\uB2E8\uD558\uC2ED\uC2DC\uC624",
+          "autonomy": "\uC0AC\uC6A9\uC790\uC758 \uC790\uC720\uB85C\uC6B4 \uC120\uD0DD\uC744 \uBCF4\uC7A5\uD558\uACE0, \uAC15\uC81C\uB098 \uC870\uC791 \uC694\uC18C\uB97C \uC81C\uAC70\uD558\uC2ED\uC2DC\uC624"
+        };
+        return suggestions[principle.id] || `${principle.name} \uC6D0\uCE59\uC5D0 \uB9DE\uAC8C \uB0B4\uC6A9\uC744 \uC218\uC815\uD558\uC2ED\uC2DC\uC624`;
+      }
+      _severityPenalty(severity) {
+        const penalties = {
+          low: 0.1,
+          medium: 0.25,
+          high: 0.5,
+          critical: 1
+        };
+        return penalties[severity] || 0.1;
+      }
+      _generateRecommendation(passed, violations, score) {
+        if (passed) {
+          return score >= 0.9 ? "\uBAA8\uB4E0 \uC724\uB9AC \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4. \uC548\uC804\uD558\uAC8C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." : "\uC8FC\uC694 \uC6D0\uCE59\uC740 \uD1B5\uACFC\uD588\uC73C\uB098 \uC77C\uBD80 \uAC1C\uC120 \uC5EC\uC9C0\uAC00 \uC788\uC2B5\uB2C8\uB2E4.";
+        }
+        const criticalCount = violations.filter((v) => v.severity === "critical").length;
+        const highCount = violations.filter((v) => v.severity === "high").length;
+        if (criticalCount > 0) {
+          return `\uC2EC\uAC01\uD55C \uC724\uB9AC \uC704\uBC18 ${criticalCount}\uAC74\uC774 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC989\uC2DC \uC0AC\uC6A9\uC744 \uC911\uB2E8\uD558\uACE0 \uC804\uBB38\uAC00 \uAC80\uD1A0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.`;
+        }
+        if (highCount > 0) {
+          return `\uC911\uB300\uD55C \uC724\uB9AC \uC704\uBC18 ${highCount}\uAC74\uC774 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC778\uAC04 \uC804\uBB38\uAC00\uC758 \uAC80\uD1A0\uAC00 \uAD8C\uC7A5\uB429\uB2C8\uB2E4.`;
+        }
+        return `\uACBD\uBBF8\uD55C \uC724\uB9AC \uC704\uBC18 ${violations.length}\uAC74\uC774 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC81C\uC548 \uC0AC\uD56D\uC744 \uCC38\uACE0\uD558\uC5EC \uC218\uC815\uD558\uC2ED\uC2DC\uC624.`;
+      }
+    };
+    globalEthics = new EthicsChecker();
   }
-  _generateRecommendation(passed, violations, score) {
-    if (passed) {
-      return score >= 0.9 ? "\uBAA8\uB4E0 \uC724\uB9AC \uC6D0\uCE59\uC744 \uC900\uC218\uD569\uB2C8\uB2E4. \uC548\uC804\uD558\uAC8C \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4." : "\uC8FC\uC694 \uC6D0\uCE59\uC740 \uD1B5\uACFC\uD588\uC73C\uB098 \uC77C\uBD80 \uAC1C\uC120 \uC5EC\uC9C0\uAC00 \uC788\uC2B5\uB2C8\uB2E4.";
-    }
-    const criticalCount = violations.filter((v) => v.severity === "critical").length;
-    const highCount = violations.filter((v) => v.severity === "high").length;
-    if (criticalCount > 0) {
-      return `\uC2EC\uAC01\uD55C \uC724\uB9AC \uC704\uBC18 ${criticalCount}\uAC74\uC774 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC989\uC2DC \uC0AC\uC6A9\uC744 \uC911\uB2E8\uD558\uACE0 \uC804\uBB38\uAC00 \uAC80\uD1A0\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.`;
-    }
-    if (highCount > 0) {
-      return `\uC911\uB300\uD55C \uC724\uB9AC \uC704\uBC18 ${highCount}\uAC74\uC774 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC778\uAC04 \uC804\uBB38\uAC00\uC758 \uAC80\uD1A0\uAC00 \uAD8C\uC7A5\uB429\uB2C8\uB2E4.`;
-    }
-    return `\uACBD\uBBF8\uD55C \uC724\uB9AC \uC704\uBC18 ${violations.length}\uAC74\uC774 \uBC1C\uACAC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC81C\uC548 \uC0AC\uD56D\uC744 \uCC38\uACE0\uD558\uC5EC \uC218\uC815\uD558\uC2ED\uC2DC\uC624.`;
-  }
-};
-var globalEthics = new EthicsChecker();
+});
 
 // src/curiosity.ts
-var CuriosityEngine = class {
-  constructor(initialTopics) {
-    this.state = {
-      explored: /* @__PURE__ */ new Set(),
-      frontier: initialTopics ? [...initialTopics] : [],
-      knowledgeGaps: [],
-      curiosityScore: 0.5,
-      explorationHistory: []
-    };
-    this.ucb1Stats = /* @__PURE__ */ new Map();
-    this.totalVisits = 0;
-    for (const t of this.state.frontier) {
-      this.ucb1Stats.set(t, { visits: 0, totalGain: 0 });
-    }
-  }
-  /**
-   * 호기심 점수 계산
-   * - knownFacts가 많을수록 낮음 (이미 알고 있으니 덜 궁금)
-   * - knownFacts가 없을수록 높음 (아무것도 모르니 궁금)
-   */
-  computeCuriosity(topic, knownFacts) {
-    const baseCuriosity = knownFacts.length === 0 ? 1 : Math.max(0, 1 - knownFacts.length * 0.15);
-    const explorationPenalty = this.state.explored.has(topic) ? 0.3 : 0;
-    const raw = baseCuriosity - explorationPenalty;
-    return Math.max(0, Math.min(1, raw));
-  }
-  /**
-   * 다음 탐색 대상 선택 (UCB1 기반)
-   * UCB1 = avgGain + C * sqrt(ln(N) / n_i)
-   * C = 탐색 계수 (1.41 = sqrt(2))
-   */
-  selectNextTopic() {
-    if (this.state.frontier.length === 0) return null;
-    const C2 = Math.SQRT2;
-    const N = Math.max(1, this.totalVisits);
-    let bestTopic = null;
-    let bestScore = -Infinity;
-    for (const topic of this.state.frontier) {
-      const stats = this.ucb1Stats.get(topic) ?? { visits: 0, totalGain: 0 };
-      const avgGain = stats.visits > 0 ? stats.totalGain / stats.visits : 0;
-      const exploration = C2 * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
-      const ucb1Score = avgGain + exploration;
-      if (ucb1Score > bestScore) {
-        bestScore = ucb1Score;
-        bestTopic = topic;
-      }
-    }
-    return bestTopic;
-  }
-  /**
-   * 탐색 수행
-   * explorerFunc: (topic) => { facts, questions }
-   */
-  explore(topic, explorerFunc) {
-    const { facts, questions } = explorerFunc(topic);
-    const discovered = facts.filter((f) => !this.state.explored.has(f));
-    const informationGain = discovered.length > 0 ? Math.min(1, discovered.length * 0.2) : 0.05;
-    const surpriseLevel = facts.length > 0 ? Math.min(1, discovered.length / facts.length) : 0;
-    const relatedTopics = questions.map((q) => q.split(/[?!.,]/)[0].trim()).filter((t) => t.length > 0 && !this.state.explored.has(t));
-    this.state.explored.add(topic);
-    this.state.frontier = this.state.frontier.filter((t) => t !== topic);
-    for (const rt of relatedTopics) {
-      if (!this.state.frontier.includes(rt) && !this.state.explored.has(rt)) {
-        this.state.frontier.push(rt);
-        if (!this.ucb1Stats.has(rt)) {
-          this.ucb1Stats.set(rt, { visits: 0, totalGain: 0 });
+var CuriosityEngine, globalCuriosity;
+var init_curiosity = __esm({
+  "src/curiosity.ts"() {
+    CuriosityEngine = class {
+      constructor(initialTopics) {
+        this.state = {
+          explored: /* @__PURE__ */ new Set(),
+          frontier: initialTopics ? [...initialTopics] : [],
+          knowledgeGaps: [],
+          curiosityScore: 0.5,
+          explorationHistory: []
+        };
+        this.ucb1Stats = /* @__PURE__ */ new Map();
+        this.totalVisits = 0;
+        for (const t of this.state.frontier) {
+          this.ucb1Stats.set(t, { visits: 0, totalGain: 0 });
         }
       }
-    }
-    const stats = this.ucb1Stats.get(topic) ?? { visits: 0, totalGain: 0 };
-    stats.visits += 1;
-    stats.totalGain += informationGain;
-    this.ucb1Stats.set(topic, stats);
-    this.totalVisits += 1;
-    this.state.explorationHistory.push({
-      topic,
-      gain: informationGain,
-      timestamp: /* @__PURE__ */ new Date()
-    });
-    this.state.curiosityScore = Math.max(
-      0.1,
-      this.state.curiosityScore - 0.05 + surpriseLevel * 0.1
-    );
-    return {
-      topic,
-      discovered,
-      newQuestions: questions,
-      informationGain,
-      surpriseLevel,
-      relatedTopics
-    };
-  }
-  /**
-   * 지식 공백 식별
-   * allTopics에는 있지만 knownTopics에 없는 것 = 공백
-   */
-  identifyGaps(knownTopics, allTopics) {
-    const knownSet = new Set(knownTopics);
-    const gaps = [];
-    for (const topic of allTopics) {
-      if (!knownSet.has(topic)) {
-        const unknownAspects = [
-          `${topic}\uC758 \uC815\uC758`,
-          `${topic}\uC758 \uC6D0\uB9AC`,
-          `${topic}\uC758 \uC751\uC6A9`
-        ];
-        const priority = this.state.explored.has(topic) ? 0.3 : 0.7;
-        const explorationCost = 0.5;
-        const expectedGain = priority * (1 - explorationCost);
-        gaps.push({
+      /**
+       * 호기심 점수 계산
+       * - knownFacts가 많을수록 낮음 (이미 알고 있으니 덜 궁금)
+       * - knownFacts가 없을수록 높음 (아무것도 모르니 궁금)
+       */
+      computeCuriosity(topic, knownFacts) {
+        const baseCuriosity = knownFacts.length === 0 ? 1 : Math.max(0, 1 - knownFacts.length * 0.15);
+        const explorationPenalty = this.state.explored.has(topic) ? 0.3 : 0;
+        const raw = baseCuriosity - explorationPenalty;
+        return Math.max(0, Math.min(1, raw));
+      }
+      /**
+       * 다음 탐색 대상 선택 (UCB1 기반)
+       * UCB1 = avgGain + C * sqrt(ln(N) / n_i)
+       * C = 탐색 계수 (1.41 = sqrt(2))
+       */
+      selectNextTopic() {
+        if (this.state.frontier.length === 0) return null;
+        const C2 = Math.SQRT2;
+        const N = Math.max(1, this.totalVisits);
+        let bestTopic = null;
+        let bestScore = -Infinity;
+        for (const topic of this.state.frontier) {
+          const stats = this.ucb1Stats.get(topic) ?? { visits: 0, totalGain: 0 };
+          const avgGain = stats.visits > 0 ? stats.totalGain / stats.visits : 0;
+          const exploration = C2 * Math.sqrt(Math.log(N + 1) / (stats.visits + 1));
+          const ucb1Score = avgGain + exploration;
+          if (ucb1Score > bestScore) {
+            bestScore = ucb1Score;
+            bestTopic = topic;
+          }
+        }
+        return bestTopic;
+      }
+      /**
+       * 탐색 수행
+       * explorerFunc: (topic) => { facts, questions }
+       */
+      explore(topic, explorerFunc) {
+        const { facts, questions } = explorerFunc(topic);
+        const discovered = facts.filter((f) => !this.state.explored.has(f));
+        const informationGain = discovered.length > 0 ? Math.min(1, discovered.length * 0.2) : 0.05;
+        const surpriseLevel = facts.length > 0 ? Math.min(1, discovered.length / facts.length) : 0;
+        const relatedTopics = questions.map((q) => q.split(/[?!.,]/)[0].trim()).filter((t) => t.length > 0 && !this.state.explored.has(t));
+        this.state.explored.add(topic);
+        this.state.frontier = this.state.frontier.filter((t) => t !== topic);
+        for (const rt of relatedTopics) {
+          if (!this.state.frontier.includes(rt) && !this.state.explored.has(rt)) {
+            this.state.frontier.push(rt);
+            if (!this.ucb1Stats.has(rt)) {
+              this.ucb1Stats.set(rt, { visits: 0, totalGain: 0 });
+            }
+          }
+        }
+        const stats = this.ucb1Stats.get(topic) ?? { visits: 0, totalGain: 0 };
+        stats.visits += 1;
+        stats.totalGain += informationGain;
+        this.ucb1Stats.set(topic, stats);
+        this.totalVisits += 1;
+        this.state.explorationHistory.push({
           topic,
-          unknownAspects,
-          priority,
-          explorationCost,
-          expectedGain
+          gain: informationGain,
+          timestamp: /* @__PURE__ */ new Date()
+        });
+        this.state.curiosityScore = Math.max(
+          0.1,
+          this.state.curiosityScore - 0.05 + surpriseLevel * 0.1
+        );
+        return {
+          topic,
+          discovered,
+          newQuestions: questions,
+          informationGain,
+          surpriseLevel,
+          relatedTopics
+        };
+      }
+      /**
+       * 지식 공백 식별
+       * allTopics에는 있지만 knownTopics에 없는 것 = 공백
+       */
+      identifyGaps(knownTopics, allTopics) {
+        const knownSet = new Set(knownTopics);
+        const gaps = [];
+        for (const topic of allTopics) {
+          if (!knownSet.has(topic)) {
+            const unknownAspects = [
+              `${topic}\uC758 \uC815\uC758`,
+              `${topic}\uC758 \uC6D0\uB9AC`,
+              `${topic}\uC758 \uC751\uC6A9`
+            ];
+            const priority = this.state.explored.has(topic) ? 0.3 : 0.7;
+            const explorationCost = 0.5;
+            const expectedGain = priority * (1 - explorationCost);
+            gaps.push({
+              topic,
+              unknownAspects,
+              priority,
+              explorationCost,
+              expectedGain
+            });
+          }
+        }
+        gaps.sort((a, b) => b.priority - a.priority);
+        this.state.knowledgeGaps = gaps;
+        return gaps;
+      }
+      /**
+       * 호기심 기반 질문 생성
+       * topic + context를 바탕으로 탐색 질문 생성
+       */
+      generateQuestions(topic, context) {
+        const questions = [
+          `${topic}\uB780 \uBB34\uC5C7\uC778\uAC00?`,
+          `${topic}\uC740 \uC5B4\uB5BB\uAC8C \uB3D9\uC791\uD558\uB294\uAC00?`,
+          `${topic}\uC758 \uD55C\uACC4\uB294 \uBB34\uC5C7\uC778\uAC00?`,
+          `${topic}\uC740 \uBB34\uC5C7\uACFC \uC5F0\uAD00\uB418\uC5B4 \uC788\uB294\uAC00?`
+        ];
+        for (const ctx of context.slice(0, 3)) {
+          questions.push(`${ctx}\uC640 ${topic}\uC758 \uAD00\uACC4\uB294?`);
+        }
+        return questions;
+      }
+      /**
+       * 탐색 우선순위 결정 (UCB1)
+       * topics 목록에서 UCB1 점수 기준 내림차순 정렬
+       */
+      prioritize(topics) {
+        const C2 = Math.SQRT2;
+        const N = Math.max(1, this.totalVisits);
+        return [...topics].sort((a, b) => {
+          const sA = this.ucb1Stats.get(a) ?? { visits: 0, totalGain: 0 };
+          const sB = this.ucb1Stats.get(b) ?? { visits: 0, totalGain: 0 };
+          const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
+          const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
+          return scoreB - scoreA;
         });
       }
-    }
-    gaps.sort((a, b) => b.priority - a.priority);
-    this.state.knowledgeGaps = gaps;
-    return gaps;
-  }
-  /**
-   * 호기심 기반 질문 생성
-   * topic + context를 바탕으로 탐색 질문 생성
-   */
-  generateQuestions(topic, context) {
-    const questions = [
-      `${topic}\uB780 \uBB34\uC5C7\uC778\uAC00?`,
-      `${topic}\uC740 \uC5B4\uB5BB\uAC8C \uB3D9\uC791\uD558\uB294\uAC00?`,
-      `${topic}\uC758 \uD55C\uACC4\uB294 \uBB34\uC5C7\uC778\uAC00?`,
-      `${topic}\uC740 \uBB34\uC5C7\uACFC \uC5F0\uAD00\uB418\uC5B4 \uC788\uB294\uAC00?`
-    ];
-    for (const ctx of context.slice(0, 3)) {
-      questions.push(`${ctx}\uC640 ${topic}\uC758 \uAD00\uACC4\uB294?`);
-    }
-    return questions;
-  }
-  /**
-   * 탐색 우선순위 결정 (UCB1)
-   * topics 목록에서 UCB1 점수 기준 내림차순 정렬
-   */
-  prioritize(topics) {
-    const C2 = Math.SQRT2;
-    const N = Math.max(1, this.totalVisits);
-    return [...topics].sort((a, b) => {
-      const sA = this.ucb1Stats.get(a) ?? { visits: 0, totalGain: 0 };
-      const sB = this.ucb1Stats.get(b) ?? { visits: 0, totalGain: 0 };
-      const scoreA = (sA.visits > 0 ? sA.totalGain / sA.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sA.visits + 1));
-      const scoreB = (sB.visits > 0 ? sB.totalGain / sB.visits : 0) + C2 * Math.sqrt(Math.log(N + 1) / (sB.visits + 1));
-      return scoreB - scoreA;
-    });
-  }
-  /**
-   * 탐색 이력 분석
-   */
-  analyzeExplorationHistory() {
-    const history = this.state.explorationHistory;
-    const totalExplored = history.length;
-    const avgInfoGain = totalExplored > 0 ? history.reduce((s, h) => s + h.gain, 0) / totalExplored : 0;
-    const mostSurprising = history.length > 0 ? history.reduce((best, h) => h.gain > best.gain ? h : best, history[0]).topic : "\uC5C6\uC74C";
-    const topFrontier = this.prioritize(this.state.frontier).slice(0, 3);
-    const recommendations = topFrontier.length > 0 ? topFrontier.map((t) => `${t} \uD0D0\uC0C9 \uAD8C\uC7A5`) : ["\uD0D0\uC0C9 \uB300\uC0C1 \uCD94\uAC00 \uD544\uC694"];
-    return { totalExplored, avgInfoGain, mostSurprising, recommendations };
-  }
-  /**
-   * 현재 상태 반환
-   */
-  getState() {
-    return {
-      explored: new Set(this.state.explored),
-      frontier: [...this.state.frontier],
-      knowledgeGaps: [...this.state.knowledgeGaps],
-      curiosityScore: this.state.curiosityScore,
-      explorationHistory: [...this.state.explorationHistory]
+      /**
+       * 탐색 이력 분석
+       */
+      analyzeExplorationHistory() {
+        const history = this.state.explorationHistory;
+        const totalExplored = history.length;
+        const avgInfoGain = totalExplored > 0 ? history.reduce((s, h) => s + h.gain, 0) / totalExplored : 0;
+        const mostSurprising = history.length > 0 ? history.reduce((best, h) => h.gain > best.gain ? h : best, history[0]).topic : "\uC5C6\uC74C";
+        const topFrontier = this.prioritize(this.state.frontier).slice(0, 3);
+        const recommendations = topFrontier.length > 0 ? topFrontier.map((t) => `${t} \uD0D0\uC0C9 \uAD8C\uC7A5`) : ["\uD0D0\uC0C9 \uB300\uC0C1 \uCD94\uAC00 \uD544\uC694"];
+        return { totalExplored, avgInfoGain, mostSurprising, recommendations };
+      }
+      /**
+       * 현재 상태 반환
+       */
+      getState() {
+        return {
+          explored: new Set(this.state.explored),
+          frontier: [...this.state.frontier],
+          knowledgeGaps: [...this.state.knowledgeGaps],
+          curiosityScore: this.state.curiosityScore,
+          explorationHistory: [...this.state.explorationHistory]
+        };
+      }
     };
+    globalCuriosity = new CuriosityEngine();
   }
-};
-var globalCuriosity = new CuriosityEngine();
+});
 
 // src/wisdom.ts
-var _expIdCounter = 0;
-var _heuristicIdCounter = 0;
 function genExpId() {
   return `exp-${++_expIdCounter}-${Date.now()}`;
 }
@@ -13419,732 +11969,748 @@ function experiencesToHeuristic(exps, domain) {
     derivedFrom: exps.map((e) => e.id)
   };
 }
-var WisdomEngine = class {
-  constructor() {
-    this.experiences = [];
-    this.heuristics = [];
-  }
-  /**
-   * 경험 추가
-   */
-  addExperience(exp) {
-    const newExp = {
-      ...exp,
-      id: genExpId(),
-      timestamp: /* @__PURE__ */ new Date()
-    };
-    this.experiences.push(newExp);
-    return newExp;
-  }
-  /**
-   * 경험에서 휴리스틱 추출 (도메인별 그룹화)
-   */
-  extractHeuristics() {
-    const domainMap = /* @__PURE__ */ new Map();
-    for (const exp of this.experiences) {
-      const list = domainMap.get(exp.domain) ?? [];
-      list.push(exp);
-      domainMap.set(exp.domain, list);
-    }
-    const newHeuristics = [];
-    for (const [domain, exps] of domainMap) {
-      const groups = this._groupSimilarExperiences(exps);
-      for (const group of groups) {
-        const h = experiencesToHeuristic(group, domain);
-        if (h) {
-          const duplicate = this.heuristics.find(
-            (existing) => existing.domain === h.domain && existing.derivedFrom.length === h.derivedFrom.length && existing.derivedFrom.every((id) => h.derivedFrom.includes(id))
-          );
-          if (!duplicate) {
-            newHeuristics.push(h);
+var _expIdCounter, _heuristicIdCounter, WisdomEngine, globalWisdom;
+var init_wisdom = __esm({
+  "src/wisdom.ts"() {
+    _expIdCounter = 0;
+    _heuristicIdCounter = 0;
+    WisdomEngine = class {
+      constructor() {
+        this.experiences = [];
+        this.heuristics = [];
+      }
+      /**
+       * 경험 추가
+       */
+      addExperience(exp) {
+        const newExp = {
+          ...exp,
+          id: genExpId(),
+          timestamp: /* @__PURE__ */ new Date()
+        };
+        this.experiences.push(newExp);
+        return newExp;
+      }
+      /**
+       * 경험에서 휴리스틱 추출 (도메인별 그룹화)
+       */
+      extractHeuristics() {
+        const domainMap = /* @__PURE__ */ new Map();
+        for (const exp of this.experiences) {
+          const list = domainMap.get(exp.domain) ?? [];
+          list.push(exp);
+          domainMap.set(exp.domain, list);
+        }
+        const newHeuristics = [];
+        for (const [domain, exps] of domainMap) {
+          const groups = this._groupSimilarExperiences(exps);
+          for (const group of groups) {
+            const h = experiencesToHeuristic(group, domain);
+            if (h) {
+              const duplicate = this.heuristics.find(
+                (existing) => existing.domain === h.domain && existing.derivedFrom.length === h.derivedFrom.length && existing.derivedFrom.every((id) => h.derivedFrom.includes(id))
+              );
+              if (!duplicate) {
+                newHeuristics.push(h);
+              }
+            }
           }
         }
+        this.heuristics.push(...newHeuristics);
+        return this.heuristics;
       }
-    }
-    this.heuristics.push(...newHeuristics);
-    return this.heuristics;
-  }
-  /**
-   * 유사한 경험들 그룹화
-   */
-  _groupSimilarExperiences(exps) {
-    if (exps.length === 0) return [];
-    if (exps.length === 1) return [exps];
-    const groups = [];
-    const used = /* @__PURE__ */ new Set();
-    for (const exp of exps) {
-      if (used.has(exp.id)) continue;
-      const group = [exp];
-      used.add(exp.id);
-      for (const other of exps) {
-        if (used.has(other.id)) continue;
-        const sim = textSimilarity(exp.situation, other.situation);
-        if (sim >= 0.2) {
-          group.push(other);
-          used.add(other.id);
+      /**
+       * 유사한 경험들 그룹화
+       */
+      _groupSimilarExperiences(exps) {
+        if (exps.length === 0) return [];
+        if (exps.length === 1) return [exps];
+        const groups = [];
+        const used = /* @__PURE__ */ new Set();
+        for (const exp of exps) {
+          if (used.has(exp.id)) continue;
+          const group = [exp];
+          used.add(exp.id);
+          for (const other of exps) {
+            if (used.has(other.id)) continue;
+            const sim = textSimilarity(exp.situation, other.situation);
+            if (sim >= 0.2) {
+              group.push(other);
+              used.add(other.id);
+            }
+          }
+          groups.push(group);
         }
+        return groups;
       }
-      groups.push(group);
-    }
-    return groups;
-  }
-  /**
-   * 상황에 맞는 경험 검색 (유사도 기반)
-   */
-  findRelevantExperiences(situation, limit = 5) {
-    return this.experiences.map((exp) => ({
-      exp,
-      score: textSimilarity(situation, exp.situation) * 0.6 + textSimilarity(situation, exp.lesson) * 0.3 + exp.importance * 0.1
-    })).sort((a, b) => b.score - a.score).slice(0, limit).map(({ exp }) => exp);
-  }
-  /**
-   * 지혜 판단 — 현재 상황에 대한 종합 판단
-   */
-  judge(situation) {
-    const relevantExps = this.findRelevantExperiences(situation, 5);
-    const applicableHeuristics = this._findApplicableHeuristics(situation, 3);
-    const reasoning = [];
-    const caveats = [];
-    const alternatives = [];
-    const successExps = relevantExps.filter((e) => e.success);
-    const failExps = relevantExps.filter((e) => !e.success);
-    if (successExps.length > 0) {
-      reasoning.push(`\uC720\uC0AC\uD55C \uC131\uACF5 \uACBD\uD5D8 ${successExps.length}\uAC74 \uBC1C\uACAC: ${successExps.map((e) => e.lesson).join("; ")}`);
-    }
-    if (failExps.length > 0) {
-      reasoning.push(`\uC720\uC0AC\uD55C \uC2E4\uD328 \uACBD\uD5D8 ${failExps.length}\uAC74 \uBC1C\uACAC: ${failExps.map((e) => e.lesson).join("; ")}`);
-      caveats.push(`\uACFC\uAC70 \uC2E4\uD328 \uD328\uD134 \uC8FC\uC758: ${failExps.map((e) => e.action).join(", ")}`);
-    }
-    for (const h of applicableHeuristics) {
-      reasoning.push(`\uC801\uC6A9 \uAC00\uB2A5\uD55C \uADDC\uCE59(\uC2E0\uB8B0\uB3C4 ${(h.confidence * 100).toFixed(0)}%): ${h.rule}`);
-      if (h.confidence < 0.6) {
-        caveats.push(`\uD734\uB9AC\uC2A4\uD2F1 '${h.rule.slice(0, 40)}...'\uC758 \uC2E0\uB8B0\uB3C4\uAC00 \uB0AE\uC74C (${(h.confidence * 100).toFixed(0)}%)`);
+      /**
+       * 상황에 맞는 경험 검색 (유사도 기반)
+       */
+      findRelevantExperiences(situation, limit = 5) {
+        return this.experiences.map((exp) => ({
+          exp,
+          score: textSimilarity(situation, exp.situation) * 0.6 + textSimilarity(situation, exp.lesson) * 0.3 + exp.importance * 0.1
+        })).sort((a, b) => b.score - a.score).slice(0, limit).map(({ exp }) => exp);
       }
-    }
-    let recommendation;
-    let confidence;
-    if (relevantExps.length === 0 && applicableHeuristics.length === 0) {
-      recommendation = "\uAD00\uB828 \uACBD\uD5D8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4. \uC2E0\uC911\uD558\uAC8C \uC811\uADFC\uD558\uACE0 \uACB0\uACFC\uB97C \uAE30\uB85D\uD558\uC5EC \uC9C0\uD61C\uB97C \uCD95\uC801\uD558\uC138\uC694.";
-      confidence = 0.2;
-      caveats.push("\uACBD\uD5D8\uC774 \uBD80\uC871\uD55C \uC601\uC5ED\uC785\uB2C8\uB2E4");
-      alternatives.push("\uC18C\uADDC\uBAA8 \uC2E4\uD5D8\uC73C\uB85C \uC2DC\uC791\uD558\uC5EC \uACBD\uD5D8\uC744 \uC313\uC744 \uAC83");
-      alternatives.push("\uC720\uC0AC \uBD84\uC57C \uC804\uBB38\uAC00\uC758 \uC758\uACAC \uCC38\uACE0");
-    } else {
-      const successRate = relevantExps.length > 0 ? successExps.length / relevantExps.length : 0.5;
-      if (successRate >= 0.7) {
-        const bestExp = successExps.sort((a, b) => b.importance - a.importance)[0];
-        recommendation = bestExp ? `\uC720\uC0AC \uC131\uACF5 \uACBD\uD5D8 \uAE30\uBC18: '${bestExp.action}' \uC811\uADFC\uBC95 \uAD8C\uC7A5. ${bestExp.lesson}` : "\uACFC\uAC70 \uC131\uACF5 \uD328\uD134\uC744 \uB530\uB974\uB294 \uAC83\uC744 \uAD8C\uC7A5\uD569\uB2C8\uB2E4.";
-        confidence = Math.min(0.9, 0.5 + successRate * 0.4);
-        alternatives.push("\uC810\uC9C4\uC801 \uC811\uADFC\uBC95\uC73C\uB85C \uB9AC\uC2A4\uD06C \uCD5C\uC18C\uD654");
-      } else if (successRate >= 0.4) {
-        recommendation = "\uD63C\uD569\uB41C \uACBD\uD5D8\uC774 \uC788\uC2B5\uB2C8\uB2E4. \uC2E0\uC911\uD558\uAC8C \uC811\uADFC\uD558\uB418, \uC131\uACF5 \uACBD\uD5D8\uC758 \uAD50\uD6C8\uC744 \uC801\uADF9 \uD65C\uC6A9\uD558\uC138\uC694.";
-        confidence = 0.5 + successRate * 0.2;
-        alternatives.push("\uC2E4\uD328 \uACBD\uD5D8\uC5D0\uC11C \uD53C\uD574\uC57C \uD560 \uD328\uD134 \uC2DD\uBCC4");
-        alternatives.push("\uB2E8\uACC4\uBCC4 \uAC80\uC99D\uC744 \uD1B5\uD55C \uB9AC\uC2A4\uD06C \uAD00\uB9AC");
-      } else {
-        const worstExp = failExps.sort((a, b) => b.importance - a.importance)[0];
-        recommendation = worstExp ? `\uC720\uC0AC \uC2E4\uD328 \uACBD\uD5D8 \uB2E4\uC218: '${worstExp.action}' \uBC29\uC2DD\uC740 \uD53C\uD560 \uAC83. \uB300\uC2E0 \uB2E4\uB978 \uC811\uADFC\uBC95 \uD0D0\uC0C9 \uD544\uC694.` : "\uACFC\uAC70 \uC2E4\uD328 \uD328\uD134\uC774 \uB9CE\uC2B5\uB2C8\uB2E4. \uB2E4\uB978 \uC811\uADFC\uBC95\uC744 \uBAA8\uC0C9\uD558\uC138\uC694.";
-        confidence = 0.4;
-        caveats.push("\uC774 \uBC29\uD5A5\uC758 \uACFC\uAC70 \uC131\uACF5\uB960\uC774 \uB0AE\uC2B5\uB2C8\uB2E4");
-        alternatives.push("\uADFC\uBCF8\uC801\uC73C\uB85C \uB2E4\uB978 \uC811\uADFC\uBC95 \uACE0\uB824");
-        alternatives.push("\uC2E4\uD328 \uC6D0\uC778 \uBD84\uC11D \uD6C4 \uC7AC\uC124\uACC4");
+      /**
+       * 지혜 판단 — 현재 상황에 대한 종합 판단
+       */
+      judge(situation) {
+        const relevantExps = this.findRelevantExperiences(situation, 5);
+        const applicableHeuristics = this._findApplicableHeuristics(situation, 3);
+        const reasoning = [];
+        const caveats = [];
+        const alternatives = [];
+        const successExps = relevantExps.filter((e) => e.success);
+        const failExps = relevantExps.filter((e) => !e.success);
+        if (successExps.length > 0) {
+          reasoning.push(`\uC720\uC0AC\uD55C \uC131\uACF5 \uACBD\uD5D8 ${successExps.length}\uAC74 \uBC1C\uACAC: ${successExps.map((e) => e.lesson).join("; ")}`);
+        }
+        if (failExps.length > 0) {
+          reasoning.push(`\uC720\uC0AC\uD55C \uC2E4\uD328 \uACBD\uD5D8 ${failExps.length}\uAC74 \uBC1C\uACAC: ${failExps.map((e) => e.lesson).join("; ")}`);
+          caveats.push(`\uACFC\uAC70 \uC2E4\uD328 \uD328\uD134 \uC8FC\uC758: ${failExps.map((e) => e.action).join(", ")}`);
+        }
+        for (const h of applicableHeuristics) {
+          reasoning.push(`\uC801\uC6A9 \uAC00\uB2A5\uD55C \uADDC\uCE59(\uC2E0\uB8B0\uB3C4 ${(h.confidence * 100).toFixed(0)}%): ${h.rule}`);
+          if (h.confidence < 0.6) {
+            caveats.push(`\uD734\uB9AC\uC2A4\uD2F1 '${h.rule.slice(0, 40)}...'\uC758 \uC2E0\uB8B0\uB3C4\uAC00 \uB0AE\uC74C (${(h.confidence * 100).toFixed(0)}%)`);
+          }
+        }
+        let recommendation;
+        let confidence;
+        if (relevantExps.length === 0 && applicableHeuristics.length === 0) {
+          recommendation = "\uAD00\uB828 \uACBD\uD5D8\uC774 \uBD80\uC871\uD569\uB2C8\uB2E4. \uC2E0\uC911\uD558\uAC8C \uC811\uADFC\uD558\uACE0 \uACB0\uACFC\uB97C \uAE30\uB85D\uD558\uC5EC \uC9C0\uD61C\uB97C \uCD95\uC801\uD558\uC138\uC694.";
+          confidence = 0.2;
+          caveats.push("\uACBD\uD5D8\uC774 \uBD80\uC871\uD55C \uC601\uC5ED\uC785\uB2C8\uB2E4");
+          alternatives.push("\uC18C\uADDC\uBAA8 \uC2E4\uD5D8\uC73C\uB85C \uC2DC\uC791\uD558\uC5EC \uACBD\uD5D8\uC744 \uC313\uC744 \uAC83");
+          alternatives.push("\uC720\uC0AC \uBD84\uC57C \uC804\uBB38\uAC00\uC758 \uC758\uACAC \uCC38\uACE0");
+        } else {
+          const successRate = relevantExps.length > 0 ? successExps.length / relevantExps.length : 0.5;
+          if (successRate >= 0.7) {
+            const bestExp = successExps.sort((a, b) => b.importance - a.importance)[0];
+            recommendation = bestExp ? `\uC720\uC0AC \uC131\uACF5 \uACBD\uD5D8 \uAE30\uBC18: '${bestExp.action}' \uC811\uADFC\uBC95 \uAD8C\uC7A5. ${bestExp.lesson}` : "\uACFC\uAC70 \uC131\uACF5 \uD328\uD134\uC744 \uB530\uB974\uB294 \uAC83\uC744 \uAD8C\uC7A5\uD569\uB2C8\uB2E4.";
+            confidence = Math.min(0.9, 0.5 + successRate * 0.4);
+            alternatives.push("\uC810\uC9C4\uC801 \uC811\uADFC\uBC95\uC73C\uB85C \uB9AC\uC2A4\uD06C \uCD5C\uC18C\uD654");
+          } else if (successRate >= 0.4) {
+            recommendation = "\uD63C\uD569\uB41C \uACBD\uD5D8\uC774 \uC788\uC2B5\uB2C8\uB2E4. \uC2E0\uC911\uD558\uAC8C \uC811\uADFC\uD558\uB418, \uC131\uACF5 \uACBD\uD5D8\uC758 \uAD50\uD6C8\uC744 \uC801\uADF9 \uD65C\uC6A9\uD558\uC138\uC694.";
+            confidence = 0.5 + successRate * 0.2;
+            alternatives.push("\uC2E4\uD328 \uACBD\uD5D8\uC5D0\uC11C \uD53C\uD574\uC57C \uD560 \uD328\uD134 \uC2DD\uBCC4");
+            alternatives.push("\uB2E8\uACC4\uBCC4 \uAC80\uC99D\uC744 \uD1B5\uD55C \uB9AC\uC2A4\uD06C \uAD00\uB9AC");
+          } else {
+            const worstExp = failExps.sort((a, b) => b.importance - a.importance)[0];
+            recommendation = worstExp ? `\uC720\uC0AC \uC2E4\uD328 \uACBD\uD5D8 \uB2E4\uC218: '${worstExp.action}' \uBC29\uC2DD\uC740 \uD53C\uD560 \uAC83. \uB300\uC2E0 \uB2E4\uB978 \uC811\uADFC\uBC95 \uD0D0\uC0C9 \uD544\uC694.` : "\uACFC\uAC70 \uC2E4\uD328 \uD328\uD134\uC774 \uB9CE\uC2B5\uB2C8\uB2E4. \uB2E4\uB978 \uC811\uADFC\uBC95\uC744 \uBAA8\uC0C9\uD558\uC138\uC694.";
+            confidence = 0.4;
+            caveats.push("\uC774 \uBC29\uD5A5\uC758 \uACFC\uAC70 \uC131\uACF5\uB960\uC774 \uB0AE\uC2B5\uB2C8\uB2E4");
+            alternatives.push("\uADFC\uBCF8\uC801\uC73C\uB85C \uB2E4\uB978 \uC811\uADFC\uBC95 \uACE0\uB824");
+            alternatives.push("\uC2E4\uD328 \uC6D0\uC778 \uBD84\uC11D \uD6C4 \uC7AC\uC124\uACC4");
+          }
+        }
+        if (reasoning.length === 0) {
+          reasoning.push("\uC9C1\uC811\uC801\uC73C\uB85C \uAD00\uB828\uB41C \uACBD\uD5D8\uC774\uB098 \uADDC\uCE59\uC774 \uC5C6\uC2B5\uB2C8\uB2E4");
+        }
+        return {
+          situation,
+          recommendation,
+          reasoning,
+          relevantExperiences: relevantExps,
+          applicableHeuristics,
+          confidence,
+          caveats,
+          alternatives
+        };
       }
-    }
-    if (reasoning.length === 0) {
-      reasoning.push("\uC9C1\uC811\uC801\uC73C\uB85C \uAD00\uB828\uB41C \uACBD\uD5D8\uC774\uB098 \uADDC\uCE59\uC774 \uC5C6\uC2B5\uB2C8\uB2E4");
-    }
-    return {
-      situation,
-      recommendation,
-      reasoning,
-      relevantExperiences: relevantExps,
-      applicableHeuristics,
-      confidence,
-      caveats,
-      alternatives
+      /**
+       * 적용 가능한 휴리스틱 찾기
+       */
+      _findApplicableHeuristics(situation, limit = 3) {
+        return this.heuristics.map((h) => ({
+          h,
+          score: textSimilarity(situation, h.rule) * h.confidence
+        })).sort((a, b) => b.score - a.score).slice(0, limit).map(({ h }) => h);
+      }
+      /**
+       * 도메인별 요약
+       */
+      summarizeDomain(domain) {
+        const domainExps = this.experiences.filter((e) => e.domain === domain);
+        const domainHeuristics = this.heuristics.filter((h) => h.domain === domain);
+        const successCount = domainExps.filter((e) => e.success).length;
+        const successRate = domainExps.length > 0 ? successCount / domainExps.length : 0;
+        const topLessons = domainExps.sort((a, b) => b.importance - a.importance).slice(0, 5).map((e) => e.lesson).filter((lesson, idx, arr) => arr.indexOf(lesson) === idx);
+        const bestHeuristics = domainHeuristics.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+        return { topLessons, bestHeuristics, successRate };
+      }
+      /**
+       * 경험 유효성 검사 (최근 180일 이내 경험만 유효)
+       */
+      isStillValid(experience) {
+        const now = /* @__PURE__ */ new Date();
+        const ageMs = now.getTime() - experience.timestamp.getTime();
+        const ageDays = ageMs / (1e3 * 60 * 60 * 24);
+        const validDays = 180 + experience.importance * 180;
+        return ageDays <= validDays;
+      }
+      /**
+       * 지혜 점수 계산 (경험의 깊이 + 판단력)
+       */
+      wisdomScore() {
+        if (this.experiences.length === 0) return 0;
+        const domains = new Set(this.experiences.map((e) => e.domain)).size;
+        const diversityScore = Math.min(1, domains / 5) * 0.25;
+        const depthScore = Math.min(1, this.experiences.length / 20) * 0.25;
+        const successRate = this.experiences.filter((e) => e.success).length / this.experiences.length;
+        const successScore = successRate * 0.25;
+        const avgConfidence = this.heuristics.length > 0 ? this.heuristics.reduce((sum, h) => sum + h.confidence, 0) / this.heuristics.length : 0;
+        const heuristicScore = avgConfidence * 0.25;
+        return diversityScore + depthScore + successScore + heuristicScore;
+      }
+      /**
+       * 교훈 목록 반환
+       */
+      getLessons(domain) {
+        const exps = domain ? this.experiences.filter((e) => e.domain === domain) : this.experiences;
+        return exps.sort((a, b) => b.importance - a.importance).map((e) => e.lesson).filter((lesson, idx, arr) => arr.indexOf(lesson) === idx);
+      }
+      /**
+       * 유사 상황 과거 사례 반환
+       */
+      findSimilarCases(situation) {
+        return this.findRelevantExperiences(situation, 10).filter((exp) => textSimilarity(situation, exp.situation) > 0.1);
+      }
+      /**
+       * 전체 경험 목록 반환
+       */
+      getExperiences() {
+        return [...this.experiences];
+      }
+      /**
+       * 전체 휴리스틱 목록 반환
+       */
+      getHeuristics() {
+        return [...this.heuristics];
+      }
     };
+    globalWisdom = new WisdomEngine();
   }
-  /**
-   * 적용 가능한 휴리스틱 찾기
-   */
-  _findApplicableHeuristics(situation, limit = 3) {
-    return this.heuristics.map((h) => ({
-      h,
-      score: textSimilarity(situation, h.rule) * h.confidence
-    })).sort((a, b) => b.score - a.score).slice(0, limit).map(({ h }) => h);
-  }
-  /**
-   * 도메인별 요약
-   */
-  summarizeDomain(domain) {
-    const domainExps = this.experiences.filter((e) => e.domain === domain);
-    const domainHeuristics = this.heuristics.filter((h) => h.domain === domain);
-    const successCount = domainExps.filter((e) => e.success).length;
-    const successRate = domainExps.length > 0 ? successCount / domainExps.length : 0;
-    const topLessons = domainExps.sort((a, b) => b.importance - a.importance).slice(0, 5).map((e) => e.lesson).filter((lesson, idx, arr) => arr.indexOf(lesson) === idx);
-    const bestHeuristics = domainHeuristics.sort((a, b) => b.confidence - a.confidence).slice(0, 3);
-    return { topLessons, bestHeuristics, successRate };
-  }
-  /**
-   * 경험 유효성 검사 (최근 180일 이내 경험만 유효)
-   */
-  isStillValid(experience) {
-    const now = /* @__PURE__ */ new Date();
-    const ageMs = now.getTime() - experience.timestamp.getTime();
-    const ageDays = ageMs / (1e3 * 60 * 60 * 24);
-    const validDays = 180 + experience.importance * 180;
-    return ageDays <= validDays;
-  }
-  /**
-   * 지혜 점수 계산 (경험의 깊이 + 판단력)
-   */
-  wisdomScore() {
-    if (this.experiences.length === 0) return 0;
-    const domains = new Set(this.experiences.map((e) => e.domain)).size;
-    const diversityScore = Math.min(1, domains / 5) * 0.25;
-    const depthScore = Math.min(1, this.experiences.length / 20) * 0.25;
-    const successRate = this.experiences.filter((e) => e.success).length / this.experiences.length;
-    const successScore = successRate * 0.25;
-    const avgConfidence = this.heuristics.length > 0 ? this.heuristics.reduce((sum, h) => sum + h.confidence, 0) / this.heuristics.length : 0;
-    const heuristicScore = avgConfidence * 0.25;
-    return diversityScore + depthScore + successScore + heuristicScore;
-  }
-  /**
-   * 교훈 목록 반환
-   */
-  getLessons(domain) {
-    const exps = domain ? this.experiences.filter((e) => e.domain === domain) : this.experiences;
-    return exps.sort((a, b) => b.importance - a.importance).map((e) => e.lesson).filter((lesson, idx, arr) => arr.indexOf(lesson) === idx);
-  }
-  /**
-   * 유사 상황 과거 사례 반환
-   */
-  findSimilarCases(situation) {
-    return this.findRelevantExperiences(situation, 10).filter((exp) => textSimilarity(situation, exp.situation) > 0.1);
-  }
-  /**
-   * 전체 경험 목록 반환
-   */
-  getExperiences() {
-    return [...this.experiences];
-  }
-  /**
-   * 전체 휴리스틱 목록 반환
-   */
-  getHeuristics() {
-    return [...this.heuristics];
-  }
-};
-var globalWisdom = new WisdomEngine();
+});
 
 // src/explain.ts
-var Explainer = class {
-  /**
-   * 결정 설명 — factors로부터 reasoning, features, alternatives를 생성
-   */
-  explain(decision, factors, context) {
-    const entries = Object.entries(factors);
-    const total = entries.reduce((s, [, v]) => s + Math.abs(v), 0) || 1;
-    const features = entries.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([feature, value]) => ({
-      feature,
-      importance: Math.min(Math.abs(value) / total, 1),
-      direction: value >= 0 ? "positive" : "negative",
-      description: `${feature}\uC740(\uB294) \uACB0\uC815\uC5D0 ${value >= 0 ? "\uAE0D\uC815\uC801" : "\uBD80\uC815\uC801"} \uC601\uD5A5\uC744 \uBBF8\uCCE4\uC2B5\uB2C8\uB2E4 (\uAC00\uC911\uCE58: ${value.toFixed(3)})`
-    }));
-    const reasoning = [];
-    if (context) reasoning.push(`\uCEE8\uD14D\uC2A4\uD2B8: ${context}`);
-    reasoning.push(`\uCD1D ${features.length}\uAC1C\uC758 \uC694\uC778\uC744 \uBD84\uC11D\uD588\uC2B5\uB2C8\uB2E4`);
-    if (features.length > 0) {
-      reasoning.push(`\uAC00\uC7A5 \uC911\uC694\uD55C \uC694\uC778: "${features[0].feature}" (\uC911\uC694\uB3C4: ${(features[0].importance * 100).toFixed(1)}%)`);
-    }
-    const positives = features.filter((f) => f.direction === "positive");
-    const negatives = features.filter((f) => f.direction === "negative");
-    if (positives.length > 0) {
-      reasoning.push(`\uAE0D\uC815\uC801 \uC694\uC778 ${positives.length}\uAC1C: ${positives.map((f) => f.feature).join(", ")}`);
-    }
-    if (negatives.length > 0) {
-      reasoning.push(`\uBD80\uC815\uC801 \uC694\uC778 ${negatives.length}\uAC1C: ${negatives.map((f) => f.feature).join(", ")}`);
-    }
-    reasoning.push(`\uCD5C\uC885 \uACB0\uC815: "${String(decision)}"`);
-    const topImportance = features.length > 0 ? features[0].importance : 0;
-    const confidence = Math.min(0.5 + topImportance * 0.5, 1);
-    const alternatives = [];
-    if (features.length > 0 && features[0].direction === "positive") {
-      alternatives.push({
-        decision: `not-${String(decision)}`,
-        reason: `"${features[0].feature}"\uC758 \uAC12\uC774 \uB0AE\uC558\uB2E4\uBA74 \uB2E4\uB978 \uACB0\uC815\uC744 \uB0B4\uB838\uC744 \uAC83\uC785\uB2C8\uB2E4`,
-        probability: Math.max(0, 1 - confidence)
-      });
-    }
-    if (features.length > 1) {
-      alternatives.push({
-        decision: "uncertain",
-        reason: `\uC694\uC778\uB4E4 \uAC04\uC758 \uADE0\uD615\uC774 \uB2EC\uB790\uB2E4\uBA74 \uACB0\uC815\uC774 \uB2EC\uB77C\uC84C\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4`,
-        probability: Math.round((1 - confidence) * 0.5 * 100) / 100
-      });
-    }
-    const summary = `"${String(decision)}" \uACB0\uC815\uC740 \uC2E0\uB8B0\uB3C4 ${(confidence * 100).toFixed(0)}%\uB85C, ${features.length}\uAC1C \uC694\uC778 \uBD84\uC11D \uACB0\uACFC\uC785\uB2C8\uB2E4`;
-    return {
-      decision,
-      reasoning,
-      features,
-      confidence,
-      alternatives,
-      summary,
-      audience: "technical"
-    };
-  }
-  /**
-   * 특성 중요도 계산 (SHAP-like 방식)
-   * baseline과의 차이로 각 입력 특성의 기여도를 계산
-   */
-  featureImportance(inputs, outputs, baselineOutputs) {
-    const inputEntries = Object.entries(inputs);
-    const outputValues = Object.values(outputs);
-    const outputMean = outputValues.reduce((s, v) => s + v, 0) / (outputValues.length || 1);
-    const baselineValues = baselineOutputs ? Object.values(baselineOutputs) : [];
-    const baselineMean = baselineValues.length > 0 ? baselineValues.reduce((s, v) => s + v, 0) / baselineValues.length : 0;
-    const delta = outputMean - baselineMean;
-    const contributions = inputEntries.map(([feature, value]) => {
-      const absVal = Math.abs(value);
-      const contribution = absVal * Math.abs(delta) * Math.sign(value) * Math.sign(delta || 1);
-      return { feature, contribution };
-    });
-    const totalAbs = contributions.reduce((s, c) => s + Math.abs(c.contribution), 0) || 1;
-    return contributions.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).map(({ feature, contribution }) => ({
-      feature,
-      importance: Math.min(Math.abs(contribution) / totalAbs, 1),
-      direction: contribution >= 0 ? "positive" : "negative",
-      description: `${feature}: \uCD9C\uB825\uC5D0 ${contribution >= 0 ? "\uAE0D\uC815\uC801" : "\uBD80\uC815\uC801"} \uAE30\uC5EC (${contribution.toFixed(4)})`
-    }));
-  }
-  /**
-   * 로컬 설명 — 단일 예측에 대한 설명
-   */
-  localExplain(input, output, model) {
-    const inputEntries = Object.entries(input);
-    const factors = inputEntries.map(([feature, value]) => {
-      let perturbedInput;
-      if (typeof value === "number") {
-        perturbedInput = { ...input, [feature]: value * 1.1 + 0.01 };
-      } else if (typeof value === "string") {
-        perturbedInput = { ...input, [feature]: "" };
-      } else {
-        perturbedInput = { ...input, [feature]: null };
+var Explainer, globalExplainer;
+var init_explain = __esm({
+  "src/explain.ts"() {
+    Explainer = class {
+      /**
+       * 결정 설명 — factors로부터 reasoning, features, alternatives를 생성
+       */
+      explain(decision, factors, context) {
+        const entries = Object.entries(factors);
+        const total = entries.reduce((s, [, v]) => s + Math.abs(v), 0) || 1;
+        const features = entries.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).map(([feature, value]) => ({
+          feature,
+          importance: Math.min(Math.abs(value) / total, 1),
+          direction: value >= 0 ? "positive" : "negative",
+          description: `${feature}\uC740(\uB294) \uACB0\uC815\uC5D0 ${value >= 0 ? "\uAE0D\uC815\uC801" : "\uBD80\uC815\uC801"} \uC601\uD5A5\uC744 \uBBF8\uCCE4\uC2B5\uB2C8\uB2E4 (\uAC00\uC911\uCE58: ${value.toFixed(3)})`
+        }));
+        const reasoning = [];
+        if (context) reasoning.push(`\uCEE8\uD14D\uC2A4\uD2B8: ${context}`);
+        reasoning.push(`\uCD1D ${features.length}\uAC1C\uC758 \uC694\uC778\uC744 \uBD84\uC11D\uD588\uC2B5\uB2C8\uB2E4`);
+        if (features.length > 0) {
+          reasoning.push(`\uAC00\uC7A5 \uC911\uC694\uD55C \uC694\uC778: "${features[0].feature}" (\uC911\uC694\uB3C4: ${(features[0].importance * 100).toFixed(1)}%)`);
+        }
+        const positives = features.filter((f) => f.direction === "positive");
+        const negatives = features.filter((f) => f.direction === "negative");
+        if (positives.length > 0) {
+          reasoning.push(`\uAE0D\uC815\uC801 \uC694\uC778 ${positives.length}\uAC1C: ${positives.map((f) => f.feature).join(", ")}`);
+        }
+        if (negatives.length > 0) {
+          reasoning.push(`\uBD80\uC815\uC801 \uC694\uC778 ${negatives.length}\uAC1C: ${negatives.map((f) => f.feature).join(", ")}`);
+        }
+        reasoning.push(`\uCD5C\uC885 \uACB0\uC815: "${String(decision)}"`);
+        const topImportance = features.length > 0 ? features[0].importance : 0;
+        const confidence = Math.min(0.5 + topImportance * 0.5, 1);
+        const alternatives = [];
+        if (features.length > 0 && features[0].direction === "positive") {
+          alternatives.push({
+            decision: `not-${String(decision)}`,
+            reason: `"${features[0].feature}"\uC758 \uAC12\uC774 \uB0AE\uC558\uB2E4\uBA74 \uB2E4\uB978 \uACB0\uC815\uC744 \uB0B4\uB838\uC744 \uAC83\uC785\uB2C8\uB2E4`,
+            probability: Math.max(0, 1 - confidence)
+          });
+        }
+        if (features.length > 1) {
+          alternatives.push({
+            decision: "uncertain",
+            reason: `\uC694\uC778\uB4E4 \uAC04\uC758 \uADE0\uD615\uC774 \uB2EC\uB790\uB2E4\uBA74 \uACB0\uC815\uC774 \uB2EC\uB77C\uC84C\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4`,
+            probability: Math.round((1 - confidence) * 0.5 * 100) / 100
+          });
+        }
+        const summary = `"${String(decision)}" \uACB0\uC815\uC740 \uC2E0\uB8B0\uB3C4 ${(confidence * 100).toFixed(0)}%\uB85C, ${features.length}\uAC1C \uC694\uC778 \uBD84\uC11D \uACB0\uACFC\uC785\uB2C8\uB2E4`;
+        return {
+          decision,
+          reasoning,
+          features,
+          confidence,
+          alternatives,
+          summary,
+          audience: "technical"
+        };
       }
-      let sensitivity = 0.5;
-      try {
-        const altOutput = model(perturbedInput);
-        const outStr = String(output);
-        const altStr = String(altOutput);
-        sensitivity = outStr !== altStr ? 0.8 : 0.2;
-      } catch {
-        sensitivity = 0.3;
+      /**
+       * 특성 중요도 계산 (SHAP-like 방식)
+       * baseline과의 차이로 각 입력 특성의 기여도를 계산
+       */
+      featureImportance(inputs, outputs, baselineOutputs) {
+        const inputEntries = Object.entries(inputs);
+        const outputValues = Object.values(outputs);
+        const outputMean = outputValues.reduce((s, v) => s + v, 0) / (outputValues.length || 1);
+        const baselineValues = baselineOutputs ? Object.values(baselineOutputs) : [];
+        const baselineMean = baselineValues.length > 0 ? baselineValues.reduce((s, v) => s + v, 0) / baselineValues.length : 0;
+        const delta = outputMean - baselineMean;
+        const contributions = inputEntries.map(([feature, value]) => {
+          const absVal = Math.abs(value);
+          const contribution = absVal * Math.abs(delta) * Math.sign(value) * Math.sign(delta || 1);
+          return { feature, contribution };
+        });
+        const totalAbs = contributions.reduce((s, c) => s + Math.abs(c.contribution), 0) || 1;
+        return contributions.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)).map(({ feature, contribution }) => ({
+          feature,
+          importance: Math.min(Math.abs(contribution) / totalAbs, 1),
+          direction: contribution >= 0 ? "positive" : "negative",
+          description: `${feature}: \uCD9C\uB825\uC5D0 ${contribution >= 0 ? "\uAE0D\uC815\uC801" : "\uBD80\uC815\uC801"} \uAE30\uC5EC (${contribution.toFixed(4)})`
+        }));
       }
-      return {
-        feature,
-        importance: sensitivity,
-        direction: "positive",
-        description: `${feature} = ${JSON.stringify(value)} (\uBBFC\uAC10\uB3C4: ${(sensitivity * 100).toFixed(0)}%)`
-      };
-    });
-    const totalImportance = factors.reduce((s, f) => s + f.importance, 0) || 1;
-    const topFactors = factors.map((f) => ({ ...f, importance: f.importance / totalImportance })).sort((a, b) => b.importance - a.importance).slice(0, 5);
-    const topFeature = topFactors[0];
-    const topValue = topFeature ? input[topFeature.feature] : void 0;
-    const counterfactual = topFeature ? `\uB9CC\uC57D "${topFeature.feature}"\uC758 \uAC12\uC774 "${String(topValue)}"\uAC00 \uC544\uB2C8\uC5C8\uB2E4\uBA74, \uACB0\uACFC\uAC00 "${String(output)}"\uC774 \uB418\uC9C0 \uC54A\uC558\uC744 \uAC00\uB2A5\uC131\uC774 \uB192\uC2B5\uB2C8\uB2E4` : `\uC785\uB825 \uD2B9\uC131\uB4E4\uC774 \uB2EC\uB790\uB2E4\uBA74 \uACB0\uACFC\uAC00 \uB2EC\uB77C\uC84C\uC744 \uAC83\uC785\uB2C8\uB2E4`;
-    const confidence = topFactors.length > 0 ? topFactors[0].importance : 0.5;
-    return {
-      input,
-      output,
-      topFactors,
-      counterfactual,
-      confidence
-    };
-  }
-  /**
-   * 자연어 설명 생성
-   */
-  toNaturalLanguage(explanation, audience) {
-    const target = audience ?? explanation.audience;
-    if (target === "general") {
-      const topFeature = explanation.features[0];
-      let text2 = `\uC774 AI\uB294 "${String(explanation.decision)}"\uB77C\uACE0 \uACB0\uC815\uD588\uC2B5\uB2C8\uB2E4.
+      /**
+       * 로컬 설명 — 단일 예측에 대한 설명
+       */
+      localExplain(input, output, model) {
+        const inputEntries = Object.entries(input);
+        const factors = inputEntries.map(([feature, value]) => {
+          let perturbedInput;
+          if (typeof value === "number") {
+            perturbedInput = { ...input, [feature]: value * 1.1 + 0.01 };
+          } else if (typeof value === "string") {
+            perturbedInput = { ...input, [feature]: "" };
+          } else {
+            perturbedInput = { ...input, [feature]: null };
+          }
+          let sensitivity = 0.5;
+          try {
+            const altOutput = model(perturbedInput);
+            const outStr = String(output);
+            const altStr = String(altOutput);
+            sensitivity = outStr !== altStr ? 0.8 : 0.2;
+          } catch {
+            sensitivity = 0.3;
+          }
+          return {
+            feature,
+            importance: sensitivity,
+            direction: "positive",
+            description: `${feature} = ${JSON.stringify(value)} (\uBBFC\uAC10\uB3C4: ${(sensitivity * 100).toFixed(0)}%)`
+          };
+        });
+        const totalImportance = factors.reduce((s, f) => s + f.importance, 0) || 1;
+        const topFactors = factors.map((f) => ({ ...f, importance: f.importance / totalImportance })).sort((a, b) => b.importance - a.importance).slice(0, 5);
+        const topFeature = topFactors[0];
+        const topValue = topFeature ? input[topFeature.feature] : void 0;
+        const counterfactual = topFeature ? `\uB9CC\uC57D "${topFeature.feature}"\uC758 \uAC12\uC774 "${String(topValue)}"\uAC00 \uC544\uB2C8\uC5C8\uB2E4\uBA74, \uACB0\uACFC\uAC00 "${String(output)}"\uC774 \uB418\uC9C0 \uC54A\uC558\uC744 \uAC00\uB2A5\uC131\uC774 \uB192\uC2B5\uB2C8\uB2E4` : `\uC785\uB825 \uD2B9\uC131\uB4E4\uC774 \uB2EC\uB790\uB2E4\uBA74 \uACB0\uACFC\uAC00 \uB2EC\uB77C\uC84C\uC744 \uAC83\uC785\uB2C8\uB2E4`;
+        const confidence = topFactors.length > 0 ? topFactors[0].importance : 0.5;
+        return {
+          input,
+          output,
+          topFactors,
+          counterfactual,
+          confidence
+        };
+      }
+      /**
+       * 자연어 설명 생성
+       */
+      toNaturalLanguage(explanation, audience) {
+        const target = audience ?? explanation.audience;
+        if (target === "general") {
+          const topFeature = explanation.features[0];
+          let text2 = `\uC774 AI\uB294 "${String(explanation.decision)}"\uB77C\uACE0 \uACB0\uC815\uD588\uC2B5\uB2C8\uB2E4.
 
 `;
-      text2 += `\uC774\uC720: ${explanation.reasoning.slice(-1)[0] ?? "\uBD84\uC11D \uC644\uB8CC"}
+          text2 += `\uC774\uC720: ${explanation.reasoning.slice(-1)[0] ?? "\uBD84\uC11D \uC644\uB8CC"}
 `;
-      if (topFeature) {
-        text2 += `\uAC00\uC7A5 \uC911\uC694\uD55C \uC774\uC720\uB294 "${topFeature.feature}" \uB54C\uBB38\uC785\uB2C8\uB2E4.
+          if (topFeature) {
+            text2 += `\uAC00\uC7A5 \uC911\uC694\uD55C \uC774\uC720\uB294 "${topFeature.feature}" \uB54C\uBB38\uC785\uB2C8\uB2E4.
 `;
-      }
-      text2 += `\uC774 \uACB0\uC815\uC758 \uD655\uC2E4\uC131\uC740 ${(explanation.confidence * 100).toFixed(0)}% \uC815\uB3C4\uC785\uB2C8\uB2E4.`;
-      if (explanation.alternatives.length > 0) {
-        text2 += `
+          }
+          text2 += `\uC774 \uACB0\uC815\uC758 \uD655\uC2E4\uC131\uC740 ${(explanation.confidence * 100).toFixed(0)}% \uC815\uB3C4\uC785\uB2C8\uB2E4.`;
+          if (explanation.alternatives.length > 0) {
+            text2 += `
 
 \uB2E4\uB978 \uAC00\uB2A5\uC131: ${explanation.alternatives[0].reason}`;
-      }
-      return text2;
-    }
-    let text = `[\uAE30\uC220\uC801 \uC124\uBA85]
+          }
+          return text2;
+        }
+        let text = `[\uAE30\uC220\uC801 \uC124\uBA85]
 `;
-    text += `\uACB0\uC815: ${JSON.stringify(explanation.decision)}
+        text += `\uACB0\uC815: ${JSON.stringify(explanation.decision)}
 `;
-    text += `\uC2E0\uB8B0\uB3C4: ${(explanation.confidence * 100).toFixed(2)}%
+        text += `\uC2E0\uB8B0\uB3C4: ${(explanation.confidence * 100).toFixed(2)}%
 
 `;
-    text += `\uCD94\uB860 \uB2E8\uACC4:
+        text += `\uCD94\uB860 \uB2E8\uACC4:
 `;
-    explanation.reasoning.forEach((r, i) => {
-      text += `  ${i + 1}. ${r}
+        explanation.reasoning.forEach((r, i) => {
+          text += `  ${i + 1}. ${r}
 `;
-    });
-    text += `
+        });
+        text += `
 \uD2B9\uC131 \uC911\uC694\uB3C4 (\uC0C1\uC704):
 `;
-    explanation.features.slice(0, 5).forEach((f) => {
-      const bar = "\u2588".repeat(Math.round(f.importance * 10));
-      text += `  ${f.feature}: ${bar} ${(f.importance * 100).toFixed(1)}% [${f.direction}]
+        explanation.features.slice(0, 5).forEach((f) => {
+          const bar = "\u2588".repeat(Math.round(f.importance * 10));
+          text += `  ${f.feature}: ${bar} ${(f.importance * 100).toFixed(1)}% [${f.direction}]
 `;
-    });
-    if (explanation.alternatives.length > 0) {
-      text += `
+        });
+        if (explanation.alternatives.length > 0) {
+          text += `
 \uB300\uC548:
 `;
-      explanation.alternatives.forEach((a) => {
-        text += `  - "${String(a.decision)}": ${a.reason} (\uD655\uB960: ${(a.probability * 100).toFixed(1)}%)
+          explanation.alternatives.forEach((a) => {
+            text += `  - "${String(a.decision)}": ${a.reason} (\uD655\uB960: ${(a.probability * 100).toFixed(1)}%)
 `;
-      });
-    }
-    text += `
+          });
+        }
+        text += `
 \uC694\uC57D: ${explanation.summary}`;
-    return text;
-  }
-  /**
-   * 대조 설명 ("A가 아니라 B인 이유")
-   */
-  contrastiveExplain(decision, alternative, factors) {
-    const entries = Object.entries(factors).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-    const topEntries = entries.slice(0, 3);
-    let explanation = `"${String(alternative)}" \uB300\uC2E0 "${String(decision)}"\uC744(\uB97C) \uC120\uD0DD\uD55C \uC774\uC720:
+        return text;
+      }
+      /**
+       * 대조 설명 ("A가 아니라 B인 이유")
+       */
+      contrastiveExplain(decision, alternative, factors) {
+        const entries = Object.entries(factors).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+        const topEntries = entries.slice(0, 3);
+        let explanation = `"${String(alternative)}" \uB300\uC2E0 "${String(decision)}"\uC744(\uB97C) \uC120\uD0DD\uD55C \uC774\uC720:
 
 `;
-    topEntries.forEach(([feature, value], i) => {
-      const direction = value > 0 ? "\uB192\uC740" : "\uB0AE\uC740";
-      explanation += `${i + 1}. ${feature}\uC758 ${direction} \uAC12(${value.toFixed(3)})\uC774 "${String(decision)}"\uC744 \uC9C0\uC9C0\uD588\uC2B5\uB2C8\uB2E4.
+        topEntries.forEach(([feature, value], i) => {
+          const direction = value > 0 ? "\uB192\uC740" : "\uB0AE\uC740";
+          explanation += `${i + 1}. ${feature}\uC758 ${direction} \uAC12(${value.toFixed(3)})\uC774 "${String(decision)}"\uC744 \uC9C0\uC9C0\uD588\uC2B5\uB2C8\uB2E4.
 `;
-    });
-    if (entries.length > 3) {
-      explanation += `
+        });
+        if (entries.length > 3) {
+          explanation += `
 (\uC678 ${entries.length - 3}\uAC1C \uC694\uC778\uB3C4 \uC601\uD5A5\uC744 \uBBF8\uCCE4\uC2B5\uB2C8\uB2E4)
 `;
-    }
-    const dominantFactor = topEntries[0];
-    if (dominantFactor) {
-      explanation += `
-\uD575\uC2EC: "${dominantFactor[0]}" \uC694\uC778\uC774 \uACB0\uC815\uC801 \uC5ED\uD560\uC744 \uD588\uC2B5\uB2C8\uB2E4. \uC774 \uC694\uC778\uC774 \uC5C6\uC5C8\uB2E4\uBA74 "${String(alternative)}"\uAC00 \uC120\uD0DD\uB410\uC744 \uAC83\uC785\uB2C8\uB2E4.`;
-    }
-    return explanation;
-  }
-  /**
-   * 규칙 추출 — 입력/출력 예시에서 간단한 if-then 규칙 추출
-   */
-  extractRules(examples) {
-    if (examples.length === 0) return [];
-    const groups = /* @__PURE__ */ new Map();
-    for (const ex of examples) {
-      const key = JSON.stringify(ex.output);
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(ex);
-    }
-    const rules = [];
-    const total = examples.length;
-    for (const [, group] of groups) {
-      const outcome = group[0].output;
-      const support = group.length / total;
-      if (group.length === 0) continue;
-      const firstInput = group[0].input;
-      const inputKeys = Object.keys(firstInput);
-      const commonConditions = [];
-      for (const key of inputKeys) {
-        const values = group.map((ex) => ex.input[key]);
-        const uniqueValues = [...new Set(values.map((v) => JSON.stringify(v)))];
-        if (uniqueValues.length === 1) {
-          commonConditions.push(`${key} = ${uniqueValues[0]}`);
-        } else if (values.every((v) => typeof v === "number")) {
-          const nums = values;
-          const min = Math.min(...nums);
-          const max = Math.max(...nums);
-          if (max - min < Math.abs(min + max) * 0.5) {
-            commonConditions.push(`${key} \u2208 [${min.toFixed(2)}, ${max.toFixed(2)}]`);
-          }
         }
+        const dominantFactor = topEntries[0];
+        if (dominantFactor) {
+          explanation += `
+\uD575\uC2EC: "${dominantFactor[0]}" \uC694\uC778\uC774 \uACB0\uC815\uC801 \uC5ED\uD560\uC744 \uD588\uC2B5\uB2C8\uB2E4. \uC774 \uC694\uC778\uC774 \uC5C6\uC5C8\uB2E4\uBA74 "${String(alternative)}"\uAC00 \uC120\uD0DD\uB410\uC744 \uAC83\uC785\uB2C8\uB2E4.`;
+        }
+        return explanation;
       }
-      const condition = commonConditions.length > 0 ? commonConditions.join(" AND ") : `\uCD9C\uB825\uC774 "${JSON.stringify(outcome)}"\uC778 \uACBD\uC6B0`;
-      rules.push({ condition, outcome, support });
-    }
-    return rules.sort((a, b) => b.support - a.support);
+      /**
+       * 규칙 추출 — 입력/출력 예시에서 간단한 if-then 규칙 추출
+       */
+      extractRules(examples) {
+        if (examples.length === 0) return [];
+        const groups = /* @__PURE__ */ new Map();
+        for (const ex of examples) {
+          const key = JSON.stringify(ex.output);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(ex);
+        }
+        const rules = [];
+        const total = examples.length;
+        for (const [, group] of groups) {
+          const outcome = group[0].output;
+          const support = group.length / total;
+          if (group.length === 0) continue;
+          const firstInput = group[0].input;
+          const inputKeys = Object.keys(firstInput);
+          const commonConditions = [];
+          for (const key of inputKeys) {
+            const values = group.map((ex) => ex.input[key]);
+            const uniqueValues = [...new Set(values.map((v) => JSON.stringify(v)))];
+            if (uniqueValues.length === 1) {
+              commonConditions.push(`${key} = ${uniqueValues[0]}`);
+            } else if (values.every((v) => typeof v === "number")) {
+              const nums = values;
+              const min = Math.min(...nums);
+              const max = Math.max(...nums);
+              if (max - min < Math.abs(min + max) * 0.5) {
+                commonConditions.push(`${key} \u2208 [${min.toFixed(2)}, ${max.toFixed(2)}]`);
+              }
+            }
+          }
+          const condition = commonConditions.length > 0 ? commonConditions.join(" AND ") : `\uCD9C\uB825\uC774 "${JSON.stringify(outcome)}"\uC778 \uACBD\uC6B0`;
+          rules.push({ condition, outcome, support });
+        }
+        return rules.sort((a, b) => b.support - a.support);
+      }
+    };
+    globalExplainer = new Explainer();
   }
-};
-var globalExplainer = new Explainer();
+});
 
 // src/world-model.ts
-var WorldModel = class {
-  constructor() {
-    this._idCounter = 0;
-    this.state = {
-      entities: /* @__PURE__ */ new Map(),
-      relations: [],
-      facts: /* @__PURE__ */ new Map(),
-      rules: [],
-      timestamp: /* @__PURE__ */ new Date(),
-      version: 0
-    };
-    this.history = [];
-  }
-  nextId(prefix = "id") {
-    return `${prefix}-${++this._idCounter}-${Date.now()}`;
-  }
-  recordUpdate(update) {
-    this.history.push(update);
-    this.state.timestamp = /* @__PURE__ */ new Date();
-    this.state.version++;
-  }
-  // 엔티티 추가
-  addEntity(entity) {
-    const e = {
-      ...entity,
-      lastUpdated: /* @__PURE__ */ new Date()
-    };
-    this.state.entities.set(e.id, e);
-    this.recordUpdate({
-      type: "add-entity",
-      data: e,
-      source: "world-model",
-      timestamp: /* @__PURE__ */ new Date()
-    });
-    return e;
-  }
-  // 엔티티 업데이트
-  updateEntity(id, props) {
-    const e = this.state.entities.get(id);
-    if (!e) return null;
-    const updated = {
-      ...e,
-      properties: { ...e.properties, ...props },
-      lastUpdated: /* @__PURE__ */ new Date()
-    };
-    this.state.entities.set(id, updated);
-    this.recordUpdate({
-      type: "update-entity",
-      data: { id, props },
-      source: "world-model",
-      timestamp: /* @__PURE__ */ new Date()
-    });
-    return updated;
-  }
-  // 엔티티 삭제
-  removeEntity(id) {
-    const existed = this.state.entities.has(id);
-    if (!existed) return false;
-    this.state.entities.delete(id);
-    this.state.relations = this.state.relations.filter(
-      (r) => r.from !== id && r.to !== id
-    );
-    this.recordUpdate({
-      type: "remove-entity",
-      data: { id },
-      source: "world-model",
-      timestamp: /* @__PURE__ */ new Date()
-    });
-    return true;
-  }
-  // 엔티티 조회
-  getEntity(id) {
-    return this.state.entities.get(id) ?? null;
-  }
-  // 관계 추가
-  addRelation(relation) {
-    const r = {
-      ...relation,
-      id: this.nextId("rel")
-    };
-    this.state.relations.push(r);
-    this.recordUpdate({
-      type: "add-relation",
-      data: r,
-      source: "world-model",
-      timestamp: /* @__PURE__ */ new Date()
-    });
-    return r;
-  }
-  // 엔티티의 관계 조회
-  getRelations(entityId) {
-    return this.state.relations.filter(
-      (r) => r.from === entityId || r.bidirectional && r.to === entityId
-    );
-  }
-  // BFS로 두 엔티티 간 경로 찾기
-  findPath(fromId, toId) {
-    if (fromId === toId) return [fromId];
-    const visited = /* @__PURE__ */ new Set();
-    const queue = [{ id: fromId, path: [fromId] }];
-    while (queue.length > 0) {
-      const { id, path: path19 } = queue.shift();
-      if (visited.has(id)) continue;
-      visited.add(id);
-      const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
-      for (const neighbor of neighbors) {
-        if (neighbor === toId) return [...path19, neighbor];
-        if (!visited.has(neighbor)) {
-          queue.push({ id: neighbor, path: [...path19, neighbor] });
-        }
+var WorldModel, globalWorldModel;
+var init_world_model = __esm({
+  "src/world-model.ts"() {
+    WorldModel = class {
+      constructor() {
+        this._idCounter = 0;
+        this.state = {
+          entities: /* @__PURE__ */ new Map(),
+          relations: [],
+          facts: /* @__PURE__ */ new Map(),
+          rules: [],
+          timestamp: /* @__PURE__ */ new Date(),
+          version: 0
+        };
+        this.history = [];
       }
-    }
-    return [];
-  }
-  // 사실 저장
-  setFact(key, value) {
-    this.state.facts.set(key, value);
-    this.recordUpdate({
-      type: "add-fact",
-      data: { key, value },
-      source: "world-model",
-      timestamp: /* @__PURE__ */ new Date()
-    });
-  }
-  // 사실 조회
-  getFact(key) {
-    return this.state.facts.get(key) ?? null;
-  }
-  // 규칙 추가
-  addRule(rule) {
-    const r = {
-      ...rule,
-      id: this.nextId("rule")
-    };
-    this.state.rules.push(r);
-    this.recordUpdate({
-      type: "add-rule",
-      data: r,
-      source: "world-model",
-      timestamp: /* @__PURE__ */ new Date()
-    });
-    return r;
-  }
-  // 규칙 적용 (조건 기반으로 사실 추론)
-  applyRules() {
-    const applied = [];
-    for (const rule of this.state.rules) {
-      for (const [, entity] of this.state.entities) {
-        const condLower = rule.condition.toLowerCase();
-        const entityStr = JSON.stringify(entity).toLowerCase();
-        if (entityStr.includes(condLower)) {
-          const factKey = `rule:${rule.id}:${entity.id}`;
-          if (!this.state.facts.has(factKey)) {
-            this.setFact(factKey, {
-              rule: rule.id,
-              entity: entity.id,
-              consequence: rule.consequence,
-              confidence: rule.confidence * entity.confidence
-            });
-            applied.push({
-              type: "add-fact",
-              data: { key: factKey, consequence: rule.consequence },
-              source: `rule:${rule.id}`,
-              timestamp: /* @__PURE__ */ new Date()
-            });
+      nextId(prefix = "id") {
+        return `${prefix}-${++this._idCounter}-${Date.now()}`;
+      }
+      recordUpdate(update) {
+        this.history.push(update);
+        this.state.timestamp = /* @__PURE__ */ new Date();
+        this.state.version++;
+      }
+      // 엔티티 추가
+      addEntity(entity) {
+        const e = {
+          ...entity,
+          lastUpdated: /* @__PURE__ */ new Date()
+        };
+        this.state.entities.set(e.id, e);
+        this.recordUpdate({
+          type: "add-entity",
+          data: e,
+          source: "world-model",
+          timestamp: /* @__PURE__ */ new Date()
+        });
+        return e;
+      }
+      // 엔티티 업데이트
+      updateEntity(id, props) {
+        const e = this.state.entities.get(id);
+        if (!e) return null;
+        const updated = {
+          ...e,
+          properties: { ...e.properties, ...props },
+          lastUpdated: /* @__PURE__ */ new Date()
+        };
+        this.state.entities.set(id, updated);
+        this.recordUpdate({
+          type: "update-entity",
+          data: { id, props },
+          source: "world-model",
+          timestamp: /* @__PURE__ */ new Date()
+        });
+        return updated;
+      }
+      // 엔티티 삭제
+      removeEntity(id) {
+        const existed = this.state.entities.has(id);
+        if (!existed) return false;
+        this.state.entities.delete(id);
+        this.state.relations = this.state.relations.filter(
+          (r) => r.from !== id && r.to !== id
+        );
+        this.recordUpdate({
+          type: "remove-entity",
+          data: { id },
+          source: "world-model",
+          timestamp: /* @__PURE__ */ new Date()
+        });
+        return true;
+      }
+      // 엔티티 조회
+      getEntity(id) {
+        return this.state.entities.get(id) ?? null;
+      }
+      // 관계 추가
+      addRelation(relation) {
+        const r = {
+          ...relation,
+          id: this.nextId("rel")
+        };
+        this.state.relations.push(r);
+        this.recordUpdate({
+          type: "add-relation",
+          data: r,
+          source: "world-model",
+          timestamp: /* @__PURE__ */ new Date()
+        });
+        return r;
+      }
+      // 엔티티의 관계 조회
+      getRelations(entityId) {
+        return this.state.relations.filter(
+          (r) => r.from === entityId || r.bidirectional && r.to === entityId
+        );
+      }
+      // BFS로 두 엔티티 간 경로 찾기
+      findPath(fromId, toId) {
+        if (fromId === toId) return [fromId];
+        const visited = /* @__PURE__ */ new Set();
+        const queue = [{ id: fromId, path: [fromId] }];
+        while (queue.length > 0) {
+          const { id, path: path19 } = queue.shift();
+          if (visited.has(id)) continue;
+          visited.add(id);
+          const neighbors = this.state.relations.filter((r) => r.from === id || r.bidirectional && r.to === id).map((r) => r.from === id ? r.to : r.from);
+          for (const neighbor of neighbors) {
+            if (neighbor === toId) return [...path19, neighbor];
+            if (!visited.has(neighbor)) {
+              queue.push({ id: neighbor, path: [...path19, neighbor] });
+            }
           }
         }
+        return [];
       }
-    }
-    return applied;
-  }
-  // 타입/신뢰도 기반 쿼리
-  query(type, minConfidence) {
-    let results = Array.from(this.state.entities.values());
-    if (type !== void 0) {
-      results = results.filter((e) => e.type === type);
-    }
-    if (minConfidence !== void 0) {
-      results = results.filter((e) => e.confidence >= minConfidence);
-    }
-    return results;
-  }
-  // 상태 스냅샷 (깊은 복사)
-  snapshot() {
-    return {
-      entities: new Map(
-        Array.from(this.state.entities.entries()).map(([k, v]) => [k, { ...v, properties: { ...v.properties } }])
-      ),
-      relations: this.state.relations.map((r) => ({ ...r })),
-      facts: new Map(this.state.facts),
-      rules: this.state.rules.map((r) => ({ ...r })),
-      timestamp: new Date(this.state.timestamp),
-      version: this.state.version
+      // 사실 저장
+      setFact(key, value) {
+        this.state.facts.set(key, value);
+        this.recordUpdate({
+          type: "add-fact",
+          data: { key, value },
+          source: "world-model",
+          timestamp: /* @__PURE__ */ new Date()
+        });
+      }
+      // 사실 조회
+      getFact(key) {
+        return this.state.facts.get(key) ?? null;
+      }
+      // 규칙 추가
+      addRule(rule) {
+        const r = {
+          ...rule,
+          id: this.nextId("rule")
+        };
+        this.state.rules.push(r);
+        this.recordUpdate({
+          type: "add-rule",
+          data: r,
+          source: "world-model",
+          timestamp: /* @__PURE__ */ new Date()
+        });
+        return r;
+      }
+      // 규칙 적용 (조건 기반으로 사실 추론)
+      applyRules() {
+        const applied = [];
+        for (const rule of this.state.rules) {
+          for (const [, entity] of this.state.entities) {
+            const condLower = rule.condition.toLowerCase();
+            const entityStr = JSON.stringify(entity).toLowerCase();
+            if (entityStr.includes(condLower)) {
+              const factKey = `rule:${rule.id}:${entity.id}`;
+              if (!this.state.facts.has(factKey)) {
+                this.setFact(factKey, {
+                  rule: rule.id,
+                  entity: entity.id,
+                  consequence: rule.consequence,
+                  confidence: rule.confidence * entity.confidence
+                });
+                applied.push({
+                  type: "add-fact",
+                  data: { key: factKey, consequence: rule.consequence },
+                  source: `rule:${rule.id}`,
+                  timestamp: /* @__PURE__ */ new Date()
+                });
+              }
+            }
+          }
+        }
+        return applied;
+      }
+      // 타입/신뢰도 기반 쿼리
+      query(type, minConfidence) {
+        let results = Array.from(this.state.entities.values());
+        if (type !== void 0) {
+          results = results.filter((e) => e.type === type);
+        }
+        if (minConfidence !== void 0) {
+          results = results.filter((e) => e.confidence >= minConfidence);
+        }
+        return results;
+      }
+      // 상태 스냅샷 (깊은 복사)
+      snapshot() {
+        return {
+          entities: new Map(
+            Array.from(this.state.entities.entries()).map(([k, v]) => [k, { ...v, properties: { ...v.properties } }])
+          ),
+          relations: this.state.relations.map((r) => ({ ...r })),
+          facts: new Map(this.state.facts),
+          rules: this.state.rules.map((r) => ({ ...r })),
+          timestamp: new Date(this.state.timestamp),
+          version: this.state.version
+        };
+      }
+      // 두 상태 비교 → 차이 WorldUpdate 목록 반환
+      diff(other) {
+        const updates = [];
+        const now = /* @__PURE__ */ new Date();
+        for (const [id, entity] of other.entities) {
+          if (!this.state.entities.has(id)) {
+            updates.push({ type: "add-entity", data: entity, source: "diff", timestamp: now });
+          }
+        }
+        for (const [id, entity] of this.state.entities) {
+          const otherEntity = other.entities.get(id);
+          if (!otherEntity) {
+            updates.push({ type: "remove-entity", data: { id }, source: "diff", timestamp: now });
+          } else if (JSON.stringify(entity.properties) !== JSON.stringify(otherEntity.properties)) {
+            updates.push({ type: "update-entity", data: { id, props: otherEntity.properties }, source: "diff", timestamp: now });
+          }
+        }
+        for (const rel of other.relations) {
+          const exists = this.state.relations.find((r) => r.id === rel.id);
+          if (!exists) {
+            updates.push({ type: "add-relation", data: rel, source: "diff", timestamp: now });
+          }
+        }
+        for (const [key, value] of other.facts) {
+          if (!this.state.facts.has(key)) {
+            updates.push({ type: "add-fact", data: { key, value }, source: "diff", timestamp: now });
+          }
+        }
+        return updates;
+      }
+      // 업데이트 이력 반환
+      getHistory() {
+        return [...this.history];
+      }
+      // 세계 요약 문자열 생성
+      summarize() {
+        const entityCount = this.state.entities.size;
+        const relationCount = this.state.relations.length;
+        const factCount = this.state.facts.size;
+        const ruleCount = this.state.rules.length;
+        const types = /* @__PURE__ */ new Map();
+        for (const e of this.state.entities.values()) {
+          types.set(e.type, (types.get(e.type) ?? 0) + 1);
+        }
+        const typeStr = Array.from(types.entries()).map(([t, c]) => `${t}(${c})`).join(", ");
+        const avgConfidence = entityCount > 0 ? (Array.from(this.state.entities.values()).reduce((s, e) => s + e.confidence, 0) / entityCount).toFixed(2) : "0.00";
+        return [
+          `WorldModel v${this.state.version}`,
+          `Entities: ${entityCount} [${typeStr || "none"}]`,
+          `Relations: ${relationCount}`,
+          `Facts: ${factCount}`,
+          `Rules: ${ruleCount}`,
+          `Avg Confidence: ${avgConfidence}`,
+          `Last Updated: ${this.state.timestamp.toISOString()}`
+        ].join(" | ");
+      }
     };
+    globalWorldModel = new WorldModel();
   }
-  // 두 상태 비교 → 차이 WorldUpdate 목록 반환
-  diff(other) {
-    const updates = [];
-    const now = /* @__PURE__ */ new Date();
-    for (const [id, entity] of other.entities) {
-      if (!this.state.entities.has(id)) {
-        updates.push({ type: "add-entity", data: entity, source: "diff", timestamp: now });
-      }
-    }
-    for (const [id, entity] of this.state.entities) {
-      const otherEntity = other.entities.get(id);
-      if (!otherEntity) {
-        updates.push({ type: "remove-entity", data: { id }, source: "diff", timestamp: now });
-      } else if (JSON.stringify(entity.properties) !== JSON.stringify(otherEntity.properties)) {
-        updates.push({ type: "update-entity", data: { id, props: otherEntity.properties }, source: "diff", timestamp: now });
-      }
-    }
-    for (const rel of other.relations) {
-      const exists = this.state.relations.find((r) => r.id === rel.id);
-      if (!exists) {
-        updates.push({ type: "add-relation", data: rel, source: "diff", timestamp: now });
-      }
-    }
-    for (const [key, value] of other.facts) {
-      if (!this.state.facts.has(key)) {
-        updates.push({ type: "add-fact", data: { key, value }, source: "diff", timestamp: now });
-      }
-    }
-    return updates;
-  }
-  // 업데이트 이력 반환
-  getHistory() {
-    return [...this.history];
-  }
-  // 세계 요약 문자열 생성
-  summarize() {
-    const entityCount = this.state.entities.size;
-    const relationCount = this.state.relations.length;
-    const factCount = this.state.facts.size;
-    const ruleCount = this.state.rules.length;
-    const types = /* @__PURE__ */ new Map();
-    for (const e of this.state.entities.values()) {
-      types.set(e.type, (types.get(e.type) ?? 0) + 1);
-    }
-    const typeStr = Array.from(types.entries()).map(([t, c]) => `${t}(${c})`).join(", ");
-    const avgConfidence = entityCount > 0 ? (Array.from(this.state.entities.values()).reduce((s, e) => s + e.confidence, 0) / entityCount).toFixed(2) : "0.00";
-    return [
-      `WorldModel v${this.state.version}`,
-      `Entities: ${entityCount} [${typeStr || "none"}]`,
-      `Relations: ${relationCount}`,
-      `Facts: ${factCount}`,
-      `Rules: ${ruleCount}`,
-      `Avg Confidence: ${avgConfidence}`,
-      `Last Updated: ${this.state.timestamp.toISOString()}`
-    ].join(" | ");
-  }
-};
-var globalWorldModel = new WorldModel();
+});
 
 // src/counterfactual.ts
-var _cfIdCounter = 0;
 function genCfId() {
   return `cf-${++_cfIdCounter}-${Date.now()}`;
 }
@@ -14172,142 +12738,148 @@ function generateExplanation(baseScenario, intervention, originalOutcome, counte
   }
   return `${changes}\uC73C\uB85C \uBCC0\uACBD\uD574\uB3C4 \uACB0\uACFC "${String(originalOutcome)}"\uB294 \uB3D9\uC77C\uD569\uB2C8\uB2E4.`;
 }
-var CounterfactualReasoner = class {
-  constructor() {
-    this.scenarios = /* @__PURE__ */ new Map();
-  }
-  // 시나리오 등록
-  registerScenario(scenario) {
-    this.scenarios.set(scenario.id, scenario);
-  }
-  // 단일 반사실 생성
-  createCounterfactual(scenarioId, intervention, outcomeFunc) {
-    const base = this.scenarios.get(scenarioId);
-    if (!base) throw new Error(`Scenario "${scenarioId}" not found`);
-    const modifiedVars = { ...base.variables, ...intervention };
-    const cfOutcome = outcomeFunc(modifiedVars);
-    const delta = {};
-    for (const [k, v] of Object.entries(intervention)) {
-      delta[k] = computeDelta(base.variables[k], v);
-    }
-    const prob = estimateProbability(
-      Object.keys(intervention).length,
-      cfOutcome !== base.outcome,
-      Object.keys(base.variables).length
-    );
-    return {
-      id: genCfId(),
-      baseScenario: base,
-      intervention,
-      counterfactualOutcome: cfOutcome,
-      delta,
-      probability: prob,
-      explanation: generateExplanation(base, intervention, base.outcome, cfOutcome)
-    };
-  }
-  // 여러 반사실 분석
-  analyze(scenarioId, interventions, outcomeFunc) {
-    const base = this.scenarios.get(scenarioId);
-    if (!base) throw new Error(`Scenario "${scenarioId}" not found`);
-    const counterfactuals = interventions.map(
-      (iv) => this.createCounterfactual(scenarioId, iv, outcomeFunc)
-    );
-    const mostLikelyAlternative = counterfactuals.reduce(
-      (best, cf) => cf.probability > best.probability ? cf : best,
-      counterfactuals[0]
-    );
-    const sensitivity = this.sensitivityAnalysis(base.variables, outcomeFunc);
-    const keyFactors = Object.entries(sensitivity).sort((a, b) => b[1] - a[1]).map(([k]) => k);
-    return {
-      original: base,
-      counterfactuals,
-      mostLikelyAlternative,
-      keyFactors,
-      sensitivity
-    };
-  }
-  // "만약 X가 N이었다면?" 단순 질문
-  whatIf(variables, change, outcomeFunc) {
-    const tempId = `__temp_${Date.now()}`;
-    const originalOutcome = outcomeFunc(variables);
-    const tempScenario = {
-      id: tempId,
-      name: "temporary",
-      variables,
-      outcome: originalOutcome
-    };
-    this.scenarios.set(tempId, tempScenario);
-    const cf = this.createCounterfactual(tempId, change, outcomeFunc);
-    this.scenarios.delete(tempId);
-    return cf;
-  }
-  // 최소 변경으로 원하는 결과 달성
-  findMinimalIntervention(scenarioId, targetOutcome, outcomeFunc) {
-    const base = this.scenarios.get(scenarioId);
-    if (!base) throw new Error(`Scenario "${scenarioId}" not found`);
-    const vars = base.variables;
-    const keys = Object.keys(vars);
-    for (const key of keys) {
-      const val = vars[key];
-      const candidates = [];
-      if (typeof val === "boolean") {
-        candidates.push(!val);
-      } else if (typeof val === "number") {
-        candidates.push(val * 0.5, val * 1.5, val * 0, val * 2);
-      } else if (typeof val === "string") {
-        candidates.push("");
+var _cfIdCounter, CounterfactualReasoner, globalCounterfactual;
+var init_counterfactual = __esm({
+  "src/counterfactual.ts"() {
+    _cfIdCounter = 0;
+    CounterfactualReasoner = class {
+      constructor() {
+        this.scenarios = /* @__PURE__ */ new Map();
       }
-      for (const candidate of candidates) {
-        const modified = { ...vars, [key]: candidate };
-        const result = outcomeFunc(modified);
-        if (result === targetOutcome) {
-          return { [key]: candidate };
+      // 시나리오 등록
+      registerScenario(scenario) {
+        this.scenarios.set(scenario.id, scenario);
+      }
+      // 단일 반사실 생성
+      createCounterfactual(scenarioId, intervention, outcomeFunc) {
+        const base = this.scenarios.get(scenarioId);
+        if (!base) throw new Error(`Scenario "${scenarioId}" not found`);
+        const modifiedVars = { ...base.variables, ...intervention };
+        const cfOutcome = outcomeFunc(modifiedVars);
+        const delta = {};
+        for (const [k, v] of Object.entries(intervention)) {
+          delta[k] = computeDelta(base.variables[k], v);
         }
+        const prob = estimateProbability(
+          Object.keys(intervention).length,
+          cfOutcome !== base.outcome,
+          Object.keys(base.variables).length
+        );
+        return {
+          id: genCfId(),
+          baseScenario: base,
+          intervention,
+          counterfactualOutcome: cfOutcome,
+          delta,
+          probability: prob,
+          explanation: generateExplanation(base, intervention, base.outcome, cfOutcome)
+        };
       }
-    }
-    for (let i = 0; i < keys.length; i++) {
-      for (let j = i + 1; j < keys.length; j++) {
-        const ki = keys[i];
-        const kj = keys[j];
-        const vi = vars[ki];
-        const vj = vars[kj];
-        const ci = typeof vi === "boolean" ? [!vi] : typeof vi === "number" ? [vi * 0.5] : [""];
-        const cj = typeof vj === "boolean" ? [!vj] : typeof vj === "number" ? [vj * 0.5] : [""];
-        for (const candidateI of ci) {
-          for (const candidateJ of cj) {
-            const modified = { ...vars, [ki]: candidateI, [kj]: candidateJ };
+      // 여러 반사실 분석
+      analyze(scenarioId, interventions, outcomeFunc) {
+        const base = this.scenarios.get(scenarioId);
+        if (!base) throw new Error(`Scenario "${scenarioId}" not found`);
+        const counterfactuals = interventions.map(
+          (iv) => this.createCounterfactual(scenarioId, iv, outcomeFunc)
+        );
+        const mostLikelyAlternative = counterfactuals.reduce(
+          (best, cf) => cf.probability > best.probability ? cf : best,
+          counterfactuals[0]
+        );
+        const sensitivity = this.sensitivityAnalysis(base.variables, outcomeFunc);
+        const keyFactors = Object.entries(sensitivity).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+        return {
+          original: base,
+          counterfactuals,
+          mostLikelyAlternative,
+          keyFactors,
+          sensitivity
+        };
+      }
+      // "만약 X가 N이었다면?" 단순 질문
+      whatIf(variables, change, outcomeFunc) {
+        const tempId = `__temp_${Date.now()}`;
+        const originalOutcome = outcomeFunc(variables);
+        const tempScenario = {
+          id: tempId,
+          name: "temporary",
+          variables,
+          outcome: originalOutcome
+        };
+        this.scenarios.set(tempId, tempScenario);
+        const cf = this.createCounterfactual(tempId, change, outcomeFunc);
+        this.scenarios.delete(tempId);
+        return cf;
+      }
+      // 최소 변경으로 원하는 결과 달성
+      findMinimalIntervention(scenarioId, targetOutcome, outcomeFunc) {
+        const base = this.scenarios.get(scenarioId);
+        if (!base) throw new Error(`Scenario "${scenarioId}" not found`);
+        const vars = base.variables;
+        const keys = Object.keys(vars);
+        for (const key of keys) {
+          const val = vars[key];
+          const candidates = [];
+          if (typeof val === "boolean") {
+            candidates.push(!val);
+          } else if (typeof val === "number") {
+            candidates.push(val * 0.5, val * 1.5, val * 0, val * 2);
+          } else if (typeof val === "string") {
+            candidates.push("");
+          }
+          for (const candidate of candidates) {
+            const modified = { ...vars, [key]: candidate };
             const result = outcomeFunc(modified);
             if (result === targetOutcome) {
-              return { [ki]: candidateI, [kj]: candidateJ };
+              return { [key]: candidate };
             }
           }
         }
+        for (let i = 0; i < keys.length; i++) {
+          for (let j = i + 1; j < keys.length; j++) {
+            const ki = keys[i];
+            const kj = keys[j];
+            const vi = vars[ki];
+            const vj = vars[kj];
+            const ci = typeof vi === "boolean" ? [!vi] : typeof vi === "number" ? [vi * 0.5] : [""];
+            const cj = typeof vj === "boolean" ? [!vj] : typeof vj === "number" ? [vj * 0.5] : [""];
+            for (const candidateI of ci) {
+              for (const candidateJ of cj) {
+                const modified = { ...vars, [ki]: candidateI, [kj]: candidateJ };
+                const result = outcomeFunc(modified);
+                if (result === targetOutcome) {
+                  return { [ki]: candidateI, [kj]: candidateJ };
+                }
+              }
+            }
+          }
+        }
+        return null;
       }
-    }
-    return null;
-  }
-  // 민감도 분석: 각 수치 변수를 ±10% 변경했을 때 결과 변화
-  sensitivityAnalysis(variables, outcomeFunc) {
-    const baseOutcome = outcomeFunc(variables);
-    const sensitivity = {};
-    for (const [key, val] of Object.entries(variables)) {
-      if (typeof val === "number") {
-        const delta = val * 0.1 || 1;
-        const plusOutcome = outcomeFunc({ ...variables, [key]: val + delta });
-        const minusOutcome = outcomeFunc({ ...variables, [key]: val - delta });
-        const avgChange = (Math.abs(plusOutcome - baseOutcome) + Math.abs(minusOutcome - baseOutcome)) / 2;
-        sensitivity[key] = avgChange;
-      } else if (typeof val === "boolean") {
-        const flipped = outcomeFunc({ ...variables, [key]: !val });
-        sensitivity[key] = Math.abs(flipped - baseOutcome);
-      } else {
-        sensitivity[key] = 0;
+      // 민감도 분석: 각 수치 변수를 ±10% 변경했을 때 결과 변화
+      sensitivityAnalysis(variables, outcomeFunc) {
+        const baseOutcome = outcomeFunc(variables);
+        const sensitivity = {};
+        for (const [key, val] of Object.entries(variables)) {
+          if (typeof val === "number") {
+            const delta = val * 0.1 || 1;
+            const plusOutcome = outcomeFunc({ ...variables, [key]: val + delta });
+            const minusOutcome = outcomeFunc({ ...variables, [key]: val - delta });
+            const avgChange = (Math.abs(plusOutcome - baseOutcome) + Math.abs(minusOutcome - baseOutcome)) / 2;
+            sensitivity[key] = avgChange;
+          } else if (typeof val === "boolean") {
+            const flipped = outcomeFunc({ ...variables, [key]: !val });
+            sensitivity[key] = Math.abs(flipped - baseOutcome);
+          } else {
+            sensitivity[key] = 0;
+          }
+        }
+        return sensitivity;
       }
-    }
-    return sensitivity;
+    };
+    globalCounterfactual = new CounterfactualReasoner();
   }
-};
-var globalCounterfactual = new CounterfactualReasoner();
+});
 
 // src/predict.ts
 function mean(data) {
@@ -14354,228 +12926,233 @@ function zScore(confidence) {
   if (confidence >= 0.8) return 1.282;
   return 1;
 }
-var Predictor = class {
-  // 선형 회귀 예측
-  linearRegression(data, horizon = 1) {
-    const { slope, intercept } = linearFit(data);
-    const nextIdx = data.length - 1 + horizon;
-    const value = intercept + slope * nextIdx;
-    const se = residualStdError(data, slope, intercept);
-    const z = zScore(0.95);
-    const minMargin = (Math.max(...data) - Math.min(...data)) * 0.05 + 1e-6;
-    const margin = Math.max(minMargin, z * se * Math.sqrt(1 + 1 / data.length));
-    return {
-      value,
-      lower: value - margin,
-      upper: value + margin,
-      confidence: 0.95,
-      method: "linear-regression",
-      horizon
-    };
-  }
-  // 이동 평균 예측
-  movingAverage(data, window = 3, horizon = 1) {
-    const w = Math.min(window, data.length);
-    const slice = data.slice(data.length - w);
-    const value = mean(slice);
-    const sd = stddev(slice.length < 2 ? data : slice);
-    const z = zScore(0.95);
-    const margin = z * sd / Math.sqrt(w);
-    return {
-      value,
-      lower: value - margin,
-      upper: value + margin,
-      confidence: 0.95,
-      method: "moving-average",
-      horizon
-    };
-  }
-  // 지수 평활 예측 (Exponential Smoothing)
-  exponentialSmoothing(data, alpha = 0.3, horizon = 1) {
-    if (data.length === 0) {
-      return { value: 0, lower: 0, upper: 0, confidence: 0.95, method: "exponential-smoothing", horizon };
-    }
-    let smoothed = data[0];
-    for (let i = 1; i < data.length; i++) {
-      smoothed = alpha * data[i] + (1 - alpha) * smoothed;
-    }
-    const errors = [];
-    let s = data[0];
-    for (let i = 1; i < data.length; i++) {
-      const prev = s;
-      s = alpha * data[i] + (1 - alpha) * prev;
-      errors.push(data[i] - prev);
-    }
-    const se = errors.length > 0 ? stddev(errors) : stddev(data) * 0.5;
-    const z = zScore(0.95);
-    const margin = z * se;
-    return {
-      value: smoothed,
-      lower: smoothed - margin,
-      upper: smoothed + margin,
-      confidence: 0.95,
-      method: "exponential-smoothing",
-      horizon
-    };
-  }
-  // 시계열 다중 예측
-  forecastTimeSeries(data, steps = 3) {
-    const trend = this.detectTrend(data);
-    const predictions = [];
-    for (let h = 1; h <= steps; h++) {
-      predictions.push(this.linearRegression(data, h));
-    }
-    let seasonality = void 0;
-    if (data.length >= 8) {
-      const bestPeriod = this._detectSeasonality(data);
-      if (bestPeriod > 1) seasonality = bestPeriod;
-    }
-    let accuracy = void 0;
-    if (data.length >= 5) {
-      const splitIdx = Math.floor(data.length * 0.8);
-      const trainData = data.slice(0, splitIdx);
-      const testData = data.slice(splitIdx);
-      const testPreds = testData.map((_, i) => {
-        const { slope, intercept } = linearFit(trainData);
-        return intercept + slope * (trainData.length + i);
-      });
-      const mae = mean(testData.map((actual, i) => Math.abs(actual - testPreds[i])));
-      const range = Math.max(...data) - Math.min(...data);
-      accuracy = range > 0 ? Math.max(0, 1 - mae / range) : 0.5;
-    }
-    return { predictions, trend, seasonality, accuracy };
-  }
-  // 신뢰구간 계산 (부트스트랩)
-  confidenceInterval(samples, confidence = 0.95) {
-    if (samples.length === 0) return { lower: 0, upper: 0 };
-    const sorted = [...samples].sort((a, b) => a - b);
-    const n = sorted.length;
-    const alpha = 1 - confidence;
-    const lowerIdx = Math.floor(alpha / 2 * n);
-    const upperIdx = Math.ceil((1 - alpha / 2) * n) - 1;
-    if (n < 30) {
-      const m = mean(samples);
-      const sd = stddev(samples);
-      const z = zScore(confidence);
-      const margin = z * sd / Math.sqrt(n);
-      return { lower: m - margin, upper: m + margin };
-    }
-    return {
-      lower: sorted[Math.max(0, lowerIdx)],
-      upper: sorted[Math.min(n - 1, upperIdx)]
-    };
-  }
-  // 분류 예측 (K-NN 스타일 + 나이브 베이즈 유사)
-  classify(features, trainingData) {
-    if (trainingData.length === 0) {
-      return {
-        classes: [{ label: "unknown", probability: 1 }],
-        predicted: "unknown",
-        confidence: 0
-      };
-    }
-    const distances = trainingData.map((item) => {
-      const keys = Object.keys(features);
-      let dist = 0;
-      for (const k2 of keys) {
-        const fv = features[k2] ?? 0;
-        const tv = item.features[k2] ?? 0;
-        dist += (fv - tv) ** 2;
+var Predictor, globalPredictor;
+var init_predict = __esm({
+  "src/predict.ts"() {
+    Predictor = class {
+      // 선형 회귀 예측
+      linearRegression(data, horizon = 1) {
+        const { slope, intercept } = linearFit(data);
+        const nextIdx = data.length - 1 + horizon;
+        const value = intercept + slope * nextIdx;
+        const se = residualStdError(data, slope, intercept);
+        const z = zScore(0.95);
+        const minMargin = (Math.max(...data) - Math.min(...data)) * 0.05 + 1e-6;
+        const margin = Math.max(minMargin, z * se * Math.sqrt(1 + 1 / data.length));
+        return {
+          value,
+          lower: value - margin,
+          upper: value + margin,
+          confidence: 0.95,
+          method: "linear-regression",
+          horizon
+        };
       }
-      return { label: item.label, dist: Math.sqrt(dist) };
-    });
-    distances.sort((a, b) => a.dist - b.dist);
-    const k = Math.min(5, distances.length);
-    const neighbors = distances.slice(0, k);
-    const labelWeights = {};
-    let totalWeight = 0;
-    for (const n of neighbors) {
-      const w = n.dist === 0 ? 1e6 : 1 / (n.dist + 1e-10);
-      labelWeights[n.label] = (labelWeights[n.label] ?? 0) + w;
-      totalWeight += w;
-    }
-    const classes = Object.entries(labelWeights).map(([label, w]) => ({ label, probability: w / totalWeight })).sort((a, b) => b.probability - a.probability);
-    const predicted = classes[0]?.label ?? "unknown";
-    const confidence = classes[0]?.probability ?? 0;
-    return { classes, predicted, confidence };
-  }
-  // 예측 정확도 평가
-  evaluate(predictions, actuals) {
-    const n = Math.min(predictions.length, actuals.length);
-    if (n === 0) return { mae: 0, rmse: 0, mape: 0 };
-    let sumAE = 0;
-    let sumSE = 0;
-    let sumAPE = 0;
-    let mapeCount = 0;
-    for (let i = 0; i < n; i++) {
-      const err4 = predictions[i] - actuals[i];
-      sumAE += Math.abs(err4);
-      sumSE += err4 ** 2;
-      if (actuals[i] !== 0) {
-        sumAPE += Math.abs(err4 / actuals[i]) * 100;
-        mapeCount++;
+      // 이동 평균 예측
+      movingAverage(data, window = 3, horizon = 1) {
+        const w = Math.min(window, data.length);
+        const slice = data.slice(data.length - w);
+        const value = mean(slice);
+        const sd = stddev(slice.length < 2 ? data : slice);
+        const z = zScore(0.95);
+        const margin = z * sd / Math.sqrt(w);
+        return {
+          value,
+          lower: value - margin,
+          upper: value + margin,
+          confidence: 0.95,
+          method: "moving-average",
+          horizon
+        };
       }
-    }
-    return {
-      mae: sumAE / n,
-      rmse: Math.sqrt(sumSE / n),
-      mape: mapeCount > 0 ? sumAPE / mapeCount : 0
+      // 지수 평활 예측 (Exponential Smoothing)
+      exponentialSmoothing(data, alpha = 0.3, horizon = 1) {
+        if (data.length === 0) {
+          return { value: 0, lower: 0, upper: 0, confidence: 0.95, method: "exponential-smoothing", horizon };
+        }
+        let smoothed = data[0];
+        for (let i = 1; i < data.length; i++) {
+          smoothed = alpha * data[i] + (1 - alpha) * smoothed;
+        }
+        const errors = [];
+        let s = data[0];
+        for (let i = 1; i < data.length; i++) {
+          const prev = s;
+          s = alpha * data[i] + (1 - alpha) * prev;
+          errors.push(data[i] - prev);
+        }
+        const se = errors.length > 0 ? stddev(errors) : stddev(data) * 0.5;
+        const z = zScore(0.95);
+        const margin = z * se;
+        return {
+          value: smoothed,
+          lower: smoothed - margin,
+          upper: smoothed + margin,
+          confidence: 0.95,
+          method: "exponential-smoothing",
+          horizon
+        };
+      }
+      // 시계열 다중 예측
+      forecastTimeSeries(data, steps = 3) {
+        const trend = this.detectTrend(data);
+        const predictions = [];
+        for (let h = 1; h <= steps; h++) {
+          predictions.push(this.linearRegression(data, h));
+        }
+        let seasonality = void 0;
+        if (data.length >= 8) {
+          const bestPeriod = this._detectSeasonality(data);
+          if (bestPeriod > 1) seasonality = bestPeriod;
+        }
+        let accuracy = void 0;
+        if (data.length >= 5) {
+          const splitIdx = Math.floor(data.length * 0.8);
+          const trainData = data.slice(0, splitIdx);
+          const testData = data.slice(splitIdx);
+          const testPreds = testData.map((_, i) => {
+            const { slope, intercept } = linearFit(trainData);
+            return intercept + slope * (trainData.length + i);
+          });
+          const mae = mean(testData.map((actual, i) => Math.abs(actual - testPreds[i])));
+          const range = Math.max(...data) - Math.min(...data);
+          accuracy = range > 0 ? Math.max(0, 1 - mae / range) : 0.5;
+        }
+        return { predictions, trend, seasonality, accuracy };
+      }
+      // 신뢰구간 계산 (부트스트랩)
+      confidenceInterval(samples, confidence = 0.95) {
+        if (samples.length === 0) return { lower: 0, upper: 0 };
+        const sorted = [...samples].sort((a, b) => a - b);
+        const n = sorted.length;
+        const alpha = 1 - confidence;
+        const lowerIdx = Math.floor(alpha / 2 * n);
+        const upperIdx = Math.ceil((1 - alpha / 2) * n) - 1;
+        if (n < 30) {
+          const m = mean(samples);
+          const sd = stddev(samples);
+          const z = zScore(confidence);
+          const margin = z * sd / Math.sqrt(n);
+          return { lower: m - margin, upper: m + margin };
+        }
+        return {
+          lower: sorted[Math.max(0, lowerIdx)],
+          upper: sorted[Math.min(n - 1, upperIdx)]
+        };
+      }
+      // 분류 예측 (K-NN 스타일 + 나이브 베이즈 유사)
+      classify(features, trainingData) {
+        if (trainingData.length === 0) {
+          return {
+            classes: [{ label: "unknown", probability: 1 }],
+            predicted: "unknown",
+            confidence: 0
+          };
+        }
+        const distances = trainingData.map((item) => {
+          const keys = Object.keys(features);
+          let dist = 0;
+          for (const k2 of keys) {
+            const fv = features[k2] ?? 0;
+            const tv = item.features[k2] ?? 0;
+            dist += (fv - tv) ** 2;
+          }
+          return { label: item.label, dist: Math.sqrt(dist) };
+        });
+        distances.sort((a, b) => a.dist - b.dist);
+        const k = Math.min(5, distances.length);
+        const neighbors = distances.slice(0, k);
+        const labelWeights = {};
+        let totalWeight = 0;
+        for (const n of neighbors) {
+          const w = n.dist === 0 ? 1e6 : 1 / (n.dist + 1e-10);
+          labelWeights[n.label] = (labelWeights[n.label] ?? 0) + w;
+          totalWeight += w;
+        }
+        const classes = Object.entries(labelWeights).map(([label, w]) => ({ label, probability: w / totalWeight })).sort((a, b) => b.probability - a.probability);
+        const predicted = classes[0]?.label ?? "unknown";
+        const confidence = classes[0]?.probability ?? 0;
+        return { classes, predicted, confidence };
+      }
+      // 예측 정확도 평가
+      evaluate(predictions, actuals) {
+        const n = Math.min(predictions.length, actuals.length);
+        if (n === 0) return { mae: 0, rmse: 0, mape: 0 };
+        let sumAE = 0;
+        let sumSE = 0;
+        let sumAPE = 0;
+        let mapeCount = 0;
+        for (let i = 0; i < n; i++) {
+          const err4 = predictions[i] - actuals[i];
+          sumAE += Math.abs(err4);
+          sumSE += err4 ** 2;
+          if (actuals[i] !== 0) {
+            sumAPE += Math.abs(err4 / actuals[i]) * 100;
+            mapeCount++;
+          }
+        }
+        return {
+          mae: sumAE / n,
+          rmse: Math.sqrt(sumSE / n),
+          mape: mapeCount > 0 ? sumAPE / mapeCount : 0
+        };
+      }
+      // 트렌드 감지
+      detectTrend(data) {
+        if (data.length < 2) return "flat";
+        const { slope, intercept } = linearFit(data);
+        const n = data.length;
+        const yMean = mean(data);
+        const ssTot = data.reduce((sum, y) => sum + (y - yMean) ** 2, 0);
+        const ssRes = data.reduce((sum, y, i) => sum + (y - (intercept + slope * i)) ** 2, 0);
+        const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 1;
+        if (rSquared >= 0.7) {
+          const range2 = Math.max(...data) - Math.min(...data);
+          const normalizedSlope2 = range2 > 0 ? slope / range2 : slope;
+          if (Math.abs(normalizedSlope2) < 0.05) return "flat";
+          if (normalizedSlope2 > 0) return "up";
+          return "down";
+        }
+        const sd = stddev(data);
+        const m = Math.abs(yMean);
+        const cv = m > 0 ? sd / m : sd;
+        if (cv > 0.3) return "volatile";
+        const range = Math.max(...data) - Math.min(...data);
+        const normalizedSlope = range > 0 ? slope / range : slope;
+        if (Math.abs(normalizedSlope) < 0.05) return "flat";
+        if (normalizedSlope > 0) return "up";
+        return "down";
+      }
+      // 계절성 감지 (자기상관 기반)
+      _detectSeasonality(data) {
+        const n = data.length;
+        const m = mean(data);
+        let bestPeriod = 0;
+        let bestCorr = 0;
+        const maxLag = Math.floor(n / 2);
+        for (let lag = 2; lag <= maxLag; lag++) {
+          let num = 0;
+          let den1 = 0;
+          let den2 = 0;
+          for (let i = lag; i < n; i++) {
+            const a = data[i] - m;
+            const b = data[i - lag] - m;
+            num += a * b;
+            den1 += a ** 2;
+            den2 += b ** 2;
+          }
+          const corr = den1 * den2 > 0 ? num / Math.sqrt(den1 * den2) : 0;
+          if (corr > bestCorr) {
+            bestCorr = corr;
+            bestPeriod = lag;
+          }
+        }
+        return bestCorr > 0.5 ? bestPeriod : 0;
+      }
     };
+    globalPredictor = new Predictor();
   }
-  // 트렌드 감지
-  detectTrend(data) {
-    if (data.length < 2) return "flat";
-    const { slope, intercept } = linearFit(data);
-    const n = data.length;
-    const yMean = mean(data);
-    const ssTot = data.reduce((sum, y) => sum + (y - yMean) ** 2, 0);
-    const ssRes = data.reduce((sum, y, i) => sum + (y - (intercept + slope * i)) ** 2, 0);
-    const rSquared = ssTot > 0 ? 1 - ssRes / ssTot : 1;
-    if (rSquared >= 0.7) {
-      const range2 = Math.max(...data) - Math.min(...data);
-      const normalizedSlope2 = range2 > 0 ? slope / range2 : slope;
-      if (Math.abs(normalizedSlope2) < 0.05) return "flat";
-      if (normalizedSlope2 > 0) return "up";
-      return "down";
-    }
-    const sd = stddev(data);
-    const m = Math.abs(yMean);
-    const cv = m > 0 ? sd / m : sd;
-    if (cv > 0.3) return "volatile";
-    const range = Math.max(...data) - Math.min(...data);
-    const normalizedSlope = range > 0 ? slope / range : slope;
-    if (Math.abs(normalizedSlope) < 0.05) return "flat";
-    if (normalizedSlope > 0) return "up";
-    return "down";
-  }
-  // 계절성 감지 (자기상관 기반)
-  _detectSeasonality(data) {
-    const n = data.length;
-    const m = mean(data);
-    let bestPeriod = 0;
-    let bestCorr = 0;
-    const maxLag = Math.floor(n / 2);
-    for (let lag = 2; lag <= maxLag; lag++) {
-      let num = 0;
-      let den1 = 0;
-      let den2 = 0;
-      for (let i = lag; i < n; i++) {
-        const a = data[i] - m;
-        const b = data[i - lag] - m;
-        num += a * b;
-        den1 += a ** 2;
-        den2 += b ** 2;
-      }
-      const corr = den1 * den2 > 0 ? num / Math.sqrt(den1 * den2) : 0;
-      if (corr > bestCorr) {
-        bestCorr = corr;
-        bestPeriod = lag;
-      }
-    }
-    return bestCorr > 0.5 ? bestPeriod : 0;
-  }
-};
-var globalPredictor = new Predictor();
+});
 
 // src/eval-builtins-ai.ts
 function evalRefactorSelf(op, args3) {
@@ -16022,16 +14599,22 @@ function evalWorldModel141(op, args3) {
   }
   return void 0;
 }
-
-// src/eval-builtins.ts
-init_lexer();
-init_parser();
+var init_eval_builtins_ai = __esm({
+  "src/eval-builtins-ai.ts"() {
+    init_refactor_self();
+    init_align();
+    init_ethics_check();
+    init_curiosity();
+    init_wisdom();
+    init_causal();
+    init_explain();
+    init_world_model();
+    init_counterfactual();
+    init_predict();
+  }
+});
 
 // src/runtime-store.ts
-var fs2 = __toESM(require("fs"));
-var path3 = __toESM(require("path"));
-var DEFAULT_PATH = ".runtime-store.json";
-var _runCounter = 0;
 function newRunId() {
   return `r-${++_runCounter}`;
 }
@@ -16066,6 +14649,15 @@ function storeClear(filePath = DEFAULT_PATH) {
 function storeGetDefaultPath() {
   return DEFAULT_PATH;
 }
+var fs2, path3, DEFAULT_PATH, _runCounter;
+var init_runtime_store = __esm({
+  "src/runtime-store.ts"() {
+    fs2 = __toESM(require("fs"));
+    path3 = __toESM(require("path"));
+    DEFAULT_PATH = ".runtime-store.json";
+    _runCounter = 0;
+  }
+});
 
 // src/runtime-history.ts
 function computeHistory(filePath) {
@@ -16154,6 +14746,11 @@ function replayHistory(filePath) {
     };
   });
 }
+var init_runtime_history = __esm({
+  "src/runtime-history.ts"() {
+    init_runtime_store();
+  }
+});
 
 // src/runtime-reputation.ts
 function computeReputation(name, filePath) {
@@ -16198,6 +14795,11 @@ function computeAllReputations(filePath) {
   const worstContract = contracts.length > 0 && contracts[0].verdict !== "unknown" ? contracts[0].name : null;
   return { contracts, worstContract };
 }
+var init_runtime_reputation = __esm({
+  "src/runtime-reputation.ts"() {
+    init_runtime_store();
+  }
+});
 
 // src/runtime-intelligence.ts
 function computeIntelligence(filePath) {
@@ -16240,8 +14842,25 @@ function computeIntelligence(filePath) {
   health = Math.max(0, Math.min(100, health));
   return { history, reputation, recommendations, "health-score": health };
 }
+var init_runtime_intelligence = __esm({
+  "src/runtime-intelligence.ts"() {
+    init_runtime_history();
+    init_runtime_reputation();
+  }
+});
+
+// src/_stdlib-signatures.json
+var require_stdlib_signatures = __commonJS({
+  "src/_stdlib-signatures.json"(exports2, module2) {
+    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "binary", name: "buf_u32be", params: "n", returns: "string (base64 of 4-byte big-endian uint32)" }, { module: "binary", name: "buf_u8", params: "n", returns: "string (base64 of 1 byte)" }, { module: "binary", name: "buf_str", params: "s", returns: "string (base64 of UTF-8 encoded string)" }, { module: "binary", name: "buf_concat", params: "list", returns: "string (base64 of concatenated byte buffers)" }, { module: "binary", name: "buf_len", params: "b64", returns: "number (byte count)" }, { module: "binary", name: "buf_read_u32be", params: "b64 offset", returns: "number (big-endian uint32 at byte offset)" }, { module: "binary", name: "buf_read_u8", params: "b64 offset", returns: "number (uint8 at byte offset)" }, { module: "binary", name: "buf_read_str", params: "b64 offset len", returns: "string (UTF-8 string from byte range)" }, { module: "binary", name: "buf_crc32", params: "b64", returns: "number (IEEE 802.3 CRC32 of all bytes)" }, { module: "binary", name: "buf_slice", params: "b64 offset len", returns: "string (sub-buffer as base64)" }, { module: "binary", name: "buf_from_bytes", params: "b64", returns: "string (alias: identity, for clarity in code)" }, { module: "binary", name: "buf_f64le", params: "n", returns: "string (base64 of 8-byte float64 little-endian)" }, { module: "binary", name: "buf_read_f64le", params: "b64 offset", returns: "number (float64 LE at byte offset)" }, { module: "binary", name: "buf_u32le", params: "n", returns: "string (base64 of 4-byte uint32 little-endian)" }, { module: "binary", name: "buf_read_u32le", params: "b64 offset", returns: "number (uint32 LE at byte offset)" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "capture-error", name: "capture_error_args", params: "fn args context?", returns: "{ok, result, error?}" }, { module: "capture-error", name: "error_log", params: "", returns: "[{message, name, stack, timestamp, context?}, ...]" }, { module: "capture-error", name: "error_log_clear", params: "", returns: "count cleared" }, { module: "capture-error", name: "error_log_last", params: "n?", returns: "last n errors (default 10)" }, { module: "capture-error", name: "error_count", params: "", returns: "number of captured errors" }, { module: "capture-error", name: "make_error", params: "message name? code?", returns: "plain object" }, { module: "capture-error", name: "error_message", params: "err", returns: "string" }, { module: "capture-error", name: "error_stack", params: "err", returns: "[string]" }, { module: "capture-error", name: "retry", params: "fn attempts delay_ms?", returns: "{ok, result, attempts_used, error?}" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "frequencies", params: "arr", returns: "{value: count}  (count occurrences of each value)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end", returns: "[number]  (inclusive start, exclusive end)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "cron", name: "cron_validate", params: "expr", returns: "bool" }, { module: "cron", name: "cron_match", params: "expr ts_ms", returns: "bool  (\uD574\uB2F9 \uC2DC\uAC01\uC774 cron \uC2DD\uACFC \uC77C\uCE58\uD558\uB294\uC9C0)" }, { module: "cron", name: "cron_next_match", params: "expr from_ms", returns: "ms  (from \uC774\uD6C4 \uB2E4\uC74C \uC77C\uCE58 \uC2DC\uAC01, \uCD5C\uB300 1\uB144)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "csv-parse", params: "text [delimiter]", returns: "[[string]] (quoted fields \uC644\uC804 \uC9C0\uC6D0)" }, { module: "data", name: "csv-parse-map", params: "text [delimiter]", returns: "[{header: val}] (\uD5E4\uB354 \uD3EC\uD568 \uD30C\uC2F1)" }, { module: "data", name: "csv-stringify", params: "rows [delimiter]", returns: "string" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "data", name: "empty?", params: "x", returns: "boolean (\uBC30\uC5F4/\uBB38\uC790\uC5F4/\uAC1D\uCCB4/nil \uBAA8\uB450 \uC9C0\uC6D0)" }, { module: "data", name: "array-empty?", params: "x", returns: "boolean (\uBC30\uC5F4\uB9CC \uD655\uC778)" }, { module: "data", name: "str_replace_in", params: "s old new", returns: "string (replaceAll, \uC778\uC790 \uC21C\uC11C: s \uBA3C\uC800)" }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: '""' }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "file", name: "file_read_or", params: "filePath defaultVal", returns: "string | any (\uD30C\uC77C \uC5C6\uAC70\uB098 \uC624\uB958 \uC2DC \uAE30\uBCF8\uAC12 \uBC18\uD658)" }, { module: "http-macro", name: "http_get_json", params: "url headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_post_json", params: "url body headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_ok?", params: "result", returns: "boolean" }, { module: "http-macro", name: "http_body", params: "result", returns: "parsed body or null" }, { module: "http-macro", name: "http_status", params: "result", returns: "number" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_static", params: "dir [urlPrefix]", returns: 'null  \uC815\uC801 \uD30C\uC77C \uC11C\uBE59 (server-static "public" "/")' }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_csp_nonce", params: "", returns: "string (\uD604\uC7AC \uC694\uCCAD\uC758 CSP nonce \u2014 <script nonce=...> \uB4F1\uC5D0 \uC0AC\uC6A9)" }, { module: "http-server", name: "server_set_cookie", params: "name value opts", returns: "cookie string (HttpOnly+Secure+SameSite \uC790\uB3D9)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_files", params: "req", returns: "array of multipart files" }, { module: "http-server", name: "server_req_fields", params: "req", returns: "map of multipart text fields" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer_json", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete_json", params: "url", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_post_bearer", params: "url body token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_retry_post", params: "url body token retries", returns: '{:status 200 :body "..."}' }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "http", name: "http-post-data", params: "url data", returns: "parsed JSON data | nil  (#12 \uD574\uACB0)" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "optional", name: "require_optional", params: "modName", returns: "true/false (\uC124\uCE58 \uC5EC\uBD80)" }, { module: "optional", name: "optional_call", params: "modName fnPath args", returns: "result or throws" }, { module: "optional", name: "optional_has?", params: "modName", returns: "boolean" }, { module: "optional", name: "optional_version", params: "modName", returns: "string or nil" }, { module: "perf", name: "profile_fn", params: "fn count", returns: "PerfResult" }, { module: "perf", name: "trace_expr", params: "fn label", returns: "TraceResult" }, { module: "perf", name: "perf_stats", params: "", returns: "PerfStats" }, { module: "perf", name: "now_ms", params: "", returns: "number" }, { module: "perf", name: "elapsed_ms", params: "start", returns: "number" }, { module: "perf", name: "bench", params: "fn iterations", returns: "{ms, ops_per_sec}" }, { module: "perf", name: "time_fn", params: "fn args...", returns: "{result, ms}" }, { module: "process", name: "shell_exec_stdout", params: "cmd cwd?", returns: "string | null (stdout\uB9CC \uBC18\uD658, \uC2E4\uD328 \uC2DC null)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "rest-crud", name: "route_info", params: "basePath", returns: "{base, param_name, supported_ops: [...]}" }, { module: "rest-crud", name: "path_param", params: "req paramName", returns: "string or nil" }, { module: "rest-crud", name: "rest_response", params: "status body", returns: "Map" }, { module: "rest-crud", name: "rest_ok", params: "body", returns: "Map (200)" }, { module: "rest-crud", name: "rest_created", params: "body", returns: "Map (201)" }, { module: "rest-crud", name: "rest_not_found", params: "msg", returns: "Map (404)" }, { module: "rest-crud", name: "rest_error", params: "status msg", returns: "Map" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_safe", params: "program args", returns: "string (\uC778\uC790 \uBC30\uC5F4 \uBC29\uC2DD \u2014 \uC0AC\uC6A9\uC790 \uC785\uB825 \uC548\uC804 \uC2E4\uD589, sh -c \uBBF8\uC0AC\uC6A9)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string | null (\uD658\uACBD\uBCC0\uC218 \uC5C6\uC73C\uBA74 null)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "number (current timestamp ms)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "verify", name: "check_parens", params: "code", returns: "VerifyResult" }, { module: "verify", name: "verify_code", params: "code", returns: "{valid, error_count, first_error}" }, { module: "verify", name: "fix_parens", params: "code", returns: "\uC790\uB3D9 \uC218\uC815\uB41C \uCF54\uB4DC (or original if already valid)" }, { module: "verify", name: "count_parens", params: "code", returns: "{open, close, balanced}" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
+  }
+});
 
 // src/eval-builtins.ts
+var eval_builtins_exports = {};
+__export(eval_builtins_exports, {
+  evalBuiltin: () => evalBuiltin
+});
 function flDeepEq(a, b) {
   if (a === b) return true;
   if (a == null || b == null) return false;
@@ -16266,7 +14885,6 @@ function flTypeOf(v) {
   if (typeof v === "object") return "map";
   return typeof v;
 }
-var MODULE_CACHE_DISABLED = false;
 function flEnvGet(env, name) {
   let e = env;
   while (e !== null && e !== void 0) {
@@ -16637,11 +15255,13 @@ function flExecOpNative(op, vals) {
     // ── Phase L1: 모듈 시스템 + 파일 I/O ──
     case "load": {
       const filePath = String(v0 ?? "");
-      const fs22 = require("fs");
+      const fs21 = require("fs");
       const path19 = require("path");
       try {
-        const resolvedPath = path19.resolve(process.cwd(), filePath);
-        const src = fs22.readFileSync(resolvedPath, "utf-8");
+        const currentFile = interp.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.resolve(baseDir, filePath);
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -16666,9 +15286,9 @@ function flExecOpNative(op, vals) {
     case "file-mkdir":
     case "file_mkdir": {
       const dirPath = String(v0 ?? "");
-      const fs22 = require("fs");
+      const fs21 = require("fs");
       try {
-        fs22.mkdirSync(dirPath, { recursive: true });
+        fs21.mkdirSync(dirPath, { recursive: true });
         return true;
       } catch {
         return false;
@@ -16678,9 +15298,9 @@ function flExecOpNative(op, vals) {
     case "file_append": {
       const filePath = String(v0 ?? "");
       const content = String(v1 ?? "");
-      const fs22 = require("fs");
+      const fs21 = require("fs");
       try {
-        fs22.appendFileSync(filePath, content);
+        fs21.appendFileSync(filePath, content);
         return true;
       } catch {
         return false;
@@ -16746,7 +15366,6 @@ req.end();`;
       return null;
   }
 }
-var FL_SPECIAL_FORMS = /* @__PURE__ */ new Set(["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"]);
 function flApplyNative(closure, vals) {
   if (!closure || closure.kind !== "closure") return null;
   const params = closure.params || [];
@@ -16927,110 +15546,6 @@ function cacheEvict(ch) {
     if (firstKey !== void 0) ch.map.delete(firstKey);
   }
 }
-var _globalCache = makeCacheHandle(1e4);
-var IO_CTRL_SLOTS = 4;
-var IO_CTRL_SIZE = IO_CTRL_SLOTS * 4;
-var IO_DATA_SIZE = 8 * 1024 * 1024;
-var IO_SLOT_WRITE = 0;
-var IO_SLOT_READ = 1;
-var IO_SLOT_NOTIFY = 2;
-var _ioWorkerCode = `
-const { workerData, parentPort } = require('worker_threads');
-const net = require('net');
-
-const ctrl = new Int32Array(workerData.ctrlBuf);
-const data = Buffer.from(workerData.dataBuf);
-const DATA_SIZE = ${IO_DATA_SIZE};
-const WP = ${IO_SLOT_WRITE};
-const NOTIFY = ${IO_SLOT_NOTIFY};
-
-// push: JSON \uC774\uBCA4\uD2B8\uB97C ring buffer\uC5D0 \uAE30\uB85D\uD558\uACE0 Main\uC744 \uAE68\uC6C0
-// wrap sentinel(0xFFFFFFFF) \uD328\uD134\uC73C\uB85C \uBC84\uD37C \uB05D \uCC98\uB9AC
-function push(eventStr) {
-  const encoded = Buffer.from(eventStr, 'utf8');
-  const totalLen = 4 + encoded.length;
-  let wp = Atomics.load(ctrl, WP);
-  // \uD604\uC7AC \uC704\uCE58\uC5D0 \uC774\uBCA4\uD2B8\uAC00 \uB4E4\uC5B4\uAC00\uC9C0 \uC54A\uC73C\uBA74 wrap sentinel \uAE30\uB85D \uD6C4 0\uC73C\uB85C \uC774\uB3D9
-  if (wp + totalLen > DATA_SIZE - 8) {
-    data.writeUInt32LE(0xFFFFFFFF, wp);
-    wp = 0;
-  }
-  data.writeUInt32LE(encoded.length, wp);
-  encoded.copy(data, wp + 4);
-  Atomics.store(ctrl, WP, wp + totalLen);
-  Atomics.store(ctrl, NOTIFY, 1);
-  Atomics.notify(ctrl, NOTIFY);
-}
-
-// \uC18C\uCF13 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: id \u2192 { sock, handler }
-const sockets = new Map();
-// \uC11C\uBC84 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: port \u2192 net.Server
-const servers = new Map();
-
-parentPort.on('message', (msg) => {
-  const { cmd } = msg;
-
-  if (cmd === 'tcp-outbound') {
-    const { id, host, port, handler } = msg;
-    const sock = new net.Socket();
-    sockets.set(id, { sock, handler });
-    sock.connect(port, host);
-    sock.on('connect', () =>
-      push(JSON.stringify({ ev: 'connect', id, handler })));
-    sock.on('data', (chunk) =>
-      push(JSON.stringify({ ev: 'data', id, handler, hex: chunk.toString('hex') })));
-    sock.on('close', () => {
-      sockets.delete(id);
-      push(JSON.stringify({ ev: 'close', id, handler }));
-    });
-    sock.on('error', (e) => {
-      sockets.delete(id);
-      push(JSON.stringify({ ev: 'error', id, handler, msg: e.message }));
-    });
-  }
-
-  if (cmd === 'tcp-write') {
-    const entry = sockets.get(msg.id);
-    if (entry && !entry.sock.destroyed) {
-      entry.sock.write(Buffer.from(msg.hex, 'hex'));
-    }
-  }
-
-  if (cmd === 'tcp-drop') {
-    const entry = sockets.get(msg.id);
-    if (entry) { entry.sock.destroy(); sockets.delete(msg.id); }
-  }
-
-  if (cmd === 'tcp-server-raw') {
-    const { port, handler } = msg;
-    if (servers.has(port)) return;
-    let seq = 0;
-    const server = net.createServer((sock) => {
-      const cid = 'conn_' + port + '_' + (++seq);
-      sockets.set(cid, { sock, handler });
-      push(JSON.stringify({ ev: 'accept', id: cid, handler }));
-      sock.on('data', (chunk) =>
-        push(JSON.stringify({ ev: 'data', id: cid, handler, hex: chunk.toString('hex') })));
-      sock.on('close', () => {
-        sockets.delete(cid);
-        push(JSON.stringify({ ev: 'close', id: cid, handler }));
-      });
-      sock.on('error', (e) => {
-        sockets.delete(cid);
-        push(JSON.stringify({ ev: 'error', id: cid, handler, msg: e.message }));
-      });
-    });
-    server.listen(port, () =>
-      push(JSON.stringify({ ev: 'listening', id: port, handler })));
-    servers.set(port, server);
-  }
-
-  if (cmd === 'tcp-server-stop') {
-    const server = servers.get(msg.port);
-    if (server) { server.close(); servers.delete(msg.port); }
-  }
-});
-`;
 function __ensureIoWorker() {
   if (globalThis.__ioWorker) return;
   const { Worker: IoWorker } = require("worker_threads");
@@ -17115,17 +15630,19 @@ function evalBuiltin(interp2, op, args3, expr2) {
     case "load": {
       const filePath = String(args3[0] ?? "");
       const nsPrefix = args3[1] != null ? String(args3[1]) : null;
-      const fs22 = require("fs");
+      const fs21 = require("fs");
       const path19 = require("path");
       try {
-        const resolvedPath = path19.resolve(process.cwd(), filePath);
+        const currentFile = interp2.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.resolve(baseDir, filePath);
         const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
         if (!MODULE_CACHE_DISABLED && !isWatchMode && !nsPrefix) {
           if (!interp2.__loadCache) interp2.__loadCache = /* @__PURE__ */ new Set();
           if (interp2.__loadCache.has(resolvedPath)) return null;
           interp2.__loadCache.add(resolvedPath);
         }
-        const src = fs22.readFileSync(resolvedPath, "utf-8");
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -17250,18 +15767,20 @@ function evalBuiltin(interp2, op, args3, expr2) {
     }
     case "require": {
       const modulePath = String(args3[0] ?? "");
-      const fs22 = require("fs");
+      const fs21 = require("fs");
       const path19 = require("path");
       try {
         let filePath = modulePath;
         if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
           filePath = filePath + ".fl";
         }
-        const resolvedPath = path19.isAbsolute(filePath) ? filePath : path19.resolve(process.cwd(), filePath);
+        const currentFile = interp2.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.isAbsolute(filePath) ? filePath : path19.resolve(baseDir, filePath);
         if (MODULE_CACHE.has(resolvedPath)) {
           return MODULE_CACHE.get(resolvedPath);
         }
-        const src = fs22.readFileSync(resolvedPath, "utf-8");
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
         const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
         const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
         const tokens = lex2(src, resolvedPath);
@@ -19547,6 +18066,28 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       return _getDef;
     }
+    case "safe-get":
+    case "safe_get": {
+      let sgKey = args3[1];
+      if (sgKey !== null && typeof sgKey === "object" && sgKey.kind === "keyword") sgKey = sgKey.name;
+      const sgHasDefault = args3.length >= 3;
+      const sgDefault = sgHasDefault ? args3[2] : void 0;
+      let sgVal = null;
+      if (args3[0] instanceof Map) {
+        const sgK = String(sgKey).replace(/^:/, "");
+        sgVal = args3[0].has(sgK) ? args3[0].get(sgK) : null;
+      } else if (args3[0] !== null && typeof args3[0] === "object") {
+        const sgK = typeof sgKey === "string" && sgKey.startsWith(":") ? sgKey.slice(1) : String(sgKey);
+        sgVal = args3[0][sgK] !== void 0 ? args3[0][sgK] : args3[0][String(sgKey)] !== void 0 ? args3[0][String(sgKey)] : null;
+      } else if (Array.isArray(args3[0])) {
+        sgVal = typeof sgKey === "number" ? args3[0][sgKey] ?? null : null;
+      }
+      if (sgVal === null || sgVal === void 0) {
+        if (sgHasDefault) return sgDefault;
+        throw new Error(`safe-get: key '${sgKey}' is nil \u2014 use (safe-get map key default) for optional fields`);
+      }
+      return sgVal;
+    }
     case "block-items":
       if (args3[0] && typeof args3[0] === "object" && args3[0].kind === "block" && args3[0].type === "Array") {
         return args3[0].fields instanceof Map ? args3[0].fields.get("items") ?? [] : [];
@@ -20045,6 +18586,21 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         if (typeof ka === "number" && typeof kb === "number") return ka - kb;
         return String(ka).localeCompare(String(kb));
       });
+    }
+    case "group-by":
+    case "group_by": {
+      if (!Array.isArray(args3[1])) return {};
+      const gbFn = args3[0];
+      const gbArr = args3[1];
+      const gbIsField = typeof gbFn === "string";
+      const gbExtract = gbIsField ? (x) => x !== null && typeof x === "object" ? String(x[gbFn] ?? x[":" + gbFn] ?? "null") : "null" : (x) => String(callFnVal(gbFn, [x]) ?? "null");
+      const gbResult = {};
+      for (const item of gbArr) {
+        const k = gbExtract(item);
+        if (!gbResult[k]) gbResult[k] = [];
+        gbResult[k].push(item);
+      }
+      return gbResult;
     }
     case "zip": {
       const a = Array.isArray(args3[0]) ? args3[0] : [];
@@ -22994,9 +21550,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         case "file-mkdir":
         case "file_mkdir": {
           const dirPath = String(args3[0] ?? "");
-          const fs22 = require("fs");
+          const fs21 = require("fs");
           try {
-            fs22.mkdirSync(dirPath, { recursive: true });
+            fs21.mkdirSync(dirPath, { recursive: true });
             return true;
           } catch {
             return false;
@@ -23077,8 +21633,2399 @@ req.end();`;
     }
   }
 }
+var MODULE_CACHE_DISABLED, FL_SPECIAL_FORMS, _globalCache, IO_CTRL_SLOTS, IO_CTRL_SIZE, IO_DATA_SIZE, IO_SLOT_WRITE, IO_SLOT_READ, IO_SLOT_NOTIFY, _ioWorkerCode;
+var init_eval_builtins = __esm({
+  "src/eval-builtins.ts"() {
+    init_async_runtime();
+    init_errors();
+    init_effect_enforcer();
+    init_lazy_seq();
+    init_context_window();
+    init_result_type();
+    init_error_system();
+    init_tool_registry();
+    init_memory_system();
+    init_rag();
+    init_multi_agent();
+    init_try_reason();
+    init_streaming();
+    init_quality_loop();
+    init_fl_tutor();
+    init_reasoning_debugger();
+    init_prompt_compiler();
+    init_fl_sdk();
+    init_hypothesis();
+    init_maybe_chain();
+    init_debate();
+    init_checkpoint();
+    init_meta_reason();
+    init_belief();
+    init_analogy();
+    init_critique();
+    init_compose_reason();
+    init_cognitive();
+    init_consensus();
+    init_delegate();
+    init_negotiate();
+    init_vote();
+    init_swarm();
+    init_peer_review();
+    init_compete();
+    init_chain_agents();
+    init_multi_agent_hub();
+    init_orchestrate();
+    init_evolve();
+    init_mutate();
+    init_crossover();
+    init_fitness();
+    init_generation();
+    init_prune();
+    init_benchmark_self();
+    init_version_self();
+    init_self_evolution_hub();
+    init_causal();
+    init_eval_builtins_ai();
+    init_lexer();
+    init_parser();
+    init_runtime_events();
+    init_runtime_contracts();
+    init_runtime_governance();
+    init_runtime_budget();
+    init_runtime_context();
+    init_runtime_watchdog();
+    init_runtime_store();
+    init_runtime_history();
+    init_runtime_reputation();
+    init_runtime_intelligence();
+    MODULE_CACHE_DISABLED = false;
+    FL_SPECIAL_FORMS = /* @__PURE__ */ new Set(["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"]);
+    _globalCache = makeCacheHandle(1e4);
+    IO_CTRL_SLOTS = 4;
+    IO_CTRL_SIZE = IO_CTRL_SLOTS * 4;
+    IO_DATA_SIZE = 8 * 1024 * 1024;
+    IO_SLOT_WRITE = 0;
+    IO_SLOT_READ = 1;
+    IO_SLOT_NOTIFY = 2;
+    _ioWorkerCode = `
+const { workerData, parentPort } = require('worker_threads');
+const net = require('net');
+
+const ctrl = new Int32Array(workerData.ctrlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const DATA_SIZE = ${IO_DATA_SIZE};
+const WP = ${IO_SLOT_WRITE};
+const NOTIFY = ${IO_SLOT_NOTIFY};
+
+// push: JSON \uC774\uBCA4\uD2B8\uB97C ring buffer\uC5D0 \uAE30\uB85D\uD558\uACE0 Main\uC744 \uAE68\uC6C0
+// wrap sentinel(0xFFFFFFFF) \uD328\uD134\uC73C\uB85C \uBC84\uD37C \uB05D \uCC98\uB9AC
+function push(eventStr) {
+  const encoded = Buffer.from(eventStr, 'utf8');
+  const totalLen = 4 + encoded.length;
+  let wp = Atomics.load(ctrl, WP);
+  // \uD604\uC7AC \uC704\uCE58\uC5D0 \uC774\uBCA4\uD2B8\uAC00 \uB4E4\uC5B4\uAC00\uC9C0 \uC54A\uC73C\uBA74 wrap sentinel \uAE30\uB85D \uD6C4 0\uC73C\uB85C \uC774\uB3D9
+  if (wp + totalLen > DATA_SIZE - 8) {
+    data.writeUInt32LE(0xFFFFFFFF, wp);
+    wp = 0;
+  }
+  data.writeUInt32LE(encoded.length, wp);
+  encoded.copy(data, wp + 4);
+  Atomics.store(ctrl, WP, wp + totalLen);
+  Atomics.store(ctrl, NOTIFY, 1);
+  Atomics.notify(ctrl, NOTIFY);
+}
+
+// \uC18C\uCF13 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: id \u2192 { sock, handler }
+const sockets = new Map();
+// \uC11C\uBC84 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: port \u2192 net.Server
+const servers = new Map();
+
+parentPort.on('message', (msg) => {
+  const { cmd } = msg;
+
+  if (cmd === 'tcp-outbound') {
+    const { id, host, port, handler } = msg;
+    const sock = new net.Socket();
+    sockets.set(id, { sock, handler });
+    sock.connect(port, host);
+    sock.on('connect', () =>
+      push(JSON.stringify({ ev: 'connect', id, handler })));
+    sock.on('data', (chunk) =>
+      push(JSON.stringify({ ev: 'data', id, handler, hex: chunk.toString('hex') })));
+    sock.on('close', () => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'close', id, handler }));
+    });
+    sock.on('error', (e) => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'error', id, handler, msg: e.message }));
+    });
+  }
+
+  if (cmd === 'tcp-write') {
+    const entry = sockets.get(msg.id);
+    if (entry && !entry.sock.destroyed) {
+      entry.sock.write(Buffer.from(msg.hex, 'hex'));
+    }
+  }
+
+  if (cmd === 'tcp-drop') {
+    const entry = sockets.get(msg.id);
+    if (entry) { entry.sock.destroy(); sockets.delete(msg.id); }
+  }
+
+  if (cmd === 'tcp-server-raw') {
+    const { port, handler } = msg;
+    if (servers.has(port)) return;
+    let seq = 0;
+    const server = net.createServer((sock) => {
+      const cid = 'conn_' + port + '_' + (++seq);
+      sockets.set(cid, { sock, handler });
+      push(JSON.stringify({ ev: 'accept', id: cid, handler }));
+      sock.on('data', (chunk) =>
+        push(JSON.stringify({ ev: 'data', id: cid, handler, hex: chunk.toString('hex') })));
+      sock.on('close', () => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'close', id: cid, handler }));
+      });
+      sock.on('error', (e) => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'error', id: cid, handler, msg: e.message }));
+      });
+    });
+    server.listen(port, () =>
+      push(JSON.stringify({ ev: 'listening', id: port, handler })));
+    servers.set(port, server);
+  }
+
+  if (cmd === 'tcp-server-stop') {
+    const server = servers.get(msg.port);
+    if (server) { server.close(); servers.delete(msg.port); }
+  }
+});
+`;
+  }
+});
+
+// src/profiler.ts
+var Profiler, globalProfiler;
+var init_profiler = __esm({
+  "src/profiler.ts"() {
+    Profiler = class {
+      constructor() {
+        this.enabled = false;
+        this.entries = /* @__PURE__ */ new Map();
+        // 호출 스택: selfMs(자식 제외 시간) 계산용
+        this.callStack = [];
+      }
+      /**
+       * enter(name) → exit 함수 반환
+       * exit 호출 시 경과 시간 기록
+       */
+      enter(name) {
+        if (!this.enabled) return () => {
+        };
+        const startMs = performance.now();
+        const stackEntry = { name, startMs, childMs: 0 };
+        this.callStack.push(stackEntry);
+        return () => {
+          const endMs = performance.now();
+          const durationMs = endMs - startMs;
+          const selfMs = durationMs - stackEntry.childMs;
+          const idx = this.callStack.lastIndexOf(stackEntry);
+          if (idx !== -1) this.callStack.splice(idx, 1);
+          if (this.callStack.length > 0) {
+            this.callStack[this.callStack.length - 1].childMs += durationMs;
+          }
+          this._addEntry(name, durationMs, selfMs);
+        };
+      }
+      /**
+       * record(name, ms): 직접 기록 (selfMs = ms로 가정)
+       */
+      record(name, ms) {
+        if (!this.enabled) return;
+        this._addEntry(name, ms, ms);
+      }
+      _addEntry(name, totalMs, selfMs) {
+        const existing = this.entries.get(name);
+        if (existing) {
+          existing.callCount++;
+          existing.totalMs += totalMs;
+          existing.selfMs += selfMs;
+          if (totalMs > existing.maxMs) existing.maxMs = totalMs;
+          if (totalMs < existing.minMs) existing.minMs = totalMs;
+        } else {
+          this.entries.set(name, {
+            callCount: 1,
+            totalMs,
+            selfMs,
+            maxMs: totalMs,
+            minMs: totalMs
+          });
+        }
+      }
+      /**
+       * getReport(): callCount 내림차순 정렬된 ProfileEntry 배열
+       */
+      getReport() {
+        const result = [];
+        for (const [name, data] of this.entries) {
+          result.push({
+            name,
+            callCount: data.callCount,
+            totalMs: data.totalMs,
+            selfMs: data.selfMs,
+            avgMs: data.totalMs / data.callCount,
+            maxMs: data.maxMs,
+            minMs: data.minMs
+          });
+        }
+        result.sort((a, b) => b.callCount - a.callCount);
+        return result;
+      }
+      /**
+       * getTop(n): 상위 N개 반환
+       */
+      getTop(n) {
+        return this.getReport().slice(0, n);
+      }
+      /**
+       * reset(): 모든 데이터 초기화
+       */
+      reset() {
+        this.entries.clear();
+        this.callStack = [];
+      }
+      /**
+       * toMarkdown(): Markdown 테이블 출력
+       */
+      toMarkdown() {
+        const report = this.getReport();
+        if (report.length === 0) {
+          return "| name | calls | totalMs | selfMs | avgMs | maxMs | minMs |\n|------|-------|---------|--------|-------|-------|-------|\n";
+        }
+        const header = "| name | calls | totalMs | selfMs | avgMs | maxMs | minMs |";
+        const divider = "|------|-------|---------|--------|-------|-------|-------|";
+        const rows = report.map(
+          (e) => `| ${e.name} | ${e.callCount} | ${e.totalMs.toFixed(3)} | ${e.selfMs.toFixed(3)} | ${e.avgMs.toFixed(3)} | ${e.maxMs.toFixed(3)} | ${e.minMs.toFixed(3)} |`
+        );
+        return [header, divider, ...rows].join("\n");
+      }
+      /**
+       * toJSON(): ProfileEntry 배열을 JSON 객체로
+       */
+      toJSON() {
+        return this.getReport();
+      }
+    };
+    globalProfiler = new Profiler();
+  }
+});
+
+// src/vm.ts
+var VM;
+var init_vm = __esm({
+  "src/vm.ts"() {
+    init_bytecode();
+    VM = class {
+      constructor() {
+        this.stack = [];
+        this.vars = /* @__PURE__ */ new Map();
+        this.ip = 0;
+      }
+      run(chunk) {
+        this.stack = [];
+        this.vars = /* @__PURE__ */ new Map();
+        this.ip = 0;
+        while (this.ip < chunk.instructions.length) {
+          const instr = chunk.instructions[this.ip];
+          this.ip++;
+          switch (instr.op) {
+            case 0 /* PUSH_CONST */: {
+              const idx = instr.arg;
+              this.push(chunk.constants[idx]);
+              break;
+            }
+            case 1 /* PUSH_VAR */: {
+              const name = instr.arg;
+              if (!this.vars.has(name)) {
+                throw new Error(`VM: \uC815\uC758\uB418\uC9C0 \uC54A\uC740 \uBCC0\uC218: ${name}`);
+              }
+              this.push(this.vars.get(name));
+              break;
+            }
+            case 2 /* SET_VAR */: {
+              const name = instr.arg;
+              const val = this.pop();
+              this.vars.set(name, val);
+              break;
+            }
+            case 7 /* POP */: {
+              this.pop();
+              break;
+            }
+            case 8 /* DUP */: {
+              if (this.stack.length === 0) {
+                throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (DUP)");
+              }
+              this.push(this.stack[this.stack.length - 1]);
+              break;
+            }
+            case 9 /* ADD */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a + b);
+              break;
+            }
+            case 10 /* SUB */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a - b);
+              break;
+            }
+            case 11 /* MUL */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a * b);
+              break;
+            }
+            case 12 /* DIV */: {
+              const b = this.pop();
+              const a = this.pop();
+              if (b === 0) throw new Error("VM: 0\uC73C\uB85C \uB098\uB204\uAE30");
+              this.push(a / b);
+              break;
+            }
+            case 13 /* MOD */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a % b);
+              break;
+            }
+            case 14 /* EQ */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a === b);
+              break;
+            }
+            case 19 /* NEQ */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a !== b);
+              break;
+            }
+            case 15 /* LT */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a < b);
+              break;
+            }
+            case 16 /* GT */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a > b);
+              break;
+            }
+            case 17 /* LE */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a <= b);
+              break;
+            }
+            case 18 /* GE */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a >= b);
+              break;
+            }
+            case 20 /* AND */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(Boolean(a) && Boolean(b));
+              break;
+            }
+            case 21 /* OR */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(Boolean(a) || Boolean(b));
+              break;
+            }
+            case 22 /* NOT */: {
+              const a = this.pop();
+              this.push(!Boolean(a));
+              break;
+            }
+            case 5 /* JUMP */: {
+              this.ip = instr.arg;
+              break;
+            }
+            case 6 /* JUMP_IF_FALSE */: {
+              const cond = this.pop();
+              if (!Boolean(cond)) {
+                this.ip = instr.arg;
+              }
+              break;
+            }
+            case 23 /* MAKE_LIST */: {
+              const count = instr.arg;
+              if (this.stack.length < count) {
+                throw new Error(`VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (MAKE_LIST: need ${count}, have ${this.stack.length})`);
+              }
+              const items = this.stack.splice(this.stack.length - count, count);
+              this.push(items);
+              break;
+            }
+            case 24 /* GET_FIELD */: {
+              const obj = this.pop();
+              const field = instr.arg;
+              if (obj !== null && typeof obj === "object") {
+                this.push(obj[field]);
+              } else {
+                throw new Error(`VM: GET_FIELD \uB300\uC0C1\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D8`);
+              }
+              break;
+            }
+            case 3 /* CALL */: {
+              throw new Error("VM: CALL \uBBF8\uAD6C\uD604");
+            }
+            case 4 /* RETURN */: {
+              return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+            }
+            case 25 /* HALT */: {
+              return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+            }
+            default: {
+              throw new Error(`VM: \uC54C \uC218 \uC5C6\uB294 OpCode: ${instr.op}`);
+            }
+          }
+        }
+        return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+      }
+      push(val) {
+        this.stack.push(val);
+      }
+      pop() {
+        if (this.stack.length === 0) {
+          throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C");
+        }
+        return this.stack.pop();
+      }
+    };
+  }
+});
+
+// src/eval-call-function.ts
+var eval_call_function_exports = {};
+__export(eval_call_function_exports, {
+  callAsyncFunctionValue: () => callAsyncFunctionValue,
+  callFunction: () => callFunction,
+  callFunctionValue: () => callFunctionValue,
+  callFunctionValueRaw: () => callFunctionValueRaw,
+  callFunctionValueTCO: () => callFunctionValueTCO,
+  callUserFunction: () => callUserFunction,
+  callUserFunctionRaw: () => callUserFunctionRaw,
+  callUserFunctionTCO: () => callUserFunctionTCO
+});
+function propagateMutations(interp2, capturedEnv, paramSet, savedStack) {
+  const finalState = interp2.context.variables.snapshot();
+  for (const [key, newVal] of finalState) {
+    if (paramSet.has(key)) continue;
+    if (!capturedEnv.has(key)) continue;
+    const oldVal = capturedEnv.get(key);
+    if (newVal === oldVal) continue;
+    capturedEnv.set(key, newVal);
+    for (let i = savedStack.length - 1; i >= 0; i--) {
+      if (savedStack[i].has(key)) {
+        savedStack[i].set(key, newVal);
+        break;
+      }
+    }
+  }
+}
+function _flCheckType(type, val) {
+  switch (type) {
+    case "int":
+      return typeof val === "number" && Number.isInteger(val);
+    case "float":
+      return typeof val === "number" && !Number.isInteger(val);
+    case "number":
+      return typeof val === "number";
+    case "string":
+      return typeof val === "string";
+    case "bool":
+    case "boolean":
+      return typeof val === "boolean";
+    case "array":
+    case "list":
+      return Array.isArray(val);
+    case "map":
+      return val !== null && typeof val === "object" && !Array.isArray(val) && val?.kind !== "function-value" && val?.kind !== "async-function-value";
+    case "fn":
+    case "function":
+      return typeof val === "function" || val?.kind === "function-value" || val?.kind === "async-function-value";
+    case "nil":
+      return val === null || val === void 0;
+    case "any":
+      return true;
+    default:
+      return true;
+  }
+}
+function _flTypeName(val) {
+  if (val === null || val === void 0) return "nil";
+  if (Array.isArray(val)) return "array";
+  if (typeof val === "function" || val?.kind === "function-value") return "function";
+  if (typeof val === "object") return "map";
+  return typeof val;
+}
+function bindParam(interp2, param, value) {
+  if (typeof param === "string") {
+    interp2.context.variables.set(param, value);
+    return;
+  }
+  if (param?.kind === "block" && param?.type === "Map") {
+    const fields = param.fields;
+    const keysField = fields?.get("keys");
+    if (keysField?.kind === "block" && keysField?.type === "Array") {
+      const keyItems = keysField.fields.get("items") ?? [];
+      for (const keyNode of keyItems) {
+        const rawName = keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value : keyNode?.kind === "variable" ? keyNode.name.replace(/^\$/, "") : null;
+        if (rawName !== null) {
+          const varName = rawName.startsWith("$") ? rawName : "$" + rawName;
+          const extracted = value !== null && typeof value === "object" ? value[rawName] ?? null : null;
+          interp2.context.variables.set(varName, extracted);
+        }
+      }
+    }
+  }
+}
+function callUserFunction(interp2, name, args3) {
+  if (interp2.tcoMode) {
+    return callUserFunctionTCO(interp2, name, args3);
+  }
+  const _effBase = name.replace(/\[.*$/, "");
+  enforceCall(_effBase);
+  if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
+    const _vmAllowed = resolveFnAllowed(_effBase);
+    pushFrame(_effBase, _vmAllowed);
+    let _vmOk = false;
+    let _vmResult;
+    try {
+      try {
+        const vmFunc = vmFunctionRegistry.get(name);
+        const initialVars = /* @__PURE__ */ new Map();
+        if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
+          for (const [k, v] of vmFunc._closure) {
+            initialVars.set(k, v);
+          }
+        } else {
+          const snapshot = interp2.context.variables.snapshot();
+          for (const [k, v] of snapshot) {
+            initialVars.set(k, v);
+          }
+        }
+        for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
+          initialVars.set("$" + vmName, vmFuncObj);
+          initialVars.set(vmName, vmFuncObj);
+        }
+        for (let i = 0; i < vmFunc._params.length; i++) {
+          initialVars.set(vmFunc._params[i], args3[i] ?? null);
+        }
+        _vmResult = _callVM.run(vmFunc._chunk, initialVars);
+        _vmOk = true;
+      } catch {
+      }
+    } finally {
+      popFrame();
+    }
+    if (_vmOk) return _vmResult;
+  }
+  const _interpAllowed = resolveFnAllowed(_effBase);
+  pushFrame(_effBase, _interpAllowed);
+  try {
+    return _callUserFunctionInterpPath(interp2, name, args3);
+  } finally {
+    popFrame();
+  }
+}
+function _callUserFunctionInterpPath(interp2, name, args3) {
+  let baseName = name;
+  let typeArgs = null;
+  const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
+  if (bracketMatch) {
+    baseName = bracketMatch[1];
+    const typeArgStr = bracketMatch[2];
+    typeArgs = typeArgStr.split(",").map((t) => ({
+      kind: "type",
+      name: t.trim()
+    }));
+  }
+  let func = interp2.context.functions.get(baseName);
+  if (!func) {
+    const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
+    if (alt !== baseName) func = interp2.context.functions.get(alt);
+  }
+  if (!func) {
+    const v = interp2.context.variables.get(baseName) ?? interp2.context.variables.get("$" + baseName);
+    if (v && (v.kind === "function-value" || v.kind === "async-function-value" || typeof v === "function" || v.params && v.body)) {
+      if (v.kind === "function-value") return callFunctionValue(interp2, v, args3);
+      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp2, v, args3);
+      if (typeof v === "function") return v(...args3);
+      func = v;
+    }
+  }
+  if (!func) {
+    const candidates = [...interp2.context.functions.keys()];
+    const alias = KNOWN_ALIASES[baseName] ?? KNOWN_ALIASES[baseName.replace(/-/g, "_")] ?? KNOWN_ALIASES[baseName.replace(/_/g, "-")];
+    let hint;
+    if (alias) {
+      hint = `'${baseName}'\uB294 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2E0 '${alias.correct}'\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
+  \uC0AC\uC6A9\uBC95: ${alias.usage}`;
+    } else {
+      const similar = suggestSimilar(baseName, candidates);
+      hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+    }
+    throw new FunctionNotFoundError(
+      baseName,
+      interp2.currentFilePath,
+      interp2.currentLine > 0 ? interp2.currentLine : void 0,
+      void 0,
+      hint
+    );
+  }
+  if (func._call) return func._call(...args3);
+  let isGenericCall = false;
+  if (func.generics && func.generics.length > 0) {
+    if (!typeArgs) {
+      throw new Error(`Generic function '${baseName}' requires type arguments, e.g., ${baseName}[int] or ${baseName}[int string]`);
+    }
+    if (interp2.context.typeChecker) {
+      const instantiation = interp2.context.typeChecker.instantiateGenericFunction(baseName, typeArgs);
+      if (!instantiation.valid) {
+        throw new Error(`Cannot instantiate generic function '${baseName}': ${instantiation.message}`);
+      }
+    }
+    isGenericCall = true;
+  }
+  if (!isGenericCall && interp2.context.runtimeTypeChecker) {
+    interp2.context.runtimeTypeChecker.checkCall(baseName, args3);
+  }
+  if (typeof func.body === "function") {
+    return func.body(...args3);
+  }
+  if (func.paramDefaults) {
+    while (args3.length < func.params.length) {
+      const def = func.paramDefaults[args3.length];
+      if (def !== void 0) args3 = [...args3, interp2.eval(def)];
+      else break;
+    }
+  }
+  if (func.params.length > args3.length) {
+    const paramNames = func.params.map(
+      (p) => typeof p === "string" ? p.replace(/^\$/, "") : p?.kind === "variable" ? p.name.replace(/^\$/, "") : "\u2026"
+    );
+    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
+  }
+  if (interp2.callDepth >= MAX_CALL_DEPTH) {
+    const _stack3 = interp2.callStack ?? [];
+    const tail = _stack3.slice(-10).map((s, i) => `  #${_stack3.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
+    throw new Error(
+      `[E_STACK_OVERFLOW] line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'
+` + (tail ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
+${tail}` : "")
+    );
+  }
+  const prefixMatch = baseName.match(/^([^:]+):/);
+  const tempAliases = [];
+  if (prefixMatch) {
+    const prefix = prefixMatch[1] + ":";
+    for (const [fname, fval] of interp2.context.functions) {
+      if (fname.startsWith(prefix)) {
+        const unqualified = fname.slice(prefix.length);
+        if (!interp2.context.functions.has(unqualified)) {
+          interp2.context.functions.set(unqualified, fval);
+          tempAliases.push(unqualified);
+        }
+      }
+    }
+  }
+  const exitProfiler = globalProfiler.enter(baseName);
+  const _callStack = interp2.context.callStack;
+  const _argsBrief = args3.slice(0, 5).map(
+    (a) => a === null ? "nil" : Array.isArray(a) ? `[${a.length}]` : typeof a === "object" ? "{obj}" : typeof a === "function" ? "<fn>" : typeof a === "string" ? a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"` : String(a)
+  );
+  const _stackEntry = { name: baseName, line: interp2.currentLine, args: _argsBrief };
+  if (process.env.FL_TRACE === "1") {
+    console.error(`[trace] ${"  ".repeat(Math.min(interp2.callDepth, 20))}\u2192 ${baseName}(${_argsBrief.join(", ")}) (line ${interp2.currentLine})`);
+  }
+  if (func.paramAnnotations) {
+    for (let _ti = 0; _ti < func.params.length; _ti++) {
+      const _ann = func.paramAnnotations[_ti];
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uD30C\uB77C\uBBF8\uD130 '${func.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
+        );
+      }
+    }
+  }
+  if (func.capturedEnv) {
+    const savedStack = interp2.context.variables.saveStack();
+    const paramSet = new Set(func.params);
+    interp2.callDepth++;
+    if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
+    _callStack.push(_stackEntry);
+    if (_callStack.length > 100) _callStack.shift();
+    let result;
+    try {
+      interp2.context.variables.fromSnapshot(func.capturedEnv);
+      for (let i = 0; i < func.params.length; i++) {
+        bindParam(interp2, func.params[i], args3[i]);
+      }
+      result = interp2.eval(func.body);
+      if (func.returnAnnotation && func.returnAnnotation !== "any" && !_flCheckType(func.returnAnnotation, result)) {
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uBC18\uD658\uAC12: ${func.returnAnnotation} \uD544\uC694, ${_flTypeName(result)} \uBC18\uD658\uB428`
+        );
+      }
+      propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
+    } catch (e) {
+      if (isReturnSignal(e)) {
+        result = e.value;
+      } else {
+        if (e instanceof Error && !e.__flCallStack) {
+          e.__flCallStack = [..._callStack];
+        }
+        throw e;
+      }
+    } finally {
+      interp2.callDepth--;
+      _callStack.pop();
+      interp2.context.variables.restoreStack(savedStack);
+      for (const alias of tempAliases) interp2.context.functions.delete(alias);
+      exitProfiler();
+    }
+    return result;
+  }
+  interp2.context.variables.push();
+  interp2.callDepth++;
+  if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
+  _callStack.push(_stackEntry);
+  if (_callStack.length > 100) _callStack.shift();
+  try {
+    for (let recurIter = 0; recurIter < 2e6; recurIter++) {
+      if (recurIter > 0 && recurIter % 1e3 === 0 && hasBudget()) {
+        checkBudget(Date.now(), 0, 0);
+      }
+      for (let i = 0; i < func.params.length; i++) {
+        bindParam(interp2, func.params[i], args3[i]);
+      }
+      let result;
+      try {
+        result = interp2.eval(func.body);
+      } catch (e) {
+        if (isReturnSignal(e)) return e.value;
+        if (e instanceof Error && !e.__flCallStack) {
+          e.__flCallStack = [..._callStack];
+        }
+        throw e;
+      }
+      if (result && typeof result === "object" && result.__FL_RECUR__) {
+        args3 = result.__args;
+        continue;
+      }
+      return result;
+    }
+    throw new Error(`recur: max iterations exceeded in '${baseName}'`);
+  } finally {
+    interp2.callDepth--;
+    _callStack.pop();
+    interp2.context.variables.pop();
+    for (const alias of tempAliases) interp2.context.functions.delete(alias);
+    exitProfiler();
+  }
+}
+function callFunctionValue(interp2, fn, args3) {
+  if (interp2.tcoMode) {
+    return callFunctionValueTCO(interp2, fn, args3);
+  }
+  if (fn._call) return fn._call(...args3);
+  if (fn.kind !== "function-value") {
+    throw new Error(`Expected function-value, got ${fn.kind}`);
+  }
+  const _effName = fn.name ?? "<anonymous>";
+  enforceCall(_effName);
+  const _allowed = resolveFnAllowed(_effName);
+  pushFrame(_effName, _allowed);
+  try {
+    return _callFunctionValueBody(interp2, fn, args3);
+  } finally {
+    popFrame();
+  }
+}
+function _callFunctionValueBody(interp2, fn, args3) {
+  if (fn.paramDefaults) {
+    while (args3.length < fn.params.length) {
+      const def = fn.paramDefaults[args3.length];
+      if (def !== void 0) args3 = [...args3, def];
+      else break;
+    }
+  }
+  if (interp2.callDepth >= MAX_CALL_DEPTH) {
+    throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
+  }
+  if (fn.paramAnnotations) {
+    for (let _ti = 0; _ti < fn.params.length; _ti++) {
+      const _ann = fn.paramAnnotations[_ti];
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
+        const _fn = fn.name ?? "\uC775\uBA85";
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uD30C\uB77C\uBBF8\uD130 '${fn.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
+        );
+      }
+    }
+  }
+  const savedStack = interp2.context.variables.saveStack();
+  const paramSet = new Set(fn.params);
+  interp2.callDepth++;
+  let result;
+  try {
+    interp2.context.variables.fromSnapshot(fn.capturedEnv);
+    for (let i = 0; i < fn.params.length; i++) {
+      bindParam(interp2, fn.params[i], args3[i]);
+    }
+    result = interp2.eval(fn.body);
+    if (fn.returnAnnotation && fn.returnAnnotation !== "any") {
+      if (!_flCheckType(fn.returnAnnotation, result)) {
+        const _fn = fn.name ?? "\uC775\uBA85";
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uBC18\uD658\uAC12: ${fn.returnAnnotation} \uD544\uC694, ${_flTypeName(result)} \uBC18\uD658\uB428`
+        );
+      }
+    }
+    propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
+  } catch (e) {
+    if (isReturnSignal(e)) {
+      result = e.value;
+    } else {
+      if (e instanceof Error && !e.__flCallStack) {
+        const _cs = interp2.context?.callStack;
+        if (_cs?.length) e.__flCallStack = [..._cs];
+      }
+      throw e;
+    }
+  } finally {
+    interp2.callDepth--;
+    interp2.context.variables.restoreStack(savedStack);
+  }
+  return result;
+}
+function callAsyncFunctionValue(interp2, fn, args3) {
+  if (fn.kind !== "async-function-value") {
+    throw new Error(`Expected async-function-value, got ${fn.kind}`);
+  }
+  const _effName = fn.name ?? "<anonymous>";
+  return new FreeLangPromise((resolve10, reject) => {
+    enforceCall(_effName);
+    pushFrame(_effName, resolveFnAllowed(_effName));
+    const savedStack = interp2.context.variables.saveStack();
+    try {
+      interp2.context.variables.fromSnapshot(fn.capturedEnv);
+      for (let i = 0; i < fn.params.length; i++) {
+        bindParam(interp2, fn.params[i], args3[i]);
+      }
+      const result = interp2.eval(fn.body);
+      if (result instanceof FreeLangPromise) {
+        result.then((value) => resolve10(value)).catch((error) => reject(error));
+      } else {
+        resolve10(result);
+      }
+    } catch (error) {
+      reject(error);
+    } finally {
+      interp2.context.variables.restoreStack(savedStack);
+      popFrame();
+    }
+  });
+}
+function callFunction(interp2, fn, args3) {
+  if (fn.kind === "builtin-function") {
+    const _bname = fn.name ?? "<builtin>";
+    enforceCall(_bname);
+    return fn.fn(args3.map((arg) => interp2.eval(arg)));
+  } else if (fn.kind === "function-value") {
+    return callFunctionValue(interp2, fn, args3);
+  } else if (fn.kind === "async-function-value") {
+    return callAsyncFunctionValue(interp2, fn, args3);
+  } else if (typeof fn === "function") {
+    return fn(...args3);
+  } else if (typeof fn === "string") {
+    const wrappedArgs = args3.map((v) => ({
+      kind: "literal",
+      value: v,
+      type: v === null ? "any" : Array.isArray(v) ? "list" : typeof v
+    }));
+    return interp2.eval({ kind: "sexpr", op: fn, args: wrappedArgs });
+  } else if (fn && fn.params && fn.body) {
+    return callUserFunction(interp2, fn.name || "anonymous", args3);
+  } else {
+    throw new Error(`Cannot call ${typeof fn}: ${JSON.stringify(fn).slice(0, 100)}`);
+  }
+}
+function callUserFunctionTCO(interp2, name, args3) {
+  let currentName = name;
+  let currentArgs = args3;
+  const prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
+  let _haveFrame = false;
+  try {
+    for (let i = 0; i < 2e6; i++) {
+      let baseName = currentName;
+      const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
+      if (bracketMatch) baseName = bracketMatch[1];
+      if (_haveFrame) popFrame();
+      enforceCall(baseName);
+      pushFrame(baseName, resolveFnAllowed(baseName));
+      _haveFrame = true;
+      let func = interp2.context.functions.get(baseName);
+      if (!func) {
+        const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
+        if (alt !== baseName) func = interp2.context.functions.get(alt);
+      }
+      if (!func) {
+        const candidates = [...interp2.context.functions.keys()];
+        const similar = suggestSimilar(baseName, candidates);
+        const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+        throw new FunctionNotFoundError(baseName, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0, void 0, hint);
+      }
+      if (func._call) return func._call(...currentArgs);
+      if (typeof func.body === "function") {
+        return func.body(...currentArgs);
+      }
+      const prefixMatch = baseName.match(/^([^:]+):/);
+      const tempAliases = [];
+      if (prefixMatch) {
+        const prefix = prefixMatch[1] + ":";
+        for (const [fname, fval] of interp2.context.functions) {
+          if (fname.startsWith(prefix)) {
+            const unqualified = fname.slice(prefix.length);
+            if (!interp2.context.functions.has(unqualified)) {
+              interp2.context.functions.set(unqualified, fval);
+              tempAliases.push(unqualified);
+            }
+          }
+        }
+      }
+      let result;
+      try {
+        if (func.capturedEnv) {
+          const savedStack = interp2.context.variables.saveStack();
+          try {
+            interp2.context.variables.fromSnapshot(func.capturedEnv);
+            for (let j = 0; j < func.params.length; j++) {
+              bindParam(interp2, func.params[j], currentArgs[j]);
+            }
+            result = interp2.eval(func.body);
+          } catch (e) {
+            if (isReturnSignal(e)) {
+              result = e.value;
+            } else throw e;
+          } finally {
+            interp2.context.variables.restoreStack(savedStack);
+          }
+        } else {
+          interp2.context.variables.push();
+          try {
+            for (let j = 0; j < func.params.length; j++) {
+              bindParam(interp2, func.params[j], currentArgs[j]);
+            }
+            result = interp2.eval(func.body);
+          } catch (e) {
+            if (isReturnSignal(e)) {
+              result = e.value;
+            } else throw e;
+          } finally {
+            interp2.context.variables.pop();
+          }
+        }
+      } finally {
+        for (const alias of tempAliases) interp2.context.functions.delete(alias);
+      }
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          currentName = result.fn;
+          currentArgs = result.args;
+          continue;
+        } else {
+          return callFunctionValueTCO(interp2, result.fn, result.args);
+        }
+      }
+      return result;
+    }
+    throw new Error(`TCO: \uCD5C\uB300 \uBC18\uBCF5(2,000,000) \uCD08\uACFC \u2014 '${currentName}'\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131`);
+  } finally {
+    if (_haveFrame) popFrame();
+    interp2.tcoMode = prevTcoMode;
+  }
+}
+function callFunctionValueTCO(interp2, fn, args3) {
+  const prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
+  let _haveFrame = false;
+  try {
+    let currentFn = fn;
+    let currentArgs = args3;
+    for (let i = 0; i < 1e6; i++) {
+      if (currentFn.kind !== "function-value") {
+        throw new Error(`Expected function-value, got ${currentFn.kind}`);
+      }
+      const _effName = currentFn.name ?? "<anonymous>";
+      if (_haveFrame) popFrame();
+      enforceCall(_effName);
+      pushFrame(_effName, resolveFnAllowed(_effName));
+      _haveFrame = true;
+      const savedStack = interp2.context.variables.saveStack();
+      let result;
+      try {
+        interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
+        for (let j = 0; j < currentFn.params.length; j++) {
+          bindParam(interp2, currentFn.params[j], currentArgs[j]);
+        }
+        result = interp2.eval(currentFn.body);
+      } finally {
+        interp2.context.variables.restoreStack(savedStack);
+      }
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          if (_haveFrame) {
+            popFrame();
+            _haveFrame = false;
+          }
+          return callUserFunctionTCO(interp2, result.fn, result.args);
+        } else {
+          currentFn = result.fn;
+          currentArgs = result.args;
+          continue;
+        }
+      }
+      return result;
+    }
+    throw new Error("TCO: \uCD5C\uB300 \uBC18\uBCF5(1,000,000) \uCD08\uACFC \u2014 function-value\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131");
+  } finally {
+    if (_haveFrame) popFrame();
+    interp2.tcoMode = prevTcoMode;
+  }
+}
+function callUserFunctionRaw(interp2, name, args3) {
+  const func = interp2.context.functions.get(name);
+  if (!func) throw new FunctionNotFoundError(name, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0);
+  const _effBase = name.replace(/\[.*$/, "");
+  enforceCall(_effBase);
+  pushFrame(_effBase, resolveFnAllowed(_effBase));
+  try {
+    if (typeof func.body === "function") return func.body(...args3);
+    let result;
+    if (func.capturedEnv) {
+      const savedStack = interp2.context.variables.saveStack();
+      try {
+        interp2.context.variables.fromSnapshot(func.capturedEnv);
+        for (let i = 0; i < func.params.length; i++) {
+          interp2.context.variables.set(func.params[i], args3[i]);
+        }
+        result = interp2.eval(func.body);
+      } finally {
+        interp2.context.variables.restoreStack(savedStack);
+      }
+    } else {
+      interp2.context.variables.push();
+      try {
+        for (let i = 0; i < func.params.length; i++) {
+          interp2.context.variables.set(func.params[i], args3[i]);
+        }
+        result = interp2.eval(func.body);
+      } finally {
+        interp2.context.variables.pop();
+      }
+    }
+    return result;
+  } finally {
+    popFrame();
+  }
+}
+function callFunctionValueRaw(interp2, fn, args3) {
+  if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
+  const _effName = fn.name ?? "<anonymous>";
+  enforceCall(_effName);
+  pushFrame(_effName, resolveFnAllowed(_effName));
+  try {
+    const savedStack = interp2.context.variables.saveStack();
+    try {
+      interp2.context.variables.fromSnapshot(fn.capturedEnv);
+      for (let i = 0; i < fn.params.length; i++) {
+        interp2.context.variables.set(fn.params[i], args3[i]);
+      }
+      return interp2.eval(fn.body);
+    } finally {
+      interp2.context.variables.restoreStack(savedStack);
+    }
+  } finally {
+    popFrame();
+  }
+}
+var _callVM, MAX_CALL_DEPTH;
+var init_eval_call_function = __esm({
+  "src/eval-call-function.ts"() {
+    init_async_runtime();
+    init_error_formatter();
+    init_errors();
+    init_tco();
+    init_profiler();
+    init_vm_eligible();
+    init_vm();
+    init_return_signal();
+    init_runtime_budget();
+    init_effect_enforcer();
+    _callVM = new VM();
+    MAX_CALL_DEPTH = 5e3;
+  }
+});
+
+// src/debugger.ts
+var debugger_exports = {};
+__export(debugger_exports, {
+  DebugSession: () => DebugSession,
+  getGlobalDebugSession: () => getGlobalDebugSession,
+  handleBreak: () => handleBreak,
+  setGlobalDebugSession: () => setGlobalDebugSession
+});
+function getGlobalDebugSession() {
+  if (!_globalSession) {
+    _globalSession = new DebugSession();
+  }
+  return _globalSession;
+}
+function setGlobalDebugSession(session) {
+  _globalSession = session;
+}
+function handleBreak(session, loc, env) {
+  if (!session.enabled) return;
+  session.onBreak(loc, env);
+}
+var DebugSession, _globalSession;
+var init_debugger = __esm({
+  "src/debugger.ts"() {
+    DebugSession = class _DebugSession {
+      constructor() {
+        /** 중단점 집합 — "file:line" 형태 */
+        this.breakpoints = /* @__PURE__ */ new Set();
+        /** step 모드 — true면 모든 줄에서 break */
+        this.stepMode = false;
+        /** 디버그 모드 활성화 여부 */
+        this.enabled = false;
+        /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
+        this.onBreakCallback = null;
+        /** 소스맵 (선택적) */
+        this.sourceMap = null;
+        /** 브레이크 이벤트 로그 (테스트 검증용) */
+        this.breakLog = [];
+        /** watch 변수 목록 */
+        this.watchList = /* @__PURE__ */ new Set();
+        /** 호출 스택 */
+        this.callStack = [];
+      }
+      static _key(file, line) {
+        return `${file}:${line}`;
+      }
+      /** 중단점 추가 */
+      addBreakpoint(file, line) {
+        this.breakpoints.add(_DebugSession._key(file, line));
+      }
+      /** 중단점 제거 */
+      removeBreakpoint(file, line) {
+        this.breakpoints.delete(_DebugSession._key(file, line));
+      }
+      /** 해당 위치가 중단점인지 확인 */
+      isBreakpoint(file, line) {
+        return this.breakpoints.has(_DebugSession._key(file, line));
+      }
+      /**
+       * 중단점 도달 시 처리:
+       * - 콘솔에 "[BREAK] file:line:col" 출력
+       * - 환경 변수 스냅샷 기록
+       * - watch 변수 값 출력
+       * - 호출 스택 출력
+       * - 콜백 실행
+       */
+      onBreak(loc, env) {
+        if (!this.enabled) return;
+        const event = { loc, env: { ...env } };
+        this.breakLog.push(event);
+        const locStr = `${loc.file}:${loc.line}:${loc.col}`;
+        console.log(`[BREAK] ${locStr}`);
+        if (this.callStack.length > 0) {
+          console.log(`  stack: [${this.callStack.join(" > ")}]`);
+        }
+        if (this.watchList.size > 0) {
+          const watchValues = this.getWatchValues(env);
+          const hasWatched = Object.keys(watchValues).length > 0;
+          if (hasWatched) {
+            console.log(`  \u{1F441} watch:`);
+            for (const [k, v] of Object.entries(watchValues)) {
+              const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+              console.log(`    ${k} = ${display.slice(0, 80)}`);
+            }
+          }
+        }
+        const entries = Object.entries(env).slice(0, 10);
+        if (entries.length > 0) {
+          console.log(`  env:`);
+          for (const [k, v] of entries) {
+            const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+            console.log(`    ${k} = ${display.slice(0, 80)}`);
+          }
+        }
+        if (this.onBreakCallback) {
+          this.onBreakCallback(event);
+        }
+      }
+      /** 중단점 모두 제거 */
+      clearBreakpoints() {
+        this.breakpoints.clear();
+      }
+      /** 중단점 개수 */
+      breakpointCount() {
+        return this.breakpoints.size;
+      }
+      /** watch에 변수 추가 */
+      addWatch(varName) {
+        this.watchList.add(varName);
+      }
+      /** watch에서 변수 제거 */
+      removeWatch(varName) {
+        this.watchList.delete(varName);
+      }
+      /** watch 중인 변수들의 현재값 반환 */
+      getWatchValues(env) {
+        const values = {};
+        for (const varName of this.watchList) {
+          if (varName in env) {
+            values[varName] = env[varName];
+          } else {
+            values[varName] = void 0;
+          }
+        }
+        return values;
+      }
+      /** 호출 스택에 함수명 추가 */
+      pushCall(fnName) {
+        this.callStack.push(fnName);
+      }
+      /** 호출 스택에서 제거 */
+      popCall() {
+        if (this.callStack.length > 0) {
+          this.callStack.pop();
+        }
+      }
+      /** 현재 호출 스택 반환 */
+      getStack() {
+        return [...this.callStack];
+      }
+    };
+    _globalSession = null;
+  }
+});
+
+// src/adapter-builtin-to-funcdef.ts
+var adapter_builtin_to_funcdef_exports = {};
+__export(adapter_builtin_to_funcdef_exports, {
+  builtinToFunctionDef: () => builtinToFunctionDef,
+  callFunction: () => callFunction2,
+  resolveFunction: () => resolveFunction,
+  userFunctionToDef: () => userFunctionToDef
+});
+function getEvalBuiltin() {
+  if (!evalBuiltinCache) {
+    const mod = (init_eval_builtins(), __toCommonJS(eval_builtins_exports));
+    evalBuiltinCache = mod.evalBuiltin || mod.default;
+  }
+  return evalBuiltinCache;
+}
+function builtinToFunctionDef(interp2, name) {
+  const effectEntry = lookupBuiltinEffects(name);
+  if (effectEntry === void 0) {
+    return null;
+  }
+  const effectTags = [];
+  if (effectEntry && effectEntry instanceof Set) {
+    effectTags.push(...Array.from(effectEntry));
+  }
+  const impl = (args3) => {
+    const evalBuiltinFunc = getEvalBuiltin();
+    return evalBuiltinFunc(interp2, name, args3, null);
+  };
+  return {
+    name,
+    arity: -1,
+    // builtin은 arity 정보 부족 (DU-2에서 개선)
+    impl,
+    effects: effectTags,
+    source: "builtin",
+    meta: {
+      nativeBuiltin: true
+    }
+  };
+}
+function userFunctionToDef(name, funcObj) {
+  if (!funcObj) return null;
+  const effectTags = [];
+  if (funcObj.effects && funcObj.effects instanceof Set) {
+    effectTags.push(...Array.from(funcObj.effects));
+  } else if (funcObj.effects && Array.isArray(funcObj.effects)) {
+    effectTags.push(...funcObj.effects);
+  }
+  const impl = (args3) => {
+    throw new Error(
+      `[userFunctionToDef] User functions must be called via callUserFunction, not via impl. Function: ${name}`
+    );
+  };
+  return {
+    name,
+    arity: funcObj.params ? funcObj.params.length : -1,
+    impl,
+    effects: effectTags,
+    source: "user",
+    meta: {
+      nativeBuiltin: false
+    }
+  };
+}
+function resolveFunction(interp2, name) {
+  if (process.env.DU_DEBUG) {
+    console.log(`[DU] resolveFunction("${name}")`);
+  }
+  let baseName = name;
+  const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
+  if (bracketMatch) {
+    baseName = bracketMatch[1];
+  }
+  const userFunc = interp2.context.functions?.get(baseName);
+  if (userFunc) {
+    if (process.env.DU_DEBUG) console.log(`[DU] Found user function: ${baseName}`);
+    return userFunctionToDef(baseName, userFunc);
+  }
+  if (process.env.DU_DEBUG) console.log(`[DU] No user function for: ${baseName}`);
+  const normalizedName = baseName.replace(/_/g, "-");
+  if (normalizedName !== baseName) {
+    const userFuncNorm = interp2.context.functions?.get(normalizedName);
+    if (userFuncNorm) {
+      return userFunctionToDef(normalizedName, userFuncNorm);
+    }
+  }
+  const builtinDef = builtinToFunctionDef(interp2, normalizedName);
+  if (builtinDef) {
+    return builtinDef;
+  }
+  return null;
+}
+function callFunction2(interp2, name, args3, span) {
+  const fn = resolveFunction(interp2, name);
+  if (!fn) {
+    return null;
+  }
+  if (fn.effects && fn.effects.length > 0) {
+    const { _enforceEffect } = (init_effect_enforcer(), __toCommonJS(effect_enforcer_exports));
+    const spanInfo = span ? { file: span.file ?? "", line: span.line ?? 0, col: span.col ?? 0 } : { file: "", line: 0, col: 0 };
+    _enforceEffect(fn.effects, spanInfo);
+  }
+  if (fn.source === "builtin") {
+    return fn.impl(args3);
+  } else if (fn.source === "user") {
+    const { callUserFunction: callUserFunction2 } = (init_eval_call_function(), __toCommonJS(eval_call_function_exports));
+    return callUserFunction2(interp2, fn.name, args3);
+  }
+  return null;
+}
+var evalBuiltinCache;
+var init_adapter_builtin_to_funcdef = __esm({
+  "src/adapter-builtin-to-funcdef.ts"() {
+    init_builtin_effects();
+    evalBuiltinCache = null;
+  }
+});
+
+// src/cli.ts
+var fs20 = __toESM(require("fs"));
+var path18 = __toESM(require("path"));
+var readline = __toESM(require("readline"));
+init_lexer();
+init_parser();
+
+// src/interpreter.ts
+var fs15 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
+init_lexer();
+init_parser();
+init_ast();
+
+// src/type-checker.ts
+var BUILTIN_TYPES = /* @__PURE__ */ new Map([
+  // Arithmetic
+  ["+", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  ["-", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  ["*", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  ["/", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  // Comparison
+  ["=", { params: [{ kind: "type", name: "any" }, { kind: "type", name: "any" }], returnType: { kind: "type", name: "bool" } }],
+  ["<", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "bool" } }],
+  [">", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "bool" } }],
+  // String
+  ["concat", { params: [{ kind: "type", name: "string" }, { kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
+  ["upper", { params: [{ kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
+  ["lower", { params: [{ kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
+  // Collection
+  ["list", { params: [{ kind: "type", name: "any" }], returnType: { kind: "type", name: "array<any>" } }]
+]);
+var TypeChecker = class {
+  constructor() {
+    this.functionTypes = /* @__PURE__ */ new Map();
+    this.variableTypes = /* @__PURE__ */ new Map();
+  }
+  /**
+   * Register a function type (from FUNC block with type annotations)
+   */
+  registerFunction(funcName, paramTypes, returnType) {
+    this.functionTypes.set(funcName, { params: paramTypes, returnType });
+  }
+  /**
+   * Register a variable type
+   */
+  registerVariable(varName, type) {
+    this.variableTypes.set(varName, type);
+  }
+  /**
+   * Check function call: verify argument types match parameter types
+   */
+  checkFunctionCall(funcName, argTypes) {
+    const builtinType = BUILTIN_TYPES.get(funcName);
+    if (builtinType) {
+      if (argTypes.length !== builtinType.params.length) {
+        return {
+          valid: false,
+          message: `Function '${funcName}' expects ${builtinType.params.length} arguments, got ${argTypes.length}`
+        };
+      }
+      return { valid: true, message: "OK", inferredType: builtinType.returnType };
+    }
+    const userFuncType = this.functionTypes.get(funcName);
+    if (userFuncType) {
+      if (argTypes.length !== userFuncType.params.length) {
+        return {
+          valid: false,
+          message: `Function '${funcName}' expects ${userFuncType.params.length} arguments, got ${argTypes.length}`
+        };
+      }
+      for (let i = 0; i < argTypes.length; i++) {
+        if (!this.isCompatible(argTypes[i], userFuncType.params[i])) {
+          return {
+            valid: false,
+            message: `Argument ${i + 1} to '${funcName}': expected ${userFuncType.params[i].name}, got ${argTypes[i].name}`
+          };
+        }
+      }
+      return { valid: true, message: "OK", inferredType: userFuncType.returnType };
+    }
+    return { valid: false, message: `Unknown function: ${funcName}` };
+  }
+  /**
+   * Check variable assignment
+   */
+  checkAssignment(varName, valueType, declaredType) {
+    if (declaredType && !this.isCompatible(valueType, declaredType)) {
+      return {
+        valid: false,
+        message: `Variable '${varName}' declared as ${declaredType.name}, but assigned ${valueType.name}`
+      };
+    }
+    return { valid: true, message: "OK" };
+  }
+  /**
+   * Infer type from AST node
+   */
+  inferType(node) {
+    const literal = node;
+    const variable = node;
+    const sexpr = node;
+    if (literal.kind === "literal") {
+      switch (literal.type) {
+        case "number":
+          return { kind: "type", name: "int" };
+        case "string":
+          return { kind: "type", name: "string" };
+        case "boolean":
+          return { kind: "type", name: "bool" };
+        default:
+          return { kind: "type", name: "any" };
+      }
+    }
+    if (variable.kind === "variable") {
+      const varType = this.variableTypes.get(variable.name);
+      return varType || { kind: "type", name: "any" };
+    }
+    if (sexpr.kind === "sexpr") {
+      const funcType = BUILTIN_TYPES.get(sexpr.op) || this.functionTypes.get(sexpr.op);
+      if (funcType) {
+        return funcType.returnType;
+      }
+    }
+    return { kind: "type", name: "any" };
+  }
+  /**
+   * Register a generic function type (Phase 4)
+   */
+  registerGenericFunction(funcName, generics, paramTypes, returnType) {
+    this.functionTypes.set(funcName, {
+      params: paramTypes,
+      returnType,
+      generics,
+      isGeneric: generics.length > 0
+    });
+  }
+  /**
+   * Instantiate generic function with concrete types (Phase 4)
+   * E.g., identity[T] with T=int becomes identity with param type int
+   */
+  instantiateGenericFunction(funcName, typeArgs) {
+    const funcType = this.functionTypes.get(funcName);
+    if (!funcType || !funcType.isGeneric) {
+      return {
+        valid: false,
+        message: `Function '${funcName}' is not generic`
+      };
+    }
+    if (!funcType.generics || typeArgs.length !== funcType.generics.length) {
+      return {
+        valid: false,
+        message: `Function '${funcName}' expects ${funcType.generics?.length || 0} type arguments, got ${typeArgs.length}`
+      };
+    }
+    const substitution = /* @__PURE__ */ new Map();
+    for (let i = 0; i < funcType.generics.length; i++) {
+      substitution.set(funcType.generics[i], typeArgs[i]);
+    }
+    const instantiatedParams = funcType.params.map((param) => this.substituteType(param, substitution));
+    const instantiatedReturn = this.substituteType(funcType.returnType, substitution);
+    return {
+      valid: true,
+      message: "OK",
+      inferredType: instantiatedReturn
+    };
+  }
+  /**
+   * Substitute type variables with concrete types (Phase 4)
+   */
+  substituteType(type, substitution) {
+    if (type.isTypeVariable && substitution.has(type.name)) {
+      return substitution.get(type.name) || type;
+    }
+    if (type.generic) {
+      return {
+        ...type,
+        generic: this.substituteType(type.generic, substitution)
+      };
+    }
+    if (type.union) {
+      return {
+        ...type,
+        union: type.union.map((t) => this.substituteType(t, substitution))
+      };
+    }
+    return type;
+  }
+  /**
+   * Check type compatibility
+   */
+  isCompatible(actualType, expectedType) {
+    if (actualType.name === expectedType.name) return true;
+    if (expectedType.name === "any" || actualType.name === "any") return true;
+    if (actualType.name === "int" && expectedType.name === "string") return true;
+    if (actualType.name === "string" && expectedType.name === "int") return true;
+    return false;
+  }
+};
+function createTypeChecker() {
+  return new TypeChecker();
+}
+
+// src/type-system.ts
+function inferType(value) {
+  if (value === null || value === void 0) return "null";
+  if (typeof value === "boolean") return "bool";
+  if (typeof value === "number") return Number.isInteger(value) ? "int" : "float";
+  if (typeof value === "string") return "string";
+  if (Array.isArray(value)) return "array";
+  if (typeof value === "function") return "fn";
+  if (typeof value === "object") return "map";
+  return "any";
+}
+function isCompatible(actual, expected) {
+  if (expected === "any") return true;
+  if (actual === "any") return true;
+  if (actual === expected) return true;
+  if (expected === "number" && (actual === "int" || actual === "float")) return true;
+  if (expected === "float" && actual === "int") return true;
+  return false;
+}
+function toFlType(typeName) {
+  switch (typeName) {
+    case "int":
+      return "int";
+    case "float":
+      return "float";
+    case "number":
+      return "number";
+    case "string":
+      return "string";
+    case "bool":
+      return "bool";
+    case "boolean":
+      return "bool";
+    case "array":
+    case "array<any>":
+      return "array";
+    case "map":
+      return "map";
+    case "fn":
+    case "function":
+      return "fn";
+    case "null":
+      return "null";
+    default:
+      return "any";
+  }
+}
+var RuntimeTypeChecker = class {
+  constructor(strict = false) {
+    // 함수 이름 → 타입 시그니처 (타입 어노테이션이 있는 함수만 등록)
+    this.funcTypes = /* @__PURE__ */ new Map();
+    this.strict = strict;
+  }
+  get isStrict() {
+    return this.strict;
+  }
+  /**
+   * 함수 타입 시그니처 등록
+   * paramTypeNames: TypeAnnotation.name 문자열 배열 (기존 type-checker와 호환)
+   */
+  registerFunc(name, paramTypeNames, retTypeName) {
+    this.funcTypes.set(name, {
+      params: paramTypeNames.map(toFlType),
+      ret: toFlType(retTypeName)
+    });
+  }
+  /**
+   * 함수 호출 시 인수 타입 검증
+   * strict 모드가 아니거나, 시그니처가 미등록이면 아무것도 하지 않음
+   */
+  checkCall(name, argValues) {
+    if (!this.strict) return;
+    const sig = this.funcTypes.get(name);
+    if (!sig) return;
+    const checkCount = Math.min(sig.params.length, argValues.length);
+    for (let i = 0; i < checkCount; i++) {
+      const expected = sig.params[i];
+      if (expected === "any") continue;
+      const actual = inferType(argValues[i]);
+      if (!isCompatible(actual, expected)) {
+        const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
+        throw new FLRuntimeError2(
+          ErrorCodes2.TYPE_MISMATCH,
+          `'${name}': arg ${i + 1} expected ${expected}, got ${actual}`,
+          { fn: name, arg: i, expected, got: actual, value: argValues[i] }
+        );
+      }
+    }
+  }
+  /**
+   * 함수 반환값 타입 검증 (optional — strict 모드)
+   */
+  checkReturn(name, retValue) {
+    if (!this.strict) return;
+    const sig = this.funcTypes.get(name);
+    if (!sig || sig.ret === "any") return;
+    const actual = inferType(retValue);
+    if (!isCompatible(actual, sig.ret)) {
+      const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
+      throw new FLRuntimeError2(
+        ErrorCodes2.TYPE_MISMATCH,
+        `'${name}' return: expected ${sig.ret}, got ${actual}`,
+        { fn: name, expected: sig.ret, got: actual, value: retValue }
+      );
+    }
+  }
+  /**
+   * 등록된 함수 시그니처 조회 (테스트용)
+   */
+  getSignature(name) {
+    return this.funcTypes.get(name);
+  }
+  /**
+   * 등록된 함수 목록 (테스트용)
+   */
+  registeredFuncs() {
+    return Array.from(this.funcTypes.keys());
+  }
+};
+
+// src/interpreter.ts
+init_errors();
+init_error_formatter();
+
+// src/logger.ts
+var StructuredLogger = class {
+  constructor(initialLevel) {
+    this.logLevelOrder = {
+      debug: 0,
+      info: 1,
+      warn: 2,
+      error: 3
+    };
+    const envLevel = process.env.LOG_LEVEL;
+    this.currentLogLevel = initialLevel || envLevel || "info";
+    if (process.env.DEBUG_LOGGER) {
+      console.log(`[Logger] Initialized with log level: ${this.currentLogLevel}`);
+    }
+  }
+  debug(message, data) {
+    this.log("debug", message, data);
+  }
+  info(message, data) {
+    this.log("info", message, data);
+  }
+  warn(message, data) {
+    this.log("warn", message, data);
+  }
+  error(message, data) {
+    this.log("error", message, data);
+  }
+  setLogLevel(level) {
+    this.currentLogLevel = level;
+  }
+  /**
+   * 실제 로그 출력 로직
+   */
+  log(level, message, data) {
+    if (this.logLevelOrder[level] < this.logLevelOrder[this.currentLogLevel]) {
+      return;
+    }
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+    const fullMessage = `${prefix} ${message}`;
+    switch (level) {
+      case "debug":
+        console.log(fullMessage, data ? data : "");
+        break;
+      case "info":
+        console.log(fullMessage, data ? data : "");
+        break;
+      case "warn":
+        console.warn(fullMessage, data ? data : "");
+        break;
+      case "error":
+        console.error(fullMessage, data ? data : "");
+        break;
+    }
+  }
+};
+var globalLogger = new StructuredLogger();
+function getGlobalLogger() {
+  return globalLogger;
+}
+
+// src/interpreter-scope.ts
+var ScopeStack = class {
+  constructor() {
+    this.stack = [/* @__PURE__ */ new Map()];
+    /** Phase Y-1: 메타정보 저장소 — 키: "depth:name", 값: ScopeVarMeta */
+    this.meta = /* @__PURE__ */ new Map();
+  }
+  /** 스코프 체인 역방향 탐색 — 가장 안쪽 스코프 우선 */
+  get(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) return this.stack[i].get(name);
+    }
+    return void 0;
+  }
+  has(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) return true;
+    }
+    return false;
+  }
+  /** 현재 스코프에 새 바인딩 생성 */
+  set(name, val, meta) {
+    this.stack[this.stack.length - 1].set(name, val);
+    if (meta) {
+      const depth = this.stack.length - 1;
+      this.meta.set(`${depth}:${name}`, {
+        scope: "local",
+        ...meta
+      });
+    }
+  }
+  /** 전역(최상위) 스코프에 직접 저장 — 최상위 define용 */
+  setGlobal(name, val, meta) {
+    this.stack[0].set(name, val);
+    if (meta) {
+      this.meta.set(`0:${name}`, {
+        scope: "global",
+        ...meta
+      });
+    }
+  }
+  /** 변수의 메타정보 조회 */
+  getMeta(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        return this.meta.get(`${i}:${name}`);
+      }
+    }
+    return void 0;
+  }
+  /** 현재 스코프의 모든 변수명 반환 (에러 메시지용) */
+  getCurrentScopeVars() {
+    if (this.stack.length === 0) return [];
+    return Array.from(this.stack[this.stack.length - 1].keys());
+  }
+  /** 현재 스코프 체인에서 정의된 모든 변수명 반환 */
+  getAllVars() {
+    const vars = /* @__PURE__ */ new Set();
+    for (const scope of this.stack) {
+      for (const name of scope.keys()) {
+        vars.add(name);
+      }
+    }
+    return Array.from(vars);
+  }
+  /** set!용: 스코프 체인에서 기존 바인딩을 찾아 수정, 없으면 false 반환 */
+  mutate(name, val) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        this.stack[i].set(name, val);
+        return true;
+      }
+    }
+    return false;
+  }
+  /** 새 함수 스코프 시작 */
+  push() {
+    this.stack.push(/* @__PURE__ */ new Map());
+  }
+  /** 함수 스코프 종료 */
+  pop() {
+    if (this.stack.length > 1) this.stack.pop();
+  }
+  /** 클로저 캡처용: 현재 스코프 체인 전체를 단일 Map으로 병합 (메타정보 포함) */
+  snapshot() {
+    const merged = /* @__PURE__ */ new Map();
+    for (const scope of this.stack) {
+      for (const [k, v] of scope) merged.set(k, v);
+    }
+    return merged;
+  }
+  /** 스냅샷 Map으로 스택을 새로 초기화 (callFunctionValue용) */
+  fromSnapshot(snap) {
+    this.stack = [new Map(snap)];
+    this.meta = /* @__PURE__ */ new Map();
+  }
+  /** 전체 스택 저장 (callFunctionValue 복원용).
+   *  stack[0](전역)은 참조로 보존 — fl-reload 등 전역 수정이 함수 반환 후에도 유지됨.
+   *  클로저 스코프(stack[1+])는 격리를 위해 복사. */
+  saveStack() {
+    return [this.stack[0], ...this.stack.slice(1).map((s) => new Map(s))];
+  }
+  /** 저장된 스택으로 복원 */
+  restoreStack(saved) {
+    this.stack = saved;
+  }
+  /** 가장 안쪽 스코프에서 이름 삭제 */
+  delete(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        this.stack[i].delete(name);
+        return;
+      }
+    }
+  }
+};
+
+// src/web-search-adapter.ts
+var WebSearchAdapter = class {
+  // 24 hours
+  constructor(apiKey, provider = "mock") {
+    this.cacheTtlMs = 24 * 60 * 60 * 1e3;
+    this.cache = /* @__PURE__ */ new Map();
+    this.apiKey = apiKey;
+    this.apiProvider = provider;
+  }
+  /**
+   * Synchronous search (for integration with sync interpreters)
+   * Only uses cached/mock results, no real API calls
+   */
+  searchSync(query, options = {}) {
+    const { limit = 10, cache = true } = options;
+    if (cache) {
+      const cached = this.getCachedResult(query);
+      if (cached) {
+        return cached.map((r) => ({ ...r, source: "cache" }));
+      }
+    }
+    const results = this.searchMock(query, limit);
+    if (cache) {
+      this.cacheResult(query, results);
+    }
+    return results;
+  }
+  /**
+   * Asynchronous search (for async-aware interpreters)
+   * Returns cached result or calls API based on provider
+   */
+  async search(query, options = {}) {
+    const { limit = 10, cache = true, timeout = 5e3 } = options;
+    if (cache) {
+      const cached = this.getCachedResult(query);
+      if (cached) {
+        return cached.map((r) => ({ ...r, source: "cache" }));
+      }
+    }
+    let results;
+    try {
+      switch (this.apiProvider) {
+        case "brave":
+          results = await this.searchBrave(query, limit, timeout);
+          break;
+        case "serper":
+          results = await this.searchSerper(query, limit, timeout);
+          break;
+        case "mock":
+        default:
+          results = this.searchMock(query, limit);
+      }
+    } catch (error) {
+      console.warn(`Search API failed: ${error.message}, using mock results`);
+      results = this.searchMock(query, limit);
+    }
+    if (cache) {
+      this.cacheResult(query, results);
+    }
+    return results;
+  }
+  /**
+   * Brave Search API integration
+   * https://api.search.brave.com/res/v1/web/search
+   */
+  async searchBrave(query, limit, timeout) {
+    if (!this.apiKey) {
+      throw new Error("Brave Search requires API key (BRAVE_SEARCH_KEY)");
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch("https://api.search.brave.com/res/v1/web/search", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "X-Subscription-Token": this.apiKey
+        },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        throw new Error(`Brave API error: ${response.status}`);
+      }
+      const data = await response.json();
+      const webResults = data.web || [];
+      return webResults.slice(0, limit).map((item) => ({
+        title: item.title,
+        url: item.url,
+        snippet: item.description,
+        source: "api",
+        relevance: 0.9,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      }));
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  /**
+   * Serper API integration
+   * https://google.serper.dev/search
+   */
+  async searchSerper(query, limit, timeout) {
+    if (!this.apiKey) {
+      throw new Error("Serper requires API key (SERPER_API_KEY)");
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": this.apiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          q: query,
+          num: Math.min(limit, 10)
+        }),
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        throw new Error(`Serper API error: ${response.status}`);
+      }
+      const data = await response.json();
+      const results = data.organic || [];
+      return results.slice(0, limit).map((item) => ({
+        title: item.title,
+        url: item.link,
+        snippet: item.snippet,
+        source: "api",
+        relevance: 0.85,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      }));
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  /**
+   * Mock search for testing/offline mode
+   */
+  searchMock(query, limit) {
+    const mockDatabase = {
+      "ai trends 2026": [
+        {
+          title: "2026 AI Trends: Multimodal Systems Dominate",
+          url: "https://example.com/ai-trends-2026",
+          snippet: "Multimodal AI systems combining text, image, and audio are becoming the standard...",
+          source: "api",
+          relevance: 0.95
+        },
+        {
+          title: "AI Safety & Alignment: Key Focus Areas",
+          url: "https://example.com/ai-safety-2026",
+          snippet: "As AI systems become more capable, safety and alignment research intensifies...",
+          source: "api",
+          relevance: 0.88
+        },
+        {
+          title: "Enterprise AI Adoption Accelerates",
+          url: "https://example.com/enterprise-ai-2026",
+          snippet: "Companies are deploying AI for productivity gains across departments...",
+          source: "api",
+          relevance: 0.82
+        }
+      ],
+      "typescript performance": [
+        {
+          title: "TypeScript Performance Optimization Guide",
+          url: "https://example.com/ts-perf",
+          snippet: "Learn how to optimize TypeScript compilation and runtime performance...",
+          source: "api",
+          relevance: 0.92
+        },
+        {
+          title: "Build Tools: esbuild vs tsc vs swc",
+          url: "https://example.com/build-tools-comparison",
+          snippet: "Comparing modern TypeScript build tools and their performance characteristics...",
+          source: "api",
+          relevance: 0.87
+        }
+      ]
+    };
+    const normalizedQuery = query.toLowerCase();
+    const results = mockDatabase[normalizedQuery] || // Generic fallback
+    [
+      {
+        title: `Results for: ${query}`,
+        url: `https://example.com/search?q=${encodeURIComponent(query)}`,
+        snippet: `Mock search results for query: "${query}"`,
+        source: "api",
+        relevance: 0.75
+      }
+    ];
+    return results.slice(0, limit);
+  }
+  /**
+   * Get cached result if not expired
+   */
+  getCachedResult(query) {
+    const cached = this.cache.get(query);
+    if (!cached) return null;
+    if (Date.now() > cached.expiresAt) {
+      this.cache.delete(query);
+      return null;
+    }
+    return cached.results;
+  }
+  /**
+   * Store search results in cache
+   */
+  cacheResult(query, results) {
+    const now = Date.now();
+    this.cache.set(query, {
+      results,
+      timestamp: now,
+      expiresAt: now + this.cacheTtlMs
+    });
+  }
+  /**
+   * Clear cache for specific query or all
+   */
+  clearCache(query) {
+    if (query) {
+      this.cache.delete(query);
+    } else {
+      this.cache.clear();
+    }
+  }
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    const queries = Array.from(this.cache.keys());
+    let oldestEntry;
+    for (const [query, entry] of this.cache.entries()) {
+      if (!oldestEntry || entry.timestamp < oldestEntry.timestamp) {
+        oldestEntry = { query, timestamp: entry.timestamp };
+      }
+    }
+    return {
+      size: this.cache.size,
+      queries,
+      oldestEntry
+    };
+  }
+};
+
+// src/learned-facts-store.ts
+var fs = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var LearnedFactsStore = class {
+  constructor(filePath = "./data/learned-facts.json", defaultTtlDays = 30) {
+    this.defaultTtlDays = 30;
+    this.autoSaveInterval = 5e3;
+    // Auto-save every 5 seconds
+    this.isDirty = false;
+    this.filePath = filePath;
+    this.facts = /* @__PURE__ */ new Map();
+    this.defaultTtlDays = defaultTtlDays;
+    const dir = path2.dirname(this.filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    this.loadFromFile();
+    this.startAutoSave();
+  }
+  /**
+   * Save a learned fact
+   */
+  save(key, data, options) {
+    const { confidence, source, ttlDays = this.defaultTtlDays } = options;
+    if (confidence < 0 || confidence > 1) {
+      throw new Error(`Invalid confidence: ${confidence}. Must be between 0 and 1.`);
+    }
+    const now = Date.now();
+    const fact = {
+      key,
+      data,
+      confidence,
+      source,
+      timestamp: now,
+      expiresAt: now + ttlDays * 24 * 60 * 60 * 1e3,
+      accessCount: 0,
+      lastAccessed: now
+    };
+    this.facts.set(key, fact);
+    this.isDirty = true;
+  }
+  /**
+   * Load a learned fact by key
+   */
+  load(key) {
+    const fact = this.facts.get(key);
+    if (!fact) return null;
+    if (Date.now() > fact.expiresAt) {
+      this.facts.delete(key);
+      this.isDirty = true;
+      return null;
+    }
+    fact.accessCount++;
+    fact.lastAccessed = Date.now();
+    this.isDirty = true;
+    return fact;
+  }
+  /**
+   * Load all learned facts (non-expired)
+   */
+  loadAll() {
+    const results = [];
+    const now = Date.now();
+    let hasExpired = false;
+    for (const [key, fact] of this.facts.entries()) {
+      if (now > fact.expiresAt) {
+        this.facts.delete(key);
+        hasExpired = true;
+      } else {
+        results.push(fact);
+      }
+    }
+    if (hasExpired) {
+      this.isDirty = true;
+    }
+    return results;
+  }
+  /**
+   * Delete a learned fact
+   */
+  delete(key) {
+    if (this.facts.has(key)) {
+      this.facts.delete(key);
+      this.isDirty = true;
+    }
+  }
+  /**
+   * Find facts by minimum confidence level
+   */
+  findByConfidence(minConfidence) {
+    return this.loadAll().filter((fact) => fact.confidence >= minConfidence);
+  }
+  /**
+   * Find facts by source
+   */
+  findBySource(source) {
+    return this.loadAll().filter((fact) => fact.source === source);
+  }
+  /**
+   * Clean up expired facts
+   * Returns the number of deleted facts
+   */
+  cleanup() {
+    const now = Date.now();
+    let deletedCount = 0;
+    for (const [key, fact] of this.facts.entries()) {
+      if (now > fact.expiresAt) {
+        this.facts.delete(key);
+        deletedCount++;
+      }
+    }
+    if (deletedCount > 0) {
+      this.isDirty = true;
+    }
+    return deletedCount;
+  }
+  /**
+   * Get store statistics
+   */
+  getStats() {
+    const all = this.loadAll();
+    const now = Date.now();
+    let expiredCount = 0;
+    let totalConfidence = 0;
+    let oldestExpiry = null;
+    const sourceDistribution = {};
+    for (const [, fact] of this.facts.entries()) {
+      if (now > fact.expiresAt) {
+        expiredCount++;
+      }
+      sourceDistribution[fact.source] = (sourceDistribution[fact.source] || 0) + 1;
+    }
+    if (all.length > 0) {
+      totalConfidence = all.reduce((sum, f) => sum + f.confidence, 0) / all.length;
+      oldestExpiry = Math.min(...all.map((f) => f.expiresAt));
+    }
+    return {
+      totalFacts: all.length,
+      expiredCount,
+      averageConfidence: totalConfidence,
+      oldestExpiry,
+      sourceDistribution
+    };
+  }
+  /**
+   * Flush all pending changes to disk
+   */
+  flush() {
+    if (!this.isDirty) return;
+    this.saveToFile();
+    this.isDirty = false;
+  }
+  /**
+   * Destroy the store (clean up auto-save timer)
+   */
+  destroy() {
+    if (this.autoSaveTimer) {
+      clearInterval(this.autoSaveTimer);
+      this.autoSaveTimer = void 0;
+    }
+    this.flush();
+  }
+  /**
+   * Private: Load facts from file
+   */
+  loadFromFile() {
+    try {
+      if (!fs.existsSync(this.filePath)) {
+        return;
+      }
+      const content = fs.readFileSync(this.filePath, "utf-8");
+      const parsed = JSON.parse(content);
+      if (!parsed.facts || !Array.isArray(parsed.facts)) {
+        console.warn("Invalid learned facts file format, starting with empty store");
+        return;
+      }
+      for (const fact of parsed.facts) {
+        this.facts.set(fact.key, fact);
+      }
+      this.cleanup();
+    } catch (error) {
+      console.error(`Failed to load learned facts: ${error.message}`);
+    }
+  }
+  /**
+   * Private: Save facts to file
+   */
+  saveToFile() {
+    try {
+      const data = {
+        version: "1.0",
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
+        facts: Array.from(this.facts.values())
+      };
+      const tempPath = this.filePath + ".tmp";
+      fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
+      fs.renameSync(tempPath, this.filePath);
+    } catch (error) {
+      console.error(`Failed to save learned facts: ${error.message}`);
+    }
+  }
+  /**
+   * Private: Start auto-save timer
+   * unref() = allow process to exit even if timer is active
+   */
+  startAutoSave() {
+    this.autoSaveTimer = setInterval(() => {
+      if (this.isDirty) {
+        this.flush();
+      }
+    }, this.autoSaveInterval);
+    if (this.autoSaveTimer && typeof this.autoSaveTimer.unref === "function") {
+      this.autoSaveTimer.unref();
+    }
+  }
+};
+
+// src/interpreter.ts
+init_eval_builtins();
 
 // src/eval-ai-blocks.ts
+init_async_runtime();
 function evalAiBlock(interp2, op, expr2) {
   const ev = (node) => interp2.eval(node);
   if (op === "search" || op === "fetch") {
@@ -23912,6 +24859,9 @@ function evalStyleBlock(interp2, op, expr2) {
   }
   throw new Error(`Unknown style block: ${op}`);
 }
+
+// src/interpreter.ts
+init_eval_special_forms();
 
 // src/eval-reasoning-sequence.ts
 function handleReasoningSequence(interp2, reasoningSeq) {
@@ -25082,6 +26032,22 @@ function createHttpModule() {
         ...result.error && { error: result.error }
       };
     },
+    // http_get_bearer_json url token -> {:status 200 :data {...}}
+    "http_get_bearer_json": (url2, token) => {
+      const result = nodeHttpRequest(
+        url2,
+        "GET",
+        { "Authorization": `Bearer ${token}` }
+      );
+      if (result.error) {
+        return { status: 0, data: null, error: result.error };
+      }
+      try {
+        return { status: result.status, data: JSON.parse(result.body) };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
     // http_put url body -> {:status 200 :body "..."}
     "http_put": (url2, body) => {
       const result = nodeHttpRequest(
@@ -25110,6 +26076,25 @@ function createHttpModule() {
         ...result.error && { error: result.error }
       };
     },
+    // http_patch_json url data -> {:status 200 :data {...}}
+    "http_patch_json": (url2, data) => {
+      const body = JSON.stringify(data);
+      const result = nodeHttpRequest(
+        url2,
+        "PATCH",
+        { "Content-Type": "application/json" },
+        body
+      );
+      try {
+        return {
+          status: result.status,
+          data: result.body ? JSON.parse(result.body) : null,
+          ...result.error && { error: result.error }
+        };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
     // http_delete url -> {:status 200 :body "..."}
     "http_delete": (url2) => {
       const result = nodeHttpRequest(url2, "DELETE");
@@ -25118,6 +26103,18 @@ function createHttpModule() {
         body: result.body,
         ...result.error && { error: result.error }
       };
+    },
+    // http_delete_json url -> {:status 200 :data {...}}
+    "http_delete_json": (url2) => {
+      const result = nodeHttpRequest(url2, "DELETE");
+      if (result.error) {
+        return { status: 0, data: null, error: result.error };
+      }
+      try {
+        return { status: result.status, data: result.body ? JSON.parse(result.body) : null };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
     },
     // http_head url -> {:status 200 :body ""}
     "http_head": (url2) => {
@@ -30016,7 +31013,7 @@ var cachedSock = null;
 function resolveSocket() {
   if (cachedSock) return cachedSock;
   if (process.env.MARIADB_SOCK) return cachedSock = process.env.MARIADB_SOCK;
-  const fs22 = require("fs");
+  const fs21 = require("fs");
   const candidates = [
     "/data/data/com.termux/files/usr/tmp/mysqld.sock",
     "/var/run/mysqld/mysqld.sock",
@@ -30026,7 +31023,7 @@ function resolveSocket() {
   ];
   for (const s of candidates) {
     try {
-      if (fs22.existsSync(s)) return cachedSock = s;
+      if (fs21.existsSync(s)) return cachedSock = s;
     } catch {
     }
   }
@@ -30061,12 +31058,12 @@ var MARIADB_SEARCH_PATHS = [
 var resolvedMariadbBin = null;
 function resolveMariadBin() {
   if (resolvedMariadbBin) return resolvedMariadbBin;
-  const fs22 = require("fs");
+  const fs21 = require("fs");
   const path19 = require("path");
   for (const dir of MARIADB_SEARCH_PATHS) {
     const full = path19.join(dir, "mariadb");
     try {
-      if (fs22.existsSync(full)) return resolvedMariadbBin = full;
+      if (fs21.existsSync(full)) return resolvedMariadbBin = full;
     } catch {
     }
   }
@@ -31258,6 +32255,7 @@ function createProcessModule() {
 }
 
 // src/stdlib-async.ts
+init_async_runtime();
 function createAsyncModule(callFn) {
   return {
     // async_call fn_name args -> Promise
@@ -32003,6 +33001,9 @@ function createTestModule(callFn) {
     "test-results": () => results
   };
 }
+
+// src/stdlib-loader.ts
+init_maybe_type();
 
 // src/stdlib-compile.ts
 var fs11 = __toESM(require("fs"));
@@ -36111,6 +37112,7 @@ function loadAllStdlib(interp2) {
 }
 
 // src/eval-pattern-match.ts
+init_return_signal();
 function evalPatternMatch(interp2, match) {
   const value = interp2.eval(match.value);
   for (const caseItem of match.cases) {
@@ -36436,954 +37438,8 @@ function evalInstance(interp2, instance) {
   );
 }
 
-// src/eval-call-function.ts
-init_errors();
-
-// src/profiler.ts
-var Profiler = class {
-  constructor() {
-    this.enabled = false;
-    this.entries = /* @__PURE__ */ new Map();
-    // 호출 스택: selfMs(자식 제외 시간) 계산용
-    this.callStack = [];
-  }
-  /**
-   * enter(name) → exit 함수 반환
-   * exit 호출 시 경과 시간 기록
-   */
-  enter(name) {
-    if (!this.enabled) return () => {
-    };
-    const startMs = performance.now();
-    const stackEntry = { name, startMs, childMs: 0 };
-    this.callStack.push(stackEntry);
-    return () => {
-      const endMs = performance.now();
-      const durationMs = endMs - startMs;
-      const selfMs = durationMs - stackEntry.childMs;
-      const idx = this.callStack.lastIndexOf(stackEntry);
-      if (idx !== -1) this.callStack.splice(idx, 1);
-      if (this.callStack.length > 0) {
-        this.callStack[this.callStack.length - 1].childMs += durationMs;
-      }
-      this._addEntry(name, durationMs, selfMs);
-    };
-  }
-  /**
-   * record(name, ms): 직접 기록 (selfMs = ms로 가정)
-   */
-  record(name, ms) {
-    if (!this.enabled) return;
-    this._addEntry(name, ms, ms);
-  }
-  _addEntry(name, totalMs, selfMs) {
-    const existing = this.entries.get(name);
-    if (existing) {
-      existing.callCount++;
-      existing.totalMs += totalMs;
-      existing.selfMs += selfMs;
-      if (totalMs > existing.maxMs) existing.maxMs = totalMs;
-      if (totalMs < existing.minMs) existing.minMs = totalMs;
-    } else {
-      this.entries.set(name, {
-        callCount: 1,
-        totalMs,
-        selfMs,
-        maxMs: totalMs,
-        minMs: totalMs
-      });
-    }
-  }
-  /**
-   * getReport(): callCount 내림차순 정렬된 ProfileEntry 배열
-   */
-  getReport() {
-    const result = [];
-    for (const [name, data] of this.entries) {
-      result.push({
-        name,
-        callCount: data.callCount,
-        totalMs: data.totalMs,
-        selfMs: data.selfMs,
-        avgMs: data.totalMs / data.callCount,
-        maxMs: data.maxMs,
-        minMs: data.minMs
-      });
-    }
-    result.sort((a, b) => b.callCount - a.callCount);
-    return result;
-  }
-  /**
-   * getTop(n): 상위 N개 반환
-   */
-  getTop(n) {
-    return this.getReport().slice(0, n);
-  }
-  /**
-   * reset(): 모든 데이터 초기화
-   */
-  reset() {
-    this.entries.clear();
-    this.callStack = [];
-  }
-  /**
-   * toMarkdown(): Markdown 테이블 출력
-   */
-  toMarkdown() {
-    const report = this.getReport();
-    if (report.length === 0) {
-      return "| name | calls | totalMs | selfMs | avgMs | maxMs | minMs |\n|------|-------|---------|--------|-------|-------|-------|\n";
-    }
-    const header = "| name | calls | totalMs | selfMs | avgMs | maxMs | minMs |";
-    const divider = "|------|-------|---------|--------|-------|-------|-------|";
-    const rows = report.map(
-      (e) => `| ${e.name} | ${e.callCount} | ${e.totalMs.toFixed(3)} | ${e.selfMs.toFixed(3)} | ${e.avgMs.toFixed(3)} | ${e.maxMs.toFixed(3)} | ${e.minMs.toFixed(3)} |`
-    );
-    return [header, divider, ...rows].join("\n");
-  }
-  /**
-   * toJSON(): ProfileEntry 배열을 JSON 객체로
-   */
-  toJSON() {
-    return this.getReport();
-  }
-};
-var globalProfiler = new Profiler();
-
-// src/vm.ts
-var VM = class {
-  constructor() {
-    this.stack = [];
-    this.vars = /* @__PURE__ */ new Map();
-    this.ip = 0;
-  }
-  run(chunk) {
-    this.stack = [];
-    this.vars = /* @__PURE__ */ new Map();
-    this.ip = 0;
-    while (this.ip < chunk.instructions.length) {
-      const instr = chunk.instructions[this.ip];
-      this.ip++;
-      switch (instr.op) {
-        case 0 /* PUSH_CONST */: {
-          const idx = instr.arg;
-          this.push(chunk.constants[idx]);
-          break;
-        }
-        case 1 /* PUSH_VAR */: {
-          const name = instr.arg;
-          if (!this.vars.has(name)) {
-            throw new Error(`VM: \uC815\uC758\uB418\uC9C0 \uC54A\uC740 \uBCC0\uC218: ${name}`);
-          }
-          this.push(this.vars.get(name));
-          break;
-        }
-        case 2 /* SET_VAR */: {
-          const name = instr.arg;
-          const val = this.pop();
-          this.vars.set(name, val);
-          break;
-        }
-        case 7 /* POP */: {
-          this.pop();
-          break;
-        }
-        case 8 /* DUP */: {
-          if (this.stack.length === 0) {
-            throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (DUP)");
-          }
-          this.push(this.stack[this.stack.length - 1]);
-          break;
-        }
-        case 9 /* ADD */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a + b);
-          break;
-        }
-        case 10 /* SUB */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a - b);
-          break;
-        }
-        case 11 /* MUL */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a * b);
-          break;
-        }
-        case 12 /* DIV */: {
-          const b = this.pop();
-          const a = this.pop();
-          if (b === 0) throw new Error("VM: 0\uC73C\uB85C \uB098\uB204\uAE30");
-          this.push(a / b);
-          break;
-        }
-        case 13 /* MOD */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a % b);
-          break;
-        }
-        case 14 /* EQ */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a === b);
-          break;
-        }
-        case 19 /* NEQ */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a !== b);
-          break;
-        }
-        case 15 /* LT */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a < b);
-          break;
-        }
-        case 16 /* GT */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a > b);
-          break;
-        }
-        case 17 /* LE */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a <= b);
-          break;
-        }
-        case 18 /* GE */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(a >= b);
-          break;
-        }
-        case 20 /* AND */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(Boolean(a) && Boolean(b));
-          break;
-        }
-        case 21 /* OR */: {
-          const b = this.pop();
-          const a = this.pop();
-          this.push(Boolean(a) || Boolean(b));
-          break;
-        }
-        case 22 /* NOT */: {
-          const a = this.pop();
-          this.push(!Boolean(a));
-          break;
-        }
-        case 5 /* JUMP */: {
-          this.ip = instr.arg;
-          break;
-        }
-        case 6 /* JUMP_IF_FALSE */: {
-          const cond = this.pop();
-          if (!Boolean(cond)) {
-            this.ip = instr.arg;
-          }
-          break;
-        }
-        case 23 /* MAKE_LIST */: {
-          const count = instr.arg;
-          if (this.stack.length < count) {
-            throw new Error(`VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (MAKE_LIST: need ${count}, have ${this.stack.length})`);
-          }
-          const items = this.stack.splice(this.stack.length - count, count);
-          this.push(items);
-          break;
-        }
-        case 24 /* GET_FIELD */: {
-          const obj = this.pop();
-          const field = instr.arg;
-          if (obj !== null && typeof obj === "object") {
-            this.push(obj[field]);
-          } else {
-            throw new Error(`VM: GET_FIELD \uB300\uC0C1\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D8`);
-          }
-          break;
-        }
-        case 3 /* CALL */: {
-          throw new Error("VM: CALL \uBBF8\uAD6C\uD604");
-        }
-        case 4 /* RETURN */: {
-          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-        }
-        case 25 /* HALT */: {
-          return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-        }
-        default: {
-          throw new Error(`VM: \uC54C \uC218 \uC5C6\uB294 OpCode: ${instr.op}`);
-        }
-      }
-    }
-    return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-  }
-  push(val) {
-    this.stack.push(val);
-  }
-  pop() {
-    if (this.stack.length === 0) {
-      throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C");
-    }
-    return this.stack.pop();
-  }
-};
-
-// src/eval-call-function.ts
-var _callVM = new VM();
-function propagateMutations(interp2, capturedEnv, paramSet, savedStack) {
-  const finalState = interp2.context.variables.snapshot();
-  for (const [key, newVal] of finalState) {
-    if (paramSet.has(key)) continue;
-    if (!capturedEnv.has(key)) continue;
-    const oldVal = capturedEnv.get(key);
-    if (newVal === oldVal) continue;
-    capturedEnv.set(key, newVal);
-    for (let i = savedStack.length - 1; i >= 0; i--) {
-      if (savedStack[i].has(key)) {
-        savedStack[i].set(key, newVal);
-        break;
-      }
-    }
-  }
-}
-var MAX_CALL_DEPTH = 5e3;
-function _flCheckType(type, val) {
-  switch (type) {
-    case "int":
-      return typeof val === "number" && Number.isInteger(val);
-    case "float":
-      return typeof val === "number" && !Number.isInteger(val);
-    case "number":
-      return typeof val === "number";
-    case "string":
-      return typeof val === "string";
-    case "bool":
-    case "boolean":
-      return typeof val === "boolean";
-    case "array":
-    case "list":
-      return Array.isArray(val);
-    case "map":
-      return val !== null && typeof val === "object" && !Array.isArray(val) && val?.kind !== "function-value" && val?.kind !== "async-function-value";
-    case "fn":
-    case "function":
-      return typeof val === "function" || val?.kind === "function-value" || val?.kind === "async-function-value";
-    case "nil":
-      return val === null || val === void 0;
-    case "any":
-      return true;
-    default:
-      return true;
-  }
-}
-function _flTypeName(val) {
-  if (val === null || val === void 0) return "nil";
-  if (Array.isArray(val)) return "array";
-  if (typeof val === "function" || val?.kind === "function-value") return "function";
-  if (typeof val === "object") return "map";
-  return typeof val;
-}
-function bindParam(interp2, param, value) {
-  if (typeof param === "string") {
-    interp2.context.variables.set(param, value);
-    return;
-  }
-  if (param?.kind === "block" && param?.type === "Map") {
-    const fields = param.fields;
-    const keysField = fields?.get("keys");
-    if (keysField?.kind === "block" && keysField?.type === "Array") {
-      const keyItems = keysField.fields.get("items") ?? [];
-      for (const keyNode of keyItems) {
-        const rawName = keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value : keyNode?.kind === "variable" ? keyNode.name.replace(/^\$/, "") : null;
-        if (rawName !== null) {
-          const varName = rawName.startsWith("$") ? rawName : "$" + rawName;
-          const extracted = value !== null && typeof value === "object" ? value[rawName] ?? null : null;
-          interp2.context.variables.set(varName, extracted);
-        }
-      }
-    }
-  }
-}
-function callUserFunction(interp2, name, args3) {
-  if (interp2.tcoMode) {
-    return callUserFunctionTCO(interp2, name, args3);
-  }
-  const _effBase = name.replace(/\[.*$/, "");
-  enforceCall(_effBase);
-  if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
-    const _vmAllowed = resolveFnAllowed(_effBase);
-    pushFrame(_effBase, _vmAllowed);
-    let _vmOk = false;
-    let _vmResult;
-    try {
-      try {
-        const vmFunc = vmFunctionRegistry.get(name);
-        const initialVars = /* @__PURE__ */ new Map();
-        if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
-          for (const [k, v] of vmFunc._closure) {
-            initialVars.set(k, v);
-          }
-        } else {
-          const snapshot = interp2.context.variables.snapshot();
-          for (const [k, v] of snapshot) {
-            initialVars.set(k, v);
-          }
-        }
-        for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
-          initialVars.set("$" + vmName, vmFuncObj);
-          initialVars.set(vmName, vmFuncObj);
-        }
-        for (let i = 0; i < vmFunc._params.length; i++) {
-          initialVars.set(vmFunc._params[i], args3[i] ?? null);
-        }
-        _vmResult = _callVM.run(vmFunc._chunk, initialVars);
-        _vmOk = true;
-      } catch {
-      }
-    } finally {
-      popFrame();
-    }
-    if (_vmOk) return _vmResult;
-  }
-  const _interpAllowed = resolveFnAllowed(_effBase);
-  pushFrame(_effBase, _interpAllowed);
-  try {
-    return _callUserFunctionInterpPath(interp2, name, args3);
-  } finally {
-    popFrame();
-  }
-}
-function _callUserFunctionInterpPath(interp2, name, args3) {
-  let baseName = name;
-  let typeArgs = null;
-  const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
-  if (bracketMatch) {
-    baseName = bracketMatch[1];
-    const typeArgStr = bracketMatch[2];
-    typeArgs = typeArgStr.split(",").map((t) => ({
-      kind: "type",
-      name: t.trim()
-    }));
-  }
-  let func = interp2.context.functions.get(baseName);
-  if (!func) {
-    const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
-    if (alt !== baseName) func = interp2.context.functions.get(alt);
-  }
-  if (!func) {
-    const v = interp2.context.variables.get(baseName) ?? interp2.context.variables.get("$" + baseName);
-    if (v && (v.kind === "function-value" || v.kind === "async-function-value" || typeof v === "function" || v.params && v.body)) {
-      if (v.kind === "function-value") return callFunctionValue(interp2, v, args3);
-      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp2, v, args3);
-      if (typeof v === "function") return v(...args3);
-      func = v;
-    }
-  }
-  if (!func) {
-    const candidates = [...interp2.context.functions.keys()];
-    const alias = KNOWN_ALIASES[baseName] ?? KNOWN_ALIASES[baseName.replace(/-/g, "_")] ?? KNOWN_ALIASES[baseName.replace(/_/g, "-")];
-    let hint;
-    if (alias) {
-      hint = `'${baseName}'\uB294 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2E0 '${alias.correct}'\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
-  \uC0AC\uC6A9\uBC95: ${alias.usage}`;
-    } else {
-      const similar = suggestSimilar(baseName, candidates);
-      hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
-    }
-    throw new FunctionNotFoundError(
-      baseName,
-      interp2.currentFilePath,
-      interp2.currentLine > 0 ? interp2.currentLine : void 0,
-      void 0,
-      hint
-    );
-  }
-  if (func._call) return func._call(...args3);
-  let isGenericCall = false;
-  if (func.generics && func.generics.length > 0) {
-    if (!typeArgs) {
-      throw new Error(`Generic function '${baseName}' requires type arguments, e.g., ${baseName}[int] or ${baseName}[int string]`);
-    }
-    if (interp2.context.typeChecker) {
-      const instantiation = interp2.context.typeChecker.instantiateGenericFunction(baseName, typeArgs);
-      if (!instantiation.valid) {
-        throw new Error(`Cannot instantiate generic function '${baseName}': ${instantiation.message}`);
-      }
-    }
-    isGenericCall = true;
-  }
-  if (!isGenericCall && interp2.context.runtimeTypeChecker) {
-    interp2.context.runtimeTypeChecker.checkCall(baseName, args3);
-  }
-  if (typeof func.body === "function") {
-    return func.body(...args3);
-  }
-  if (func.paramDefaults) {
-    while (args3.length < func.params.length) {
-      const def = func.paramDefaults[args3.length];
-      if (def !== void 0) args3 = [...args3, interp2.eval(def)];
-      else break;
-    }
-  }
-  if (func.params.length > args3.length) {
-    const paramNames = func.params.map(
-      (p) => typeof p === "string" ? p.replace(/^\$/, "") : p?.kind === "variable" ? p.name.replace(/^\$/, "") : "\u2026"
-    );
-    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
-  }
-  if (interp2.callDepth >= MAX_CALL_DEPTH) {
-    const _stack3 = interp2.callStack ?? [];
-    const tail = _stack3.slice(-10).map((s, i) => `  #${_stack3.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
-    throw new Error(
-      `[E_STACK_OVERFLOW] line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'
-` + (tail ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
-${tail}` : "")
-    );
-  }
-  const prefixMatch = baseName.match(/^([^:]+):/);
-  const tempAliases = [];
-  if (prefixMatch) {
-    const prefix = prefixMatch[1] + ":";
-    for (const [fname, fval] of interp2.context.functions) {
-      if (fname.startsWith(prefix)) {
-        const unqualified = fname.slice(prefix.length);
-        if (!interp2.context.functions.has(unqualified)) {
-          interp2.context.functions.set(unqualified, fval);
-          tempAliases.push(unqualified);
-        }
-      }
-    }
-  }
-  const exitProfiler = globalProfiler.enter(baseName);
-  const _callStack = interp2.context.callStack;
-  const _argsBrief = args3.slice(0, 5).map(
-    (a) => a === null ? "nil" : Array.isArray(a) ? `[${a.length}]` : typeof a === "object" ? "{obj}" : typeof a === "function" ? "<fn>" : typeof a === "string" ? a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"` : String(a)
-  );
-  const _stackEntry = { name: baseName, line: interp2.currentLine, args: _argsBrief };
-  if (process.env.FL_TRACE === "1") {
-    console.error(`[trace] ${"  ".repeat(Math.min(interp2.callDepth, 20))}\u2192 ${baseName}(${_argsBrief.join(", ")}) (line ${interp2.currentLine})`);
-  }
-  if (func.paramAnnotations) {
-    for (let _ti = 0; _ti < func.params.length; _ti++) {
-      const _ann = func.paramAnnotations[_ti];
-      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
-        throw new TypeError(
-          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uD30C\uB77C\uBBF8\uD130 '${func.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
-        );
-      }
-    }
-  }
-  if (func.capturedEnv) {
-    const savedStack = interp2.context.variables.saveStack();
-    const paramSet = new Set(func.params);
-    interp2.callDepth++;
-    if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
-    _callStack.push(_stackEntry);
-    if (_callStack.length > 100) _callStack.shift();
-    let result;
-    try {
-      interp2.context.variables.fromSnapshot(func.capturedEnv);
-      for (let i = 0; i < func.params.length; i++) {
-        bindParam(interp2, func.params[i], args3[i]);
-      }
-      result = interp2.eval(func.body);
-      if (func.returnAnnotation && func.returnAnnotation !== "any" && !_flCheckType(func.returnAnnotation, result)) {
-        throw new TypeError(
-          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uBC18\uD658\uAC12: ${func.returnAnnotation} \uD544\uC694, ${_flTypeName(result)} \uBC18\uD658\uB428`
-        );
-      }
-      propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
-    } catch (e) {
-      if (isReturnSignal(e)) {
-        result = e.value;
-      } else {
-        if (e instanceof Error && !e.__flCallStack) {
-          e.__flCallStack = [..._callStack];
-        }
-        throw e;
-      }
-    } finally {
-      interp2.callDepth--;
-      _callStack.pop();
-      interp2.context.variables.restoreStack(savedStack);
-      for (const alias of tempAliases) interp2.context.functions.delete(alias);
-      exitProfiler();
-    }
-    return result;
-  }
-  interp2.context.variables.push();
-  interp2.callDepth++;
-  if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
-  _callStack.push(_stackEntry);
-  if (_callStack.length > 100) _callStack.shift();
-  try {
-    for (let recurIter = 0; recurIter < 2e6; recurIter++) {
-      if (recurIter > 0 && recurIter % 1e3 === 0 && hasBudget()) {
-        checkBudget(Date.now(), 0, 0);
-      }
-      for (let i = 0; i < func.params.length; i++) {
-        bindParam(interp2, func.params[i], args3[i]);
-      }
-      let result;
-      try {
-        result = interp2.eval(func.body);
-      } catch (e) {
-        if (isReturnSignal(e)) return e.value;
-        if (e instanceof Error && !e.__flCallStack) {
-          e.__flCallStack = [..._callStack];
-        }
-        throw e;
-      }
-      if (result && typeof result === "object" && result.__FL_RECUR__) {
-        args3 = result.__args;
-        continue;
-      }
-      return result;
-    }
-    throw new Error(`recur: max iterations exceeded in '${baseName}'`);
-  } finally {
-    interp2.callDepth--;
-    _callStack.pop();
-    interp2.context.variables.pop();
-    for (const alias of tempAliases) interp2.context.functions.delete(alias);
-    exitProfiler();
-  }
-}
-function callFunctionValue(interp2, fn, args3) {
-  if (interp2.tcoMode) {
-    return callFunctionValueTCO(interp2, fn, args3);
-  }
-  if (fn._call) return fn._call(...args3);
-  if (fn.kind !== "function-value") {
-    throw new Error(`Expected function-value, got ${fn.kind}`);
-  }
-  const _effName = fn.name ?? "<anonymous>";
-  enforceCall(_effName);
-  const _allowed = resolveFnAllowed(_effName);
-  pushFrame(_effName, _allowed);
-  try {
-    return _callFunctionValueBody(interp2, fn, args3);
-  } finally {
-    popFrame();
-  }
-}
-function _callFunctionValueBody(interp2, fn, args3) {
-  if (fn.paramDefaults) {
-    while (args3.length < fn.params.length) {
-      const def = fn.paramDefaults[args3.length];
-      if (def !== void 0) args3 = [...args3, def];
-      else break;
-    }
-  }
-  if (interp2.callDepth >= MAX_CALL_DEPTH) {
-    throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
-  }
-  if (fn.paramAnnotations) {
-    for (let _ti = 0; _ti < fn.params.length; _ti++) {
-      const _ann = fn.paramAnnotations[_ti];
-      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
-        const _fn = fn.name ?? "\uC775\uBA85";
-        throw new TypeError(
-          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uD30C\uB77C\uBBF8\uD130 '${fn.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
-        );
-      }
-    }
-  }
-  const savedStack = interp2.context.variables.saveStack();
-  const paramSet = new Set(fn.params);
-  interp2.callDepth++;
-  let result;
-  try {
-    interp2.context.variables.fromSnapshot(fn.capturedEnv);
-    for (let i = 0; i < fn.params.length; i++) {
-      bindParam(interp2, fn.params[i], args3[i]);
-    }
-    result = interp2.eval(fn.body);
-    if (fn.returnAnnotation && fn.returnAnnotation !== "any") {
-      if (!_flCheckType(fn.returnAnnotation, result)) {
-        const _fn = fn.name ?? "\uC775\uBA85";
-        throw new TypeError(
-          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uBC18\uD658\uAC12: ${fn.returnAnnotation} \uD544\uC694, ${_flTypeName(result)} \uBC18\uD658\uB428`
-        );
-      }
-    }
-    propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
-  } catch (e) {
-    if (isReturnSignal(e)) {
-      result = e.value;
-    } else {
-      if (e instanceof Error && !e.__flCallStack) {
-        const _cs = interp2.context?.callStack;
-        if (_cs?.length) e.__flCallStack = [..._cs];
-      }
-      throw e;
-    }
-  } finally {
-    interp2.callDepth--;
-    interp2.context.variables.restoreStack(savedStack);
-  }
-  return result;
-}
-function callAsyncFunctionValue(interp2, fn, args3) {
-  if (fn.kind !== "async-function-value") {
-    throw new Error(`Expected async-function-value, got ${fn.kind}`);
-  }
-  const _effName = fn.name ?? "<anonymous>";
-  return new FreeLangPromise((resolve10, reject) => {
-    enforceCall(_effName);
-    pushFrame(_effName, resolveFnAllowed(_effName));
-    const savedStack = interp2.context.variables.saveStack();
-    try {
-      interp2.context.variables.fromSnapshot(fn.capturedEnv);
-      for (let i = 0; i < fn.params.length; i++) {
-        bindParam(interp2, fn.params[i], args3[i]);
-      }
-      const result = interp2.eval(fn.body);
-      if (result instanceof FreeLangPromise) {
-        result.then((value) => resolve10(value)).catch((error) => reject(error));
-      } else {
-        resolve10(result);
-      }
-    } catch (error) {
-      reject(error);
-    } finally {
-      interp2.context.variables.restoreStack(savedStack);
-      popFrame();
-    }
-  });
-}
-function callFunction(interp2, fn, args3) {
-  if (fn.kind === "builtin-function") {
-    const _bname = fn.name ?? "<builtin>";
-    enforceCall(_bname);
-    return fn.fn(args3.map((arg) => interp2.eval(arg)));
-  } else if (fn.kind === "function-value") {
-    return callFunctionValue(interp2, fn, args3);
-  } else if (fn.kind === "async-function-value") {
-    return callAsyncFunctionValue(interp2, fn, args3);
-  } else if (typeof fn === "function") {
-    return fn(...args3);
-  } else if (typeof fn === "string") {
-    const wrappedArgs = args3.map((v) => ({
-      kind: "literal",
-      value: v,
-      type: v === null ? "any" : Array.isArray(v) ? "list" : typeof v
-    }));
-    return interp2.eval({ kind: "sexpr", op: fn, args: wrappedArgs });
-  } else if (fn && fn.params && fn.body) {
-    return callUserFunction(interp2, fn.name || "anonymous", args3);
-  } else {
-    throw new Error(`Cannot call ${typeof fn}: ${JSON.stringify(fn).slice(0, 100)}`);
-  }
-}
-function callUserFunctionTCO(interp2, name, args3) {
-  let currentName = name;
-  let currentArgs = args3;
-  const prevTcoMode = interp2.tcoMode;
-  interp2.tcoMode = true;
-  let _haveFrame = false;
-  try {
-    for (let i = 0; i < 2e6; i++) {
-      let baseName = currentName;
-      const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
-      if (bracketMatch) baseName = bracketMatch[1];
-      if (_haveFrame) popFrame();
-      enforceCall(baseName);
-      pushFrame(baseName, resolveFnAllowed(baseName));
-      _haveFrame = true;
-      let func = interp2.context.functions.get(baseName);
-      if (!func) {
-        const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
-        if (alt !== baseName) func = interp2.context.functions.get(alt);
-      }
-      if (!func) {
-        const candidates = [...interp2.context.functions.keys()];
-        const similar = suggestSimilar(baseName, candidates);
-        const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
-        throw new FunctionNotFoundError(baseName, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0, void 0, hint);
-      }
-      if (func._call) return func._call(...currentArgs);
-      if (typeof func.body === "function") {
-        return func.body(...currentArgs);
-      }
-      const prefixMatch = baseName.match(/^([^:]+):/);
-      const tempAliases = [];
-      if (prefixMatch) {
-        const prefix = prefixMatch[1] + ":";
-        for (const [fname, fval] of interp2.context.functions) {
-          if (fname.startsWith(prefix)) {
-            const unqualified = fname.slice(prefix.length);
-            if (!interp2.context.functions.has(unqualified)) {
-              interp2.context.functions.set(unqualified, fval);
-              tempAliases.push(unqualified);
-            }
-          }
-        }
-      }
-      let result;
-      try {
-        if (func.capturedEnv) {
-          const savedStack = interp2.context.variables.saveStack();
-          try {
-            interp2.context.variables.fromSnapshot(func.capturedEnv);
-            for (let j = 0; j < func.params.length; j++) {
-              bindParam(interp2, func.params[j], currentArgs[j]);
-            }
-            result = interp2.eval(func.body);
-          } catch (e) {
-            if (isReturnSignal(e)) {
-              result = e.value;
-            } else throw e;
-          } finally {
-            interp2.context.variables.restoreStack(savedStack);
-          }
-        } else {
-          interp2.context.variables.push();
-          try {
-            for (let j = 0; j < func.params.length; j++) {
-              bindParam(interp2, func.params[j], currentArgs[j]);
-            }
-            result = interp2.eval(func.body);
-          } catch (e) {
-            if (isReturnSignal(e)) {
-              result = e.value;
-            } else throw e;
-          } finally {
-            interp2.context.variables.pop();
-          }
-        }
-      } finally {
-        for (const alias of tempAliases) interp2.context.functions.delete(alias);
-      }
-      if (isTailCall(result)) {
-        if (typeof result.fn === "string") {
-          currentName = result.fn;
-          currentArgs = result.args;
-          continue;
-        } else {
-          return callFunctionValueTCO(interp2, result.fn, result.args);
-        }
-      }
-      return result;
-    }
-    throw new Error(`TCO: \uCD5C\uB300 \uBC18\uBCF5(2,000,000) \uCD08\uACFC \u2014 '${currentName}'\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131`);
-  } finally {
-    if (_haveFrame) popFrame();
-    interp2.tcoMode = prevTcoMode;
-  }
-}
-function callFunctionValueTCO(interp2, fn, args3) {
-  const prevTcoMode = interp2.tcoMode;
-  interp2.tcoMode = true;
-  let _haveFrame = false;
-  try {
-    let currentFn = fn;
-    let currentArgs = args3;
-    for (let i = 0; i < 1e6; i++) {
-      if (currentFn.kind !== "function-value") {
-        throw new Error(`Expected function-value, got ${currentFn.kind}`);
-      }
-      const _effName = currentFn.name ?? "<anonymous>";
-      if (_haveFrame) popFrame();
-      enforceCall(_effName);
-      pushFrame(_effName, resolveFnAllowed(_effName));
-      _haveFrame = true;
-      const savedStack = interp2.context.variables.saveStack();
-      let result;
-      try {
-        interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
-        for (let j = 0; j < currentFn.params.length; j++) {
-          bindParam(interp2, currentFn.params[j], currentArgs[j]);
-        }
-        result = interp2.eval(currentFn.body);
-      } finally {
-        interp2.context.variables.restoreStack(savedStack);
-      }
-      if (isTailCall(result)) {
-        if (typeof result.fn === "string") {
-          if (_haveFrame) {
-            popFrame();
-            _haveFrame = false;
-          }
-          return callUserFunctionTCO(interp2, result.fn, result.args);
-        } else {
-          currentFn = result.fn;
-          currentArgs = result.args;
-          continue;
-        }
-      }
-      return result;
-    }
-    throw new Error("TCO: \uCD5C\uB300 \uBC18\uBCF5(1,000,000) \uCD08\uACFC \u2014 function-value\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131");
-  } finally {
-    if (_haveFrame) popFrame();
-    interp2.tcoMode = prevTcoMode;
-  }
-}
-function callUserFunctionRaw(interp2, name, args3) {
-  const func = interp2.context.functions.get(name);
-  if (!func) throw new FunctionNotFoundError(name, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0);
-  const _effBase = name.replace(/\[.*$/, "");
-  enforceCall(_effBase);
-  pushFrame(_effBase, resolveFnAllowed(_effBase));
-  try {
-    if (typeof func.body === "function") return func.body(...args3);
-    let result;
-    if (func.capturedEnv) {
-      const savedStack = interp2.context.variables.saveStack();
-      try {
-        interp2.context.variables.fromSnapshot(func.capturedEnv);
-        for (let i = 0; i < func.params.length; i++) {
-          interp2.context.variables.set(func.params[i], args3[i]);
-        }
-        result = interp2.eval(func.body);
-      } finally {
-        interp2.context.variables.restoreStack(savedStack);
-      }
-    } else {
-      interp2.context.variables.push();
-      try {
-        for (let i = 0; i < func.params.length; i++) {
-          interp2.context.variables.set(func.params[i], args3[i]);
-        }
-        result = interp2.eval(func.body);
-      } finally {
-        interp2.context.variables.pop();
-      }
-    }
-    return result;
-  } finally {
-    popFrame();
-  }
-}
-function callFunctionValueRaw(interp2, fn, args3) {
-  if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
-  const _effName = fn.name ?? "<anonymous>";
-  enforceCall(_effName);
-  pushFrame(_effName, resolveFnAllowed(_effName));
-  try {
-    const savedStack = interp2.context.variables.saveStack();
-    try {
-      interp2.context.variables.fromSnapshot(fn.capturedEnv);
-      for (let i = 0; i < fn.params.length; i++) {
-        interp2.context.variables.set(fn.params[i], args3[i]);
-      }
-      return interp2.eval(fn.body);
-    } finally {
-      interp2.context.variables.restoreStack(savedStack);
-    }
-  } finally {
-    popFrame();
-  }
-}
+// src/interpreter.ts
+init_eval_call_function();
 
 // src/macro-expander.ts
 var MacroExpander = class {
@@ -37706,6 +37762,7 @@ var StructRegistry = class {
 };
 
 // src/interpreter.ts
+init_lazy_seq();
 init_debugger();
 
 // src/cot.ts
@@ -37862,6 +37919,7 @@ function evalCotForm(args3, evalFn, setVar, getVar) {
 }
 
 // src/tot.ts
+init_maybe_type();
 var TreeOfThought = class {
   constructor() {
     this._branches = [];
@@ -38077,6 +38135,9 @@ function evalReflectForm(opts) {
   }
   return result;
 }
+
+// src/interpreter.ts
+init_tool_registry();
 
 // src/agent.ts
 var FLAgent = class {
@@ -38303,7 +38364,13 @@ function createAgentBuiltins(interp2) {
   };
 }
 
+// src/interpreter.ts
+init_vm_eligible();
+init_compiler();
+init_vm();
+
 // src/optimizer.ts
+init_bytecode();
 function cloneChunk(chunk) {
   return {
     instructions: chunk.instructions.map((i) => ({ ...i })),
@@ -38608,6 +38675,20 @@ var Interpreter = class _Interpreter {
   }
   static {
     this._vmEnabled = process.env.FL_VM === "1";
+  }
+  static {
+    // DU-1: 성능 최적화 — 어댑터/debug 플래그 캐싱
+    this._duAdapter = null;
+  }
+  static {
+    this._duDebugEnabled = process.env.DU_DEBUG === "true";
+  }
+  // DU-1: 어댑터 캐싱 (성능 최적화 — 매 호출마다 require() 방지)
+  static getDUAdapter() {
+    if (!this._duAdapter) {
+      this._duAdapter = (init_adapter_builtin_to_funcdef(), __toCommonJS(adapter_builtin_to_funcdef_exports));
+    }
+    return this._duAdapter;
   }
   // Phase 98: Agent 빌트인 함수 등록
   registerAgentBuiltins() {
@@ -39778,7 +39859,7 @@ var Interpreter = class _Interpreter {
     const AI_OPS = /* @__PURE__ */ new Set(["search", "fetch", "learn", "recall", "remember", "forget", "observe", "analyze", "decide", "act", "verify", "await"]);
     const INFRA_OPS = /* @__PURE__ */ new Set(["DOCKERFILE", "dockerfile", "DOCKER-COMPOSE", "docker-compose", "K8S-DEPLOYMENT", "deployment", "K8S-SERVICE", "service", "K8S-INGRESS", "ingress", "GITHUB-ACTIONS", "github-actions", "ci", "AWS-S3", "aws-s3", "AWS-LAMBDA", "aws-lambda", "AWS-RDS", "aws-rds", "GCP-RUN", "gcp-run", "AZURE-FUNCTION", "azure-function"]);
     const STYLE_OPS = /* @__PURE__ */ new Set(["STYLE", "style", "THEME", "theme"]);
-    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace", "defcontract", "with-budget"]);
+    const SPECIAL_OPS = /* @__PURE__ */ new Set(["fn", "defn", "defun", "async", "set!", "define", "func-ref", "call", "compose", "comp", "pipe", "->", "->>", "as->", "?.", "?.", "|>", "??", "let", "set", "if", "if-let", "when", "when-not", "when-let", "unless", "cond", "case", "for", "do", "begin", "progn", "loop", "recur", "while", "doseq", "dotimes", "and", "or", "defmacro", "macroexpand", "defstruct", "defprotocol", "impl", "parallel", "race", "with-timeout", "fl-try", "use", "defprop", "map-keys", "map_keys", "map-vals", "map_vals", "return", "group-by", "group_by", "safe-get", "safe_get", "partial", "memoize", "deftest", "describe", "it", "is", "is=", "run-tests", "test-summary", "import", "migrate", "trace", "with-trace", "defcontract", "with-budget"]);
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr2);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
@@ -39998,6 +40079,19 @@ var Interpreter = class _Interpreter {
       return nativeFn(...args3);
     }
     try {
+      try {
+        if (_Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: resolveFunction \uC2DC\uB3C4...`);
+        const duAdapter = _Interpreter.getDUAdapter();
+        const resolved = duAdapter.resolveFunction(this, op);
+        if (_Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: resolved=${resolved ? "yes" : "no"}`);
+        if (resolved) {
+          if (_Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: callFunction \uD638\uCD9C...`);
+          return duAdapter.callFunction(this, op, args3, expr2);
+        }
+      } catch (_duErr) {
+        if (_Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: DU \uC624\uB958: ${_duErr?.message}`);
+      }
+      if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: fallback to evalBuiltin`);
       return evalBuiltin(this, op, args3, expr2);
     } catch (err4) {
       if (err4 && err4.constructor && err4.constructor.name === "ReturnSignal") throw err4;
@@ -41623,174 +41717,11 @@ function toAnchor(name) {
   return name.toLowerCase().replace(/[^a-z0-9가-힣]/g, "-");
 }
 
-// src/ci-runner.ts
-var fs17 = __toESM(require("fs"));
-init_linter();
-var CIPipeline = class {
-  constructor(opts = {}) {
-    this.steps = [];
-    this.failFast = true;
-    if (opts.failFast !== void 0) {
-      this.failFast = opts.failFast;
-    }
-  }
-  setFailFast(value) {
-    this.failFast = value;
-    return this;
-  }
-  addStep(step) {
-    this.steps.push(step);
-    return this;
-  }
-  async run() {
-    const results = [];
-    let pipelinePassed = true;
-    let totalMs = 0;
-    let shouldSkip = false;
-    for (const step of this.steps) {
-      if (shouldSkip) {
-        results.push({
-          name: step.name,
-          passed: false,
-          output: "(skipped)",
-          durationMs: 0,
-          skipped: true
-        });
-        continue;
-      }
-      let result;
-      try {
-        result = await step.run();
-      } catch (err4) {
-        result = {
-          passed: false,
-          output: `Exception: ${err4.message ?? String(err4)}`,
-          durationMs: 0
-        };
-      }
-      const icon = result.passed ? "\u2705" : "\u274C";
-      console.log(`${icon} ${step.name} (${result.durationMs}ms)`);
-      if (!result.passed && result.output && result.output !== "(skipped)") {
-        const indented = result.output.split("\n").map((l) => "    " + l).join("\n");
-        console.log(indented);
-      }
-      results.push({
-        name: step.name,
-        passed: result.passed,
-        output: result.output,
-        durationMs: result.durationMs,
-        skipped: false
-      });
-      totalMs += result.durationMs;
-      if (!result.passed) {
-        pipelinePassed = false;
-        if (this.failFast) {
-          shouldSkip = true;
-        }
-      }
-    }
-    return {
-      passed: pipelinePassed,
-      steps: results,
-      totalMs
-    };
-  }
-};
-async function timed(fn) {
-  const start = Date.now();
-  const { passed, output } = await fn();
-  const durationMs = Date.now() - start;
-  return { passed, output, durationMs };
-}
-function createFmtCheckStep(files) {
-  return {
-    name: "fmt-check",
-    run: () => timed(async () => {
-      if (files.length === 0) {
-        return { passed: true, output: "\uAC80\uC0AC\uD560 \uD30C\uC77C \uC5C6\uC74C" };
-      }
-      const needsFormat = [];
-      for (const f of files) {
-        if (!fs17.existsSync(f)) continue;
-        const src = fs17.readFileSync(f, "utf-8");
-        try {
-          const formatted = formatFL(src);
-          if (src !== formatted) {
-            needsFormat.push(f);
-          }
-        } catch (err4) {
-          return {
-            passed: false,
-            output: `\uD3EC\uB9F7 \uC624\uB958 ${f}: ${err4.message}`
-          };
-        }
-      }
-      if (needsFormat.length > 0) {
-        return {
-          passed: false,
-          output: `\uD3EC\uB9F7 \uD544\uC694 \uD30C\uC77C:
-${needsFormat.map((f) => `  - ${f}`).join("\n")}`
-        };
-      }
-      return { passed: true, output: `${files.length}\uAC1C \uD30C\uC77C \uD3EC\uB9F7 OK` };
-    })
-  };
-}
-function createLintStep(files) {
-  return {
-    name: "lint",
-    run: () => timed(async () => {
-      if (files.length === 0) {
-        return { passed: true, output: "\uAC80\uC0AC\uD560 \uD30C\uC77C \uC5C6\uC74C" };
-      }
-      const linter = createDefaultLinter();
-      const errors = [];
-      for (const f of files) {
-        if (!fs17.existsSync(f)) continue;
-        const src = fs17.readFileSync(f, "utf-8");
-        const diags = linter.lint(src);
-        const errs = diags.filter((d) => d.severity === "error");
-        for (const e of errs) {
-          errors.push(`  ${f}:${e.line ?? "?"}:${e.col ?? "?"} [${e.rule}] ${e.message}`);
-        }
-      }
-      if (errors.length > 0) {
-        return {
-          passed: false,
-          output: `Lint \uC624\uB958 ${errors.length}\uAC1C:
-${errors.join("\n")}`
-        };
-      }
-      return { passed: true, output: `${files.length}\uAC1C \uD30C\uC77C lint OK` };
-    })
-  };
-}
-function createTypeCheckStep() {
-  return {
-    name: "type-check",
-    run: () => timed(async () => {
-      const { execSync: execSync2 } = require("child_process");
-      try {
-        const cwd2 = process.cwd();
-        execSync2("npx tsc --noEmit", { cwd: cwd2, stdio: "pipe" });
-        return { passed: true, output: "TypeScript \uD0C0\uC785 \uCCB4\uD06C OK" };
-      } catch (err4) {
-        const output = err4.stdout?.toString() ?? err4.stderr?.toString() ?? String(err4);
-        return { passed: false, output: output.trim() };
-      }
-    })
-  };
-}
-function createDefaultPipeline(files, opts = {}) {
-  const pipeline = new CIPipeline(opts);
-  pipeline.addStep(createFmtCheckStep(files));
-  pipeline.addStep(createLintStep(files));
-  pipeline.addStep(createTypeCheckStep());
-  return pipeline;
-}
+// src/cli.ts
+init_runtime_events();
 
 // src/web/app-router.ts
-var fs18 = __toESM(require("fs"));
+var fs17 = __toESM(require("fs"));
 var path16 = __toESM(require("path"));
 var AppRouter = class {
   // W4: not-found.fl 파일
@@ -41811,7 +41742,7 @@ var AppRouter = class {
   scanNotFound(dir) {
     try {
       const notFoundPath = path16.join(dir, "not-found.fl");
-      if (fs18.existsSync(notFoundPath)) {
+      if (fs17.existsSync(notFoundPath)) {
         this.notFoundHandler = notFoundPath;
         console.log(`approuter.not-found file=${notFoundPath}`);
       }
@@ -41822,7 +41753,7 @@ var AppRouter = class {
    * 파일시스템 스캔 시작
    */
   scan() {
-    if (!fs18.existsSync(this.appDir)) {
+    if (!fs17.existsSync(this.appDir)) {
       console.log(`approuter.warn event=app_dir_missing path=${this.appDir}`);
       return;
     }
@@ -41841,7 +41772,7 @@ var AppRouter = class {
    */
   scanDirectory(dir, currentPath = "", phase = "page") {
     try {
-      const entries = fs18.readdirSync(dir, { withFileTypes: true });
+      const entries = fs17.readdirSync(dir, { withFileTypes: true });
       for (const entry of entries) {
         const fullPath = path16.join(dir, entry.name);
         const nextPath = currentPath === "" ? "/" + entry.name : currentPath + "/" + entry.name;
@@ -41991,7 +41922,7 @@ var AppRouter = class {
 };
 
 // src/web/fl-executor.ts
-var fs19 = __toESM(require("fs"));
+var fs18 = __toESM(require("fs"));
 var crypto4 = __toESM(require("crypto"));
 init_lexer();
 init_parser();
@@ -42025,7 +41956,7 @@ var FLExecutor = class {
     if (cached && now - cached.timestamp < this.cacheTimeout) {
       return cached.ast;
     }
-    const code = fs19.readFileSync(filePath, "utf-8");
+    const code = fs18.readFileSync(filePath, "utf-8");
     const tokens = lex(code);
     const ast = parse(tokens);
     this.cache.set(filePath, { ast, timestamp: now });
@@ -42056,7 +41987,7 @@ var FLExecutor = class {
    */
   async executePage(filePath, context) {
     try {
-      if (!fs19.existsSync(filePath)) {
+      if (!fs18.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -42106,7 +42037,7 @@ var FLExecutor = class {
    */
   async executeRoute(filePath, context) {
     try {
-      if (!fs19.existsSync(filePath)) {
+      if (!fs18.existsSync(filePath)) {
         return {
           success: false,
           status: 404,
@@ -42447,7 +42378,7 @@ var FLExecutor = class {
 var fl_executor_default = FLExecutor;
 
 // src/web/page-renderer.ts
-var fs20 = __toESM(require("fs"));
+var fs19 = __toESM(require("fs"));
 var path17 = __toESM(require("path"));
 var PageRenderer = class {
   constructor(executor, buildOutputDir) {
@@ -42531,9 +42462,9 @@ var PageRenderer = class {
       this.buildOutputDir,
       cacheKey.replace(/\//g, "_") + ".html"
     );
-    if (fs20.existsSync(outputPath)) {
-      const html = fs20.readFileSync(outputPath, "utf-8");
-      const stat = fs20.statSync(outputPath);
+    if (fs19.existsSync(outputPath)) {
+      const html = fs19.readFileSync(outputPath, "utf-8");
+      const stat = fs19.statSync(outputPath);
       return {
         html,
         timestamp: stat.mtime.getTime(),
@@ -42542,10 +42473,10 @@ var PageRenderer = class {
       };
     }
     const result = await this.renderSSR(context);
-    if (!fs20.existsSync(this.buildOutputDir)) {
-      fs20.mkdirSync(this.buildOutputDir, { recursive: true });
+    if (!fs19.existsSync(this.buildOutputDir)) {
+      fs19.mkdirSync(this.buildOutputDir, { recursive: true });
     }
-    fs20.writeFileSync(outputPath, result.html, "utf-8");
+    fs19.writeFileSync(outputPath, result.html, "utf-8");
     return result;
   }
   /**
@@ -43061,6 +42992,8 @@ var WebServer = class {
 };
 
 // src/cli.ts
+init_eval_special_forms();
+init_stdlib_property();
 function formatCallStack(stack) {
   if (!stack || stack.length === 0) return "";
   const frames = stack.slice().reverse().slice(0, 10);
@@ -43144,24 +43077,24 @@ function flPidFile(absPath) {
 function cmdRun(filePath, watch2, extraArgs = []) {
   const absPath = path18.resolve(filePath);
   const vmBench = extraArgs.includes("--vm-bench");
-  if (!fs21.existsSync(absPath)) {
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   const pidFile = flPidFile(absPath);
   try {
-    fs21.writeFileSync(pidFile, `${process.pid}
+    fs20.writeFileSync(pidFile, `${process.pid}
 ${absPath}`);
   } catch {
   }
   process.on("exit", () => {
     try {
-      fs21.unlinkSync(pidFile);
+      fs20.unlinkSync(pidFile);
     } catch {
     }
   });
   function execute() {
-    const source = fs21.readFileSync(absPath, "utf-8");
+    const source = fs20.readFileSync(absPath, "utf-8");
     let ctx;
     try {
       const tokens = lex(source);
@@ -43192,7 +43125,7 @@ ${absPath}`);
   if (vmBench) {
     console.log("\n\x1B[36m[vm-bench] \uC131\uB2A5 \uCE21\uC815 \uC2DC\uC791...\x1B[0m");
     const ITERATIONS = 100;
-    const source = fs21.readFileSync(absPath, "utf-8");
+    const source = fs20.readFileSync(absPath, "utf-8");
     const t0 = performance.now();
     for (let i = 0; i < ITERATIONS; i++) {
       delete process.env.FL_VM;
@@ -43241,7 +43174,7 @@ ${absPath}`);
     if (!watch2) return;
   }
   if (!watch2 && !vmBench && !process.env.FL_NO_HINT) {
-    const isServerFile = fs21.readFileSync(absPath, "utf-8").includes("server_start");
+    const isServerFile = fs20.readFileSync(absPath, "utf-8").includes("server_start");
     if (isServerFile) {
       process.stderr.write(`\x1B[2m\u{1F4A1}  \uAC1C\uBC1C \uC911\uC5D0\uB294: freelang watch ${path18.basename(absPath)}\x1B[0m
 `);
@@ -43253,7 +43186,7 @@ ${absPath}`);
     let lastMtime = 0;
     let lastSize = -1;
     try {
-      const st = fs21.statSync(absPath);
+      const st = fs20.statSync(absPath);
       lastMtime = st.mtimeMs;
       lastSize = st.size;
     } catch (_e) {
@@ -43261,7 +43194,7 @@ ${absPath}`);
     let debounce = null;
     setInterval(() => {
       try {
-        const st = fs21.statSync(absPath);
+        const st = fs20.statSync(absPath);
         if (st.mtimeMs !== lastMtime || st.size !== lastSize) {
           lastMtime = st.mtimeMs;
           lastSize = st.size;
@@ -43279,13 +43212,13 @@ ${absPath}`);
 }
 function cmdProps(filePath, extraArgs) {
   const absPath = path18.resolve(filePath);
-  if (!fs21.existsSync(absPath)) {
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
   const samplesIdx = extraArgs.indexOf("--samples");
   const samplesOverride = samplesIdx >= 0 ? parseInt(extraArgs[samplesIdx + 1], 10) : void 0;
-  const source = fs21.readFileSync(absPath, "utf-8");
+  const source = fs20.readFileSync(absPath, "utf-8");
   try {
     const tokens = lex(source);
     const ast = parse(tokens);
@@ -43353,11 +43286,11 @@ function cmdProps(filePath, extraArgs) {
 }
 function cmdCheck(filePath) {
   const absPath = path18.resolve(filePath);
-  if (!fs21.existsSync(absPath)) {
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const source = fs21.readFileSync(absPath, "utf-8");
+  const source = fs20.readFileSync(absPath, "utf-8");
   const ok2 = checkSource(source, absPath);
   if (!ok2) process.exit(1);
   const { metaMissing, effectsWarn } = checkDefnMeta(source, absPath);
@@ -43495,12 +43428,12 @@ function cmdCodegen(args3) {
     process.exit(1);
   }
   const absInput = path18.resolve(inputFile);
-  if (!fs21.existsSync(absInput)) {
+  if (!fs20.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs21.readFileSync(absInput, "utf-8");
+    const source = fs20.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -43517,7 +43450,7 @@ function cmdCodegen(args3) {
       }
     }
   } catch (err4) {
-    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput)}`);
+    console.error(`\x1B[31m\uC624\uB958\x1B[0m  ${formatError(err4, fs20.readFileSync(absInput, "utf-8"), absInput)}`);
     process.exit(1);
   }
 }
@@ -43532,12 +43465,12 @@ function cmdCompile(args3) {
     process.exit(1);
   }
   const absInput = path18.resolve(inputFile);
-  if (!fs21.existsSync(absInput)) {
+  if (!fs20.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
-    const source = fs21.readFileSync(absInput, "utf-8");
+    const source = fs20.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const cg = new JSCodegen();
@@ -43550,16 +43483,16 @@ function cmdCompile(args3) {
     if (outputFile) {
       const absOutput = path18.resolve(outputFile);
       const dir = path18.dirname(absOutput);
-      if (dir !== "." && !fs21.existsSync(dir)) {
-        fs21.mkdirSync(dir, { recursive: true });
+      if (dir !== "." && !fs20.existsSync(dir)) {
+        fs20.mkdirSync(dir, { recursive: true });
       }
-      fs21.writeFileSync(absOutput, js, "utf-8");
+      fs20.writeFileSync(absOutput, js, "utf-8");
       console.log(`\x1B[32m\u2713\x1B[0m  \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path18.basename(inputFile)} \u2192 ${outputFile}`);
     } else {
       process.stdout.write(js);
     }
   } catch (err4) {
-    console.error(formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput));
+    console.error(formatError(err4, fs20.readFileSync(absInput, "utf-8"), absInput));
     process.exit(1);
   }
 }
@@ -43572,14 +43505,14 @@ function cmdCompileC(args3) {
     process.exit(1);
   }
   const absInput = path18.resolve(inputFile);
-  if (!fs21.existsSync(absInput)) {
+  if (!fs20.existsSync(absInput)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${inputFile}`);
     process.exit(1);
   }
   try {
     const bootstrapDir = path18.dirname(process.argv[1]);
     const cgcPath = path18.join(bootstrapDir, "self", "cgc-main.out.js");
-    if (!fs21.existsSync(cgcPath)) {
+    if (!fs20.existsSync(cgcPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  C \uCF54\uB4DC \uC0DD\uC131\uAE30\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${cgcPath}`);
       process.exit(1);
     }
@@ -43591,28 +43524,28 @@ function cmdCompileC(args3) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  C \uCF54\uB4DC \uC0DD\uC131 \uC2E4\uD328: ${e.message}`);
       process.exit(1);
     }
-    if (!fs21.existsSync(tmpOutput)) {
+    if (!fs20.existsSync(tmpOutput)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  C \uCF54\uB4DC \uC0DD\uC131 \uC2E4\uD328: \uCD9C\uB825 \uD30C\uC77C \uC5C6\uC74C`);
       process.exit(1);
     }
-    const cCode = fs21.readFileSync(tmpOutput, "utf-8");
+    const cCode = fs20.readFileSync(tmpOutput, "utf-8");
     if (outputFile) {
       const absOutput = path18.resolve(outputFile);
       const dir = path18.dirname(absOutput);
-      if (dir !== "." && !fs21.existsSync(dir)) {
-        fs21.mkdirSync(dir, { recursive: true });
+      if (dir !== "." && !fs20.existsSync(dir)) {
+        fs20.mkdirSync(dir, { recursive: true });
       }
-      fs21.writeFileSync(absOutput, cCode, "utf-8");
+      fs20.writeFileSync(absOutput, cCode, "utf-8");
       console.log(`\x1B[32m\u2713\x1B[0m  C \uCEF4\uD30C\uC77C \uC644\uB8CC  ${path18.basename(inputFile)} \u2192 ${outputFile}`);
     } else {
       process.stdout.write(cCode);
     }
     try {
-      fs21.unlinkSync(tmpOutput);
+      fs20.unlinkSync(tmpOutput);
     } catch {
     }
   } catch (err4) {
-    console.error(formatError(err4, fs21.readFileSync(absInput, "utf-8"), absInput));
+    console.error(formatError(err4, fs20.readFileSync(absInput, "utf-8"), absInput));
     process.exit(1);
   }
 }
@@ -43631,9 +43564,9 @@ function cmdRepl() {
   let initialHistory = [];
   if (historyPath) {
     try {
-      const fs22 = require("fs");
-      if (fs22.existsSync(historyPath)) {
-        initialHistory = fs22.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
+      const fs21 = require("fs");
+      if (fs21.existsSync(historyPath)) {
+        initialHistory = fs21.readFileSync(historyPath, "utf8").split("\n").filter((l) => l.trim()).slice(-500).reverse();
       }
     } catch {
     }
@@ -43816,8 +43749,8 @@ function cmdRepl() {
     }
     if (historyPath && source) {
       try {
-        const fs22 = require("fs");
-        fs22.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
+        const fs21 = require("fs");
+        fs21.appendFileSync(historyPath, source.replace(/\n/g, " ") + "\n");
       } catch {
       }
     }
@@ -43908,11 +43841,11 @@ function cmdFmt(args3) {
   let needsChange = false;
   for (const filePath of filePaths) {
     const absPath = path18.resolve(filePath);
-    if (!fs21.existsSync(absPath)) {
+    if (!fs20.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
       process.exit(1);
     }
-    const src = fs21.readFileSync(absPath, "utf-8");
+    const src = fs20.readFileSync(absPath, "utf-8");
     let formatted;
     try {
       formatted = formatFL(src);
@@ -43929,7 +43862,7 @@ function cmdFmt(args3) {
       }
     } else {
       if (src !== formatted) {
-        fs21.writeFileSync(absPath, formatted, "utf-8");
+        fs20.writeFileSync(absPath, formatted, "utf-8");
         console.log(`\x1B[32m\uD3EC\uB9F7 \uC644\uB8CC\x1B[0m  ${path18.basename(absPath)}`);
       } else {
         console.log(`\x1B[2m\uBCC0\uACBD \uC5C6\uC74C\x1B[0m  ${path18.basename(absPath)}`);
@@ -43942,7 +43875,7 @@ function cmdFmt(args3) {
 }
 function cmdDebug(filePath, stepMode) {
   const absPath = path18.resolve(filePath);
-  if (!fs21.existsSync(absPath)) {
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
@@ -43954,7 +43887,7 @@ function cmdDebug(filePath, stepMode) {
   console.log(`\x1B[2m  (break!) \uC704\uCE58\uC5D0\uC11C \uC911\uB2E8\uC810 \uBC1C\uC0DD\x1B[0m`);
   console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
   try {
-    const source = fs21.readFileSync(absPath, "utf-8");
+    const source = fs20.readFileSync(absPath, "utf-8");
     const tokens = lex(source);
     const ast = parse(tokens);
     const interp2 = new Interpreter();
@@ -43975,35 +43908,6 @@ function cmdDebug(filePath, stepMode) {
     process.exit(1);
   }
 }
-async function cmdCi(ciArgs) {
-  const noFailFast = ciArgs.includes("--no-fail-fast");
-  const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
-  let targetFiles;
-  if (filePaths.length > 0) {
-    targetFiles = filePaths.map((f) => path18.resolve(f)).filter((f) => fs21.existsSync(f));
-    if (targetFiles.length === 0) {
-      console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uC9C0\uC815\uD55C \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
-      process.exit(1);
-    }
-  } else {
-    const cwd2 = process.cwd();
-    targetFiles = fs21.readdirSync(cwd2).filter((f) => f.endsWith(".fl")).map((f) => path18.join(cwd2, f));
-  }
-  console.log(`\x1B[36m[FreeLang CI]\x1B[0m  \uD30C\uC77C ${targetFiles.length}\uAC1C  fail-fast=${!noFailFast}`);
-  console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  const pipeline = createDefaultPipeline(targetFiles, { failFast: !noFailFast });
-  const summary = await pipeline.run();
-  console.log(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  const stepCount = summary.steps.length;
-  const passCount = summary.steps.filter((s) => s.passed && !s.skipped).length;
-  const skipCount = summary.steps.filter((s) => s.skipped).length;
-  if (summary.passed) {
-    console.log(`\x1B[32m[CI PASS]\x1B[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms)`);
-  } else {
-    console.log(`\x1B[31m[CI FAIL]\x1B[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms, ${skipCount} skipped)`);
-    process.exit(1);
-  }
-}
 function cmdDoc(docArgs) {
   const dirIdx = docArgs.indexOf("--dir");
   if (dirIdx !== -1) {
@@ -44013,18 +43917,18 @@ function cmdDoc(docArgs) {
       process.exit(1);
     }
     const absDir = path18.resolve(dirPath);
-    if (!fs21.existsSync(absDir) || !fs21.statSync(absDir).isDirectory()) {
+    if (!fs20.existsSync(absDir) || !fs20.statSync(absDir).isDirectory()) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uB514\uB809\uD1A0\uB9AC\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       process.exit(1);
     }
-    const flFiles = fs21.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path18.join(absDir, f));
+    const flFiles = fs20.readdirSync(absDir).filter((f) => f.endsWith(".fl")).map((f) => path18.join(absDir, f));
     if (flFiles.length === 0) {
       console.error(`\x1B[33m\uACBD\uACE0\x1B[0m  .fl \uD30C\uC77C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4: ${dirPath}`);
       return;
     }
     const allEntries = [];
     for (const filePath2 of flFiles) {
-      const src2 = fs21.readFileSync(filePath2, "utf-8");
+      const src2 = fs20.readFileSync(filePath2, "utf-8");
       allEntries.push(...extractDocs(src2));
     }
     const title2 = path18.basename(absDir) + " API \uBB38\uC11C";
@@ -44032,7 +43936,7 @@ function cmdDoc(docArgs) {
     const outIdx2 = docArgs.indexOf("-o");
     if (outIdx2 !== -1 && docArgs[outIdx2 + 1]) {
       const outPath = path18.resolve(docArgs[outIdx2 + 1]);
-      fs21.writeFileSync(outPath, md2, "utf-8");
+      fs20.writeFileSync(outPath, md2, "utf-8");
       console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${allEntries.length}\uAC1C \uD56D\uBAA9)`);
     } else {
       process.stdout.write(md2);
@@ -44046,18 +43950,18 @@ function cmdDoc(docArgs) {
   }
   const filePath = filePaths[0];
   const absPath = path18.resolve(filePath);
-  if (!fs21.existsSync(absPath)) {
+  if (!fs20.existsSync(absPath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const src = fs21.readFileSync(absPath, "utf-8");
+  const src = fs20.readFileSync(absPath, "utf-8");
   const entries = extractDocs(src);
   const title = path18.basename(absPath, ".fl") + " API \uBB38\uC11C";
   const md = renderMarkdown(entries, title);
   const outIdx = docArgs.indexOf("-o");
   if (outIdx !== -1 && docArgs[outIdx + 1]) {
     const outPath = path18.resolve(docArgs[outIdx + 1]);
-    fs21.writeFileSync(outPath, md, "utf-8");
+    fs20.writeFileSync(outPath, md, "utf-8");
     console.log(`\x1B[32m\uBB38\uC11C \uC800\uC7A5\uB428\x1B[0m  ${outPath}  (${entries.length}\uAC1C \uD56D\uBAA9)`);
   } else {
     process.stdout.write(md);
@@ -44069,10 +43973,10 @@ function cmdBuild(buildArgs2) {
   if (isStatic) {
     let expandDynamicParams = function(dir, paramName) {
       const paramsFile = path18.join(dir, "generate-static-params.fl");
-      if (!fs21.existsSync(paramsFile)) return [];
+      if (!fs20.existsSync(paramsFile)) return [];
       try {
         const cwdBootstrap2 = path18.resolve(process.cwd(), "bootstrap.js");
-        const bs = fs21.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path18.resolve(__dirname, "bootstrap.js");
+        const bs = fs20.existsSync(cwdBootstrap2) ? cwdBootstrap2 : path18.resolve(__dirname, "bootstrap.js");
         const { execSync: execSync2 } = require("child_process");
         const out = execSync2(`node "${bs}" run "${paramsFile}"`, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
         const m = out.match(/\[[\s\S]*\]/);
@@ -44084,7 +43988,7 @@ function cmdBuild(buildArgs2) {
         return [];
       }
     }, walk = function(dir, routeBase) {
-      const entries = fs21.readdirSync(dir, { withFileTypes: true });
+      const entries = fs20.readdirSync(dir, { withFileTypes: true });
       for (const e of entries) {
         const full = path18.join(dir, e.name);
         if (e.isDirectory()) {
@@ -44096,7 +44000,7 @@ function cmdBuild(buildArgs2) {
               console.log(`build.skip reason=dynamic_no_params path=/${path18.relative(absApp, full)} param=${paramName}`);
               continue;
             }
-            if (!fs21.existsSync(pageFile)) {
+            if (!fs20.existsSync(pageFile)) {
               console.log(`build.skip reason=dynamic_no_page path=/${path18.relative(absApp, full)}`);
               continue;
             }
@@ -44122,16 +44026,16 @@ function cmdBuild(buildArgs2) {
     const port = portIdx !== -1 ? parseInt(buildArgs2[portIdx + 1], 10) : 43099;
     const absApp = path18.resolve(appDir);
     const absOut = path18.resolve(outDir);
-    if (!fs21.existsSync(absApp)) {
+    if (!fs20.existsSync(absApp)) {
       console.error(`build.error event=app_not_found path=${appDir}`);
       process.exit(1);
     }
     console.log(`build.start app=${appDir} out=${outDir} port=${port}`);
-    fs21.mkdirSync(absOut, { recursive: true });
+    fs20.mkdirSync(absOut, { recursive: true });
     const pages = [];
     walk(absApp, "");
     const notFoundFile = path18.join(absApp, "not-found.fl");
-    if (fs21.existsSync(notFoundFile)) {
+    if (fs20.existsSync(notFoundFile)) {
       pages.push({ filePath: notFoundFile, route: "/__404__" });
     }
     if (pages.length === 0) {
@@ -44141,7 +44045,7 @@ function cmdBuild(buildArgs2) {
     const { spawn } = require("child_process");
     const http3 = require("http");
     const cwdBootstrap = path18.resolve(process.cwd(), "bootstrap.js");
-    const bootstrap = fs21.existsSync(cwdBootstrap) ? cwdBootstrap : path18.resolve(__dirname, "bootstrap.js");
+    const bootstrap = fs20.existsSync(cwdBootstrap) ? cwdBootstrap : path18.resolve(__dirname, "bootstrap.js");
     const serveProc = spawn(
       "node",
       [bootstrap, "serve", "--app", absApp, "--port", String(port)],
@@ -44233,8 +44137,8 @@ function cmdBuild(buildArgs2) {
         }
         if (html) {
           const outPath = p.route === "/__404__" ? path18.join(absOut, "404.html") : path18.join(absOut, p.route === "/" ? "index.html" : p.route.slice(1) + "/index.html");
-          fs21.mkdirSync(path18.dirname(outPath), { recursive: true });
-          fs21.writeFileSync(outPath, html);
+          fs20.mkdirSync(path18.dirname(outPath), { recursive: true });
+          fs20.writeFileSync(outPath, html);
           console.log(`build.page route=${p.route === "/__404__" ? "/404" : p.route} ok=true file=${path18.relative(process.cwd(), outPath)} bytes=${html.length}`);
           ok2++;
         } else {
@@ -44266,13 +44170,13 @@ function cmdBuild(buildArgs2) {
       process.exit(1);
     }
     const absPath = path18.resolve(appFile);
-    if (!fs21.existsSync(absPath)) {
+    if (!fs20.existsSync(absPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${appFile}`);
       process.exit(1);
     }
     console.log(`\x1B[36m[OCI Build]\x1B[0m  ${path18.basename(appFile)} \u2192 ${tag}`);
     const ociScriptPath = path18.resolve(__dirname, "../vpm/v9-oci.fl");
-    if (!fs21.existsSync(ociScriptPath)) {
+    if (!fs20.existsSync(ociScriptPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  v9-oci.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4`);
       process.exit(1);
     }
@@ -44306,7 +44210,7 @@ function cmdRegistry(registryArgs) {
     console.log(`\x1B[36m[Registry]\x1B[0m  v9 \uD328\uD0A4\uC9C0 \uB808\uC9C0\uC2A4\uD2B8\uB9AC \uC2DC\uC791 (\uD3EC\uD2B8 ${port})`);
     console.log(`\x1B[36m[Registry]\x1B[0m  http://localhost:${port}/`);
     const registryPath = path18.resolve(__dirname, "../vpm/registry-server.fl");
-    if (!fs21.existsSync(registryPath)) {
+    if (!fs20.existsSync(registryPath)) {
       console.error(`\x1B[31m\uC624\uB958\x1B[0m  registry-server.fl\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${registryPath}`);
       process.exit(1);
     }
@@ -44365,18 +44269,18 @@ function cmdInstall(args3) {
   }
   const homeDir = require("os").homedir();
   const pluginsDir = path18.resolve(homeDir, ".fl", "plugins");
-  if (!fs21.existsSync(pluginsDir)) {
-    fs21.mkdirSync(pluginsDir, { recursive: true });
+  if (!fs20.existsSync(pluginsDir)) {
+    fs20.mkdirSync(pluginsDir, { recursive: true });
     console.log(`\x1B[36m[Y5]\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uB514\uB809\uD1A0\uB9AC \uC0DD\uC131: ${pluginsDir}`);
   }
   const localPath = path18.resolve(process.cwd(), "plugins", pluginName + ".fl");
   const stdlibPath = path18.resolve(process.cwd(), "self/stdlib", pluginName + ".fl");
   const installedPath = path18.resolve(pluginsDir, pluginName + ".fl");
   let sourceFile = null;
-  if (fs21.existsSync(localPath)) {
+  if (fs20.existsSync(localPath)) {
     sourceFile = localPath;
     console.log(`\x1B[36m[Y5]\x1B[0m  \uB85C\uCEEC \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${localPath}`);
-  } else if (fs21.existsSync(stdlibPath)) {
+  } else if (fs20.existsSync(stdlibPath)) {
     sourceFile = stdlibPath;
     console.log(`\x1B[36m[Y5]\x1B[0m  \uB0B4\uC7A5 stdlib \uD50C\uB7EC\uADF8\uC778 \uCC3E\uC74C: ${stdlibPath}`);
   } else {
@@ -44387,8 +44291,8 @@ function cmdInstall(args3) {
     process.exit(1);
   }
   try {
-    const content = fs21.readFileSync(sourceFile, "utf-8");
-    fs21.writeFileSync(installedPath, content, "utf-8");
+    const content = fs20.readFileSync(sourceFile, "utf-8");
+    fs20.writeFileSync(installedPath, content, "utf-8");
     console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uC124\uCE58 \uC644\uB8CC: ${installedPath}`);
     console.log(`\x1B[2m  \uC0AC\uC6A9: (use ${pluginName})\x1B[0m`);
   } catch (err4) {
@@ -44402,11 +44306,11 @@ function cmdPublish(args3) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD50C\uB7EC\uADF8\uC778 \uD30C\uC77C\uC744 \uC9C0\uC815\uD558\uC138\uC694: publish <plugin-file.fl>`);
     process.exit(1);
   }
-  if (!fs21.existsSync(filePath)) {
+  if (!fs20.existsSync(filePath)) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uD30C\uC77C\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4: ${filePath}`);
     process.exit(1);
   }
-  const content = fs21.readFileSync(filePath, "utf-8");
+  const content = fs20.readFileSync(filePath, "utf-8");
   const nameMatch = content.match(/^;; plugin:\s*(.+)$/m);
   const versionMatch = content.match(/^;; version:\s*(.+)$/m);
   if (!nameMatch) {
@@ -44422,12 +44326,12 @@ function cmdPublish(args3) {
   try {
     const { execSync: execSync2 } = require("child_process");
     const tmpDir = path18.resolve("/tmp", `fl-publish-${Date.now()}`);
-    fs21.mkdirSync(tmpDir, { recursive: true });
+    fs20.mkdirSync(tmpDir, { recursive: true });
     execSync2("git clone https://gogs.dclub.kr/kim/fl-plugins.git .", {
       cwd: tmpDir,
       stdio: "pipe"
     });
-    fs21.copyFileSync(filePath, path18.resolve(tmpDir, `${pluginName}.fl`));
+    fs20.copyFileSync(filePath, path18.resolve(tmpDir, `${pluginName}.fl`));
     execSync2(`git add ${pluginName}.fl`, { cwd: tmpDir, stdio: "pipe" });
     execSync2(
       `git -c user.name="FreeLang CLI" -c user.email="cli@freelang.dev" commit -m "Add plugin: ${pluginName} v${version}"`,
@@ -44436,7 +44340,7 @@ function cmdPublish(args3) {
     execSync2("git push origin master", { cwd: tmpDir, stdio: "pipe" });
     console.log(`\x1B[32m\u2713\x1B[0m  \uD50C\uB7EC\uADF8\uC778 '${pluginName}' \uAC8C\uC2DC \uC644\uB8CC`);
     console.log(`\x1B[2m  \uC800\uC7A5\uC18C: https://gogs.dclub.kr/kim/fl-plugins\x1B[0m`);
-    fs21.rmSync(tmpDir, { recursive: true, force: true });
+    fs20.rmSync(tmpDir, { recursive: true, force: true });
   } catch (err4) {
     console.error(`\x1B[31m\uC624\uB958\x1B[0m  \uBC30\uD3EC \uC2E4\uD328: ${err4.message}`);
     process.exit(1);
@@ -44469,11 +44373,11 @@ function cmdServe(args3) {
       port = parseInt(process.env.PORT, 10);
     } else {
       try {
-        const fs22 = require("fs");
+        const fs21 = require("fs");
         const path19 = require("path");
         const configPath = path19.join(process.cwd(), "fl.config.json");
-        if (fs22.existsSync(configPath)) {
-          const cfg = JSON.parse(fs22.readFileSync(configPath, "utf-8"));
+        if (fs21.existsSync(configPath)) {
+          const cfg = JSON.parse(fs21.readFileSync(configPath, "utf-8"));
           if (cfg.port) port = cfg.port;
         }
       } catch (_e) {
@@ -44807,13 +44711,6 @@ switch (cmd) {
     cmdProps(filePath, args2.slice(2));
     break;
   }
-  case "ci": {
-    cmdCi(args2.slice(1)).catch((err4) => {
-      console.error(`\x1B[31m[CI \uC624\uB958]\x1B[0m  ${err4.message}`);
-      process.exit(1);
-    });
-    break;
-  }
   case "doc": {
     cmdDoc(args2.slice(1));
     break;
@@ -44842,7 +44739,7 @@ switch (cmd) {
     const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
     const topN = parseInt(args2[1] ?? "20", 10);
     try {
-      const raw = fs21.readFileSync(logPath, "utf-8").trim();
+      const raw = fs20.readFileSync(logPath, "utf-8").trim();
       if (!raw) {
         console.log("(\uAE30\uB85D\uB41C \uC5D0\uB7EC \uC5C6\uC74C)");
         break;
@@ -44877,7 +44774,7 @@ switch (cmd) {
   case "errors-clear": {
     const logPath = process.env.FL_ERROR_LOG ?? "/tmp/fl-unknown-functions.jsonl";
     try {
-      fs21.unlinkSync(logPath);
+      fs20.unlinkSync(logPath);
       console.log(`\u2713 \uB85C\uADF8 \uC0AD\uC81C: ${logPath}`);
     } catch {
       console.log("(\uB85C\uADF8 \uC5C6\uC74C)");
@@ -44887,7 +44784,7 @@ switch (cmd) {
   case "stop": {
     const target = args2[1];
     if (!target) {
-      const pidFiles = fs21.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
+      const pidFiles = fs20.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
       if (pidFiles.length === 0) {
         console.log("(\uC2E4\uD589 \uC911\uC778 fl \uD504\uB85C\uC138\uC2A4 \uC5C6\uC74C)");
         break;
@@ -44895,17 +44792,17 @@ switch (cmd) {
       let killed = 0;
       for (const pf of pidFiles) {
         try {
-          const content = fs21.readFileSync(`/tmp/${pf}`, "utf-8").trim();
+          const content = fs20.readFileSync(`/tmp/${pf}`, "utf-8").trim();
           const [pidStr, filePath] = content.split("\n");
           const pid = parseInt(pidStr, 10);
           process.kill(pid, "SIGTERM");
-          fs21.unlinkSync(`/tmp/${pf}`);
+          fs20.unlinkSync(`/tmp/${pf}`);
           console.log(`\u2713 \uC885\uB8CC: PID ${pid}  ${filePath ?? pf}`);
           killed++;
         } catch (e) {
           if (e.code === "ESRCH") {
             try {
-              fs21.unlinkSync(`/tmp/${pf}`);
+              fs20.unlinkSync(`/tmp/${pf}`);
             } catch {
             }
             console.log(`\u2713 \uC774\uBBF8 \uC885\uB8CC\uB428: ${pf}`);
@@ -44920,11 +44817,11 @@ switch (cmd) {
       const absTarget = path18.resolve(target);
       const pidFile = flPidFile(absTarget);
       try {
-        const content = fs21.readFileSync(pidFile, "utf-8").trim();
+        const content = fs20.readFileSync(pidFile, "utf-8").trim();
         const pid = parseInt(content.split("\n")[0], 10);
         process.kill(pid, "SIGTERM");
         try {
-          fs21.unlinkSync(pidFile);
+          fs20.unlinkSync(pidFile);
         } catch {
         }
         console.log(`\u2713 \uC885\uB8CC: ${target}  (PID ${pid})`);
@@ -44932,7 +44829,7 @@ switch (cmd) {
         if (e.code === "ENOENT") console.log(`(PID \uD30C\uC77C \uC5C6\uC74C \u2014 ${target} \uC774 \uC2E4\uD589 \uC911\uC774\uC9C0 \uC54A\uAC70\uB098 \uC774\uBBF8 \uC885\uB8CC\uB428)`);
         else if (e.code === "ESRCH") {
           try {
-            fs21.unlinkSync(pidFile);
+            fs20.unlinkSync(pidFile);
           } catch {
           }
           console.log(`(\uC774\uBBF8 \uC885\uB8CC\uB428)`);
@@ -44942,7 +44839,7 @@ switch (cmd) {
     break;
   }
   case "ps": {
-    const pidFiles = fs21.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
+    const pidFiles = fs20.readdirSync("/tmp").filter((f) => f.startsWith("fl_") && f.endsWith(".pid"));
     if (pidFiles.length === 0) {
       console.log("(\uC2E4\uD589 \uC911\uC778 fl \uD504\uB85C\uC138\uC2A4 \uC5C6\uC74C)");
       break;
@@ -44950,7 +44847,7 @@ switch (cmd) {
     console.log("\n\uC2E4\uD589 \uC911\uC778 FreeLang \uD504\uB85C\uC138\uC2A4:\n");
     for (const pf of pidFiles) {
       try {
-        const content = fs21.readFileSync(`/tmp/${pf}`, "utf-8").trim();
+        const content = fs20.readFileSync(`/tmp/${pf}`, "utf-8").trim();
         const [pidStr, filePath] = content.split("\n");
         const pid = parseInt(pidStr, 10);
         process.kill(pid, 0);
@@ -44959,7 +44856,7 @@ switch (cmd) {
       } catch (e) {
         if (e.code === "ESRCH") {
           try {
-            fs21.unlinkSync(`/tmp/${pf}`);
+            fs20.unlinkSync(`/tmp/${pf}`);
           } catch {
           }
         }

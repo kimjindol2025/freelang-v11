@@ -23,7 +23,6 @@ import { DebugSession, setGlobalDebugSession } from "./debugger"; // Phase 78: �
 import { runWithWatch } from "./hot-reload"; // Phase 79: 워치 모드
 import { extractDocs } from "./doc-extractor"; // Phase 77: 문서 추출기
 import { renderMarkdown } from "./doc-renderer"; // Phase 77: 문서 렌더러
-import { createDefaultPipeline, createFmtCheckStep, createLintStep, createTestStep } from "./ci-runner"; // Phase 80: CI
 import { recordEvent } from "./runtime-events";
 import { WebServer } from "./web"; // Phase 3: Web Server
 import { fnMetaRegistry, FnMeta, EFFECT_CATALOG } from "./eval-special-forms"; // AI-Native Phase 1+2
@@ -1143,46 +1142,6 @@ function cmdDebug(filePath: string, stepMode: boolean): void {
 // ci 커맨드 (Phase 80)
 // ─────────────────────────────────────────
 
-async function cmdCi(ciArgs: string[]): Promise<void> {
-  const noFailFast = ciArgs.includes("--no-fail-fast");
-  const filePaths = ciArgs.filter((a) => !a.startsWith("--"));
-
-  let targetFiles: string[];
-
-  if (filePaths.length > 0) {
-    // 특정 파일 지정
-    targetFiles = filePaths.map((f) => path.resolve(f)).filter((f) => fs.existsSync(f));
-    if (targetFiles.length === 0) {
-      console.error(`\x1b[31m오류\x1b[0m  지정한 파일을 찾을 수 없습니다`);
-      process.exit(1);
-    }
-  } else {
-    // 현재 디렉토리의 .fl 파일 전체
-    const cwd = process.cwd();
-    targetFiles = fs.readdirSync(cwd)
-      .filter((f) => f.endsWith(".fl"))
-      .map((f) => path.join(cwd, f));
-  }
-
-  console.log(`\x1b[36m[FreeLang CI]\x1b[0m  파일 ${targetFiles.length}개  fail-fast=${!noFailFast}`);
-  console.log(`─────────────────────────────────────────`);
-
-  const pipeline = createDefaultPipeline(targetFiles, { failFast: !noFailFast });
-  const summary = await pipeline.run();
-
-  console.log(`─────────────────────────────────────────`);
-  const stepCount = summary.steps.length;
-  const passCount = summary.steps.filter((s) => s.passed && !s.skipped).length;
-  const skipCount = summary.steps.filter((s) => s.skipped).length;
-
-  if (summary.passed) {
-    console.log(`\x1b[32m[CI PASS]\x1b[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms)`);
-  } else {
-    console.log(`\x1b[31m[CI FAIL]\x1b[0m  ${passCount}/${stepCount} steps  (${summary.totalMs}ms, ${skipCount} skipped)`);
-    process.exit(1);
-  }
-}
-
 // ─────────────────────────────────────────
 // doc 커맨드 (Phase 77)
 // ─────────────────────────────────────────
@@ -2075,14 +2034,6 @@ switch (cmd) {
       process.exit(1);
     }
     cmdProps(filePath, args.slice(2));
-    break;
-  }
-  case "ci": {
-    // Phase 80: freelang ci [<file.fl>] [--no-fail-fast]
-    cmdCi(args.slice(1)).catch((err) => {
-      console.error(`\x1b[31m[CI 오류]\x1b[0m  ${err.message}`);
-      process.exit(1);
-    });
     break;
   }
   case "doc": {
