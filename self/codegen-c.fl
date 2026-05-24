@@ -325,14 +325,15 @@
     (if (or (null? $args) (>= $i (length $args))) $acc
     (recur (+ $i 1) (cgc-collect-vars (get $args $i) $acc)))))
 
-;; 캡처 후보 필터 (closure 대신 loop — self-host 캡처 분석 회피)
+;; 캡처 후보 필터 — 외부 변수 중 파라미터 아닌 것만 추출 (중복 제거)
 (defn cgc-fn-caps-filter [$all-vars $param-names $outer $i $acc]
   (if (>= $i (length $all-vars))
     $acc
     (let [[$v (get $all-vars $i)]]
       (cgc-fn-caps-filter $all-vars $param-names $outer (+ $i 1)
         (if (and (not (includes-item $param-names $v))
-                 (includes-item $outer $v))
+                 (includes-item $outer $v)
+                 (not (includes-item $acc $v)))  ;; 중복 제거
           (push $acc $v)
           $acc)))))
 
@@ -343,12 +344,14 @@
     (recur (+ $i 1)
       (str $acc "    FLValue " (get $caps $i) " = _self->env[" $i "];\n")))))
 
-;; 캡처 변수 배열 표현식 "v1, v2"
+;; 캡처 변수 배열 표현식 "v1, v2, v3"
 (defn cgc-env-arr [$caps $i $acc]
   (loop [$i $i $acc $acc]
     (if (>= $i (length $caps)) $acc
     (recur (+ $i 1)
-      (if (= $i 0) (get $caps 0) (str $acc ", " (get $caps $i)))))))
+      (if (= $i 0)
+        (c-name (get $caps 0))
+        (str $acc ", " (c-name (get $caps $i))))))))
 
 (defn cgc-fn [$args]
   (let [[$id @lambda-id-atom]
