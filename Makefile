@@ -131,34 +131,25 @@ semantic-test:
 parity-test:
 	@bash self/parity-test.sh
 
-# P1: Integrated release gate
+# Phase 1E: Integrated CI Verification Gate (L0+L1+L3+L4)
 verify:
-	@echo ""
-	@echo "╔════════════════════════════════════════════════════════╗"
-	@echo "║           FreeLang v11 Release Gate                   ║"
-	@echo "╚════════════════════════════════════════════════════════╝"
-	@echo ""
-	@echo "[1/4] Running semantic-test (7 C invariants)..."
-	@$(MAKE) semantic-test
-	@echo ""
-	@echo "[2/4] Running parity-test (JS/C output equality)..."
-	@$(MAKE) parity-test
-	@echo ""
-	@echo "[3/4] Running native-test (FL→C→ELF pipeline)..."
-	@$(MAKE) native-test
-	@echo ""
-	@echo "[4/4] Running verify-all (build + self-host + bench)..."
-	@$(MAKE) verify-all
-	@echo ""
-	@echo "╔════════════════════════════════════════════════════════╗"
-	@echo "║              ✅ verify PASS — release 가능              ║"
-	@echo "╚════════════════════════════════════════════════════════╝"
+	@bash scripts/ci-verify.sh
 
-# P1: Release checkpoint
+# Phase 1E: Quick CI verification (L0+L1 only, ~35 seconds)
+verify-fast:
+	@bash scripts/ci-verify.sh --fast
+
+# Phase 1E: Release checkpoint
 release: verify
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════╗"
 	@echo "║           Release gate PASSED                         ║"
 	@echo "║                                                        ║"
 	@echo "║  git tag vX.Y.Z && git push origin --tags             ║"
+	@echo "║                                                        ║"
+	@echo "║  All CI gates verified:                              ║"
+	@echo "║    L0 Static:        PASS                            ║"
+	@echo "║    L1 Unit:          PASS                            ║"
+	@echo "║    L3 E2E:           PASS                            ║"
+	@echo "║    L4 Fixpoint:      PASS                            ║"
 	@echo "╚════════════════════════════════════════════════════════╝"
