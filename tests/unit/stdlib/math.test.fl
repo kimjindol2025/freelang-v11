@@ -1,0 +1,29 @@
+;; tests/unit/stdlib/math.test.fl — Math Library Unit Tests
+;; 16개 테스트 (산술 함수)
+
+(load "/home/kimjin/freelang-v11/tests/lib/assert.fl")
+
+(test-section "Math Tests")
+
+;; 기본 산술
+(assert-eq (+ 1 2) 3 "addition")
+(assert-eq (- 10 3) 7 "subtraction")
+(assert-eq (* 4 5) 20 "multiplication")
+(assert-eq (/ 10 2) 5 "division")
+(assert-eq (% 10 3) 1 "modulo")
+
+;; 비교
+(assert-true (> 5 3) "greater than")
+(assert-true (< 3 5) "less than")
+(assert-true (= 5 5) "equal")
+(assert-false (= 5 6) "not equal")
+(assert-true (>= 5 5) "gte equal")
+(assert-true (<= 3 5) "lte less")
+
+;; 수학 함수
+(assert-eq (abs -5) 5 "abs negative")
+(assert-eq (abs 5) 5 "abs positive")
+(assert-eq (max 3 7 2) 7 "max")
+(assert-eq (min 3 7 2) 2 "min")
+
+(println "✅ Math tests passed")
