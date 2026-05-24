@@ -18,19 +18,31 @@ NODE := node --stack-size=8000
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
+	@echo ""
+	@echo "  [JS Backend]"
 	@echo "  make compile FILE=in.fl OUT=out.js  - stage1.js로 컴파일"
 	@echo "  make compile-self                   - stage1 self-host"
+	@echo "  make semantic-test                  - P2 Stage 2: 7개 invariant 검증"
+	@echo "  make parity-test                    - P2 Stage 2: JS/C 출력 동등성"
+	@echo "  make native-test                    - P2 Stage 1: compile --target c 파이프라인"
+	@echo "  make verify                         - Release gate: semantic+parity+native+verify-all"
+	@echo ""
+	@echo "  [C Backend]"
+	@echo "  make c-hello                        - FL→C→ELF (hello.fl)"
+	@echo "  make c-test                         - FL→C→ELF (4-file test)"
+	@echo "  make c-parity                       - JS/C 출력 동등성 검증"
+	@echo "  make c-verify                       - C backend gate: semantic+c-test+c-parity"
+	@echo ""
+	@echo "  [Release]"
+	@echo "  make release                        - verify + c-verify 완료 후 릴리즈"
+	@echo ""
+	@echo "  [Infrastructure]"
 	@echo "  make verify-all                     - 4개 검증 통합 대시보드"
 	@echo "  make verify-fixed-point             - stage1~10 SHA256 chain"
 	@echo "  make verify-build                   - TS→bootstrap 결정론"
 	@echo "  make verify-self-host               - tier2 (PASS≥91)"
 	@echo "  make bench                          - FL-Bench 100 reference"
 	@echo "  make ai-eval                        - Claude CLI 평가 (~41분)"
-	@echo "  make native-test                    - P2 Stage 1: FL→C→ELF 파이프라인"
-	@echo "  make semantic-test                  - P2 Stage 2: 7개 invariant 검증"
-	@echo "  make parity-test                    - P2 Stage 2: JS/C 출력 동등성 검증"
-	@echo "  make verify                         - Release gate: semantic+parity+native+verify-all"
-	@echo "  make release                        - verify PASS 후 릴리즈 체크포인트"
 
 compile:
 	@$(NODE) $(STAGE1) $(FILE) $(OUT)
@@ -139,11 +151,58 @@ verify:
 verify-fast:
 	@bash scripts/ci-verify.sh --fast
 
-# Phase 1E: Release checkpoint
-release: verify
+# P2-Core: FL → C → ELF hello.fl
+c-hello:
+	@echo "=== P2-Core: FL → C → ELF Pipeline (hello.fl) ==="
+	@node bootstrap.js compile examples/hello.fl --target c -o /tmp/c_hello.c
+	@gcc /tmp/c_hello.c runtime/core.c runtime/collection.c runtime/io.c runtime/math.c runtime/error.c -I runtime/ -lm -o /tmp/c_hello
+	@echo "Running hello ELF..."
+	@/tmp/c_hello
+	@echo "✓ c-hello SUCCESS"
+
+# P2-Core: FL → C → ELF 4-file test suite
+c-test:
+	@echo "=== P2-Core: FL → C → ELF (loop.fl, fib.fl, factorial.fl, nested-loop.fl) ==="
+	@for f in examples/loop.fl examples/fib.fl examples/factorial.fl examples/nested-loop.fl; do \
+		echo "Testing $$f..."; \
+		node bootstrap.js compile $$f --target c -o /tmp/c_test.c || exit 1; \
+		gcc /tmp/c_test.c runtime/core.c runtime/collection.c runtime/io.c runtime/math.c runtime/error.c -I runtime/ -lm -o /tmp/c_test || exit 1; \
+		/tmp/c_test || exit 1; \
+	done
+	@echo "✓ c-test SUCCESS (4/4 compiled and executed)"
+
+# P2-Core: C backend parity validation
+c-parity:
+	@bash self/parity-test.sh
+
+# P2-Core: Integrated C backend validation
+c-verify:
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║      P2-Core Release Gate (C Backend)                 ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "[1/3] Running semantic-test (7 C invariants)..."
+	@$(MAKE) semantic-test
+	@echo ""
+	@echo "[2/3] Running c-test (4-file FL→C→ELF)..."
+	@$(MAKE) c-test
+	@echo ""
+	@echo "[3/3] Running c-parity (JS/C output equality)..."
+	@$(MAKE) c-parity
+	@echo ""
+	@echo "╔════════════════════════════════════════════════════════╗"
+	@echo "║     ✅ c-verify PASS — C backend stable                ║"
+	@echo "╚════════════════════════════════════════════════════════╝"
+
+# Release checkpoint (Phase 1E CI gate + C backend)
+release: verify c-verify
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════╗"
 	@echo "║           Release gate PASSED                         ║"
+	@echo "║                                                        ║"
+	@echo "║  ✅ JS backend (verify PASS)                          ║"
+	@echo "║  ✅ C backend (c-verify PASS)                         ║"
 	@echo "║                                                        ║"
 	@echo "║  git tag vX.Y.Z && git push origin --tags             ║"
 	@echo "║                                                        ║"
