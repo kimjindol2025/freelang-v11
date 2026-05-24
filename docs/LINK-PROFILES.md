@@ -106,27 +106,17 @@ bash scripts/build-cgc-native.sh /tmp/gen1.c /tmp/gen1-bin
 
 ### General Program Profile
 
-**상태**: 🔴 자동화 미완료
+**상태**: ✅ 자동화 완료 (2026-05-24)
 
-**수동 해결책** (임시):
+**자동화 스크립트**:
 ```bash
-# ✅ 작동 (cgc-bridge.c 제외)
-gcc -I runtime \
-  /tmp/test-gen.c \
-  runtime/core.c \
-  runtime/collection.c \
-  runtime/io.c \
-  runtime/math.c \
-  runtime/error.c \
-  runtime/process.c \
-  runtime/json.c \
-  -lm -o /tmp/test-bin
+bash scripts/build-general-program.sh <gen.c> <output-bin>
 ```
 
-**자동화 계획** (E-0-4 이후):
-- `scripts/build-general-program.sh` (proposed)
+**구현**: `scripts/build-general-program.sh`
 - Input: `<gen.c> <output-bin>`
 - Linker: 7개 runtime 모듈 (cgc-bridge.c 제외)
+- 결과: Standalone ELF executable (lex/parse 불필요)
 
 ---
 
@@ -173,19 +163,14 @@ sha256sum /tmp/gen1.c /tmp/gen2.c
 # ✅ 동일 (5c1edeaf...)
 ```
 
-### General Program Test (D-4) ← 미완료
+### General Program Test (D-4) ← 완료 ✅
 
 ```bash
 # test-recur-tco.fl → gen.c (bootstrap.js)
 node bootstrap.js run self/cgc-main.fl test-recur-tco.fl /tmp/test-gen.c
 
-# C → executable 링크 (General Profile) — 아직 자동화 X
-gcc -I runtime \
-  /tmp/test-gen.c \
-  runtime/core.c runtime/collection.c runtime/io.c \
-  runtime/math.c runtime/error.c runtime/process.c \
-  runtime/json.c \
-  -lm -o /tmp/test-bin
+# C → executable 링크 (General Profile) — 자동화 완료
+bash scripts/build-general-program.sh /tmp/test-gen.c /tmp/test-bin
 
 # 실행
 /tmp/test-bin arg1 arg2
