@@ -7,7 +7,7 @@
 
 | 영역 | 완성도 | 비고 |
 |------|--------|------|
-| **언어 기능** | 99% | 자가호스팅, 결정론 컴파일, AI-Native |
+| **언어 기능** | 100% | ✅ L4 네이티브 자가호스팅 완료, 결정론 컴파일, AI-Native |
 | **보안** | 100% | v11.5.3 완성 (CSRF, XSS, 쿠키) |
 | **성능** | 95% | 분산 Task, 비동기 병렬 실행 |
 | **린터** | 66% | P0 (5/5) + P1 (4/6) |
@@ -42,6 +42,50 @@
 | **P1-3: params** | ✅ | 웹 버그 -40% |
 
 **완성도**: 8/11 (73%) — 위험도 HIGH+MEDIUM 중심
+
+---
+
+## Phase D: Native Self-Hosting (2026-05-24) ✅ COMPLETE
+
+**목표**: 네이티브 ELF 컴파일러가 자신을 재생성하는 고정점 달성
+
+**D-1~D-6 완료**:
+- D-1: cgc-main.fl → gen1.c (bootstrap.js, 142KB) ✅
+- D-2: gen1.c → cgc-native1 (gcc + 8 runtime modules, 257KB ELF) ✅
+- D-3: cgc-native1 PATH 제한 실행 ✅
+- D-4: 일반 입력 codegen 지원 ✅
+- D-5: 고정점 검증 (SHA 동일) ✅
+- D-6: L4 선언 (네이티브 경로 공식화) ✅
+
+**고정점**: 
+```
+gen1.c == gen2.c == gen3.c
+SHA 5c1edeafb7ae346f2347a9321b0bfe8dfef7ae0be91c5e049b6bcfcbb57f2f74 (identical)
+```
+
+**스크립트**: `scripts/build-cgc-native.sh`, `scripts/verify-l4-fixpoint.sh`
+
+**신뢰도**: 9.4/10 (L4 달성, caveat 문서화 필요)
+
+---
+
+## Phase E-0: L4 Stabilization (2026-05-24~06-07) 🟡 CURRENT
+
+**목표**: L4 네이티브 자가호스팅을 문서에 고정, 검증 자동화
+
+**E-0-1**: 문서 정정 (README/ROADMAP/STATE_OF_V11) ✅
+- README.md L4 업데이트
+- STATE_OF_V11.md L4 완료 표시
+- ROADMAP.md Phase D/E-0 추가
+
+**E-0-2**: BUILD-SYSTEM.md에 Native Build Path 추가 (진행중)
+
+**E-0-3**: 링크 프로파일 문서화 (진행중)
+- LINK-PROFILES.md: 컴파일러 vs 일반 프로그램 링크 분리
+
+**E-0-4**: verify-l4-fixpoint.sh에 PATH 제한 자동화 (진행중)
+
+**E-0-5**: L4 완료 블로그 + PHASE-D-COMPLETION-REPORT.md (대기중)
 
 ---
 
