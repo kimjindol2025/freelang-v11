@@ -18,8 +18,8 @@ FreeLang v11은 세 개의 분리된 빌드 트랙을 가진다. 각 트랙은 �
 │  [Runtime Path]            ← Execution                         │
 │  stage1.js + interpreter + effect system                       │
 ├───────────────────────────────────────────────────────────────┤
-│  [Experimental Path]       ← Future (not implemented)          │
-│  self-host compiler                                            │
+│  [Native Build Path]       ← L4 Self-Hosting (2026-05-24)      │
+│  self/cgc-main.fl → gen1.c → gcc → cgc-native1 (ELF)          │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -89,25 +89,103 @@ bootstrap.js가 실행될 때 사용하는 보조 컴포넌트들. **빌드 산�
 
 ---
 
-## 3. Experimental Path
+## 3. Native Build Path (L4 Self-Hosting)
 
-**현재 구현되지 않음.** 향후 자주국방(self-hosting sovereignty) 진화 트랙.
+**Status**: Production (2026-05-24)
 
-### Future scope
+네이티브 ELF 컴파일러로 FreeLang을 자신을 재컴파일하는 자가호스팅 경로. L4 고정점 달성.
 
-- `stage1.js`를 확장해 bootstrap.js 전체를 self-host 컴파일하는 stage2 작업
-- 또는 별도 FreeLang으로 작성된 compiler가 TS 소스를 직접 컴파일
-- 최종 목표: 외부 npm(esbuild) devDependency 0
+### Tooling
 
-### Status
+- **Source**: `self/cgc-main.fl` (FreeLang compiler, 1521줄)
+- **Intermediate**: `gen1.c` (142KB, ~2874 lines)
+  - bootstrap.js 또는 이전 gen-bin에서 생성
+  - 순수 C 코드 (forward declarations + functions + main)
+- **Compiler**: GCC (또는 clang)
+  - 플래그: `-Wall -Wextra -I runtime`
+  - Output: ELF 64-bit executable
+- **Runtime modules** (8개, 총 ~50KB):
+  - `runtime/core.c` — FLValue 타입, 기본 함수
+  - `runtime/collection.c` — 배열/맵
+  - `runtime/io.c` — 파일 I/O
+  - `runtime/math.c` — 수학, `fl_get_argv()`
+  - `runtime/error.c` — 오류 처리
+  - `runtime/process.c` — 프로세스
+  - `runtime/json.c` — JSON
+  - `runtime/cgc-bridge.c` — compiler bridge
+- **Linker flags**: `-lm` (math library)
 
-- **Not in production build path.** Production은 esbuild 사용 (정식 결정 2026-05-21)
-- 진화 계획은 별도 SPEC.airc task / PLAN으로 등록 후 진행
-- 현재 stage1.js는 runtime helpers만 — 컴파일러 진화 작업 미착수
+### Build Chain
+
+```
+gen1.c (bootstrap.js로부터)
+  ↓ gcc + 8 runtime modules
+cgc-native1 (ELF 257KB)
+  ↓ cgc-native1 self/cgc-main.fl
+gen2.c
+  ↓ [identical to gen1.c ✅]
+cgc-native2 (ELF)
+  ↓ cgc-native2 self/cgc-main.fl
+gen3.c
+  ↓ [identical to gen2.c ✅]
+[Fixed-point verified]
+```
+
+### Scripts
+
+- **`scripts/build-cgc-native.sh`** — C → 네이티브 바이너리 자동 링크
+  ```bash
+  bash scripts/build-cgc-native.sh <input.c> <output-bin>
+  ```
+- **`scripts/verify-l4-fixpoint.sh`** — L4 고정점 검증
+  ```bash
+  bash scripts/verify-l4-fixpoint.sh
+  ```
+
+### Verification
+
+```
+SHA256 Identity Check:
+  gen1.c:  5c1edeafb7ae346f2347a9321b0bfe8dfef7ae0be91c5e049b6bcfcbb57f2f74
+  gen2.c:  5c1ede... ✅ (identical)
+  gen3.c:  5c1ede... ✅ (identical)
+
+PATH Restriction:
+  PATH=/usr/bin:/bin cgc-native1 self/cgc-main.fl → Success ✅
+```
+
+### Implications
+
+- **Zero Node.js dependency** (bootstrap.js 제외, 초기 gen1.c 1회만)
+- **Platform-independent** (gcc 표준, 모든 Unix/Linux)
+- **Deterministic** (same input = same output, bit-for-bit)
+- **Self-verifying** (fixed-point proof = compiler stability)
 
 ---
 
-## 4. History
+## 4. Future Path (L5+)
+
+**목표**: bootstrap.js 의존성 완전 제거
+
+### Options
+
+1. **gen1.c를 순수 C로 작성** (10,000줄+ 수동 작업)
+2. **Go/Rust/C++ 기존 컴파일러로 부트스트랩**
+3. **다른 언어(OCaml, Haskell)로 작성된 중간 컴파일러**
+
+### Timeline
+
+- L4 현재 상태: 2026-05-24 달성
+- E-0 (L4 정착): 2026-05-24 ~ 2026-06-07
+- L5 연구: 2026-06-08+
+
+---
+
+## 5. History (updated)
+
+---
+
+## 6. History
 
 | 시점 | 사건 |
 |------|------|
@@ -115,10 +193,11 @@ bootstrap.js가 실행될 때 사용하는 보조 컴포넌트들. **빌드 산�
 | `71a638ff` (Phase X-2) | "npm esbuild 제거" — `scripts/build.js`에서 esbuild 호출 삭제, dependency 5→4. 그러나 다른 빌드 스크립트(`build-runtime.sh`, `build-stage1-final.sh`)는 esbuild 유지 |
 | ~2026-04~05 | bootstrap.js 갱신은 외부 임시 스크립트(`/tmp/build-p18.js` 등)로만 가능한 hidden pipeline 상태 진입 |
 | `2026-05-21` | P1 build pipeline unification 결정 — esbuild 정식화, scripts/build.js 복원, BUILD-SYSTEM.md 신설 |
+| `2026-05-24` | **Phase D (L4 Native)**: gen1.c → cgc-native1 (ELF) → gen2.c (SHA identical). Native Build Path 공식화. Commit b83a5ba6 |
 
 ---
 
-## 5. Dependencies
+## 7. Dependencies
 
 `package.json` devDependencies:
 
@@ -133,7 +212,7 @@ bootstrap.js가 실행될 때 사용하는 보조 컴포넌트들. **빌드 산�
 
 ---
 
-## 6. Cross-references
+## 8. Cross-references
 
 - PLAN: `docs/PLAN-build-pipeline-unify.md`
 - SPEC: `SPEC.airc` `dec-010` (bootstrap SHA scope_out)
