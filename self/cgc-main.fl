@@ -907,10 +907,14 @@
         (str "fl_atom_reset(" $atom-c ", " $rhs ")")))))
 
 (defn cgc-dispatch-fallback [$op $args]
-  (let [[$cn (c-name $op)]]
-    (if (includes-item @known-fncall-targets-atom $cn)
-      (cgc-fncall $cn $args)
-      (str $cn "(" (cgc-args $args) ")"))))
+  (cond
+    [(= $op "first")  (str "fl_vec_first(" (cgc (get $args 0)) ")")]
+    [(= $op "rest")   (str "fl_vec_rest(" (cgc (get $args 0)) ")")]
+    [true
+     (let [[$cn (c-name $op)]]
+       (if (includes-item @known-fncall-targets-atom $cn)
+         (cgc-fncall $cn $args)
+         (str $cn "(" (cgc-args $args) ")")))]))
 
 ;; ── S19/S20: fn lambda → static FLClosure 추출 (capture 지원) ──
 
