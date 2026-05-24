@@ -259,58 +259,57 @@ SHA 5c1edeafb7ae346f2347a9321b0bfe8dfef7ae0be91c5e049b6bcfcbb57f2f74 (identical)
 
 ---
 
-## Phase 2: VSCode 확장 (1.5개월)
+## Phase 2: 성능 최적화 (1.5개월)
 
-### 2-1. 문법 강조 (2주)
+### 2-1. 분산 Task 시스템 (2주)
 
-**파일**: `/home/kimjin/freelang-v11/vscode/`
+**목표**: 컴파일 시간 3배 단축 (현재 실제 측정 필요)
 
-```json
-{
-  "name": "freelang",
-  "displayName": "FreeLang v11",
-  "version": "1.0.0",
-  "description": "FreeLang v11 syntax highlighting & linting"
-}
+**아키텍처**:
+```
+cgc-main.fl (1,528줄)
+  ├─ Lexer Task (192줄, ~10ms)
+  ├─ Parser Task (295줄, ~20ms)
+  ├─ Codegen Task (766줄, ~100ms) ← 병목
+  └─ Emit Task (275줄, ~30ms)
 ```
 
-**기능**:
-- 문법 강조 (keywords, strings, comments)
-- 괄호 매칭
-- 자동 들여쓰기
+**구현**:
+- `Task.fork()` — 독립적 프로세스 생성
+- `Task.join()` — 완료 대기
+- Work-stealing 큐
+
+**예상**: 순차 160ms → 병렬 50ms (3배 향상)
 
 ---
 
-### 2-2. Linter 통합 (2주)
+### 2-2. 비동기 병렬 실행 (2주)
 
-**기능**:
-- P0 + P1 린터 자동 실행
-- 실시간 오류 표시
-- 빠른 수정 (quick fix)
+**대상**:
+- HTTP 요청 응답 (병렬 처리)
+- DB 쿼리 배치 (파이프라인)
+- 파일 I/O (논블로킹)
 
-```typescript
-// vscode/src/linter.ts
-import { execSync } from 'child_process';
-
-export function lint(document: TextDocument) {
-  const result = execSync(`lint-p0-p1.py ${document.uri.fsPath}`);
-  const violations = parseViolations(result);
-  
-  violations.forEach(v => {
-    const range = new Range(v.line - 1, v.col - 1, v.line - 1, v.col + 10);
-    addDiagnostic(document.uri, range, v.message, v.severity);
-  });
-}
+**구현**:
+```lisp
+(defn handle-batch-queries [$queries]
+  (map-async $queries
+    (fn [$q] (db-query $q))))
 ```
 
 ---
 
-### 2-3. 디버거 (1주)
+### 2-3. 성능 측정 + 벤치마크 (1주)
 
-**기능**:
-- 중단점 설정
-- 변수 검사
-- 스택 추적
+**도구**:
+- `benchmark.sh` — compile, runtime, memory
+- `perf-report.md` — baseline vs 최적화
+
+**메트릭**:
+- Compile time (bootstrap → gen1.c)
+- Gen1 → cgc-native (gcc + link)
+- cgc-native self-recompile (cgc-main.fl)
+- Memory usage (MB)
 
 ---
 
