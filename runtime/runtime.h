@@ -112,6 +112,9 @@ FLValue fl_vec_get(FLValue vec, FLValue idx);
 FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val);
 FLValue fl_vec_push(FLValue vec, FLValue val);
 FLValue fl_vec_len(FLValue vec);
+FLValue fl_vec_first(FLValue vec);
+FLValue fl_vec_rest(FLValue vec);
+FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
 
 /* ── Map ── */
 FLValue fl_map_new(void);
@@ -186,6 +189,8 @@ FLValue fl_str_includes(FLValue s, FLValue sub);
 FLValue fl_string_p(FLValue v);
 FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
 FLValue fl_vec_last(FLValue vec);
+FLValue fl_vec_first(FLValue vec);
+FLValue fl_vec_rest(FLValue vec);
 FLValue fl_map_del(FLValue map, FLValue key);
 FLValue fl_map_merge(FLValue a, FLValue b);
 FLValue fl_concat(FLValue a, FLValue b);

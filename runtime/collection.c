@@ -261,6 +261,21 @@ FLValue fl_vec_last(FLValue vec) {
     return v->len > 0 ? v->data[v->len-1] : fl_nil();
 }
 
+FLValue fl_vec_first(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_nil();
+    FLVector* v = (FLVector*)vec.obj;
+    return v->len > 0 ? v->data[0] : fl_nil();
+}
+
+FLValue fl_vec_rest(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    if (v->len <= 1) return fl_vec_new();
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 1; i < v->len; i++) r = fl_vec_push(r, v->data[i]);
+    return r;
+}
+
 FLValue fl_map_del(FLValue map, FLValue key) {
     if (map.tag != FL_MAP) return map;
     FLMap* m = (FLMap*)map.obj;

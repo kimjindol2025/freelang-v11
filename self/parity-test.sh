@@ -8,6 +8,8 @@ FILES=(
   "examples/fib.fl"
   "examples/factorial.fl"
   "examples/nested-loop.fl"
+  "examples/closure.fl"
+  "examples/recur.fl"
 )
 
 echo "=== P2-Stage2: Semantic Parity Test (JS vs C) ==="
