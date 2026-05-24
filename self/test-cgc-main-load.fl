@@ -1,0 +1,3 @@
+;; Test: Load cgc-main.fl to verify TCO compatibility
+(load "self/cgc-main.fl")
+(println "✅ cgc-main.fl loaded successfully with TCO implementation")

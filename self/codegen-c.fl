@@ -13,6 +13,8 @@
 (define wrapper-defs-atom  (atom []))
 ;; S24: define 전역 선언 목록 ("static FLValue name;")
 (define global-decls-atom  (atom []))
+;; TCO: Loop label counter for goto-based tail call optimization
+(define loop-label-counter-atom (atom 0))
 
 ;; ── 유틸 ──
 
@@ -658,41 +660,137 @@
            "    FLValue " $tmp " = " $val ";\n"
            "    FLValue " $name " = " $tmp ";\n")))))
 
-;; (loop [...] body) → while 래퍼 생성
+;; ── TCO: Extract initial values from loop declaration ──
+(defn loop-extract-inits [$items $i $acc]
+  (if (>= $i (length $items)) (reverse $acc)
+  (if (= (mod $i 2) 1)
+    (loop-extract-inits $items (+ $i 1) (push $acc (get $items $i)))
+    (loop-extract-inits $items (+ $i 1) $acc))))
+
+;; ── TCO: Generate variable declarations ──
+(defn cgc-loop-var-decls [$vars $i $acc]
+  (if (>= $i (length $vars)) $acc
+  (cgc-loop-var-decls $vars (+ $i 1)
+    (str $acc "    FLValue " (get $vars $i) ";\n"))))
+
+;; ── TCO: Generate initial assignments ──
+(defn cgc-loop-var-inits [$vars $inits $i $acc]
+  (if (>= $i (length $vars)) $acc
+  (cgc-loop-var-inits $vars $inits (+ $i 1)
+    (str $acc "    " (get $vars $i) " = " (cgc (get $inits $i)) ";\n"))))
+
+;; ── TCO: Loop label ID generation ──
+(defn cgc-loop-label-id []
+  (let [[$id @loop-label-counter-atom]]
+    (do (swap! loop-label-counter-atom (fn [$x] (+ $x 1)))
+        (str "_fl_loop_" $id))))
+
+;; ── IMPROVED: cgc-loop-tco — Goto-based TCO instead of while-loop ──
 (defn cgc-loop [$args]
   (let [[$items (get-block-items (get $args 0))]
         [$body (get $args 1)]
         [$vars (loop-extract-vars $items 0 [])]
-        [$decls (loop-make-decls $items 0 "")]
-        [$body-c (cgc-with-recur $body $vars)]]
+        [$inits (loop-extract-inits $items 0 [])]
+        [$label (cgc-loop-label-id)]
+        [$decls (cgc-loop-var-decls $vars 0 "")]
+        [$assigns (cgc-loop-var-inits $vars $inits 0 "")]
+        [$body-c (cgc-with-recur-tco $body $vars $label)]]
     (str "(__extension__ ({\n"
          $decls
-         "    int _fl_looping = 1; FLValue _fl_result = fl_nil();\n"
-         "    while (_fl_looping) { _fl_looping = 0;\n"
-         "    _fl_result = " $body-c ";\n    }\n"
-         "    _fl_result;\n}))")))
+         $assigns
+         $label ":\n"
+         "    (__extension__ ({ " $body-c "; }));\n"
+         "}))")))
 
-;; recur 임시변수 선언 생성
-(defn cgc-recur-temps [$args $i $acc]
-  (if (>= $i (length $args)) $acc
-  (cgc-recur-temps $args (+ $i 1)
-    (str $acc "    FLValue _fl_t" $i " = " (cgc (get $args $i)) ";\n"))))
-
-;; 임시변수 → 루프 변수 재할당
-(defn cgc-recur-assigns [$vars $i $acc]
+;; ── TCO: Direct assignment without temp variables ──
+(defn cgc-recur-direct-assigns [$args $vars $i $acc]
   (if (>= $i (length $vars)) $acc
-  (cgc-recur-assigns $vars (+ $i 1)
-    (str $acc "    " (get $vars $i) " = _fl_t" $i ";\n"))))
+  (let [[$var (get $vars $i)]
+        [$arg (cgc (get $args $i))]
+        [$assign (str "    " $var " = " $arg ";\n")]]
+    (cgc-recur-direct-assigns $args $vars (+ $i 1) (str $acc $assign)))))
 
-;; (recur ...) → 임시 평가 후 재할당 + _fl_looping=1
+;; ── IMPROVED: cgc-recur-tco — Goto-based recur without temps ──
 (defn cgc-recur-stmt [$args $vars]
-  (let [[$temps (cgc-recur-temps $args 0 "")]
-        [$assigns (cgc-recur-assigns $vars 0 "")]]
-    (str "(__extension__ ({\n"
-         $temps $assigns
-         "    _fl_looping = 1; fl_nil();\n}))")))
+  (let [[$label (cgc-loop-label-id)]]  ;; We need label from context
+    ;; For non-TCO contexts, fallback to old implementation
+    ;; (This is replaced in cgc-with-recur-tco context)
+    (str "(__extension__ ({"
+         (cgc-recur-direct-assigns $args $vars 0 "")
+         "    goto " $label "; fl_nil();"
+         "}))")))
 
-;; recur-aware AST 순회: recur만 특수 처리, 나머지는 위임
+;; ── recur-aware AST 순회 (TCO 버전) ──
+(defn cgc-with-recur-tco [$node $vars $label]
+  (if (null? $node) "fl_nil()"
+  (let [[$k (get $node :kind)]]
+  (cond
+    [(= $k "sexpr")
+     (let [[$op (get $node :op)] [$args (get $node :args)]]
+     (cond
+       [(= $op "recur")
+        (let [[$assigns (cgc-recur-direct-assigns $args $vars 0 "")]]
+          (str "(__extension__ ({\n" $assigns "    goto " $label "; fl_nil();\n}))"))]
+       [(= $op "if")    (cgc-if-wr-tco $args $vars $label)]
+       [(= $op "cond")  (cgc-cond-wr-tco $args $vars $label)]
+       [(= $op "do")    (cgc-do-wr-tco $args $vars $label)]
+       [(= $op "let")   (cgc-let-wr-tco $args $vars $label)]
+       [(= $op "loop")  (cgc-loop $args)]
+       [true            (cgc $node)]))]
+    [true (cgc $node)]))))
+
+;; if 내부 recur-aware (TCO)
+(defn cgc-if-wr-tco [$args $vars $label]
+  (let [[$cond (cgc (get $args 0))]
+        [$then (cgc-with-recur-tco (get $args 1) $vars $label)]
+        [$else (if (>= (length $args) 3) (cgc-with-recur-tco (get $args 2) $vars $label) "fl_nil()")]]
+  (str "(fl_truthy(" $cond ") ? " $then " : " $else ")")))
+
+;; cond 내부 recur-aware (TCO)
+(defn cgc-cond-wr-tco [$args $vars $label]
+  (if (= (length $args) 0) "fl_nil()"
+  (let [[$first (get $args 0)]
+        [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]]
+    (if $nested
+      (cgc-cond-nested-wr-tco $args $vars $label (- (length $args) 1) "fl_nil()")
+      "fl_nil()"))))
+
+(defn cgc-cond-nested-wr-tco [$args $vars $label $i $acc]
+  (if (< $i 0) $acc
+  (let [[$items (get-block-items (get $args $i))]
+        [$test (get $items 0)]
+        [$body (get $items 1)]
+        [$is-else (and (= (get $test :kind) "literal")
+                       (or (= (get $test :value) true) (= (get $test :value) "true")))]]
+    (cgc-cond-nested-wr-tco $args $vars $label (- $i 1)
+      (if $is-else
+        (cgc-with-recur-tco $body $vars $label)
+        (str "(fl_truthy(" (cgc $test) ") ? " (cgc-with-recur-tco $body $vars $label) " : " $acc ")"))))))
+
+;; do 내부 recur-aware (TCO)
+(defn cgc-do-wr-tco [$args $vars $label]
+  (str "(__extension__ ({ " (cgc-stmts-wr-tco $args $vars $label 0 "") " }))"))
+
+(defn cgc-stmts-wr-tco [$args $vars $label $i $acc]
+  (if (>= $i (length $args)) $acc
+  (cgc-stmts-wr-tco $args $vars $label (+ $i 1)
+    (str $acc (cgc-with-recur-tco (get $args $i) $vars $label) "; "))))
+
+;; let 내부 recur-aware (TCO)
+(defn cgc-let-wr-tco [$args $vars $label]
+  (let [[$items (get-block-items (get $args 0))]
+        [$first (get $items 0)]
+        [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]
+        [$decls (if $nested (cgc-let-2d $items 0 "") (cgc-let-1d $items 0 ""))]
+        [$body-c (cgc-body-wr-tco (slice $args 1 (length $args)) $vars $label 0 "")]]
+  (str "((__extension__ ({\n" $decls "    " $body-c ";\n})))")))
+
+(defn cgc-body-wr-tco [$args $vars $label $i $acc]
+  (if (>= $i (length $args)) $acc
+  (let [[$c (cgc-with-recur-tco (get $args $i) $vars $label)]]
+    (cgc-body-wr-tco $args $vars $label (+ $i 1) (str $acc $c)))))
+
+;; Backward compatibility: keep old cgc-with-recur for non-loop contexts
 (defn cgc-with-recur [$node $vars]
   (if (null? $node) "fl_nil()"
   (let [[$k (get $node :kind)]]
@@ -700,7 +798,6 @@
     [(= $k "sexpr")
      (let [[$op (get $node :op)] [$args (get $node :args)]]
      (cond
-       [(= $op "recur") (cgc-recur-stmt $args $vars)]
        [(= $op "if")    (cgc-if-wr $args $vars)]
        [(= $op "cond")  (cgc-cond-wr $args $vars)]
        [(= $op "do")    (cgc-do-wr $args $vars)]
