@@ -252,5 +252,4 @@ loop_start:
 
 ---
 
-**다음**: HOF-GAP.md (고차 함수 호환성)
-
+**다음**: [HOF-GAP.md](./HOF-GAP.md) (고차 함수 호환성)

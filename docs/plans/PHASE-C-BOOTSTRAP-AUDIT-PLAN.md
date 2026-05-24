@@ -2,7 +2,7 @@
 
 **목표**: TS 의존성을 정확히 지도화하고 제거 순서 결정  
 **범위**: bootstrap.ts, bootstrap.js, cli.ts, build.ts, scripts/, cgc-main.fl  
-**결과물**: bootstrap-audit.md (의존성 매트릭스)
+**결과물**: [../audits/bootstrap-audit.md](../audits/bootstrap-audit.md) (의존성 매트릭스)
 
 ---
 
@@ -178,7 +178,7 @@ Risk:          <제거 시 위험도>
 
 ### Phase C-3: 매트릭스 작성 (1시간)
 ```
-분석 결과를 bootstrap-audit.md로 작성
+분석 결과를 ../audits/bootstrap-audit.md로 작성
 
 포맷:
 Module | Role | Category | Candidate | Priority
@@ -242,7 +242,7 @@ ELF (native)
 
 - [ ] 모든 모듈 분류 완료
 - [ ] 의존성 그래프 작성
-- [ ] bootstrap-audit.md 작성
+- [ ] ../audits/bootstrap-audit.md 작성
 - [ ] 제거 순서 확정
 - [ ] Phase D 진입 가능
 
@@ -285,12 +285,12 @@ C-4: 순서 결정        30분
 ## 커밋 계획
 
 ### 이번 세션
-- [ ] PHASE-C-BOOTSTRAP-AUDIT-PLAN.md 작성
+- [ ] docs/plans/PHASE-C-BOOTSTRAP-AUDIT-PLAN.md 작성
 - [ ] Gogs 커밋
 
 ### 다음 세션
 - [ ] Phase C 실행
-- [ ] bootstrap-audit.md 생성
+- [ ] docs/audits/bootstrap-audit.md 생성
 - [ ] Phase D 진입
 
 ---

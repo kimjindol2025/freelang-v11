@@ -94,15 +94,23 @@
 - FreeLang 컴파일러 아키텍처
 - 파서, 코드생성, 인터프리터 구조
 
+### 12. [audits/](./audits/)
+- 컴파일러 감사, 갭 분석, 검증 결과
+- Bootstrap 의존성 감사
+
+### 13. [plans/](./plans/)
+- 단계별 실행 계획
+- Native compiler 전환 계획
+
 ---
 
 ## 📖 예제 & 튜토리얼
 
-### 12. [guide/](./guide/)
+### 14. [guide/](./guide/)
 - 초급자 튜토리얼
 - 단계별 학습
 
-### 13. [examples/patterns/](../examples/patterns/) ⭐⭐ 실무 패턴 10개
+### 15. [examples/patterns/](../examples/patterns/) ⭐⭐ 실무 패턴 10개
 **AI/개발자가 반드시 봐야 할 실무 예제**:
 
 1. **01-map-filter-reduce.fl** — 고차 함수 마스터
@@ -125,7 +133,7 @@
 
 각 파일은 2-3KB, 주석 포함, 그대로 실행 가능.
 
-### 14. [examples/](../examples/)
+### 16. [examples/](../examples/)
 - 초보자 예제 (hello.fl, factorial.fl)
 - 브라우저 테스트
 
