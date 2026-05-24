@@ -69,23 +69,68 @@ SHA 5c1edeafb7ae346f2347a9321b0bfe8dfef7ae0be91c5e049b6bcfcbb57f2f74 (identical)
 
 ---
 
-## Phase E-0: L4 Stabilization (2026-05-24~06-07) 🟡 CURRENT
-
+## Phase E-0: L4 Stabilization (2026-05-24) ✅ COMPLETE
 **목표**: L4 네이티브 자가호스팅을 문서에 고정, 검증 자동화
 
-**E-0-1**: 문서 정정 (README/ROADMAP/STATE_OF_V11) ✅
-- README.md L4 업데이트
-- STATE_OF_V11.md L4 완료 표시
-- ROADMAP.md Phase D/E-0 추가
+**E-0-1**: 문서 정정 ✅
+- README.md, STATE_OF_V11.md, ROADMAP.md L4 업데이트
 
-**E-0-2**: BUILD-SYSTEM.md에 Native Build Path 추가 (진행중)
+**E-0-2**: BUILD-SYSTEM.md Native Build Path 추가 ✅
 
-**E-0-3**: 링크 프로파일 문서화 (진행중)
-- LINK-PROFILES.md: 컴파일러 vs 일반 프로그램 링크 분리
+**E-0-3**: LINK-PROFILES.md 링크 프로파일 공식화 ✅
+- Compiler Profile (cgc-bridge.c 포함)
+- General Profile (cgc-bridge.c 제외)
 
-**E-0-4**: verify-l4-fixpoint.sh에 PATH 제한 자동화 (진행중)
+**E-0-4**: verify-l4-fixpoint.sh PATH 제한 자동화 ✅
 
-**E-0-5**: L4 완료 블로그 + PHASE-D-COMPLETION-REPORT.md (대기중)
+**E-0-5**: L4 완료 블로그 + 보고서 ✅
+
+**신뢰도**: 9.5/10 (L4 공식화 완료)
+
+---
+
+## Phase L5: TypeScript 완전 제거 연구 (2026-05-24) ✅ RESEARCH COMPLETE
+
+**목표**: bootstrap.js(44,988줄 TS) 의존성 제거 가능성 검증
+
+**L5 연구 결과**:
+
+### Key Findings
+
+| 항목 | 결과 |
+|------|------|
+| **stage1.js 역할** | ❌ Runtime Helper (arithmetic, type-check) — Compiler 아님 |
+| **bootstrap.js 필수성** | ✅ cgc-main.fl 해석 → gen1.c 생성에 필수 |
+| **cgc-main.fl 복잡도** | 8/10 (lexer 192줄 + parser 295줄 + **codegen 766줄**) |
+| **fixed-point 달성** | ✅ gen1.c == gen2.c == gen3.c (SHA 5c1ede...) |
+
+### L5 옵션 분석
+
+| 옵션 | 난이도 | 비용 | 이점 | 평가 |
+|------|--------|------|------|------|
+| **A: gen1.c 순수 C** | 매우높음 | 4-8주 | TS 제거 (상징적) | ⭐ 유지보수 불가능 |
+| **B: Go/Rust/C++ 재작성** | 높음 | 3-6주 | 의존성 교체 | ⭐⭐ 본질 미해결 |
+| **C: stage1.js 최적화** | 중간 | 2-4주 | stage1.js = compiler 아님 | ⭐⭐ 불가능 |
+| **D: L4 유지** | 없음 | 0 | 프로덕션 안정성 유지 | ⭐⭐⭐⭐ 권장 |
+
+### 권장 결정: L4 유지 (Option D) ✅
+
+**근거**:
+1. stage1.js는 runtime helper — gen1.c 생성 불가능
+2. bootstrap.js는 1회만 필요 (초기 gen1.c 생성)
+3. 배포/개발/프로덕션 모두 차단되지 않음
+4. L5 비용(2-4주) > 이점(상징적 TS 제거)
+
+**분류**: bootstrap.js를 "수용 가능한 기술 부채"로 재분류
+
+### 문서
+- `docs/L5-RESEARCH.md`: 완전 분석 (220줄)
+- Cost-Benefit 분석 포함
+- L5 추적 가능 시 조건 명시
+
+---
+
+## Phase 1: 테스트 프레임워크 (1개월) — 권장 우선순위 1
 
 ---
 
