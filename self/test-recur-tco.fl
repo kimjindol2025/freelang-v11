@@ -61,7 +61,7 @@
       [true (recur (+ $i 2))])))
 
 (defn even? [$x]
-  (= (mod $x 2) 0))
+  (= (% $x 2) 0))
 
 (defn test-pattern-5 []
   (let [[$result (classify 0)]]
