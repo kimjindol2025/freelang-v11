@@ -134,74 +134,128 @@ SHA 5c1edeafb7ae346f2347a9321b0bfe8dfef7ae0be91c5e049b6bcfcbb57f2f74 (identical)
 
 ---
 
-## Phase 1: 테스트 프레임워크 (1개월)
+## Phase 1: 테스트 프레임워크 (1.5개월)
 
-### 1-1. 단위 테스트 (2주)
+### Phase 1A: 아키텍처 설계 (2026-05-24) ✅ COMPLETE
 
-**목표**: 모든 stdlib 함수에 테스트
+**목표**: 테스트 체계화 설계 확정 후 구현 단계별 준비
 
-```lisp
-;; test/stdlib/string-test.fl
-(defn test-string-concat []
-  (assert (= (str "a" "b") "ab") "문자열 연결")
-  (assert (= (str 1 2 3) "123") "숫자 변환")
-  (assert (= (str `hello=${:world}) "hello=world") "보간"))
+**1A-1**: 설계 문서 작성 ✅
+- `docs/TEST-FRAMEWORK-DESIGN.md` (500줄)
+  - 5계층 테스트 정의 (L0~L4)
+  - 디렉토리 구조 통합 (test/ → tests/, 분산 해소)
+  - 단일 진입점 `test.sh` 설계
 
-;; 자동 실행
-make test-stdlib
-```
+**1A-2**: 단일 진입점 구현 ✅
+- `test.sh` (80줄, 스켈레톤)
+  - `./test.sh [static|unit|integration|e2e|fixpoint|--fast]`
+  - L0 정적 검증 즉시 실행 가능
 
-**파일**: `/home/kimjin/freelang-v11/test/`
-- `stdlib/string-test.fl` (50줄)
-- `stdlib/array-test.fl` (50줄)
-- `stdlib/map-test.fl` (50줄)
-- `stdlib/db-test.fl` (100줄 - 통합 테스트)
+**1A-3**: 테스트 러너 구조 ✅
+- `tests/runners/run-unit.sh` (30줄, 스켈레톤)
+- `tests/runners/run-integration.sh` (다음 구현)
+- `tests/runners/run-e2e.sh` (다음 구현)
 
-**수량**: 250+ 테스트 케이스
+**1A-4**: Golden Test 정책 ✅
+- `tests/golden/README.md` — golden 기준 파일 관리 정책
+- 기준 파일 스켈레톤 생성 (Phase 1B에서 추가)
 
----
-
-### 1-2. 통합 테스트 (1주)
-
-**목표**: 실제 서비스 패턴 검증
-
-```lisp
-;; test/integration/server-test.fl
-(defn test-http-server []
-  ;; 서버 시작
-  (define server (server-start 9999))
-  
-  ;; 핸들러 등록
-  (server-on-get "/api/users" handler)
-  
-  ;; HTTP 요청
-  (let [[$resp (http-get "http://localhost:9999/api/users")]]
-    (assert (= (json-parse $resp :status) 200)))
-  
-  ;; 종료
-  (server-close server))
-```
-
-**파일**:
-- `test/integration/http-server-test.fl`
-- `test/integration/db-test.fl`
-- `test/integration/auth-test.fl`
+**신뢰도**: 10/10 (설계 확정, 구현 준비 완료)
 
 ---
 
-### 1-3. E2E 테스트 (1주)
+### Phase 1B: Unit Framework 구현 (2~3주)
 
-**목표**: 실제 앱 전체 흐름 검증
+**목표**: L1 단위 테스트 프레임워크 자동화
 
-```bash
-# test/e2e/dispatch-app-test.sh
-# 1. dispatch-app 빌드
-# 2. 3개 포탈 기능 테스트
-# 3. 50개 API 엔드포인트 검증
-# 4. 성능 벤치마크 (응답 <100ms)
-```
+**1B-1**: FL-native Assert 라이브러리
+- `assert-eq`, `assert-true` 기본 함수 (tests/lib/assert.fl)
 
-**결과**: 자동화된 회귀 테스트
+**1B-2**: stdlib 단위 테스트
+- `tests/unit/stdlib/string.test.fl` (50줄)
+- `tests/unit/stdlib/array.test.fl` (50줄)
+- `tests/unit/stdlib/map.test.fl` (50줄)
+- `tests/unit/stdlib/math.test.fl` (50줄)
+- 총 250+ 테스트 케이스
+
+**1B-3**: Codegen Golden Test
+- `tests/unit/codegen/emit-let.test.fl`
+- `tests/unit/codegen/emit-fn.test.fl`
+- `tests/unit/codegen/emit-recur.test.fl`
+- `tests/unit/codegen/emit-closure.test.fl`
+- `tests/unit/codegen/emit-hof.test.fl`
+- `tests/golden/*.expected.c` 기준 파일
+
+**1B-4**: L1 러너 자동화
+- `run-unit.sh` 완성
+- `./test.sh unit --verbose` 실행 가능
+
+---
+
+### Phase 1C: Integration Suite (1~2주)
+
+**목표**: L2 통합 테스트 (HTTP, DB, auth)
+
+**1C-1**: HTTP 서버 테스트
+- `tests/integration/http-server.test.fl`
+  - server-start, route 핸들링, 응답 검증
+
+**1C-2**: DB 쿼리 테스트
+- `tests/integration/db-query.test.fl`
+  - SELECT, INSERT, UPDATE, DELETE, 트랜잭션
+
+**1C-3**: Auth 테스트
+- `tests/integration/auth.test.fl`
+  - JWT 생성/검증, CSRF 토큰
+
+**1C-4**: L2 러너 자동화
+- `run-integration.sh` 완성
+- `./test.sh integration` 실행 가능
+
+---
+
+### Phase 1D: E2E + Golden Suite (1주)
+
+**목표**: L3 E2E 파이프라인 + Golden 자동화
+
+**1D-1**: E2E 컴파일 테스트
+- `tests/e2e/compile-hello.sh` — 기본 산술
+- `tests/e2e/compile-recur.sh` — TCO
+- `tests/e2e/compile-closure.sh` — 클로저
+- `tests/e2e/compile-hof.sh` — map/filter/reduce
+- `tests/e2e/compile-self.sh` — cgc-main.fl 자가호스팅
+
+**1D-2**: Golden 기준 파일
+- `tests/golden/hello.expected.c`
+- `tests/golden/recur.expected.c`
+- `tests/golden/closure.expected.c`
+- `tests/golden/hof.expected.c`
+- `tests/golden/self.expected.c`
+
+**1D-3**: L3 러너 자동화
+- `run-e2e.sh` 완성
+- `./test.sh e2e` 실행 가능
+
+---
+
+### Phase 1E: CI 통합 (1주)
+
+**목표**: CI 게이트 완성 + 자동 회귀 검출
+
+**1E-1**: verify.sh 통합
+- `scripts/verify.sh` — 단일 CI 게이트
+  - Step 1: `./test.sh static` (~5초)
+  - Step 2: `./test.sh unit` (~30초)
+  - Step 3: `./test.sh e2e` (~30초)
+  - Step 4: `./test.sh fixpoint` (~60초)
+  - **총 3분**
+
+**1E-2**: Makefile 통합
+- `make verify` → `scripts/verify.sh` 호출 (기존 호환성 유지)
+
+**1E-3**: GitHub Actions 또는 CI/CD
+- 모든 커밋 시 `./test.sh --fast` 실행
+- PR 병합 전 `scripts/verify.sh` 실행
 
 ---
 
