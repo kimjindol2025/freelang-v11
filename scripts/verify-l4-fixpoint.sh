@@ -31,8 +31,8 @@ SHA1=$(sha256sum /tmp/verify-gen1.c | cut -d' ' -f1)
 echo "Bootstrap gen1.c: SHA=$SHA1"
 
 echo ""
-echo "── Step 2: Native compile gen1 → gen2 ──"
-(cd "$REPO_ROOT" && /tmp/gen1-bin self/cgc-main.fl /tmp/verify-gen2.c)
+echo "── Step 2: Native compile gen1 → gen2 (PATH=/usr/bin:/bin) ──"
+(cd "$REPO_ROOT" && env -i PATH=/usr/bin:/bin /tmp/gen1-bin self/cgc-main.fl /tmp/verify-gen2.c)
 SHA2=$(sha256sum /tmp/verify-gen2.c | cut -d' ' -f1)
 echo "Native gen2.c: SHA=$SHA2"
 
@@ -42,8 +42,8 @@ bash "$SCRIPT_DIR/build-cgc-native.sh" /tmp/verify-gen2.c /tmp/verify-gen2-bin >
 echo "✅ gen2-bin created ($(stat --format=%s /tmp/verify-gen2-bin) bytes)"
 
 echo ""
-echo "── Step 4: Native compile gen2 → gen3 ──"
-(cd "$REPO_ROOT" && /tmp/verify-gen2-bin self/cgc-main.fl /tmp/verify-gen3.c)
+echo "── Step 4: Native compile gen2 → gen3 (PATH=/usr/bin:/bin) ──"
+(cd "$REPO_ROOT" && env -i PATH=/usr/bin:/bin /tmp/verify-gen2-bin self/cgc-main.fl /tmp/verify-gen3.c)
 SHA3=$(sha256sum /tmp/verify-gen3.c | cut -d' ' -f1)
 echo "Native gen3.c: SHA=$SHA3"
 
