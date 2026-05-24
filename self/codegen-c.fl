@@ -147,9 +147,19 @@
 
 (defn cgc-sexpr [$n]
   (let [[$op (get $n :op)] [$args (get $n :args)]]
-  (if (string? $op)
-    (cgc-dispatch $op $args)
-    (cgc-fncall (cgc $op) $args))))
+  (cond
+    [(null? $op)
+     ;; dynamic call: ((fn ...) arg1 arg2) — args[0] = fn, args[1..] = arguments
+     (if (> (length $args) 0)
+       (let [[$op-node (get $args 0)]
+             [$fn-c (cgc $op-node)]
+             [$rest-args (slice $args 1 (length $args))]]
+         (cgc-fncall $fn-c $rest-args))
+       "fl_nil()")]
+    [(string? $op)
+     (cgc-dispatch $op $args)]
+    [true
+     (cgc-fncall (cgc $op) $args)])))
 
 (defn cgc-dispatch [$op $args]
   (cond
@@ -304,11 +314,16 @@
     (push $acc (c-name (cgc-extract-name (get $items $i)))))))
 
 ;; body AST에서 variable 이름 수집 (중복 제거)
+;; NOTE: parser가 unprefixed symbol을 "literal"(type="symbol")로 파싱하므로,
+;; symbol literal도 변수로 취급. keyword/number/string은 제외.
 (defn cgc-collect-vars [$node $acc]
   (cond
     [(null? $node) $acc]
     [(= (get $node :kind) "variable")
      (let [[$n (c-name (get $node :name))]]
+       (if (includes-item $acc $n) $acc (push $acc $n)))]
+    [(and (= (get $node :kind) "literal") (= (get $node :type) "symbol"))
+     (let [[$n (c-name (get $node :value))]]
        (if (includes-item $acc $n) $acc (push $acc $n)))]
     [(= (get $node :kind) "sexpr")
      (cgc-collect-vars-loop (get $node :args) 0 $acc)]
@@ -436,7 +451,16 @@
 ;; ── do ──
 
 (defn cgc-do [$args]
-  (str "(__extension__ ({ " (cgc-stmts $args 0 "") " }))"))
+  ;; workaround: parser 내장 버전이 ((fn ...) 3 4)를 (do (fn ...) 3 4)로 파싱.
+  ;; args[0].kind="sexpr" + args.length>1 → dynamic call로 처리.
+  (if (and (> (length $args) 1) (= (get (get $args 0) :kind) "sexpr"))
+    ;; dynamic call: (do (fn ...) arg1 arg2)
+    (let [[$op-node (get $args 0)]
+          [$fn-c (cgc $op-node)]
+          [$rest-args (slice $args 1 (length $args))]]
+      (cgc-fncall $fn-c $rest-args))
+    ;; normal do: sequence statements
+    (str "(__extension__ ({ " (cgc-stmts $args 0 "") " }))")))
 
 ;; ── let ──
 
