@@ -11,7 +11,7 @@
 | **보안** | 100% | v11.5.3 완성 (CSRF, XSS, 쿠키) |
 | **성능** | 95% | 분산 Task, 비동기 병렬 실행 |
 | **린터** | 66% | P0 (5/5) + P1 (4/6) |
-| **테스트** | 65% | L0 (static) + L1 (unit) 구현 완료 |
+| **테스트** | 85% | L0 (static) + L1 (unit) + L3 (e2e) + L4 (fixpoint) 완료 |
 | **문서** | 50% | 레퍼런스만 있음 |
 | **IDE** | 0% | VSCode 확장 없음 |
 | **CI/CD** | 30% | pre-commit 훅만 |
@@ -205,6 +205,43 @@ Unit: 4 passed, 0 failed ✓
 ```
 
 **신뢰도**: 9/10 (stdlib 기본만 커버, codegen golden은 Phase 1D로 연기)
+
+---
+
+### Phase 1D: E2E + Golden Suite (2026-05-24) ✅ COMPLETE
+
+**목표**: L3 E2E 파이프라인 + Golden 기준 파일 + L4 Fixed-point 검증
+
+**D1-D4**: Golden 기준 파일 생성 ✅
+- hello.fl → hello.expected.c (기본 산술)
+- loop.fl → loop.expected.c (reduce + range)
+- fib.fl → fib.expected.c (Recur TCO)
+- factorial.fl → factorial.expected.c (단순 재귀)
+
+**E2E Runner**: run-e2e.sh 완성 ✅
+- 4개 테스트 파일 순차 실행
+- Golden 파일과 deterministic 비교
+- `./test.sh e2e` → 4/4 PASS
+
+**D6-D7**: Fixed-point 검증 ✅
+```
+gen1.c (bootstrap) == gen2.c (gen1-bin) == gen3.c (gen2-bin)
+SHA256: 5c1edeafb7ae346f2347a9321b0bfe8dfef7ae0be91c5e049b6bcfcbb57f2f74 (일치)
+```
+- gen1.c → gcc → cgc-native1
+- cgc-native1로 cgc-main.fl 재컴파일 → gen2.c
+- gen2.c → gcc → cgc-native2
+- cgc-native2로 cgc-main.fl 재컴파일 → gen3.c
+- SHA256 비교 (완전 일치)
+
+**신뢰도**: 9.5/10 (E2E 완성, fixed-point 달성)
+
+**검증**:
+```bash
+$ ./test.sh unit → 4/4 PASS
+$ ./test.sh e2e → 4/4 PASS
+$ ./test.sh fixpoint → PASS (SHA256 일치)
+```
 
 ---
 
