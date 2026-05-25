@@ -266,8 +266,8 @@
   [(= $op "cli-args")              "fl_get_argv()"]
   [(= $op "bit-xor")               (str "fl_int(" (cgc (get $args 0)) ".i ^ " (cgc (get $args 1)) ".i)")]
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
-  [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
-  [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
+  [(= $op "json-parse")      (str "fl_json_parse(" (cgc (get $args 0)) ")")]
+  [(= $op "json-stringify")  (str "fl_json_stringify(" (cgc (get $args 0)) ")")]
   ;; S19: fn lambda → static FLClosure 추출
   [(= $op "fn")      (cgc-fn $args)]
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
