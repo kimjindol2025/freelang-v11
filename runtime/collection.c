@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 /* ── Vector ── */
 
@@ -294,5 +295,110 @@ FLValue fl_map_merge(FLValue a, FLValue b) {
     for (uint32_t i = 0; i < mb->len; i++)
         r = fl_map_set(r, mb->entries[i].key, mb->entries[i].val);
     return r;
+}
+
+/* ── N-07: 문자열 함수 ── */
+
+static const char* _s(FLValue v) {
+    return (v.tag == FL_STRING && v.obj) ? ((FLString*)v.obj)->data : "";
+}
+
+FLValue str_split(FLValue s, FLValue sep) {
+    const char* src = _s(s);
+    const char* delim = _s(sep);
+    size_t dlen = strlen(delim);
+    FLValue vec = fl_vec_new();
+    if (dlen == 0) { vec = fl_vec_push(vec, s); return vec; }
+    const char* p = src;
+    const char* found;
+    while ((found = strstr(p, delim)) != NULL) {
+        size_t chunk = (size_t)(found - p);
+        char* buf = malloc(chunk + 1);
+        memcpy(buf, p, chunk); buf[chunk] = '\0';
+        vec = fl_vec_push(vec, fl_str_val(buf)); free(buf);
+        p = found + dlen;
+    }
+    vec = fl_vec_push(vec, fl_str_val(p));
+    return vec;
+}
+
+FLValue str_to_upper(FLValue s) {
+    const char* src = _s(s);
+    size_t len = strlen(src);
+    char* buf = malloc(len + 1);
+    for (size_t i = 0; i <= len; i++) buf[i] = (char)toupper((unsigned char)src[i]);
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+FLValue str_to_lower(FLValue s) {
+    const char* src = _s(s);
+    size_t len = strlen(src);
+    char* buf = malloc(len + 1);
+    for (size_t i = 0; i <= len; i++) buf[i] = (char)tolower((unsigned char)src[i]);
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+FLValue str_trim(FLValue s) {
+    const char* src = _s(s);
+    while (*src && isspace((unsigned char)*src)) src++;
+    size_t len = strlen(src);
+    while (len > 0 && isspace((unsigned char)src[len-1])) len--;
+    char* buf = malloc(len + 1);
+    memcpy(buf, src, len); buf[len] = '\0';
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+FLValue str_pad_left(FLValue s, FLValue width, FLValue ch) {
+    const char* src = _s(s);
+    const char* pad = _s(ch);
+    size_t src_len = strlen(src);
+    int64_t w = (width.tag == FL_INT) ? width.i : (int64_t)width.f;
+    if ((int64_t)src_len >= w) return s;
+    size_t pad_n = (size_t)(w - (int64_t)src_len);
+    size_t pad_ch_len = strlen(pad) > 0 ? strlen(pad) : 1;
+    char* buf = malloc((size_t)w + 1);
+    for (size_t i = 0; i < pad_n; i++) buf[i] = pad[i % pad_ch_len];
+    memcpy(buf + pad_n, src, src_len); buf[w] = '\0';
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+FLValue str_pad_right(FLValue s, FLValue width, FLValue ch) {
+    const char* src = _s(s);
+    const char* pad = _s(ch);
+    size_t src_len = strlen(src);
+    int64_t w = (width.tag == FL_INT) ? width.i : (int64_t)width.f;
+    if ((int64_t)src_len >= w) return s;
+    size_t pad_n = (size_t)(w - (int64_t)src_len);
+    size_t pad_ch_len = strlen(pad) > 0 ? strlen(pad) : 1;
+    char* buf = malloc((size_t)w + 1);
+    memcpy(buf, src, src_len);
+    for (size_t i = 0; i < pad_n; i++) buf[src_len + i] = pad[i % pad_ch_len];
+    buf[w] = '\0';
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+FLValue str_repeat(FLValue s, FLValue n) {
+    const char* src = _s(s);
+    size_t slen = strlen(src);
+    int64_t cnt = (n.tag == FL_INT) ? n.i : (int64_t)n.f;
+    if (cnt <= 0) return fl_str_val("");
+    char* buf = malloc(slen * (size_t)cnt + 1);
+    for (int64_t i = 0; i < cnt; i++) memcpy(buf + slen * (size_t)i, src, slen);
+    buf[slen * (size_t)cnt] = '\0';
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+FLValue uuid(void) {
+    unsigned char b[16];
+    FILE* f = fopen("/dev/urandom", "rb");
+    if (f) { (void)fread(b, 1, 16, f); fclose(f); }
+    b[6] = (b[6] & 0x0f) | 0x40; /* version 4 */
+    b[8] = (b[8] & 0x3f) | 0x80; /* variant */
+    char buf[37];
+    snprintf(buf, sizeof(buf),
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        b[0],b[1],b[2],b[3],b[4],b[5],b[6],b[7],
+        b[8],b[9],b[10],b[11],b[12],b[13],b[14],b[15]);
+    return fl_str_val(buf);
 }
 

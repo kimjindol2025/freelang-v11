@@ -242,6 +242,16 @@ FLValue _fl_env_set(FLValue key, FLValue val);
 FLValue _fl_env_all(void);
 FLValue str_join(FLValue sep, FLValue vec);
 
+/* ── N-07: 문자열 함수 ── */
+FLValue str_split(FLValue s, FLValue sep);
+FLValue str_to_upper(FLValue s);
+FLValue str_to_lower(FLValue s);
+FLValue str_trim(FLValue s);
+FLValue str_pad_left(FLValue s, FLValue width, FLValue ch);
+FLValue str_pad_right(FLValue s, FLValue width, FLValue ch);
+FLValue str_repeat(FLValue s, FLValue n);
+FLValue uuid(void);
+
 /* ── 암호화 (crypto.c) ── */
 FLValue fl_jwt_sign(FLValue payload_map, FLValue secret, FLValue exp_sec);
 FLValue fl_jwt_verify(FLValue token, FLValue secret);
