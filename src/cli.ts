@@ -17,7 +17,6 @@ import { parse, ParserError } from "./parser";
 import { interpret, Interpreter } from "./interpreter";
 import { Block } from "./ast";
 import { JSCodegen } from "./codegen-js"; // Phase 6: FL 컴파일러
-import { formatFL } from "./formatter";
 import { typeCheckSource, formatTypeIssues } from "./type-check-static";
 import { DebugSession, setGlobalDebugSession } from "./debugger"; // Phase 78: 디버거
 import { runWithWatch } from "./hot-reload"; // Phase 79: 워치 모드
