@@ -169,6 +169,8 @@
   [(= $op "let")    (cgc-let $args)]
   [(= $op "defn")   (cgc-defn $args)]
   [(= $op "define") (cgc-define $args)]
+  [(= $op "min")    (cgc-binop-chain $args "fl_min2")]
+  [(= $op "max")    (cgc-binop-chain $args "fl_max2")]
   [(= $op "+")      (cgc-binop-chain $args "fl_add")]
   [(= $op "-")      (if (= (length $args) 1)
                       (str "fl_sub(fl_int(0), " (cgc (get $args 0)) ")")

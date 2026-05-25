@@ -242,6 +242,26 @@ FLValue _fl_env_set(FLValue key, FLValue val);
 FLValue _fl_env_all(void);
 FLValue str_join(FLValue sep, FLValue vec);
 
+/* ── N-08: 컬렉션 함수 ── */
+FLValue sort(FLValue vec);
+FLValue reverse(FLValue vec);
+FLValue flatten(FLValue vec);
+FLValue distinct(FLValue vec);
+FLValue take(FLValue n, FLValue vec);
+FLValue drop(FLValue n, FLValue vec);
+FLValue zip(FLValue a, FLValue b);
+FLValue partition(FLValue n, FLValue vec);
+FLValue interpose(FLValue sep, FLValue vec);
+FLValue group_by(FLValue fn, FLValue vec);
+FLValue frequencies(FLValue vec);
+FLValue keys(FLValue map);
+FLValue vals(FLValue map);
+FLValue entries(FLValue map);
+FLValue dissoc(FLValue map, FLValue key);
+FLValue select_keys(FLValue map, FLValue ks);
+FLValue fl_min2(FLValue a, FLValue b);
+FLValue fl_max2(FLValue a, FLValue b);
+
 /* ── N-07: 문자열 함수 ── */
 FLValue str_split(FLValue s, FLValue sep);
 FLValue str_to_upper(FLValue s);

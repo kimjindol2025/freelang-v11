@@ -388,6 +388,169 @@ FLValue str_repeat(FLValue s, FLValue n) {
     FLValue r = fl_str_val(buf); free(buf); return r;
 }
 
+/* ── N-08: 컬렉션 함수 ── */
+
+static int fl_cmp_vals(const void* a, const void* b) {
+    const FLValue* va = (const FLValue*)a;
+    const FLValue* vb = (const FLValue*)b;
+    if (va->tag == FL_INT   && vb->tag == FL_INT)   return (va->i > vb->i) - (va->i < vb->i);
+    if (va->tag == FL_FLOAT || vb->tag == FL_FLOAT) {
+        double da = (va->tag==FL_FLOAT)?va->f:(double)va->i;
+        double db = (vb->tag==FL_FLOAT)?vb->f:(double)vb->i;
+        return (da > db) - (da < db);
+    }
+    if (va->tag == FL_STRING && vb->tag == FL_STRING)
+        return strcmp(((FLString*)va->obj)->data, ((FLString*)vb->obj)->data);
+    return 0;
+}
+
+FLValue sort(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return vec;
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue* copy = malloc(sizeof(FLValue) * v->len);
+    memcpy(copy, v->data, sizeof(FLValue) * v->len);
+    qsort(copy, v->len, sizeof(FLValue), fl_cmp_vals);
+    FLValue r = fl_vec_from(copy, v->len); free(copy); return r;
+}
+
+FLValue reverse(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return vec;
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (int64_t i = (int64_t)v->len - 1; i >= 0; i--)
+        r = fl_vec_push(r, v->data[i]);
+    return r;
+}
+
+FLValue flatten(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return vec;
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        if (v->data[i].tag == FL_VECTOR) {
+            FLVector* inner = (FLVector*)v->data[i].obj;
+            for (uint32_t j = 0; j < inner->len; j++)
+                r = fl_vec_push(r, inner->data[j]);
+        } else {
+            r = fl_vec_push(r, v->data[i]);
+        }
+    }
+    return r;
+}
+
+FLValue distinct(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return vec;
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        int found = 0;
+        FLVector* rv = (FLVector*)r.obj;
+        for (uint32_t j = 0; j < rv->len; j++)
+            if (fl_truthy(fl_eq(rv->data[j], v->data[i]))) { found=1; break; }
+        if (!found) r = fl_vec_push(r, v->data[i]);
+    }
+    return r;
+}
+
+FLValue take(FLValue n, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    int64_t cnt = (n.tag==FL_INT)?n.i:(int64_t)n.f;
+    if (cnt < 0) cnt = 0;
+    if ((uint32_t)cnt > v->len) cnt = (int64_t)v->len;
+    return fl_vec_from(v->data, (uint32_t)cnt);
+}
+
+FLValue drop(FLValue n, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    int64_t cnt = (n.tag==FL_INT)?n.i:(int64_t)n.f;
+    if (cnt < 0) cnt = 0;
+    if ((uint32_t)cnt >= v->len) return fl_vec_new();
+    return fl_vec_from(v->data + cnt, v->len - (uint32_t)cnt);
+}
+
+FLValue zip(FLValue a, FLValue b) {
+    if (a.tag != FL_VECTOR || b.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* va = (FLVector*)a.obj;
+    FLVector* vb = (FLVector*)b.obj;
+    uint32_t len = va->len < vb->len ? va->len : vb->len;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < len; i++) {
+        FLValue pair[2] = { va->data[i], vb->data[i] };
+        r = fl_vec_push(r, fl_vec_from(pair, 2));
+    }
+    return r;
+}
+
+FLValue partition(FLValue n, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    int64_t sz = (n.tag==FL_INT)?n.i:(int64_t)n.f;
+    if (sz <= 0) return fl_vec_new();
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i + (uint32_t)sz <= v->len; i += (uint32_t)sz)
+        r = fl_vec_push(r, fl_vec_from(v->data + i, (uint32_t)sz));
+    return r;
+}
+
+FLValue interpose(FLValue sep, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        if (i) r = fl_vec_push(r, sep);
+        r = fl_vec_push(r, v->data[i]);
+    }
+    return r;
+}
+
+FLValue group_by(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_map_new();
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_map_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue key = fl_fn_call(fn, 1, &v->data[i]);
+        FLValue group = fl_map_get(r, key);
+        if (group.tag != FL_VECTOR) group = fl_vec_new();
+        group = fl_vec_push(group, v->data[i]);
+        r = fl_map_set(r, key, group);
+    }
+    return r;
+}
+
+FLValue frequencies(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_map_new();
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_map_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue cnt = fl_map_get(r, v->data[i]);
+        int64_t n = (cnt.tag == FL_INT) ? cnt.i : 0;
+        r = fl_map_set(r, v->data[i], fl_int(n + 1));
+    }
+    return r;
+}
+
+FLValue keys(FLValue map) { return fl_map_keys(map); }
+FLValue vals(FLValue map) { return fl_map_vals(map); }
+FLValue entries(FLValue map) { return fl_map_entries(map); }
+
+FLValue dissoc(FLValue map, FLValue key) { return fl_map_del(map, key); }
+
+FLValue select_keys(FLValue map, FLValue ks) {
+    if (map.tag != FL_MAP || ks.tag != FL_VECTOR) return fl_map_new();
+    FLVector* v = (FLVector*)ks.obj;
+    FLValue r = fl_map_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue val = fl_map_get(map, v->data[i]);
+        if (val.tag != FL_NIL) r = fl_map_set(r, v->data[i], val);
+    }
+    return r;
+}
+
+FLValue fl_min2(FLValue a, FLValue b) { return fl_truthy(fl_lt(a, b)) ? a : b; }
+FLValue fl_max2(FLValue a, FLValue b) { return fl_truthy(fl_gt(a, b)) ? a : b; }
+
 FLValue uuid(void) {
     unsigned char b[16];
     FILE* f = fopen("/dev/urandom", "rb");
