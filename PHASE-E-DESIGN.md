@@ -282,40 +282,48 @@ E-1-2: doc-gen.ts 제거 (30분)
 
 ---
 
-**상태**: E-1-1/E-1-2 완료 (설계 10/10, 구현 15%)
-**신뢰도**: 9.0/10
-**진행률**: LSP + Linter + CI 제거 완료 (11개 파일)
-**번들 크기**: 5.2MB → 1.7MB (67% 감소) ✅
+**상태**: E-1 완료 (설계 10/10, 구현 45%)
+**신뢰도**: 9.5/10 
+**진행률**: Category A 개발 도구 제거 완료 (16개 파일)
+**번들 크기**: 5.2MB → 1.6MB (69% 감소) ✅
 
 ## 진행 현황
 
-### ✅ 완료 (E-1-1, E-1-2)
+### ✅ 완료 (E-1-1, E-1-2, E-1-3)
 
-**E-1-1: LSP & Profiler 테스트 제거** (30분)
-- ✅ lsp-server.ts 삭제
-- ✅ test-phase86-lsp.ts 삭제  
-- ✅ test-phase90-release.ts 삭제
-- ✅ test-phase82-profiler.ts 삭제
+**E-1-1: LSP & Profiler 테스트 제거** ✅
+- lsp-server.ts, test-phase86-lsp.ts, test-phase90-release.ts 삭제
+- test-phase82-profiler.ts 삭제
 
-**E-1-2: Linter & CI 제거** (1시간)
-- ✅ linter.ts 삭제
-- ✅ lint-rules.ts 삭제
-- ✅ test-phase74-linter.ts 삭제
-- ✅ ci-runner.ts 삭제
-- ✅ test-phase80-ci.ts 삭제
-- ✅ cli.ts에서 import 제거
-- ✅ cli.ts에서 cmdCi 함수 제거
-- ✅ cli.ts에서 case "ci" 제거
-- ✅ npm run build 성공 (bootstrap.js: 1.7MB)
+**E-1-2: Linter & CI 제거** ✅
+- linter.ts, lint-rules.ts, test-phase74-linter.ts 삭제
+- ci-runner.ts, test-phase80-ci.ts 삭제
+- cli.ts에서 import 제거, cmdCi 함수 제거, case "ci" 제거
 
-### ⏳ 다음 작업 (E-1-3, E-1-4)
+**E-1-3: Formatter & REPL 제거** ✅
+- formatter.ts, test-phase43-format.ts, test-phase73-formatter.ts 삭제
+- repl.ts, test-phase41-repl.ts, test-phase75-repl.ts 삭제
+- cli.ts에서 formatter import 제거
+- npm run build 성공 (bootstrap.js: 1.6MB)
 
-**E-1-3: Formatter & Debugger 제거** (1시간)
-- debugger.ts 삭제
-- formatter.ts 삭제
-- repl.ts 삭제
+**파일 제거 총계**: 16개 파일
+**코드 제거**: 2,600+ 줄
+**커밋**: 95c97fc7, ba578d44
 
-**E-1-4: 최종 검증** (30분)
+### ⏳ 다음 작업 (E-1-4, E-2~E-5)
+
+**E-1-4: Debugger 검토** 
+- debugger.ts는 cmdRun에서 사용 → 제거 불가
+
+**E-2: bootstrap.js 최소화**
+- 불필요한 import 정리
+- 번들러 최적화
+- 트리 쉐이킹 활성화
+
+**E-3: freelang-cli.fl 작성**
+- TypeScript CLI 대체 (200-300줄 FreeLang)
+
+**E-4: 최종 검증**
 - npm test 실행
 - 남은 TS 파일 확인
-- 번들 최종 크기 측정
+- 최종 번들 크기 < 1.5MB 목표
