@@ -130,5 +130,40 @@ export function createTimerModule(interpreter: any) {
         throw new Error(`timer_clear_all failed: ${err.message}`);
       }
     },
+
+    // fl-timeout ms fn -> number — (fl-timeout 1000 (fn [] ...))
+    "fl-timeout": (ms: number, fn: any): number => {
+      if (typeof ms !== "number" || ms < 0) throw new Error(`fl-timeout: ms must be non-negative number, got ${ms}`);
+      if (!fn) throw new Error(`fl-timeout: fn required`);
+      const timerId = nextTimerId++;
+      const callback = () => {
+        try { interpreter.callFunctionValue(fn, []); } catch (err: any) { console.error(`fl-timeout[${timerId}] error:`, err.message); }
+        timerRegistry.delete(timerId);
+      };
+      timerRegistry.set(timerId, setTimeout(callback, ms));
+      return timerId;
+    },
+
+    // fl-interval ms fn -> number — (fl-interval 1000 (fn [] ...))
+    "fl-interval": (ms: number, fn: any): number => {
+      if (typeof ms !== "number" || ms < 1) throw new Error(`fl-interval: ms must be positive number, got ${ms}`);
+      if (!fn) throw new Error(`fl-interval: fn required`);
+      const timerId = nextTimerId++;
+      const callback = () => {
+        try { interpreter.callFunctionValue(fn, []); } catch (err: any) { console.error(`fl-interval[${timerId}] error:`, err.message); }
+      };
+      timerRegistry.set(timerId, setInterval(callback, ms));
+      return timerId;
+    },
+
+    // fl-cancel-timer id -> boolean — cancels both timeout and interval
+    "fl-cancel-timer": (timerId: number): boolean => {
+      const nodeTimer = timerRegistry.get(timerId);
+      if (nodeTimer === undefined) return false;
+      clearTimeout(nodeTimer as any);
+      clearInterval(nodeTimer as any);
+      timerRegistry.delete(timerId);
+      return true;
+    },
   };
 }
