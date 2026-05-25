@@ -242,6 +242,13 @@ FLValue _fl_env_set(FLValue key, FLValue val);
 FLValue _fl_env_all(void);
 FLValue str_join(FLValue sep, FLValue vec);
 
+/* ── 암호화 (crypto.c) ── */
+FLValue fl_jwt_sign(FLValue payload_map, FLValue secret, FLValue exp_sec);
+FLValue fl_jwt_verify(FLValue token, FLValue secret);
+FLValue fl_jwt_expired(FLValue token);
+FLValue fl_hash_password(FLValue pw);
+FLValue fl_verify_password(FLValue pw, FLValue hash);
+
 /* ── try/catch 인프라 ── */
 #define FL_TRY_MAX 64
 typedef struct { jmp_buf buf; FLValue err; } FLTryFrame;
