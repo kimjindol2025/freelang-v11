@@ -1,8 +1,8 @@
 # FreeLang v11 — Claude AI 완전 레퍼런스
 
-**버전**: v11.6.39 (L4 Self-Hosting) | **최신 갱신**: 2026-05-25  
-**상태**: ✅ 프로덕션 (1018/1018 테스트 통과) | **L4 검증**: ✅ 완료 (SHA256 3중) | **AI 신뢰도**: 9.5/10  
-**Node.js 독립성**: ✅ 가능 (bootstrap.js 제거 설계 완료, Phase F 진행 중)
+**버전**: v11.8.0 (Node.js Free) | **최신 갱신**: 2026-05-29  
+**상태**: ✅ 프로덕션 (Node.js 완전 독립) | **L4 검증**: ✅ 완료 (SHA256 3중) | **AI 신뢰도**: 9.5/10  
+**Node.js 독립성**: ✅ 완료 (bin/cgc-bin + fl-native.sh, Phase F DONE)
 
 ---
 
