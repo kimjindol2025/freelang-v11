@@ -216,5 +216,133 @@ FLValue fl_str_ends_with(FLValue s, FLValue suffix) {
 
 FLValue fl_string_p(FLValue v) { return string_p(v); }
 
+/* ── 타입 술어 ── */
+FLValue fl_number_p(FLValue v)  { return fl_bool(v.tag == FL_INT || v.tag == FL_FLOAT); }
+FLValue fl_boolean_p(FLValue v) { return fl_bool(v.tag == FL_BOOL); }
+FLValue fl_integer_p(FLValue v) { return fl_bool(v.tag == FL_INT); }
+FLValue fl_float_p(FLValue v)   { return fl_bool(v.tag == FL_FLOAT); }
+FLValue fl_array_p(FLValue v)   { return fl_bool(v.tag == FL_VECTOR); }
+FLValue fl_map_p(FLValue v)     { return fl_bool(v.tag == FL_MAP); }
+FLValue fl_fn_p(FLValue v)      { return fl_bool(v.tag == FL_FN); }
+
+FLValue fl_empty_p(FLValue v) {
+    if (v.tag == FL_NIL) return fl_bool(true);
+    if (v.tag == FL_VECTOR) return fl_bool(((FLVector*)v.obj)->len == 0);
+    if (v.tag == FL_MAP) return fl_bool(((FLMap*)v.obj)->len == 0);
+    if (v.tag == FL_STRING) return fl_bool(((FLString*)v.obj)->data[0] == '\0');
+    return fl_bool(false);
+}
+FLValue fl_not_empty_p(FLValue v) { return fl_bool(!fl_truthy(fl_empty_p(v))); }
+FLValue fl_nil_or_empty_p(FLValue v) {
+    if (v.tag == FL_NIL) return fl_bool(true);
+    return fl_empty_p(v);
+}
+
+/* ── 문자열 변환 ── */
+FLValue fl_str_to_num(FLValue s) {
+    if (s.tag != FL_STRING) return fl_nil();
+    const char* p = ((FLString*)s.obj)->data;
+    char* end;
+    long long iv = strtoll(p, &end, 10);
+    if (*end == '\0') return fl_int(iv);
+    double fv = strtod(p, &end);
+    if (*end == '\0') return fl_float(fv);
+    return fl_nil();
+}
+
+/* ── 문자열 concat (배열 또는 문자열) ── */
+FLValue fl_concat(FLValue a, FLValue b) {
+    if (a.tag == FL_VECTOR) return fl_vec_push(a, b);  /* fallback: push */
+    if (a.tag != FL_STRING || b.tag != FL_STRING) return fl_nil();
+    const char* sa = ((FLString*)a.obj)->data;
+    const char* sb = ((FLString*)b.obj)->data;
+    size_t la = strlen(sa), lb = strlen(sb);
+    char* buf = malloc(la + lb + 1);
+    memcpy(buf, sa, la); memcpy(buf + la, sb, lb); buf[la+lb] = '\0';
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+/* ── HTML 이스케이프 ── */
+FLValue fl_html_escape(FLValue s) {
+    if (s.tag != FL_STRING) return s;
+    const char* src = ((FLString*)s.obj)->data;
+    size_t len = strlen(src);
+    char* buf = malloc(len * 6 + 1);
+    char* p = buf;
+    for (size_t i = 0; i < len; i++) {
+        switch (src[i]) {
+            case '&':  memcpy(p, "&amp;",  5); p += 5; break;
+            case '<':  memcpy(p, "&lt;",   4); p += 4; break;
+            case '>':  memcpy(p, "&gt;",   4); p += 4; break;
+            case '"':  memcpy(p, "&quot;", 6); p += 6; break;
+            case '\'': memcpy(p, "&#39;",  5); p += 5; break;
+            default:   *p++ = src[i]; break;
+        }
+    }
+    *p = '\0';
+    FLValue r = fl_str_val(buf); free(buf); return r;
+}
+
+/* ── 중첩 맵 접근 (get-in) ── */
+FLValue fl_get_in(FLValue m, FLValue keys) {
+    if (keys.tag != FL_VECTOR) return fl_nil();
+    FLVector* ks = (FLVector*)keys.obj;
+    FLValue cur = m;
+    for (uint32_t i = 0; i < ks->len; i++) {
+        if (cur.tag == FL_NIL) return fl_nil();
+        cur = get(cur, ks->data[i]);
+    }
+    return cur;
+}
+
+/* ── map-vals(fn, map) ── */
+FLValue fl_map_vals_fn(FLValue fn, FLValue map) {
+    if (map.tag != FL_MAP) return map;
+    FLMap* m = (FLMap*)map.obj;
+    FLValue result = fl_map_new();
+    for (uint32_t i = 0; i < m->len; i++) {
+        FLValue argv[1] = { m->entries[i].val };
+        FLValue v2 = fl_fn_call(fn, 1, argv);
+        result = fl_map_set(result, m->entries[i].key, v2);
+    }
+    return result;
+}
+
+/* ── sort-by(fn, vec) ── */
+/* 간단한 삽입 정렬 (소규모 배열 기준) */
+FLValue fl_sort_by(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return vec;
+    FLVector* v = (FLVector*)vec.obj;
+    if (v->len <= 1) return vec;
+    FLValue result = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++)
+        result = fl_vec_push(result, v->data[i]);
+    FLVector* rv = (FLVector*)result.obj;
+    for (uint32_t i = 1; i < rv->len; i++) {
+        FLValue key = rv->data[i];
+        FLValue argv[1] = { key };
+        FLValue ki = fl_fn_call(fn, 1, argv);
+        int j = (int)i - 1;
+        while (j >= 0) {
+            FLValue kj_argv[1] = { rv->data[j] };
+            FLValue kj = fl_fn_call(fn, 1, kj_argv);
+            if (!fl_truthy(fl_lt(kj, ki))) { rv->data[j+1] = rv->data[j]; j--; }
+            else break;
+        }
+        rv->data[j+1] = key;
+    }
+    return result;
+}
+
+/* ── obj-omit ── */
+FLValue fl_obj_omit(FLValue map, FLValue keys) {
+    if (map.tag != FL_MAP || keys.tag != FL_VECTOR) return map;
+    FLVector* ks = (FLVector*)keys.obj;
+    FLValue result = map;
+    for (uint32_t i = 0; i < ks->len; i++)
+        result = fl_map_del(result, ks->data[i]);
+    return result;
+}
+
 /* ── stdlib aliases — self/all.fl compatibility ── */
 
