@@ -125,14 +125,22 @@ fl-build:
 
 # ── Node.js 독립 — Native 타겟 ──────────────────────────────────────
 
-# cgc-bin 빌드 (Node.js로 1회만, 이후 자가 재빌드 가능)
+# cgc-bin 설치/재빌드 — Node.js 불필요
+# bin/cgc-bin이 있으면 자가 재빌드, 없으면 bootstrap.js 1회 사용
 install-native:
 	@echo "=== FreeLang Native Compiler 설치 ==="
-	@echo "Step 1: FL → C (bootstrap.js 마지막 사용)"
-	@node --stack-size=8192 bootstrap.js run self/cgc-main.fl self/cgc-main.fl /tmp/cgc-install.c
+	@if [ -x bin/cgc-bin ]; then \
+		echo "✅ bin/cgc-bin 존재 → 자가 재빌드 (Node.js 불필요)"; \
+		echo "Step 1: cgc-bin → C"; \
+		bin/cgc-bin self/cgc-main.fl /tmp/cgc-install.c; \
+	else \
+		echo "⚠️  최초 설치 — bootstrap.js 사용 (1회만)"; \
+		node --stack-size=8192 /root/kim/freelang-v11/bootstrap.js run \
+			self/cgc-main.fl self/cgc-main.fl /tmp/cgc-install.c; \
+	fi
 	@echo "Step 2: C → ELF"
 	@bash scripts/build-cgc-native.sh /tmp/cgc-install.c bin/cgc-bin
-	@echo "✅ bin/cgc-bin 설치 완료 (이후 Node.js 불필요)"
+	@echo "✅ bin/cgc-bin 갱신 완료"
 
 # FL → ELF 실행 (Node.js 없이)
 # 사용: make fl-run FILE=examples/hello.fl
