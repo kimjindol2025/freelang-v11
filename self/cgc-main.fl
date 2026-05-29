@@ -879,8 +879,11 @@
   [(= $op "keys")        (str "fl_map_keys(" (cgc (get $args 0)) ")")]
   [(= $op "obj-keys")    (str "fl_map_keys(" (cgc (get $args 0)) ")")]
   [(= $op "map-entries") (str "fl_map_entries(" (cgc (get $args 0)) ")")]
-  [(= $op "null?")       (str "null_p(" (cgc (get $args 0)) ")")]
-  [(= $op "nil?")        (str "null_p(" (cgc (get $args 0)) ")")]
+  [(= $op "null?")        (str "null_p(" (cgc (get $args 0)) ")")]
+  [(= $op "nil?")         (str "null_p(" (cgc (get $args 0)) ")")]
+  ;; N-12: 미커버리지 완전 해소
+  [(= $op "char-at")      (str "char_at(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "char-code-at") (str "char_code_at(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S15: math/time — C stdlib 충돌 방지용 fl_ 접두사
   [(= $op "floor")       (str "fl_floor(" (cgc (get $args 0)) ")")]
   [(= $op "ceil")        (str "fl_ceil(" (cgc (get $args 0)) ")")]
