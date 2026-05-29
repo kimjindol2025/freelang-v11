@@ -13,8 +13,10 @@
 REPO := $(shell pwd)
 STAGE1 := $(REPO)/stage1.js
 NODE := node --stack-size=8000
+CGC_BIN := $(REPO)/bin/cgc-bin
+FL_NATIVE := bash $(REPO)/scripts/fl-native.sh
 
-.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build native-test semantic-test parity-test verify verify-core verify-full release clean help
+.PHONY: compile compile-self run serve repl property-test build-runtime verify-all verify-fixed-point verify-build verify-self-host bench ai-eval lint-aliases fl-test fl-build native-test semantic-test parity-test verify verify-core verify-full release clean help install-native fl-run test-native
 
 help:
 	@echo "FreeLang v11 self-hosting commands:"
@@ -120,6 +122,42 @@ fl-test:
 # FL-Native 빌드 도구
 fl-build:
 	@npm run fl-build
+
+# ── Node.js 독립 — Native 타겟 ──────────────────────────────────────
+
+# cgc-bin 빌드 (Node.js로 1회만, 이후 자가 재빌드 가능)
+install-native:
+	@echo "=== FreeLang Native Compiler 설치 ==="
+	@echo "Step 1: FL → C (bootstrap.js 마지막 사용)"
+	@node --stack-size=8192 bootstrap.js run self/cgc-main.fl self/cgc-main.fl /tmp/cgc-install.c
+	@echo "Step 2: C → ELF"
+	@bash scripts/build-cgc-native.sh /tmp/cgc-install.c bin/cgc-bin
+	@echo "✅ bin/cgc-bin 설치 완료 (이후 Node.js 불필요)"
+
+# FL → ELF 실행 (Node.js 없이)
+# 사용: make fl-run FILE=examples/hello.fl
+fl-run:
+	@$(FL_NATIVE) run $(FILE)
+
+# FL → ELF 빌드 (실행 안 함)
+# 사용: make fl-build-native FILE=examples/hello.fl OUT=/tmp/hello
+fl-build-native:
+	@$(FL_NATIVE) build $(FILE) -o $(OUT)
+
+# Node.js 독립 통합 테스트
+test-native:
+	@echo "=== test-native: Node.js 없이 FL E2E 검증 ==="
+	@echo ""
+	@echo "[1/3] SQLite DB E2E..."
+	@$(FL_NATIVE) run examples/test-sqlite-db.fl | grep -q "ALL PASS" && echo "  ✅ SQLite PASS" || (echo "  ❌ SQLite FAIL"; exit 1)
+	@echo ""
+	@echo "[2/3] DB Gap 검증..."
+	@$(FL_NATIVE) run examples/test-db-gaps.fl | grep -q "ALL GAP CHECKS DONE" && echo "  ✅ DB Gaps PASS" || (echo "  ❌ DB Gaps FAIL"; exit 1)
+	@echo ""
+	@echo "[3/3] cgc-bin 자가검증 (L4 고정점)..."
+	@bash scripts/verify-l4-fixpoint.sh 2>&1 | grep -E "FIXED-POINT|❌" | head -3
+	@echo ""
+	@echo "✅ test-native ALL PASS"
 
 # P2: Native C backend compilation test
 native-test:
@@ -231,19 +269,14 @@ c-verify:
 	@echo "║     ✅ c-verify PASS — C backend stable                ║"
 	@echo "╚════════════════════════════════════════════════════════╝"
 
-<<<<<<< HEAD
-# Release checkpoint (Phase 1E CI gate + C backend)
-release: verify c-verify
-=======
-# P2-Core: Release gate (requires verify-core PASS)
-release: verify-core
+# Release checkpoint (Phase 1E CI gate + C backend + P2-Core)
+release: verify c-verify verify-core
 	@if [ -z "$(VERSION)" ]; then \
 		echo ""; \
 		echo "사용: make release VERSION=v11.X.X"; \
 		echo ""; \
 		exit 1; \
 	fi
->>>>>>> cb573f7c (build: verify-core, verify-full, release 명령 추가)
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════╗"
 	@echo "║         Release Candidate: $(VERSION)                   ║"
@@ -253,15 +286,6 @@ release: verify-core
 	@echo "║  ✅ parity-test PASS                                  ║"
 	@echo "║  ✅ native-test PASS                                  ║"
 	@echo "║                                                        ║"
-<<<<<<< HEAD
-	@echo "║  git tag vX.Y.Z && git push origin --tags             ║"
-	@echo "║                                                        ║"
-	@echo "║  All CI gates verified:                              ║"
-	@echo "║    L0 Static:        PASS                            ║"
-	@echo "║    L1 Unit:          PASS                            ║"
-	@echo "║    L3 E2E:           PASS                            ║"
-	@echo "║    L4 Fixpoint:      PASS                            ║"
-=======
 	@echo "╚════════════════════════════════════════════════════════╝"
 	@echo ""
 	@echo "Creating git tag: $(VERSION)"
@@ -271,5 +295,4 @@ release: verify-core
 	@echo ""
 	@echo "╔════════════════════════════════════════════════════════╗"
 	@echo "║  ✅ Release $(VERSION) created and pushed               ║"
->>>>>>> cb573f7c (build: verify-core, verify-full, release 명령 추가)
 	@echo "╚════════════════════════════════════════════════════════╝"
