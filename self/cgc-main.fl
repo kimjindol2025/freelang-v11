@@ -953,9 +953,6 @@
   [(= $op "bit-shl") (str "fl_bit_shl(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "bit-shr") (str "fl_bit_shr(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
-  [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
-  [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
-  ;; N-03: json 완전 구현
   [(= $op "json-parse")      (str "fl_json_parse(" (cgc (get $args 0)) ")")]
   [(= $op "json-stringify")  (str "fl_json_stringify(" (cgc (get $args 0)) ")")]
   ;; 유틸 — sleep/now
