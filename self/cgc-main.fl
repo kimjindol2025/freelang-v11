@@ -932,7 +932,11 @@
   [(= $op "_fl_process_ppid")      "fl_nil()"]
   [(= $op "_fl_run_inherit")       "fl_nil()"]
   [(= $op "cli-args")              "fl_get_argv()"]
-  [(= $op "bit-xor")               (str "fl_int(" (cgc (get $args 0)) ".i ^ " (cgc (get $args 1)) ".i)")]
+  [(= $op "bit-xor") (str "fl_bit_xor(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-and") (str "fl_bit_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-or")  (str "fl_bit_or("  (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-shl") (str "fl_bit_shl(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-shr") (str "fl_bit_shr(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
   [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
   [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
