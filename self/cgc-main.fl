@@ -493,7 +493,7 @@
          ;; loop: (loop [[$i 0] (< $i 10) (+ $i 1)] body...)
          ;; 형식: (loop [init-binding condition update] body)
          (let [[$loop-array (if (> (length $rest) 0) (get $rest 0) null)]
-               [$body-start (if (> (length $rest) 1) (get $rest 1) null)]]
+               [$_body-start (if (> (length $rest) 1) (get $rest 1) null)]]
            (if (null? $loop-array)
              (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
              (if (not (= (get $loop-array :kind) "array"))
@@ -811,8 +811,10 @@
   [(= $op "swap!")         (cgc-swap! $args)]
   ;; S26: 누락 stdlib 매핑
   [(= $op "includes-item") (str "fl_includes_item(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "str-includes")  (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "string?")       (str "fl_string_p(" (cgc (get $args 0)) ")")]
+  [(= $op "str-includes")    (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-starts-with") (str "fl_str_starts_with(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-ends-with")   (str "fl_str_ends_with(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "string?")         (str "fl_string_p(" (cgc (get $args 0)) ")")]
   [(= $op "obj-entries")   (str "fl_map_entries(" (cgc (get $args 0)) ")")]
   [(= $op "loop")   (cgc-loop $args)]
   [(= $op "recur")  "/* orphan recur */ fl_nil()"]
@@ -1107,12 +1109,13 @@
 
 (defn cgc-let-2d [$it $i $acc]
   (if (>= $i (length $it)) $acc
-  (let [[$p (get-block-items (get $it $i))]
-        [$n (cgc-extract-name (get $p 0))]
-        [$v (cgc (get $p 1))]]
+  (let [[$p    (get-block-items (get $it $i))]
+        [$n    (cgc-extract-name (get $p 0))]
+        [$v    (cgc (get $p 1))]
+        [$attr (if (str-starts-with $n "_") " __attribute__((unused))" "")]]
     (swap! known-fncall-targets-atom push $n)
     (swap! outer-params-atom push $n)
-    (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n " = " $v ";\n")))))
+    (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n $attr " = " $v ";\n")))))
 
 (defn cgc-body [$args $i $acc]
   (if (>= $i (length $args)) $acc

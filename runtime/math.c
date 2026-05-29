@@ -199,6 +199,21 @@ FLValue fl_str_includes(FLValue s, FLValue sub) {
     return fl_bool(strstr(((FLString*)s.obj)->data, ((FLString*)sub.obj)->data) != NULL);
 }
 
+FLValue fl_str_starts_with(FLValue s, FLValue prefix) {
+    if (s.tag != FL_STRING || prefix.tag != FL_STRING) return fl_bool(false);
+    const char* sp = ((FLString*)s.obj)->data;
+    const char* pp = ((FLString*)prefix.obj)->data;
+    return fl_bool(strncmp(sp, pp, strlen(pp)) == 0);
+}
+
+FLValue fl_str_ends_with(FLValue s, FLValue suffix) {
+    if (s.tag != FL_STRING || suffix.tag != FL_STRING) return fl_bool(false);
+    const char* sp = ((FLString*)s.obj)->data;
+    const char* ep = ((FLString*)suffix.obj)->data;
+    size_t sl = strlen(sp), el = strlen(ep);
+    return fl_bool(sl >= el && strcmp(sp + sl - el, ep) == 0);
+}
+
 FLValue fl_string_p(FLValue v) { return string_p(v); }
 
 /* ── stdlib aliases — self/all.fl compatibility ── */

@@ -187,6 +187,8 @@ FLValue fl_atom_reset(FLValue atom, FLValue val);
 /* ── S26: stdlib bridge ── */
 FLValue fl_includes_item(FLValue vec, FLValue item);
 FLValue fl_str_includes(FLValue s, FLValue sub);
+FLValue fl_str_starts_with(FLValue s, FLValue prefix);
+FLValue fl_str_ends_with(FLValue s, FLValue suffix);
 FLValue fl_string_p(FLValue v);
 FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
 FLValue fl_vec_last(FLValue vec);
