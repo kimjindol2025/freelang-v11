@@ -1099,10 +1099,11 @@
 (defn cgc-let-1d [$it $i $acc]
   (if (>= $i (length $it)) $acc
   (let [[$n (cgc-extract-name (get $it $i))]
-        [$v (cgc (get $it (+ $i 1)))]]
+        [$v (cgc (get $it (+ $i 1)))]
+        [$attr (if (str-starts-with $n "_") " __attribute__((unused))" "")]]
     (swap! known-fncall-targets-atom push $n)
     (swap! outer-params-atom push $n)
-    (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n " = " $v ";\n")))))
+    (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n $attr " = " $v ";\n")))))
 
 (defn cgc-let-2d [$it $i $acc]
   (if (>= $i (length $it)) $acc
