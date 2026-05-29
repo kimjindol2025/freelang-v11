@@ -1,0 +1,16 @@
+;; N-05 HTTP 서버 C 포팅 검증
+(server-get "/hello" (fn [req]
+  (server-html "<h1>Hello from FL C HTTP!</h1>")))
+
+(server-get "/api/echo" (fn [req]
+  (let [q (get req "query")]
+    (server-json {"echo" (get q "msg") "ok" true}))))
+
+(server-post "/submit" (fn [req]
+  (let [b (get req "body")]
+    (server-json {"received" b "ok" true}))))
+
+(server-start 19765)
+(println "N-05 HTTP server started on :19765")
+(sleep 3000)
+(println "DONE")

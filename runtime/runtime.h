@@ -160,6 +160,7 @@ FLValue fl_floor(FLValue x);
 FLValue fl_ceil(FLValue x);
 FLValue fl_abs(FLValue x);
 FLValue fl_math_sqrt(FLValue x);
+FLValue fl_sleep_ms(FLValue ms);
 FLValue fl_now(void);
 FLValue fl_now_ms(void);
 FLValue string_p(FLValue v);
@@ -278,6 +279,23 @@ FLValue fl_jwt_verify(FLValue token, FLValue secret);
 FLValue fl_jwt_expired(FLValue token);
 FLValue fl_hash_password(FLValue pw);
 FLValue fl_verify_password(FLValue pw, FLValue hash);
+
+/* ── N-06: SQLite3 DB ── */
+FLValue fl_db_open(FLValue path);
+FLValue fl_db_close(FLValue handle);
+FLValue fl_db_query(FLValue handle, FLValue sql, FLValue params);
+FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params);
+
+/* ── N-05: HTTP 서버 (POSIX socket) ── */
+FLValue fl_http_route(FLValue method, FLValue pattern, FLValue handler);
+FLValue fl_http_start(FLValue port);
+FLValue fl_http_stop(void);
+FLValue fl_resp_html(FLValue body);
+FLValue fl_resp_json(FLValue val);
+FLValue fl_resp_status(FLValue code, FLValue msg);
+FLValue fl_resp_redirect(FLValue url);
+FLValue fl_resp_html_cookie(FLValue body, FLValue cookie);
+FLValue fl_resp_set_cookie(FLValue name, FLValue value, FLValue opts);
 
 /* ── try/catch 인프라 ── */
 #define FL_TRY_MAX 64

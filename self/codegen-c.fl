@@ -276,6 +276,20 @@
   [(= $op "auth-jwt-expired")     (str "fl_jwt_expired(" (cgc (get $args 0)) ")")]
   [(= $op "auth-hash-password")   (str "fl_hash_password(" (cgc (get $args 0)) ")")]
   [(= $op "auth-verify-password") (str "fl_verify_password(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  ;; N-05: HTTP 서버
+  [(= $op "server-start")       (str "fl_http_start(" (cgc (get $args 0)) ")")]
+  [(= $op "server-html")        (str "fl_resp_html(" (cgc (get $args 0)) ")")]
+  [(= $op "server-json")        (str "fl_resp_json(" (cgc (get $args 0)) ")")]
+  [(= $op "server-status")      (str "fl_resp_status(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-redirect")    (str "fl_resp_redirect(" (cgc (get $args 0)) ")")]
+  [(= $op "server-html-cookie") (str "fl_resp_html_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-set-cookie")  (str "fl_resp_set_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "server-route")       (str "fl_http_route(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  ;; N-06: SQLite3 DB
+  [(= $op "db-open")   (str "fl_db_open(" (cgc (get $args 0)) ")")]
+  [(= $op "db-close")  (str "fl_db_close(" (cgc (get $args 0)) ")")]
+  [(= $op "db-query")  (str "fl_db_query(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "db-exec")   (str "fl_db_exec("  (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   ;; S19: fn lambda → static FLClosure 추출
   [(= $op "fn")      (cgc-fn $args)]
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]

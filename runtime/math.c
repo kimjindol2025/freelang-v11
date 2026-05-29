@@ -15,6 +15,12 @@ FLValue fl_abs(FLValue x) {
 FLValue fl_math_sqrt(FLValue x) {
     return fl_float(sqrt(x.tag==FL_INT ? (double)x.i : x.f));
 }
+FLValue fl_sleep_ms(FLValue ms) {
+    int64_t t = ms.tag==FL_INT ? ms.i : (int64_t)ms.f;
+    struct timespec ts = { t/1000, (t%1000)*1000000L };
+    nanosleep(&ts, NULL);
+    return fl_nil();
+}
 FLValue fl_now(void)    { return fl_int((int64_t)time(NULL)); }
 FLValue fl_now_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);

@@ -882,6 +882,24 @@
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
   [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
   [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
+  ;; N-03: json 완전 구현
+  [(= $op "json-parse")      (str "fl_json_parse(" (cgc (get $args 0)) ")")]
+  [(= $op "json-stringify")  (str "fl_json_stringify(" (cgc (get $args 0)) ")")]
+  ;; 유틸 — sleep/now
+  [(= $op "sleep")   (str "fl_sleep_ms(" (cgc (get $args 0)) ")")]
+  [(= $op "now-ms")  "fl_now_ms()"]
+  ;; N-05: HTTP 서버
+  [(= $op "server-start")       (str "fl_http_start(" (cgc (get $args 0)) ")")]
+  [(= $op "server-stop")        "fl_http_stop()"]
+  [(= $op "server-html")        (str "fl_resp_html(" (cgc (get $args 0)) ")")]
+  [(= $op "server-json")        (str "fl_resp_json(" (cgc (get $args 0)) ")")]
+  [(= $op "server-status")      (str "fl_resp_status(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-redirect")    (str "fl_resp_redirect(" (cgc (get $args 0)) ")")]
+  [(= $op "server-html-cookie") (str "fl_resp_html_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-set-cookie")  (str "fl_resp_set_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "server-route")       (str "fl_http_route(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "server-get")         (str "fl_http_route(fl_str_val(\"GET\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-post")        (str "fl_http_route(fl_str_val(\"POST\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S19: fn lambda → static FLClosure 추출
   [(= $op "fn")      (cgc-fn $args)]
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -923,7 +941,7 @@
   (if (>= $i (length $items)) $acc
   (let [[$name (c-name (cgc-extract-name (get $items $i)))]]
     (cgc-fn-argv-decls $items (+ $i 1)
-      (str $acc "    FLValue " $name " = argv[" $i "];\n")))))
+      (str $acc "    FLValue " $name " __attribute__((unused)) = argv[" $i "];\n")))))
 
 ;; 파라미터 이름 목록 수집
 (defn cgc-fn-param-names [$items $i $acc]
