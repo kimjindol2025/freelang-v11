@@ -13,15 +13,19 @@
   (let [api-key (env-get "ANTHROPIC_API_KEY")]
     (if (null? api-key)
       (do (println "[ai-complete] ANTHROPIC_API_KEY 없음") nil)
-      (let [body (json-stringify
+      (let [;; OAuth Bearer(sk-ant-oat...) 또는 일반 API key(sk-ant-api...) 자동 감지
+            headers (if (str-starts-with api-key "sk-ant-oat")
+                      {"Authorization" (str "Bearer " api-key)
+                       "anthropic-version" ANTHROPIC_VERSION
+                       "content-type" "application/json"}
+                      {"x-api-key" api-key
+                       "anthropic-version" ANTHROPIC_VERSION
+                       "content-type" "application/json"})
+            body (json-stringify
                    {"model" model
                     "max_tokens" max-tokens
                     "messages" [{"role" "user" "content" prompt}]})
-            res (http-post-headers
-                  ANTHROPIC_API body
-                  {"x-api-key" api-key
-                   "anthropic-version" ANTHROPIC_VERSION
-                   "content-type" "application/json"})]
+            res (http-post-headers ANTHROPIC_API body headers)]
         (if (= (get res "status") 200)
           (let [parsed (json-parse (get res "body"))]
             (get (get (get parsed "content") 0) "text"))
