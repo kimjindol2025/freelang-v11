@@ -10,7 +10,7 @@
     "for": "AI 에이전트 (Claude). 인간은 감독자",
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
-  "hot": "done-phase4",
+  "hot": "phase5-dispatch-app",
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
     "2": "identity는 잠긴다. 변경은 사용자 협의 필수. Claude 단독 변경 금지",
@@ -867,6 +867,41 @@
       ],
       "date": "2026-06-01",
       "next": "Phase 5 — 분산·모니터링 또는 실전 프로젝트 검증"
+    },
+    "phase4-complete": {
+      "t": "decision",
+      "v": "Phase 4 완료 선언 — 언어 설계 + 기초 구현 Phase 종료",
+      "date": "2026-06-01",
+      "completed_tasks": [
+        "task-error-quality",
+        "task-arg-consistency",
+        "task-native-stdlib-gap",
+        "task-streaming-response",
+        "task-parallel-agent",
+        "task-repl-native"
+      ],
+      "known_gaps": [
+        "REPL 속도 (gcc 매번 ~500ms)",
+        "parallel closure 이중 중첩 불안정",
+        "HTTP 클라이언트 popen subprocess",
+        "P2/P3 stdlib 미구현",
+        "자율 운영 부분적"
+      ],
+      "why": "계획한 Phase 4 항목 전부 완료. 미완 항목은 Phase 5 실전 중 수정.",
+      "lock": true
+    },
+    "phase5-dispatch-app": {
+      "t": "task",
+      "v": "Phase 5 — dispatch-app Phase 2 FreeLang 구현 (실전 검증)",
+      "why": "실제 사용자가 있는 프로덕션 앱을 FL로 구현해야 언어 완성 여부 증명 가능. 컴파일러 버그·한계를 실전에서 발견하고 즉시 수정.",
+      "expected_findings": [
+        "v11 런타임 버그 발견·수정",
+        "stdlib 부족 함수 식별",
+        "에러 메시지 추가 개선",
+        "성능 병목 발견"
+      ],
+      "success": "dispatch-app Phase 2가 FreeLang Native로 프로덕션 배포됨",
+      "verified": false
     }
   },
   "lock": [
