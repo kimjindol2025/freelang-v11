@@ -2388,7 +2388,9 @@ loop().catch(e => {
       return Object.values(args[0]);
     }
     case "obj-entries": case "obj_entries": {
-      if (!args[0] || typeof args[0] !== "object" || Array.isArray(args[0])) return [];
+      if (!args[0]) return [];
+      if (args[0] instanceof Map) return Array.from(args[0].entries());
+      if (typeof args[0] !== "object" || Array.isArray(args[0])) return [];
       return Object.entries(args[0]);
     }
     case "obj-merge": case "obj_merge": case "merge": {
