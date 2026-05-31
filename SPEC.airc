@@ -12,7 +12,7 @@
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
 
-  "hot": "task-streaming-response",
+  "hot": "task-parallel-agent",
 
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
@@ -679,6 +679,10 @@
     "task-streaming-response": {
       "t": "task",
       "v": "ai-complete 스트리밍 지원 — (ai-stream prompt handler)",
+      "verified": true,
+      "date": "2026-06-01",
+      "implemented": ["fl_http_post_stream (FL fn handler)", "fl_http_stream_collect (C level text_delta accumulation)", "ai-stream-collect (FL)", "ai-stream-collect-model (FL)"],
+      "note": "fl_http_post_stream handler 기반 콜백은 closure capture 제약으로 fl_http_stream_collect(C level) 방식 채택",
       "why": "현재 ai-complete은 전체 응답을 기다림. agent loop에서 느린 응답이 블로킹됨.",
       "scope": [
         "http-client.c: chunked transfer streaming 콜백 지원",
