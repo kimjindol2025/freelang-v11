@@ -984,6 +984,8 @@
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
   [(= $op "json-parse")      (str "fl_json_parse(" (cgc (get $args 0)) ")")]
   [(= $op "json-stringify")  (str "fl_json_stringify(" (cgc (get $args 0)) ")")]
+  ;; 병렬 실행
+  [(= $op "run-parallel")      (str "fl_run_parallel(" (cgc (get $args 0)) ", " (if (>= (length $args) 2) (cgc (get $args 1)) "fl_int(0)") ")")]
   ;; HTTP 클라이언트 (libcurl) — {:status N :body "..." :headers {}}
   [(= $op "http-get")          (str "fl_http_get(" (cgc (get $args 0)) ")")]
   [(= $op "http-post")         (str "fl_http_post(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]

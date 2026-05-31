@@ -315,6 +315,9 @@ FLValue fl_resp_redirect(FLValue url);
 FLValue fl_resp_html_cookie(FLValue body, FLValue cookie);
 FLValue fl_resp_set_cookie(FLValue name, FLValue value, FLValue opts);
 
+/* ── 병렬 실행 ── */
+FLValue fl_run_parallel(FLValue fns, FLValue timeout_ms);
+
 /* ── task-native-stdlib-gap P1 ── */
 FLValue fl_every_p(FLValue pred, FLValue vec);
 FLValue fl_any_p(FLValue pred, FLValue vec);

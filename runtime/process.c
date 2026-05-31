@@ -106,3 +106,93 @@ FLValue _fl_process_spawn(FLValue cmd, FLValue args) {
 /* ── try/catch 런타임 ── */
 extern FLTryFrame fl_try_stack[FL_TRY_MAX];
 extern int fl_try_top;
+
+/* ── 병렬 실행 ── */
+#include <sys/wait.h>
+
+/* fl_run_parallel(fns, timeout_ms)
+ * fns: FL fn 배열 — 각각 fork해서 실행
+ * timeout_ms: 0이면 무제한
+ * 반환: 각 fn 결과의 배열 (실패 시 nil) */
+FLValue fl_run_parallel(FLValue fns, FLValue timeout_ms) {
+    if (fns.tag != FL_VECTOR) return fl_vec_new();
+    FLVector *v = (FLVector *)fns.obj;
+    uint32_t n = v->len;
+    if (n == 0) return fl_vec_new();
+
+    /* 각 자식의 결과 파일 경로 */
+    char **result_paths = malloc(n * sizeof(char *));
+    pid_t *pids = malloc(n * sizeof(pid_t));
+
+    for (uint32_t i = 0; i < n; i++) {
+        result_paths[i] = malloc(64);
+        snprintf(result_paths[i], 64, "/tmp/_fl_par_%d_%u", getpid(), i);
+        pids[i] = -1;
+    }
+
+    /* fork & 실행 */
+    for (uint32_t i = 0; i < n; i++) {
+        pid_t pid = fork();
+        if (pid < 0) {
+            /* fork 실패 — 해당 슬롯 건너뜀 */
+            continue;
+        }
+        if (pid == 0) {
+            /* 자식 프로세스: fn 실행 후 결과 파일에 저장 */
+            FLValue fn = v->data[i];
+            FLValue result = fl_nil();
+            if (fn.tag == FL_FN)
+                result = fl_fn_call(fn, 0, NULL);
+
+            /* 결과를 JSON으로 파일에 쓰기 */
+            FLValue json_result = fl_json_stringify(result);
+            if (json_result.tag == FL_STRING) {
+                FILE *f = fopen(result_paths[i], "w");
+                if (f) {
+                    fputs(((FLString *)json_result.obj)->data, f);
+                    fclose(f);
+                }
+            }
+            /* 자식 종료 — atexit 등 방지 */
+            _exit(0);
+        }
+        pids[i] = pid;
+    }
+
+    /* 모든 자식 대기 */
+    long tms = (timeout_ms.tag == FL_INT) ? timeout_ms.i : 0;
+    (void)tms; /* TODO: timeout 지원 */
+    for (uint32_t i = 0; i < n; i++) {
+        if (pids[i] > 0) waitpid(pids[i], NULL, 0);
+    }
+
+    /* 결과 수집 */
+    FLValue results = fl_vec_new();
+    for (uint32_t i = 0; i < n; i++) {
+        FILE *f = fopen(result_paths[i], "r");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long sz = ftell(f);
+            rewind(f);
+            if (sz > 0) {
+                char *buf = malloc((size_t)sz + 1);
+                size_t rd = fread(buf, 1, (size_t)sz, f);
+                buf[rd] = '\0';
+                FLValue parsed = fl_json_parse(fl_str_val(buf));
+                free(buf);
+                results = fl_vec_push(results, parsed);
+            } else {
+                results = fl_vec_push(results, fl_nil());
+            }
+            fclose(f);
+            remove(result_paths[i]);
+        } else {
+            results = fl_vec_push(results, fl_nil());
+        }
+        free(result_paths[i]);
+    }
+
+    free(result_paths);
+    free(pids);
+    return results;
+}
