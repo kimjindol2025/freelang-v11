@@ -51,12 +51,18 @@ for module in "${RUNTIME_MODULES[@]}"; do
 done
 
 echo "컴파일 중: $INPUT_C → $OUTPUT_BIN"
+# 파일명을 고정된 이름으로 복사: ELF .strtab 결정론성 보장 (L4 고정점)
+CANONICAL_C="/tmp/_cgc_build_input.c"
+cp "$INPUT_C" "$CANONICAL_C"
+RUNTIME_REAL="$(realpath "$RUNTIME_DIR")"
 gcc -Wall -Wextra \
+  -ffile-prefix-map="$RUNTIME_REAL"=runtime \
   -I "$RUNTIME_DIR" \
   -o "$OUTPUT_BIN" \
-  "$INPUT_C" \
+  "$CANONICAL_C" \
   $RUNTIME_SOURCES \
   -lm
+rm -f "$CANONICAL_C"
 
 if [[ $? -eq 0 ]]; then
   echo "✅ 성공: $OUTPUT_BIN ($(stat --format=%s "$OUTPUT_BIN") bytes)"
