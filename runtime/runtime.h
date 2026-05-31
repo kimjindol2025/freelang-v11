@@ -332,6 +332,10 @@ FLValue fl_into(FLValue coll, FLValue items);
 /* ── HTTP 클라이언트 (libcurl) ── */
 /* 반환값: {:status 200 :body "..." :headers {...}} */
 FLValue fl_http_get(FLValue url);
+/* 스트리밍: handler = FL fn(chunk), 반환 {:status N} */
+FLValue fl_http_post_stream(FLValue url, FLValue body, FLValue headers, FLValue handler);
+/* 스트리밍 수집: text_delta만 추출 → {:status N :text "전체"} */
+FLValue fl_http_stream_collect(FLValue url, FLValue body, FLValue headers);
 FLValue fl_http_post(FLValue url, FLValue body, FLValue content_type);
 FLValue fl_http_get_headers(FLValue url, FLValue headers);
 FLValue fl_http_post_headers(FLValue url, FLValue body, FLValue headers);

@@ -989,6 +989,8 @@
   [(= $op "http-post")         (str "fl_http_post(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "http-get-headers")  (str "fl_http_get_headers(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "http-post-headers") (str "fl_http_post_headers(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "http-post-stream")     (str "fl_http_post_stream(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ", " (cgc (get $args 3)) ")")]
+  [(= $op "http-stream-collect") (str "fl_http_stream_collect(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   ;; 유틸 — sleep/now
   [(= $op "sleep")   (str "fl_sleep_ms(" (cgc (get $args 0)) ")")]
   [(= $op "now-ms")  "fl_now_ms()"]

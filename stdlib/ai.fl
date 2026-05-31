@@ -32,6 +32,37 @@
           (do (println "[ai-complete] error:" (get res "status"))
               nil))))))
 
+;; ── 스트리밍 ──
+
+(defn ai-make-headers [api-key]
+  (if (str-starts-with api-key "sk-ant-oat")
+    {"Authorization" (str "Bearer " api-key)
+     "anthropic-version" ANTHROPIC_VERSION
+     "content-type" "application/json"}
+    {"x-api-key" api-key
+     "anthropic-version" ANTHROPIC_VERSION
+     "content-type" "application/json"}))
+
+;; (ai-stream-collect prompt) → 전체 텍스트 문자열 반환
+;; C 레벨에서 SSE 파싱 및 text_delta 축적
+(defn ai-stream-collect [prompt]
+  (ai-stream-collect-model prompt "claude-haiku-4-5-20251001" 1024))
+
+(defn ai-stream-collect-model [prompt model max-tokens]
+  (let [api-key (env-get "ANTHROPIC_API_KEY")]
+    (if (null? api-key)
+      (do (println "[ai-stream] ANTHROPIC_API_KEY 없음") "")
+      (let [headers (ai-make-headers api-key)
+            body (json-stringify
+                   {"model" model
+                    "max_tokens" max-tokens
+                    "stream" true
+                    "messages" [{"role" "user" "content" prompt}]})
+            res (http-stream-collect ANTHROPIC_API body headers)]
+        (if (= (get res "status") 200)
+          (get res "text")
+          (do (println "[ai-stream] error:" (get res "status")) ""))))))
+
 ;; ── OpenAI 호환 ──
 
 (defn ai-openai [prompt base-url api-key model]
