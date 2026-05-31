@@ -1,5 +1,33 @@
 # Changelog
 
+
+## v11.9.0 — Phase 4 완료 (2026-06-01)
+
+### 달성
+- **Native AI Runtime 완성**: FL → C → ELF → Claude API 전체 체인
+- **L4 고정점**: SHA256 `90d01409...` 3세대 동일 (ELF 레벨 재현성)
+- **언어 독립**: 97MB Bun → 343KB 순수 C (300배 경량화)
+
+### 새 기능
+- `stdlib/ai.fl`: ai-complete, ai-stream-collect, OAuth/API key 자동 감지
+- `stdlib/agent.fl`: ReAct loop, 내장 tool (http_get/post, file_read/write)
+- `stdlib/parallel.fl`: fork 기반 병렬 실행 (1.74x 속도)
+- `stdlib/http-stream.fl`: SSE 스트리밍 수집
+- `scripts/repl.sh`: Native REPL (stdin loop, 상태 누적)
+
+### stdlib 추가 (P1 15개)
+flatten, distinct, zip, group-by, frequencies,
+every?, any?, none?, find-first, count-if, repeat,
+map-indexed, mapcat, keep, comp, conj, into
+
+### 에러 품질
+- [FL Error] 형식: 미정의 변수, 인자 부족, 타입 불일치, 0 나누기
+- gcc 에러 → FL 관점 메시지 자동 변환
+
+### Phase 5 예고
+dispatch-app Phase 2 FreeLang 구현 (실전 검증)
+
+
 ---
 
 ## v11.7.10 — 배열 헬퍼 완성 (무작위 선택) (2026-05-14)

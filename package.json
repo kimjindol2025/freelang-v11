@@ -1,7 +1,7 @@
 {
   "name": "freelang-editor",
-  "version": "11.8.0",
-  "description": "FreeLang v11 — AI-Native Self-Hosting Language. Node.js-free native build via bin/cgc-bin.",
+  "version": "11.9.0",
+  "description": "FreeLang v11 — AI-Native Self-Hosting Language. Phase 4 완료: Native AI Runtime + REPL + Parallel + Streaming.",
   "keywords": [
     "ai",
     "language",
@@ -28,5 +28,8 @@
     "@types/jest": "^30.0.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.4.11"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.0"
   }
 }
