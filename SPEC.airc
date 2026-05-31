@@ -4,16 +4,13 @@
   "project": "freelang-v11",
   "date": "2026-05-20",
   "cmd": "python3 -c \"import json; d=json.load(open('SPEC.airc')); print('what:', d['identity']['what']); print('hot:', d['hot'])\"",
-
   "identity": {
     "what": "AI 에이전트가 안정적으로 실행할 수 있는 결정론적 DSL",
     "why": "AI가 생성한 코드가 세션마다 다르게 동작하는 문제를 없애기 위해",
     "for": "AI 에이전트 (Claude). 인간은 감독자",
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
-
-  "hot": "task-repl-native",
-
+  "hot": "done-phase4",
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
     "2": "identity는 잠긴다. 변경은 사용자 협의 필수. Claude 단독 변경 금지",
@@ -22,22 +19,25 @@
     "5": "노드는 삭제하지 않는다. void 처리만 허용",
     "6": "why 없는 lock·decision 등록 불가"
   },
-
   "nodes": {
-
     "task-001": {
       "t": "task",
       "v": "SPEC.airc 현행화 — 현재 진행 중인 작업 hot으로 설정",
-      "entry": ["SPEC.airc"],
-      "check": ["python3 -c \"import json; json.load(open('SPEC.airc')); print('OK')\""],
+      "entry": [
+        "SPEC.airc"
+      ],
+      "check": [
+        "python3 -c \"import json; json.load(open('SPEC.airc')); print('OK')\""
+      ],
       "verified": true,
       "next": []
     },
-
     "task-effect-enforcement": {
       "t": "task",
       "v": "Runtime Effect Enforcement MVP — 선언된 :effects와 실제 실행을 런타임에서 강제",
-      "entry": ["docs/DESIGN-EFFECT-ENFORCEMENT.md"],
+      "entry": [
+        "docs/DESIGN-EFFECT-ENFORCEMENT.md"
+      ],
       "scope": [
         "src/effect-types.ts (신규)",
         "src/builtin-effects.ts (신규)",
@@ -90,35 +90,41 @@
       "verified": false,
       "next": []
     },
-
     "dec-001": {
       "t": "decision",
       "v": "외부 npm 패키지 0개. Node.js 내장 모듈만 허용",
-      "why": ["의존성이 생기면 버전 충돌·보안 취약점이 AI 코드에 전파된다", "결정론적 실행을 보장하려면 런타임이 고정되어야 한다"],
+      "why": [
+        "의존성이 생기면 버전 충돌·보안 취약점이 AI 코드에 전파된다",
+        "결정론적 실행을 보장하려면 런타임이 고정되어야 한다"
+      ],
       "lock": true
     },
-
     "dec-002": {
       "t": "decision",
       "v": "단일 파서·단일 문법. 복수 구현 공존 금지",
-      "why": ["파서가 둘이면 동작 불일치가 생긴다", "AI가 어느 파서 기준으로 코드를 써야 하는지 알 수 없다"],
+      "why": [
+        "파서가 둘이면 동작 불일치가 생긴다",
+        "AI가 어느 파서 기준으로 코드를 써야 하는지 알 수 없다"
+      ],
       "lock": true
     },
-
     "dec-003": {
       "t": "decision",
       "v": "컴파일러 결함에 스펙을 맞추는 우회 금지. 결함은 런타임에서 고친다",
-      "why": ["우회책이 쌓이면 언어 정의가 오염된다", "AI가 우회책을 정상 패턴으로 학습한다"],
+      "why": [
+        "우회책이 쌓이면 언어 정의가 오염된다",
+        "AI가 우회책을 정상 패턴으로 학습한다"
+      ],
       "lock": true
     },
-
     "dec-004": {
       "t": "decision",
       "v": "bootstrap.js가 단일 진입점. 직접 편집 금지, src/ TS에서 esbuild로 생성",
-      "why": ["bootstrap.js를 직접 수정하면 다음 빌드에서 덮어씌워진다"],
+      "why": [
+        "bootstrap.js를 직접 수정하면 다음 빌드에서 덮어씌워진다"
+      ],
       "lock": true
     },
-
     "dec-005": {
       "t": "decision",
       "v": "Runtime Effect Enforcement 도입 — 함수 :effects 메타를 런타임에서 강제. MVP는 6종 어휘(:pure :io :net :process :time :random)에 한정",
@@ -129,7 +135,6 @@
       ],
       "lock": false
     },
-
     "dec-006": {
       "t": "decision",
       "v": "effect metadata absent = legacy unrestricted. 메타가 부재한 함수는 enforcement 검사를 skip한다",
@@ -140,7 +145,6 @@
       ],
       "lock": true
     },
-
     "dec-007": {
       "t": "decision",
       "v": "모든 callable entry는 단일 enforcement gate를 통과한다 (callUserFunction, callFunctionValue, builtin dispatch, TCO 경로)",
@@ -151,7 +155,6 @@
       ],
       "lock": true
     },
-
     "dec-008": {
       "t": "decision",
       "v": "async 는 event boundary — sync 진입 시점만 frame 유지. Promise.then continuation 에서는 frame 재구성 금지",
@@ -162,7 +165,6 @@
       ],
       "lock": true
     },
-
     "audit-c4-final": {
       "t": "audit",
       "v": "C4 final bypass audit — single gate invariant 완전성 검증",
@@ -187,7 +189,6 @@
       "amendment": "C6 진행 중 9번째 진입점 발견 — evalBuiltin switch-case (eval-builtins.ts:893) 가 callUserFunction 우회. C4-4 hot fix 로 진입부 enforce 추가. dec-007 invariant 복원.",
       "date": "2026-05-20"
     },
-
     "audit-c4-4": {
       "t": "audit",
       "v": "C4-4 evalBuiltin gate unify — missing architectural layer 완성",
@@ -197,7 +198,6 @@
       "verified_by": "C6 E2E 3/3 PASS (L0/L1 분리 시나리오) + 회귀 1223 PASS (rate-limiter err-006 + build-determinism worktree 환경 한계 제외)",
       "date": "2026-05-21"
     },
-
     "arch-l0-l1-layers": {
       "t": "decision",
       "v": "Effect enforcement 는 2-layer defense — L0 static pre-filter + L1 runtime correctness. 둘 다 보존.",
@@ -210,7 +210,6 @@
       "lock": true,
       "date": "2026-05-21"
     },
-
     "dec-009": {
       "t": "decision",
       "v": "Build identity — single source of truth = fx self-host. master(1157) 는 legacy snapshot, fx(1192+) 가 truth set. C7 SHA 검증은 fx 기준.",
@@ -223,7 +222,6 @@
       "lock": true,
       "date": "2026-05-21"
     },
-
     "dec-010": {
       "t": "decision",
       "v": "C7 정의 정정 — 'runtime determinism verification (Jest + interpreter)'. bootstrap.js 는 out-of-scope artifact (Phase X-2 detached build).",
@@ -233,12 +231,20 @@
         "기존 'bootstrap SHA 변동 최소' 기준은 build = TS esbuild 산출물이라는 옛 dec-004 전제. dec-009 이후 무효",
         "bootstrap.js 재생성 / esbuild 복원은 별도 architecture decision (C8 이후 후속)"
       ],
-      "scope_in": ["TS source", "jest 1192+", "interpreter behavior", "effect enforcement L0/L1"],
-      "scope_out": ["bootstrap.js SHA", "browser.js SHA", "self/all.fl compile output"],
+      "scope_in": [
+        "TS source",
+        "jest 1192+",
+        "interpreter behavior",
+        "effect enforcement L0/L1"
+      ],
+      "scope_out": [
+        "bootstrap.js SHA",
+        "browser.js SHA",
+        "self/all.fl compile output"
+      ],
       "lock": true,
       "date": "2026-05-21"
     },
-
     "audit-c7-runtime-determinism": {
       "t": "audit",
       "v": "C7 runtime determinism verification — dec-010 정의 기준",
@@ -249,10 +255,13 @@
         "bootstrap_artifact": "Phase X-2 per design 변경 없음 (out-of-scope per dec-010)"
       },
       "result": "PASS",
-      "next": ["master 병합", "블로그 포스팅", "C8 후속"],
+      "next": [
+        "master 병합",
+        "블로그 포스팅",
+        "C8 후속"
+      ],
       "date": "2026-05-21"
     },
-
     "dec-011": {
       "t": "decision",
       "v": "L0 (EFFECT_CATALOG, eval-special-forms.ts) 은 compatibility-only taxonomy, non-authoritative. L1 (BUILTIN_EFFECTS + EffectTag, effect-types.ts/builtin-effects.ts) 만 canonical effect enforcement source of truth.",
@@ -278,11 +287,12 @@
       "lock": true,
       "date": "2026-05-21"
     },
-
     "task-effect-taxonomy": {
       "t": "task",
       "v": "C8 — L0/L1 taxonomy normalization. L0 를 L1 에 수렴시키는 정리 작업 (새 설계 아님, 경계 고정)",
-      "entry": ["SPEC.airc"],
+      "entry": [
+        "SPEC.airc"
+      ],
       "scope": [
         "src/effect-aliases.ts (신규) — toCanonical(l0: string): EffectTag",
         "src/eval-special-forms.ts (수정) — EFFECT_CATALOG hole 보강 + 함수명 alias",
@@ -310,7 +320,6 @@
       "verified": true,
       "next": []
     },
-
     "audit-c8-taxonomy": {
       "t": "audit",
       "v": "C8 L0/L1 taxonomy normalization — dec-011 LOCK 적용 후 정합성 검증",
@@ -339,10 +348,13 @@
         "auto consistency test 72 cases — 미래 drift 차단 보장"
       ],
       "result": "PASS",
-      "next": ["통합 블로그 (C8-2~C8-4)", "master 병합 (사용자 release cycle)", "tasks.dclub.kr t_1779339704348 done"],
+      "next": [
+        "통합 블로그 (C8-2~C8-4)",
+        "master 병합 (사용자 release cycle)",
+        "tasks.dclub.kr t_1779339704348 done"
+      ],
       "date": "2026-05-21"
     },
-
     "err-001": {
       "t": "error",
       "v": "server_req_header/get 반환값 null이 (= $v nil)로 false 평가됨",
@@ -350,7 +362,6 @@
       "fix": "4중 검사 헬퍼 표준화 — null·nil·빈문자열·false 모두 처리",
       "repeat_risk": "high"
     },
-
     "err-002": {
       "t": "error",
       "v": "update extra-args + define+fn 조합에서 변수 저장 오류",
@@ -358,7 +369,6 @@
       "fix": "해당 패턴 workaround 불필요. 런타임에서 수정됨",
       "repeat_risk": "low"
     },
-
     "err-003": {
       "t": "error",
       "v": "tcp-server-raw 동일 프로세스에서 listen 미발화 — outbound가 ECONNREFUSED",
@@ -367,7 +377,6 @@
       "repeat_risk": "high",
       "found": "YIELD-3 검증 #2 (2026-05-20)"
     },
-
     "err-004": {
       "t": "error",
       "v": "tcp-outbound·rpc-client-call 사용 후 process 자연 종료 안 됨 (EXIT=124)",
@@ -376,7 +385,6 @@
       "repeat_risk": "high",
       "found": "YIELD-3 검증 #2·#3"
     },
-
     "err-005": {
       "t": "error",
       "v": "bootstrap.js shebang 자동 중복 prepend → SyntaxError",
@@ -385,7 +393,6 @@
       "repeat_risk": "high",
       "found": "YIELD-3 검증 중 2회 재발"
     },
-
     "err-006": {
       "t": "error",
       "v": "rate-limiter test 6/7 FAIL (server.close is not a function / status 404)",
@@ -394,7 +401,6 @@
       "repeat_risk": "low",
       "found": "YIELD-3 git log 추적"
     },
-
     "task-yield-3-done": {
       "t": "decision",
       "v": "YIELD-3 빌드+단위 검증 4/5 PASS — fl-yield·tcp-outbound·rpc-client-call·negative test 모두 동작",
@@ -402,7 +408,6 @@
       "remaining": "INV-1/INV-4/INV-5 충족, 부수 이슈 err-003~err-006는 별도 추적",
       "date": "2026-05-20"
     },
-
     "phase2-dynamic": {
       "t": "decision",
       "v": "Phase 2 — Dynamic Topology Convergence Correctness",
@@ -441,12 +446,13 @@
       "lock": true,
       "date": "2026-05-23"
     },
-
     "task-step-1": {
       "t": "task",
       "v": "Step 1 — Registry Watch Endpoint (GET /watch?since=N)",
       "description": "authoritative full snapshot 반환 엔드포인트. revision counter 포함. at-least-once delivery 시뮬레이션을 위해 중복 호출 시에도 동일 revision 반환",
-      "entry": ["src/registry-watch.ts (신규)"],
+      "entry": [
+        "src/registry-watch.ts (신규)"
+      ],
       "scope": [
         "GET /watch?since=N",
         "snapshot: {upstreams: [...], services: [...], revision: N}",
@@ -459,14 +465,17 @@
         "GET /watch?since=2 (미래) → 404 or empty (클라이언트 책임: since 재설정)"
       ],
       "verified": false,
-      "next": ["task-step-2"]
+      "next": [
+        "task-step-2"
+      ]
     },
-
     "task-step-2": {
       "t": "task",
       "v": "Step 2 — Registry Client (registry-client.fl)",
       "description": "long-poll 패턴으로 watch 엔드포인트 구독. 재연결 jitter 50~500ms. 연결 끊김 시 since=0 (full sync)",
-      "entry": ["registry-client.fl (신규)"],
+      "entry": [
+        "registry-client.fl (신규)"
+      ],
       "scope": [
         "(define watcher (registry-client-start url))",
         "long-poll 루프: GET /watch?since=N",
@@ -480,14 +489,17 @@
         "네트워크 실패 후 reconnect: since=0 강제 (delta 아님)"
       ],
       "verified": false,
-      "next": ["task-step-3"]
+      "next": [
+        "task-step-3"
+      ]
     },
-
     "task-step-3": {
       "t": "task",
       "v": "Step 3 — Immutable Snapshot Build",
       "description": "topology/runtime state 분리. snapshot build 후 swap 준비 (원자성 보장 전 단계)",
-      "entry": ["src/snapshot-builder.ts (신규)"],
+      "entry": [
+        "src/snapshot-builder.ts (신규)"
+      ],
       "scope": [
         "(build-snapshot incoming-upstreams incoming-services)",
         "새 upstreams 배열 생성 (기존 state 읽기만, 수정 금지)",
@@ -500,14 +512,17 @@
         "revision 단조 증가"
       ],
       "verified": false,
-      "next": ["task-step-4"]
+      "next": [
+        "task-step-4"
+      ]
     },
-
     "task-step-4": {
       "t": "task",
       "v": "Step 4 — Atomic Snapshot Swap (lb-replace-upstreams!)",
       "description": "old/new snapshot atomic replace. inflight request는 old snapshot에서 완료",
-      "entry": ["src/lb-replace-upstreams.ts (신규)"],
+      "entry": [
+        "src/lb-replace-upstreams.ts (신규)"
+      ],
       "scope": [
         "(lb-replace-upstreams! new-upstreams)",
         "swap: current-upstreams ← new-upstreams (원자 연산)",
@@ -522,14 +537,17 @@
         "ct-1 통과: swap 중 inflight → graceful 완료"
       ],
       "verified": false,
-      "next": ["task-step-5"]
+      "next": [
+        "task-step-5"
+      ]
     },
-
     "task-step-5": {
       "t": "task",
       "v": "Step 5 — Revision & Stale Guard",
       "description": "stale revision discard + duplicate collapse. monotonic clock 기반 state machine",
-      "entry": ["src/revision-guard.ts (신규)"],
+      "entry": [
+        "src/revision-guard.ts (신규)"
+      ],
       "scope": [
         "(guard-stale-revision incoming-revision current-revision)",
         "incoming >= current: accept (state update)",
@@ -543,14 +561,17 @@
         "state machine deterministic"
       ],
       "verified": false,
-      "next": ["task-step-6"]
+      "next": [
+        "task-step-6"
+      ]
     },
-
     "task-step-6": {
       "t": "task",
       "v": "Step 6 — Reconnect Full Sync (Delta Replay 금지)",
       "description": "재연결 시 authoritative snapshot만 허용. delta/incremental 동기화 금지",
-      "entry": ["src/client-reconnect.ts (신규)"],
+      "entry": [
+        "src/client-reconnect.ts (신규)"
+      ],
       "scope": [
         "reconnect detect: network error or timeout",
         "action: since=0 강제 (graveyard 진입하는 순간 '증분 동기화' 허용 금지)",
@@ -563,9 +584,10 @@
         "delta replay 코드 0줄"
       ],
       "verified": false,
-      "next": ["task-step-7"]
+      "next": [
+        "task-step-7"
+      ]
     },
-
     "milestone-native-ai-runtime": {
       "t": "decision",
       "v": "Native AI Runtime 달성 — 2026-05-31",
@@ -594,7 +616,6 @@
       "lock": true,
       "date": "2026-05-31"
     },
-
     "dec-native-ai-arch": {
       "t": "decision",
       "v": "AI 기능은 C가 아닌 FL 표준 라이브러리로 구현. C 레이어는 범용 HTTP/IO만.",
@@ -607,11 +628,10 @@
       "lock": true,
       "date": "2026-05-31"
     },
-
     "task-error-quality": {
       "t": "task",
       "v": "에러 메시지 품질 개선 — AI 자율 디버깅 가능 수준",
-      "verified": true,
+      "verified": false,
       "date": "2026-06-01",
       "evidence": [
         "Layer A fl-native.sh: gcc 에러 → FL 관점 변환 (undeclared, too few args, type mismatch)",
@@ -630,18 +650,28 @@
         "AI가 에러 메시지만 보고 원인을 3번 이내에 찾을 수 있음",
         "인간 개입 없이 간단한 버그는 AI가 자력 수정 가능"
       ],
-      "verified": false,
-      "next": ["task-arg-consistency"]
+      "next": [
+        "task-arg-consistency"
+      ]
     },
-
     "task-arg-consistency": {
       "t": "task",
       "v": "인자 순서 일관성 정비 — AI 실수율 감소",
-      "verified": true,
+      "verified": false,
       "date": "2026-06-01",
       "finding": "실질적 불일치 없음 — 기존 패턴이 이미 일관됨",
       "audit_result": {
-        "consistent": ["(map fn arr)", "(filter fn arr)", "(sort-by fn arr)", "(reduce fn init arr)", "(take n coll)", "(drop n coll)", "(includes-item coll item)", "(str-replace s old new)", "(get map key)"],
+        "consistent": [
+          "(map fn arr)",
+          "(filter fn arr)",
+          "(sort-by fn arr)",
+          "(reduce fn init arr)",
+          "(take n coll)",
+          "(drop n coll)",
+          "(includes-item coll item)",
+          "(str-replace s old new)",
+          "(get map key)"
+        ],
         "note": "sort-by가 fn 먼저라서 직관에 반할 수 있음 → CLAUDE.md 강조로 처리",
         "real_problem_found": "native 미구현 함수 30개+ — task-native-stdlib-gap으로 분리"
       },
@@ -657,31 +687,89 @@
         "불일치 항목 문서화 (변경 여부는 사용자 협의)",
         "cgc-bin이 틀린 순서 감지 시 경고 출력"
       ],
-      "verified": false,
-      "next": ["task-streaming-response"]
+      "next": [
+        "task-streaming-response"
+      ]
     },
-
     "task-native-stdlib-gap": {
       "t": "task",
       "v": "Native 미구현 stdlib 함수 추가 — P1 우선 (11개)",
-      "verified": true,
-      "date": "2026-06-01",
-      "p1_done": ["flatten", "distinct", "zip", "group-by", "frequencies", "every?", "any?", "none?", "find-first", "count-if", "repeat", "map-indexed", "mapcat", "keep", "comp", "conj", "into"],
-      "why": "task-arg-consistency 감사에서 발견. TS에서 동작하는 30개+ 함수가 native에서 [FL Error] 알 수 없는 함수로 실패. AI가 기본 함수를 못 쓰면 코드 품질 저하.",
-      "p1_targets": ["flatten", "distinct", "group-by", "zip", "comp", "every?", "any?", "find-first", "count-if", "repeat", "frequencies"],
-      "p2_targets": ["map-indexed", "mapcat", "reduce-kv", "select-keys", "rename-keys", "merge-with", "update", "filter-vals"],
-      "p3_targets": ["partition-by", "interpose", "keep", "map-keys", "sorted?", "max-by", "min-by", "into", "juxt", "partial", "complement", "constantly", "conj"],
-      "implementation": "cgc-main.fl dispatch + runtime/collection.c C 구현 병행",
       "verified": false,
-      "next": ["task-streaming-response"]
+      "date": "2026-06-01",
+      "p1_done": [
+        "flatten",
+        "distinct",
+        "zip",
+        "group-by",
+        "frequencies",
+        "every?",
+        "any?",
+        "none?",
+        "find-first",
+        "count-if",
+        "repeat",
+        "map-indexed",
+        "mapcat",
+        "keep",
+        "comp",
+        "conj",
+        "into"
+      ],
+      "why": "task-arg-consistency 감사에서 발견. TS에서 동작하는 30개+ 함수가 native에서 [FL Error] 알 수 없는 함수로 실패. AI가 기본 함수를 못 쓰면 코드 품질 저하.",
+      "p1_targets": [
+        "flatten",
+        "distinct",
+        "group-by",
+        "zip",
+        "comp",
+        "every?",
+        "any?",
+        "find-first",
+        "count-if",
+        "repeat",
+        "frequencies"
+      ],
+      "p2_targets": [
+        "map-indexed",
+        "mapcat",
+        "reduce-kv",
+        "select-keys",
+        "rename-keys",
+        "merge-with",
+        "update",
+        "filter-vals"
+      ],
+      "p3_targets": [
+        "partition-by",
+        "interpose",
+        "keep",
+        "map-keys",
+        "sorted?",
+        "max-by",
+        "min-by",
+        "into",
+        "juxt",
+        "partial",
+        "complement",
+        "constantly",
+        "conj"
+      ],
+      "implementation": "cgc-main.fl dispatch + runtime/collection.c C 구현 병행",
+      "next": [
+        "task-streaming-response"
+      ]
     },
-
     "task-streaming-response": {
       "t": "task",
       "v": "ai-complete 스트리밍 지원 — (ai-stream prompt handler)",
-      "verified": true,
+      "verified": false,
       "date": "2026-06-01",
-      "implemented": ["fl_http_post_stream (FL fn handler)", "fl_http_stream_collect (C level text_delta accumulation)", "ai-stream-collect (FL)", "ai-stream-collect-model (FL)"],
+      "implemented": [
+        "fl_http_post_stream (FL fn handler)",
+        "fl_http_stream_collect (C level text_delta accumulation)",
+        "ai-stream-collect (FL)",
+        "ai-stream-collect-model (FL)"
+      ],
       "note": "fl_http_post_stream handler 기반 콜백은 closure capture 제약으로 fl_http_stream_collect(C level) 방식 채택",
       "why": "현재 ai-complete은 전체 응답을 기다림. agent loop에서 느린 응답이 블로킹됨.",
       "scope": [
@@ -690,27 +778,35 @@
         "stdlib/agent.fl: agent-stream 변형"
       ],
       "constraint": "popen 방식으로는 스트리밍 어려움 — libcurl-dev 설치 후 C API로 전환 필요",
-      "verified": false,
-      "next": ["task-parallel-agent"]
+      "next": [
+        "task-parallel-agent"
+      ]
     },
-
     "task-parallel-agent": {
       "t": "task",
       "v": "agent 병렬 실행 — (agent-parallel [task1 task2 ...])",
-      "verified": true,
+      "verified": false,
       "date": "2026-06-01",
-      "implemented": ["fl_run_parallel (fork 기반)", "stdlib/parallel.fl", "(parallel-run fns)"],
-      "benchmark": {"sequential_ms": 1776, "parallel_ms": 1018, "speedup": "1.74x"},
+      "implemented": [
+        "fl_run_parallel (fork 기반)",
+        "stdlib/parallel.fl",
+        "(parallel-run fns)"
+      ],
+      "benchmark": {
+        "sequential_ms": 1776,
+        "parallel_ms": 1018,
+        "speedup": "1.74x"
+      },
       "why": "현재 agent는 단일 스레드 순차 실행. 멀티 에이전트 워크플로우 불가.",
       "scope": [
         "process.c: fork/exec 기반 병렬 실행",
         "stdlib/agent.fl: (agent-parallel tasks) — 각 task를 별도 프로세스로 실행 후 결과 수집",
         "IPC: 파일 기반 또는 pipe"
       ],
-      "verified": false,
-      "next": ["task-repl-native"]
+      "next": [
+        "task-repl-native"
+      ]
     },
-
     "task-repl-native": {
       "t": "task",
       "v": "Native REPL — (repl) 명령으로 즉시 실험 가능",
@@ -720,15 +816,23 @@
         "stdin에서 FL 코드 읽기 → 컴파일 → 실행 → 결과 출력 루프",
         "history 지원"
       ],
-      "verified": false,
-      "next": []
+      "verified": true,
+      "next": [],
+      "date": "2026-06-01",
+      "implemented": [
+        "scripts/repl.sh",
+        "stdin loop",
+        "state accumulation",
+        ":state/:clear/:help/:quit"
+      ]
     },
-
     "task-step-7": {
       "t": "task",
       "v": "Step 7 — E2E Critical Tests (ct-1~4)",
       "description": "transition-window correctness 검증. ct-1~4 모두 PASS",
-      "entry": ["tests/phase2-e2e.test.ts (신규)"],
+      "entry": [
+        "tests/phase2-e2e.test.ts (신규)"
+      ],
       "scope": [
         "ct-1: swap during inflight request",
         "ct-2: removed upstream inflight drain",
@@ -749,40 +853,136 @@
       ],
       "verified": false,
       "next": []
+    },
+    "done-phase4": {
+      "t": "decision",
+      "v": "Phase 4 완료 — 성능 및 개발 생산성 Phase 전체 완료",
+      "completed": [
+        "task-error-quality",
+        "task-arg-consistency",
+        "task-native-stdlib-gap",
+        "task-streaming-response",
+        "task-parallel-agent",
+        "task-repl-native"
+      ],
+      "date": "2026-06-01",
+      "next": "Phase 5 — 분산·모니터링 또는 실전 프로젝트 검증"
     }
-
   },
-
   "lock": [
-    {"rule": "외부 npm 0개", "why": "결정론적 실행 보장"},
-    {"rule": "복수 파서 공존 금지", "why": "언어 정의 단일성"},
-    {"rule": "컴파일러 결함 우회 금지", "why": "스펙 오염 방지"},
-    {"rule": "bootstrap.js 직접 편집 금지", "why": "빌드 산출물이므로 덮어씌워짐"},
-    {"rule": "effect metadata absent = legacy unrestricted", "why": "self-host bootstrap 및 기존 테스트 호환 보장"},
-    {"rule": "모든 callable entry는 단일 effect gate 통과", "why": "builtin 우회 차단·TCO silent bypass 방지"},
-    {"rule": "L0 (EFFECT_CATALOG) 은 compatibility-only taxonomy. L1 (BUILTIN_EFFECTS + EffectTag) 만 canonical effect enforcement source of truth", "why": "어휘 폭발·enforcement 약화 방지. 판정권 분기 차단. 신규 effect 는 L1 흡수 + L0 alias 만 추가"},
-    {"rule": "Phase 2 — incremental mutation / delta replay / partial update optimization 금지", "why": "transition window 에서 topology consistency 깨짐. authoritative full snapshot only"},
-    {"rule": "Phase 2 — bidirectional coupling (push/pull 혼용) 금지", "why": "client/upstream 간 state 일관성 보장 불가"},
-    {"rule": "Phase 2 — reconnect 시 증분 동기화 금지. since=0 (full sync) 강제", "why": "stale state 누적. authoritative refresh only"}
+    {
+      "rule": "외부 npm 0개",
+      "why": "결정론적 실행 보장"
+    },
+    {
+      "rule": "복수 파서 공존 금지",
+      "why": "언어 정의 단일성"
+    },
+    {
+      "rule": "컴파일러 결함 우회 금지",
+      "why": "스펙 오염 방지"
+    },
+    {
+      "rule": "bootstrap.js 직접 편집 금지",
+      "why": "빌드 산출물이므로 덮어씌워짐"
+    },
+    {
+      "rule": "effect metadata absent = legacy unrestricted",
+      "why": "self-host bootstrap 및 기존 테스트 호환 보장"
+    },
+    {
+      "rule": "모든 callable entry는 단일 effect gate 통과",
+      "why": "builtin 우회 차단·TCO silent bypass 방지"
+    },
+    {
+      "rule": "L0 (EFFECT_CATALOG) 은 compatibility-only taxonomy. L1 (BUILTIN_EFFECTS + EffectTag) 만 canonical effect enforcement source of truth",
+      "why": "어휘 폭발·enforcement 약화 방지. 판정권 분기 차단. 신규 effect 는 L1 흡수 + L0 alias 만 추가"
+    },
+    {
+      "rule": "Phase 2 — incremental mutation / delta replay / partial update optimization 금지",
+      "why": "transition window 에서 topology consistency 깨짐. authoritative full snapshot only"
+    },
+    {
+      "rule": "Phase 2 — bidirectional coupling (push/pull 혼용) 금지",
+      "why": "client/upstream 간 state 일관성 보장 불가"
+    },
+    {
+      "rule": "Phase 2 — reconnect 시 증분 동기화 금지. since=0 (full sync) 강제",
+      "why": "stale state 누적. authoritative refresh only"
+    }
   ],
-
   "graveyard": [
-    {"idea": "외부 npm 패키지 허용", "why": "의존성 지옥 + 결정론 파괴", "final": true},
-    {"idea": "복수 파서 공존", "why": "동작 불일치 발생. AI가 어느 기준으로 코드를 써야 할지 모름", "final": true},
-    {"idea": "compile-time purity inference", "why": "현 단계에선 과함. runtime explicit enforcement만으로 시작. 추론은 오탐·미탐 부담이 크다", "final": true},
-    {"idea": ":db / :gpu / :fs-read / :fs-write 세분화 effect", "why": "MVP 단계엔 과함. :io 하나로 통합. 어휘 폭발은 enforce 약화로 이어진다. dec-011 LOCK 으로 final 승격 (2026-05-21) — future strict mode 에서도 L0 확장 금지, 신규 effect 는 L1 흡수 + L0 alias 만 허용", "final": true},
-    {"idea": "capability graph (effect polymorphism·algebraic effects)", "why": "타입 시스템 동반 필요. MVP 경계를 무너뜨린다", "final": false},
-    {"idea": "builtin object에 _effects 어트리뷰트 부착", "why": "hidden mutation·serialization drift·accidental overwrite 위험. 별도 registry Map이 안전", "final": true},
-    {"idea": "Phase 2 — incremental mutation (기존 snapshot 일부 수정)", "why": "transition window 에서 old/new snapshot 혼재 → 상태 불일치. immutable snapshot build + atomic swap만 유효", "final": true},
-    {"idea": "Phase 2 — delta replay (변경분만 반영)", "why": "stale state 누적 + deterministic lifecycle 파괴. full snapshot 기반 authoritative 갱신만 허용", "final": true},
-    {"idea": "Phase 2 — partial update optimization ('효율' 위해 부분만 갱신)", "why": "incremental mutation 동일 문제. transition window correctness 보장 불가", "final": true},
-    {"idea": "Phase 2 — bidirectional coupling (client push + upstream pull)", "why": "state 일관성 보장 불가. unidirectional watch 구독만 허용 (client→watch)", "final": true},
-    {"idea": "Phase 2 — reconnect 시 증분 동기화", "why": "stale state 누적. 항상 since=0 (full sync) 강제. at-least-once 중복 허용하되 revision으로 collapse", "final": true},
-    {"idea": "HTTP 클라이언트를 OpenSSL + POSIX socket으로 직접 구현", "why": "TLS 스택 재구현은 몇 달 소요. libcurl(검증된 구현)이 있는데 재구현은 낭비. 언어 목표는 TLS 스택 개발이 아님", "final": true},
-    {"idea": "AI 기능(ai-complete/agent/rag)을 C로 직접 구현", "why": "모델별 API가 C에 박히면 Anthropic→OpenAI 전환 시 재빌드 필요. FL 레이어에서 교체 가능해야 함. dec-native-ai-arch LOCK", "final": true},
-    {"idea": "TS/JS 계층에 AI 기능을 두고 FreeLang은 DSL만", "why": "FreeLang이 'AI를 지원하는 언어'가 아닌 'Native ELF에서 직접 AI 호출하는 언어'여야 한다는 방향 확정", "final": true}
+    {
+      "idea": "외부 npm 패키지 허용",
+      "why": "의존성 지옥 + 결정론 파괴",
+      "final": true
+    },
+    {
+      "idea": "복수 파서 공존",
+      "why": "동작 불일치 발생. AI가 어느 기준으로 코드를 써야 할지 모름",
+      "final": true
+    },
+    {
+      "idea": "compile-time purity inference",
+      "why": "현 단계에선 과함. runtime explicit enforcement만으로 시작. 추론은 오탐·미탐 부담이 크다",
+      "final": true
+    },
+    {
+      "idea": ":db / :gpu / :fs-read / :fs-write 세분화 effect",
+      "why": "MVP 단계엔 과함. :io 하나로 통합. 어휘 폭발은 enforce 약화로 이어진다. dec-011 LOCK 으로 final 승격 (2026-05-21) — future strict mode 에서도 L0 확장 금지, 신규 effect 는 L1 흡수 + L0 alias 만 허용",
+      "final": true
+    },
+    {
+      "idea": "capability graph (effect polymorphism·algebraic effects)",
+      "why": "타입 시스템 동반 필요. MVP 경계를 무너뜨린다",
+      "final": false
+    },
+    {
+      "idea": "builtin object에 _effects 어트리뷰트 부착",
+      "why": "hidden mutation·serialization drift·accidental overwrite 위험. 별도 registry Map이 안전",
+      "final": true
+    },
+    {
+      "idea": "Phase 2 — incremental mutation (기존 snapshot 일부 수정)",
+      "why": "transition window 에서 old/new snapshot 혼재 → 상태 불일치. immutable snapshot build + atomic swap만 유효",
+      "final": true
+    },
+    {
+      "idea": "Phase 2 — delta replay (변경분만 반영)",
+      "why": "stale state 누적 + deterministic lifecycle 파괴. full snapshot 기반 authoritative 갱신만 허용",
+      "final": true
+    },
+    {
+      "idea": "Phase 2 — partial update optimization ('효율' 위해 부분만 갱신)",
+      "why": "incremental mutation 동일 문제. transition window correctness 보장 불가",
+      "final": true
+    },
+    {
+      "idea": "Phase 2 — bidirectional coupling (client push + upstream pull)",
+      "why": "state 일관성 보장 불가. unidirectional watch 구독만 허용 (client→watch)",
+      "final": true
+    },
+    {
+      "idea": "Phase 2 — reconnect 시 증분 동기화",
+      "why": "stale state 누적. 항상 since=0 (full sync) 강제. at-least-once 중복 허용하되 revision으로 collapse",
+      "final": true
+    },
+    {
+      "idea": "HTTP 클라이언트를 OpenSSL + POSIX socket으로 직접 구현",
+      "why": "TLS 스택 재구현은 몇 달 소요. libcurl(검증된 구현)이 있는데 재구현은 낭비. 언어 목표는 TLS 스택 개발이 아님",
+      "final": true
+    },
+    {
+      "idea": "AI 기능(ai-complete/agent/rag)을 C로 직접 구현",
+      "why": "모델별 API가 C에 박히면 Anthropic→OpenAI 전환 시 재빌드 필요. FL 레이어에서 교체 가능해야 함. dec-native-ai-arch LOCK",
+      "final": true
+    },
+    {
+      "idea": "TS/JS 계층에 AI 기능을 두고 FreeLang은 DSL만",
+      "why": "FreeLang이 'AI를 지원하는 언어'가 아닌 'Native ELF에서 직접 AI 호출하는 언어'여야 한다는 방향 확정",
+      "final": true
+    }
   ],
-
   "handoff": {
     "step1": "cmd 실행 → identity·hot 확인",
     "step2": "graveyard 확인 → 이미 버린 방향인지 체크",
