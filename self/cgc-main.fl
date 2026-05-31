@@ -686,10 +686,18 @@
     [(null? $n) "fl_nil()"]
     [(= (get $n :kind) "literal")   (cgc-literal $n)]
     [(= (get $n :kind) "variable")
-      (let [[$cn (c-name (get $n :name))]]
+      (let [[$name (get $n :name)]
+            [$cn   (c-name $name)]
+            [$line (get $n :line)]]
         (if (includes-item @known-defns-atom $cn)
           (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
-          $cn))]
+          ;; 알려진 함수/변수가 아니면 경고 출력 (컴파일 시점)
+          (if (not (includes-item @known-fncall-targets-atom $cn))
+            (do
+              (println (str "[FL Warn] 정의되지 않은 이름: " $name
+                            (if (null? $line) "" (str " (line " $line ")"))))
+              $cn)
+            $cn)))]
     [(= (get $n :kind) "keyword")   (str "fl_str_val(\"" (c-esc (get $n :name)) "\")")]
     [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
     [(= (get $n :kind) "block")     (cgc-block $n)]

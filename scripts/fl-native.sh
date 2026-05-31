@@ -43,17 +43,81 @@ compile_fl_to_c() {
   "$CGC_BIN" "$fl_file" "$c_file" 2>&1
 }
 
+FL_ERROR_PY='
+import sys, re
+shown = set()
+for line in sys.stdin:
+    line = line.rstrip()
+    m = re.search(r"error: .([A-Za-z_][A-Za-z0-9_]*). undeclared", line)
+    if m:
+        name = m.group(1).replace("_", "-")
+        lm = re.search(r":(\d+):\d+:", line)
+        loc = " (line " + lm.group(1) + ")" if lm else ""
+        key = "undef:" + name
+        if key not in shown:
+            shown.add(key)
+            print("[FL Error] 정의되지 않은 이름: " + name + loc)
+        continue
+    m = re.search(r"error: too few arguments to function .([A-Za-z_][A-Za-z0-9_]*)", line)
+    if m:
+        name = m.group(1).replace("_", "-")
+        if "argc:" + name not in shown:
+            shown.add("argc:" + name)
+            print("[FL Error] 함수 \"" + name + "\": 인자가 부족합니다")
+        continue
+    m = re.search(r"error: too many arguments to function .([A-Za-z_][A-Za-z0-9_]*)", line)
+    if m:
+        name = m.group(1).replace("_", "-")
+        if "argcm:" + name not in shown:
+            shown.add("argcm:" + name)
+            print("[FL Error] 함수 \"" + name + "\": 인자가 너무 많습니다")
+        continue
+    if "incompatible type" in line and "error:" in line:
+        lm = re.search(r":(\d+):\d+:", line)
+        loc = " (line " + lm.group(1) + ")" if lm else ""
+        if "type:" + loc not in shown:
+            shown.add("type:" + loc)
+            print("[FL Error] 타입 불일치" + loc)
+        continue
+    m = re.search(r"warning: implicit declaration of function .([A-Za-z_][A-Za-z0-9_]*)", line)
+    if m:
+        name = m.group(1).replace("_", "-")
+        if "impl:" + name not in shown:
+            shown.add("impl:" + name)
+            print("[FL Error] 알 수 없는 함수: " + name)
+        continue
+'
+
+fl_error_from_gcc() {
+  python3 -c "$FL_ERROR_PY" 2>/dev/null
+}
+export FL_ERROR_PY
+export -f fl_error_from_gcc
+
 compile_c_to_bin() {
   local c_file="$1"
   local bin_file="$2"
-  gcc -O2 -Wall -Wextra \
+  local gcc_out
+  gcc_out=$(gcc -O2 -Wall -Wextra \
     -Wno-unused-variable -Wno-unused-parameter \
     -I "$RUNTIME_DIR" \
     -o "$bin_file" \
     "$c_file" \
     "${RUNTIME_SOURCES[@]}" \
     -lm -lpthread -ldl -lssl -lcrypto \
-    2>&1
+    2>&1)
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    local fl_out
+    fl_out=$(echo "$gcc_out" | fl_error_from_gcc 2>/dev/null)
+    if [[ -n "$fl_out" ]]; then
+      echo "$fl_out" >&2
+    else
+      echo "$gcc_out" >&2
+    fi
+    return $rc
+  fi
+  return 0
 }
 
 CMD="${1:-}"
@@ -72,8 +136,8 @@ case "$CMD" in
 
     trap "rm -f '$TMP_C' '$TMP_BIN'" EXIT
 
-    compile_fl_to_c "$FL_FILE" "$TMP_C" >/dev/null
-    compile_c_to_bin "$TMP_C" "$TMP_BIN" >/dev/null
+    compile_fl_to_c "$FL_FILE" "$TMP_C" 2>&1 | grep -v "^Compiled" >&2 || true
+    compile_c_to_bin "$TMP_C" "$TMP_BIN" || exit 1
     exec "$TMP_BIN" "$@"
     ;;
 

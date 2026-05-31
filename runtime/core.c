@@ -50,6 +50,32 @@ bool fl_truthy(FLValue v) {
     }
 }
 
+/* ── 타입 이름 (에러 메시지용) ── */
+
+const char* fl_type_name(FLValue v) {
+    switch (v.tag) {
+        case FL_INT:    return "int";
+        case FL_FLOAT:  return "float";
+        case FL_BOOL:   return "bool";
+        case FL_NIL:    return "nil";
+        case FL_STRING: return "string";
+        case FL_VECTOR: return "array";
+        case FL_MAP:    return "map";
+        case FL_FN:     return "function";
+        default:        return "unknown";
+    }
+}
+
+static void fl_type_error(const char* op, const char* expected, FLValue got) {
+    fprintf(stderr, "[FL Error] TypeError: %s — %s 필요, %s 제공\n",
+            op, expected, fl_type_name(got));
+    exit(1);
+}
+
+static int fl_is_num(FLValue v) {
+    return v.tag == FL_INT || v.tag == FL_FLOAT;
+}
+
 /* ── 문자열 변환 (출력용) ── */
 
 const char* fl_to_str(FLValue v, char* buf, size_t sz) {
@@ -114,6 +140,8 @@ FLValue fl_add(FLValue a, FLValue b) {
         memcpy(obj->data + la, sb, lb + 1);
         FLValue r; r.tag = FL_STRING; r.obj = (FLObject*)obj; return r;
     }
+    if (!fl_is_num(a)) fl_type_error("+ (add)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("+ (add)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
@@ -123,6 +151,8 @@ FLValue fl_add(FLValue a, FLValue b) {
 }
 
 FLValue fl_sub(FLValue a, FLValue b) {
+    if (!fl_is_num(a)) fl_type_error("- (sub)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("- (sub)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
@@ -132,6 +162,8 @@ FLValue fl_sub(FLValue a, FLValue b) {
 }
 
 FLValue fl_mul(FLValue a, FLValue b) {
+    if (!fl_is_num(a)) fl_type_error("* (mul)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("* (mul)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
@@ -141,12 +173,15 @@ FLValue fl_mul(FLValue a, FLValue b) {
 }
 
 FLValue fl_div(FLValue a, FLValue b) {
+    if (!fl_is_num(a)) fl_type_error("/ (div)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("/ (div)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
+        if (bv == 0.0) { fprintf(stderr, "[FL Error] ArithmeticError: 0으로 나눌 수 없습니다\n"); exit(1); }
         return fl_float(av / bv);
     }
-    if (b.i == 0) { fl_throw(fl_make_error("ArithmeticError", "Division by zero")); }
+    if (b.i == 0) { fprintf(stderr, "[FL Error] ArithmeticError: 0으로 나눌 수 없습니다\n"); exit(1); }
     return fl_int(a.i / b.i);
 }
 
