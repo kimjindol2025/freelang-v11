@@ -1624,15 +1624,58 @@
           (recur (+ $i 1)))))))
 
 ;; ── S27 entry point ──────────────────────────────────────────────────────────
+;; 경로에서 디렉토리 부분 추출 ("a/b/c.fl" → "a/b/")
+(defn path-dir [$path]
+  (let [[$len (length $path)]
+        [$last (loop [$i (- $len 1) $r -1]
+                 (if (< $i 0) $r
+                   (if (= (char-at $path $i) "/")
+                     $i
+                     (recur (- $i 1) $r))))]]
+    (if (< $last 0) "" (substring $path 0 (+ $last 1)))))
+
+;; 노드 목록에 서브목록 모두 추가
+(defn append-all [$acc $items]
+  (loop [$i 0 $a $acc]
+    (if (>= $i (length $items)) $a
+      (recur (+ $i 1) (push $a (get $items $i))))))
+
+;; (load "file.fl") 를 컴파일 타임에 인라인 — 재귀적으로 처리
+(defn expand-loads [$nodes $base-dir]
+  (loop [$i 0 $acc []]
+    (if (>= $i (length $nodes))
+      $acc
+      (let [[$node (get $nodes $i)]]
+        (if (and (= (get $node :kind) "sexpr") (= (get $node :op) "load"))
+          (let [[$path-node (get (get $node :args) 0)]
+                [$rel-path  (get $path-node :value)]
+                ;; 절대 경로면 그대로, 상대 경로면 base-dir 우선, 없으면 CWD 기준
+                [$try1 (if (str-starts-with $rel-path "/")
+                          $rel-path
+                          (str $base-dir $rel-path))]
+                [$src1 (file-read $try1)]
+                [$abs-path (if (null? $src1) $rel-path $try1)]
+                [$src  (if (null? $src1) (file-read $rel-path) $src1)]]
+            (if (null? $src)
+              (do (println (str "[load] 파일 없음: " $rel-path))
+                  (recur (+ $i 1) $acc))
+              (let [[$sub-dir  (path-dir $abs-path)]
+                    [$sub-raw  (parse (lex $src))]
+                    [$expanded (expand-loads $sub-raw $sub-dir)]]
+                (recur (+ $i 1) (append-all $acc $expanded)))))
+          (recur (+ $i 1) (push $acc $node)))))))
+
 (defn cgc-run [$argv]
   (let [[$input  (get $argv 0)]
         [$output (get $argv 1)]]
   (if (or (null? $input) (null? $output))
     (println "usage: cgc-bin <input.fl> <output.c>")
-    (let [[$src    (file-read $input)]
-          [$nodes  (parse (lex $src))]
-          [$_v    (ir-validate $nodes)]
-          [$c-code (generate-c $nodes)]]
+    (let [[$src      (file-read $input)]
+          [$base-dir (path-dir $input)]
+          [$raw      (parse (lex $src))]
+          [$nodes    (expand-loads $raw $base-dir)]
+          [$_v      (ir-validate $nodes)]
+          [$c-code   (generate-c $nodes)]]
       (file-write $output $c-code)
       (println (str "Compiled " $input " -> " $output))))))
 
