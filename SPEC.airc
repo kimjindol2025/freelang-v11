@@ -12,7 +12,7 @@
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
 
-  "hot": "task-error-quality",
+  "hot": "task-arg-consistency",
 
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
@@ -611,6 +611,14 @@
     "task-error-quality": {
       "t": "task",
       "v": "에러 메시지 품질 개선 — AI 자율 디버깅 가능 수준",
+      "verified": true,
+      "date": "2026-06-01",
+      "evidence": [
+        "Layer A fl-native.sh: gcc 에러 → FL 관점 변환 (undeclared, too few args, type mismatch)",
+        "Layer B runtime/core.c: fl_add/sub/mul/div nil·타입 에러 즉시 감지",
+        "Layer C cgc-main.fl: 미정의 변수 컴파일 시점 경고",
+        "4개 케이스 모두 [FL Error] 메시지로 개선됨"
+      ],
       "why": "현재 줄 번호만 나옴. AI가 에러 원인을 스스로 파악하지 못하면 인간 없는 자율 운영 불가.",
       "scope": [
         "cgc-bin: 컴파일 에러 시 원인 + 제안 출력 (예: 'arg order: (map fn arr) not (map arr fn)')",
