@@ -565,3 +565,149 @@ FLValue uuid(void) {
     return fl_str_val(buf);
 }
 
+
+/* ── task-native-stdlib-gap P1 신규 함수 ── */
+
+/* (every? pred arr) — 모두 참이면 true */
+FLValue fl_every_p(FLValue pred, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_bool(true);
+    FLVector *v = (FLVector *)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue r = fl_fn_call(pred, 1, &v->data[i]);
+        if (!fl_truthy(r)) return fl_bool(false);
+    }
+    return fl_bool(true);
+}
+
+/* (any? pred arr) — 하나라도 참이면 true */
+FLValue fl_any_p(FLValue pred, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_bool(false);
+    FLVector *v = (FLVector *)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue r = fl_fn_call(pred, 1, &v->data[i]);
+        if (fl_truthy(r)) return fl_bool(true);
+    }
+    return fl_bool(false);
+}
+
+/* (none? pred arr) — 모두 거짓이면 true */
+FLValue fl_none_p(FLValue pred, FLValue vec) {
+    return fl_not(fl_any_p(pred, vec));
+}
+
+/* (find-first pred arr) — 첫 매칭 값, 없으면 nil */
+FLValue fl_find_first(FLValue pred, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_nil();
+    FLVector *v = (FLVector *)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue r = fl_fn_call(pred, 1, &v->data[i]);
+        if (fl_truthy(r)) return v->data[i];
+    }
+    return fl_nil();
+}
+
+/* (count-if pred arr) — 조건 만족 개수 */
+FLValue fl_count_if(FLValue pred, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_int(0);
+    FLVector *v = (FLVector *)vec.obj;
+    int64_t cnt = 0;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue r = fl_fn_call(pred, 1, &v->data[i]);
+        if (fl_truthy(r)) cnt++;
+    }
+    return fl_int(cnt);
+}
+
+/* (repeat n val) — val을 n번 반복한 배열 */
+FLValue fl_repeat(FLValue n, FLValue val) {
+    int64_t cnt = (n.tag == FL_INT) ? n.i : 0;
+    FLValue r = fl_vec_new();
+    for (int64_t i = 0; i < cnt; i++) r = fl_vec_push(r, val);
+    return r;
+}
+
+/* (map-indexed fn arr) — (fn index elem) 으로 map */
+FLValue fl_map_indexed(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector *v = (FLVector *)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue args[2] = { fl_int((int64_t)i), v->data[i] };
+        r = fl_vec_push(r, fl_fn_call(fn, 2, args));
+    }
+    return r;
+}
+
+/* (mapcat fn arr) — map 후 한 단계 flatten */
+FLValue fl_mapcat(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector *v = (FLVector *)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue sub = fl_fn_call(fn, 1, &v->data[i]);
+        if (sub.tag == FL_VECTOR) {
+            FLVector *sv = (FLVector *)sub.obj;
+            for (uint32_t j = 0; j < sv->len; j++) r = fl_vec_push(r, sv->data[j]);
+        } else {
+            r = fl_vec_push(r, sub);
+        }
+    }
+    return r;
+}
+
+/* (keep fn arr) — nil 제거 map */
+FLValue fl_keep(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector *v = (FLVector *)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue val = fl_fn_call(fn, 1, &v->data[i]);
+        if (val.tag != FL_NIL) r = fl_vec_push(r, val);
+    }
+    return r;
+}
+
+/* (comp f g ...) → (fn [x] (f (g (... x)))) 오른쪽부터 실행
+ * C에서는 런타임 함수 합성이 복잡하므로 간단 버전: 2~3 함수만
+ * vararg로 받는 대신 fl_comp(args, n) 형태 */
+FLValue fl_comp_apply(FLClosure *self, int argc, FLValue *argv) {
+    /* env[0] = fn array (FLVector of functions) */
+    FLValue fns = self->env[0];
+    if (fns.tag != FL_VECTOR || argc < 1) return fl_nil();
+    FLVector *v = (FLVector *)fns.obj;
+    FLValue acc = argv[0];
+    /* 오른쪽에서 왼쪽으로 적용 */
+    for (int32_t i = (int32_t)v->len - 1; i >= 0; i--) {
+        acc = fl_fn_call(v->data[i], 1, &acc);
+    }
+    return acc;
+}
+FLValue fl_comp(FLValue fns_val, FLValue count_val) {
+    /* fns_val은 cgc_args로 쌓인 vararg C 배열이 아닌 단일 배열이어야 함.
+     * dispatch에서 fl_comp(cgc_args(args), length(args)) 형태로 호출됨.
+     * 실제로 args 배열 자체를 받으면 안 되고, 함수 목록을 배열로 받아야 함.
+     * 단순화: 두 함수 합성만 지원 */
+    (void)count_val;
+    if (fns_val.tag != FL_VECTOR) return fns_val;
+    FLValue env[1] = { fns_val };
+    return fl_fn_new(fl_comp_apply, 1, env);
+}
+
+/* (conj coll item) — 타입 무관 추가 (배열→push, 맵→assoc) */
+FLValue fl_conj(FLValue coll, FLValue item) {
+    if (coll.tag == FL_VECTOR) return fl_vec_push(coll, item);
+    if (coll.tag == FL_MAP && item.tag == FL_VECTOR) {
+        /* item이 [k v] 쌍 */
+        FLVector *pv = (FLVector *)item.obj;
+        if (pv->len >= 2) return fl_map_set(coll, pv->data[0], pv->data[1]);
+    }
+    return coll;
+}
+
+/* (into coll items) — items를 coll에 모두 추가 */
+FLValue fl_into(FLValue coll, FLValue items) {
+    if (items.tag != FL_VECTOR) return coll;
+    FLVector *v = (FLVector *)items.obj;
+    for (uint32_t i = 0; i < v->len; i++) coll = fl_conj(coll, v->data[i]);
+    return coll;
+}

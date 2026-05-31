@@ -315,6 +315,20 @@ FLValue fl_resp_redirect(FLValue url);
 FLValue fl_resp_html_cookie(FLValue body, FLValue cookie);
 FLValue fl_resp_set_cookie(FLValue name, FLValue value, FLValue opts);
 
+/* ── task-native-stdlib-gap P1 ── */
+FLValue fl_every_p(FLValue pred, FLValue vec);
+FLValue fl_any_p(FLValue pred, FLValue vec);
+FLValue fl_none_p(FLValue pred, FLValue vec);
+FLValue fl_find_first(FLValue pred, FLValue vec);
+FLValue fl_count_if(FLValue pred, FLValue vec);
+FLValue fl_repeat(FLValue n, FLValue val);
+FLValue fl_map_indexed(FLValue fn, FLValue vec);
+FLValue fl_mapcat(FLValue fn, FLValue vec);
+FLValue fl_keep(FLValue fn, FLValue vec);
+FLValue fl_comp(FLValue fns_val, FLValue count_val);
+FLValue fl_conj(FLValue coll, FLValue item);
+FLValue fl_into(FLValue coll, FLValue items);
+
 /* ── HTTP 클라이언트 (libcurl) ── */
 /* 반환값: {:status 200 :body "..." :headers {...}} */
 FLValue fl_http_get(FLValue url);
