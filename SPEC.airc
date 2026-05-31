@@ -12,7 +12,7 @@
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
 
-  "hot": "task-parallel-agent",
+  "hot": "task-repl-native",
 
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
@@ -697,6 +697,10 @@
     "task-parallel-agent": {
       "t": "task",
       "v": "agent 병렬 실행 — (agent-parallel [task1 task2 ...])",
+      "verified": true,
+      "date": "2026-06-01",
+      "implemented": ["fl_run_parallel (fork 기반)", "stdlib/parallel.fl", "(parallel-run fns)"],
+      "benchmark": {"sequential_ms": 1776, "parallel_ms": 1018, "speedup": "1.74x"},
       "why": "현재 agent는 단일 스레드 순차 실행. 멀티 에이전트 워크플로우 불가.",
       "scope": [
         "process.c: fork/exec 기반 병렬 실행",
