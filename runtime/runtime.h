@@ -315,6 +315,13 @@ FLValue fl_resp_redirect(FLValue url);
 FLValue fl_resp_html_cookie(FLValue body, FLValue cookie);
 FLValue fl_resp_set_cookie(FLValue name, FLValue value, FLValue opts);
 
+/* ── HTTP 클라이언트 (libcurl) ── */
+/* 반환값: {:status 200 :body "..." :headers {...}} */
+FLValue fl_http_get(FLValue url);
+FLValue fl_http_post(FLValue url, FLValue body, FLValue content_type);
+FLValue fl_http_get_headers(FLValue url, FLValue headers);
+FLValue fl_http_post_headers(FLValue url, FLValue body, FLValue headers);
+
 /* ── try/catch 인프라 ── */
 #define FL_TRY_MAX 64
 typedef struct { jmp_buf buf; FLValue err; } FLTryFrame;

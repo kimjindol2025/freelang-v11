@@ -22,6 +22,7 @@ RUNTIME_SOURCES=(
   "$RUNTIME_DIR/error.c"
   "$RUNTIME_DIR/process.c"
   "$RUNTIME_DIR/json.c"
+  "$RUNTIME_DIR/http-client.c"
   "$RUNTIME_DIR/crypto.c"
   "$RUNTIME_DIR/http.c"
   "$RUNTIME_DIR/db.c"

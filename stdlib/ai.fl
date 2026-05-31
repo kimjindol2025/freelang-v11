@@ -1,0 +1,44 @@
+;; stdlib/ai.fl — AI Runtime Layer 2
+;; Layer 1(http-post-headers, json-parse/stringify)이 Native에서 동작하는 전제.
+
+;; ── Anthropic Claude ──
+
+(define ANTHROPIC_API "https://api.anthropic.com/v1/messages")
+(define ANTHROPIC_VERSION "2023-06-01")
+
+(defn ai-complete [prompt]
+  (ai-complete-model prompt "claude-opus-4-8" 1024))
+
+(defn ai-complete-model [prompt model max-tokens]
+  (let [api-key (env-get "ANTHROPIC_API_KEY")]
+    (if (null? api-key)
+      (do (println "[ai-complete] ANTHROPIC_API_KEY 없음") nil)
+      (let [body (json-stringify
+                   {"model" model
+                    "max_tokens" max-tokens
+                    "messages" [{"role" "user" "content" prompt}]})
+            res (http-post-headers
+                  ANTHROPIC_API body
+                  {"x-api-key" api-key
+                   "anthropic-version" ANTHROPIC_VERSION
+                   "content-type" "application/json"})]
+        (if (= (get res "status") 200)
+          (let [parsed (json-parse (get res "body"))]
+            (get (get (get parsed "content") 0) "text"))
+          (do (println "[ai-complete] error:" (get res "status"))
+              nil))))))
+
+;; ── OpenAI 호환 ──
+
+(defn ai-openai [prompt base-url api-key model]
+  (let [body (json-stringify
+               {"model" model
+                "messages" [{"role" "user" "content" prompt}]})]
+    (let [res (http-post-headers
+                (str base-url "/chat/completions") body
+                {"Authorization" (str "Bearer " api-key)
+                 "Content-Type" "application/json"})]
+      (if (= (get res "status") 200)
+        (let [parsed (json-parse (get res "body"))]
+          (get (get (get (get parsed "choices") 0) "message") "content"))
+        nil))))

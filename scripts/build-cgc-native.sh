@@ -34,6 +34,7 @@ RUNTIME_MODULES=(
   "error.c"
   "process.c"
   "json.c"
+  "http-client.c"
   "cgc-bridge.c"
 )
 
