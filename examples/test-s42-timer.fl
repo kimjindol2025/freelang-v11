@@ -1,0 +1,42 @@
+;; S42 검증: fl-timeout / fl-interval / fl-cancel-timer
+
+(define log (atom []))
+
+;; 1. fl-timeout: 100ms 후 1회 실행
+(define t1 (fl-timeout 100 (fn [] (swap! log push "timeout-fired"))))
+(println (str "fl-timeout id=" t1))
+
+;; 2. fl-interval: 80ms 마다 반복
+(define count (atom 0))
+(define t2 (fl-interval 80 (fn []
+  (swap! count inc)
+  (swap! log push (str "interval-" @count)))))
+(println (str "fl-interval id=" t2))
+
+;; 3. fl-cancel-timer: 즉시 취소 가능 확인
+(define t3 (fl-timeout 50 (fn [] (swap! log push "should-not-fire"))))
+(define cancelled (fl-cancel-timer t3))
+(println (str "cancel t3=" cancelled))
+
+;; 4. 300ms 대기 후 결과 확인
+(sleep 300)
+
+(println (str "log=" (json-stringify @log)))
+(println (str "interval-count=" @count))
+
+;; 5. interval 취소
+(fl-cancel-timer t2)
+(println "interval cancelled")
+
+;; 검증
+(if (includes-item @log "timeout-fired")
+  (println "PASS: timeout fired")
+  (println "FAIL: timeout did not fire"))
+
+(if (not (includes-item @log "should-not-fire"))
+  (println "PASS: cancelled timer did not fire")
+  (println "FAIL: cancelled timer fired"))
+
+(if (>= @count 2)
+  (println (str "PASS: interval fired " @count " times"))
+  (println (str "FAIL: interval fired only " @count " times")))

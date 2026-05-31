@@ -1,0 +1,78 @@
+;; P0 Linter Test Cases
+;; Expected: 5 violations detected
+
+;; ============================================================
+;; P0-1: $ 파라미터 강제
+;; ============================================================
+
+;; ❌ Violation: defn 파라미터 없는 $
+(defn add [x y]
+  (+ x y))
+
+;; ❌ Violation: fn 파라미터 없는 $
+(let [double (fn [n] (* n 2))]
+  (double 5))
+
+;; ============================================================
+;; P0-2: try-catch 정확한 문법
+;; ============================================================
+
+;; ❌ Violation: fn으로 catch (람다 사용)
+(try
+  (http-get "http://example.com")
+  (fn [error]
+    {:ok false :message (get error "message")}))
+
+;; ============================================================
+;; P0-3: Bearer 토큰
+;; ============================================================
+
+;; ❌ Violation: http-get 헤더 전달 불가
+(let [headers {"Authorization" (str "Bearer " token)}]
+  (http-get "http://api.example.com" headers))
+
+;; ============================================================
+;; P0-4: let 바인딩 각 줄 분리
+;; ============================================================
+
+;; ❌ Violation: let 바인딩 같은 줄
+(let [x 1 y 2]
+  (+ x y))
+
+;; ============================================================
+;; P0-5: json-stringify
+;; ============================================================
+
+;; ❌ Violation: str에 리터럴 맵
+(str "Response: " {:status "ok" :data [1 2 3]})
+
+;; ============================================================
+;; 정상 코드 (모두 OK)
+;; ============================================================
+
+;; ✅ OK: defn with $
+(defn correct-add [$x $y]
+  (+ $x $y))
+
+;; ✅ OK: fn with $
+(let [[$double (fn [$n] (* $n 2))]]
+  (list
+    ($double 5)))
+
+;; ✅ OK: try-catch with catch
+(try
+  (http-get "http://example.com")
+  (catch $error
+    {:ok false :message (get $error "message")}))
+
+;; ✅ OK: http-get-bearer
+(http-get-bearer "http://api.example.com" $token)
+
+;; ✅ OK: let with $ and separated lines
+(let [[$x 1]
+      [$y 2]]
+  (+ $x $y))
+
+;; ✅ OK: json-stringify
+(let [[$response {:status "ok" :data [1 2 3]}]]
+  (println (str "Response: " (json-stringify $response))))

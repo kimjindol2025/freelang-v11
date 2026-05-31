@@ -1,0 +1,396 @@
+FREEDOC {
+  version: 2
+  project: freelang-v11
+  entry: src/eval-builtins.ts
+  spec_type: semantics
+  description: "FreeLang v11 Yield Runtime Semantics — 실행 진행 공식 명세"
+  created: "2026-05-19"
+  status: canonical
+}
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; YIELD-SEMANTICS.fds
+;;
+;; FreeLang v11 의 yield 의미론(execution progression semantics)을 공식
+;; invariant 로 고정한 명세서.
+;;
+;; 이 문서는 다음 구현의 계약서 역할을 한다:
+;;   - fl-yield  (YIELD-2 구현 대상)
+;;   - tcp-outbound / tcp-write / tcp-drop  (YIELD-2)
+;;   - IO Worker SAB ring buffer  (YIELD-1)
+;;   - Starvation Detector  (YIELD-4, 미구현)
+;;   - Procfs /proc/scheduler  (YIELD-5, 미구현)
+;;
+;; 변경 금지 원칙: 구현이 이 명세에 맞아야 한다. 명세를 구현에 맞추지 않는다.
+;; ═══════════════════════════════════════════════════════════════════════
+
+EXECUTION_MODEL {
+  name: "Synchronous Interpreter + Cooperative IO Worker"
+
+  description: """
+    FreeLang v11 인터프리터는 Node.js 위에서 동기(synchronous)로 실행된다.
+    FreeLang 코드의 단 하나의 call-stack이 Node.js main thread를 독점한다.
+    Node.js 이벤트 루프(libuv)의 IO 콜백은 FreeLang 코드가 실행 중인 동안
+    절대 발화(fire)하지 않는다.
+
+    IO를 비동기로 처리하기 위해 IO Worker Thread를 사용한다.
+    Worker는 별도 스레드에서 TCP 이벤트를 감지하고 SharedArrayBuffer
+    ring buffer에 이벤트를 기록한다.
+    FreeLang 코드는 fl-yield를 호출해 이 ring buffer를 드레인(drain)하고
+    등록된 콜백을 동기적으로 실행한다.
+  """
+
+  components: [
+    "FreeLang Interpreter (main thread, synchronous)",
+    "IO Worker Thread (별도 스레드, Node.js async)",
+    "SharedArrayBuffer Ring Buffer (ctrl[4×4B] + dataBuf[8MB])",
+    "fl-yield primitive (ring buffer drain + callback dispatch)"
+  ]
+
+  threading: "2-thread: main(interpreter) + worker(IO)"
+  communication: "SharedArrayBuffer + Atomics (lock-free ring buffer)"
+  io_model: "worker push → main drain on yield"
+}
+
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; SCHEDULER TICK MODEL
+;; ═══════════════════════════════════════════════════════════════════════
+
+SCHEDULER_TICK {
+  name: "fl-yield Scheduler Tick"
+
+  description: """
+    fl-yield 는 FreeLang 런타임의 유일한 스케줄러 틱(tick) 단위다.
+    매 fl-yield 호출마다 아래 순서가 보장된다.
+  """
+
+  tick_sequence: [
+    "1. Atomics.wait(ctrl, NOTIFY_SLOT, 0, ms)  — Worker 신호 대기(최대 ms)",
+    "2. Ring buffer drain: readPos ~ writePos 사이 모든 이벤트 읽기",
+    "3. 이벤트별 등록 콜백 동기 실행 (callFnVal)",
+    "4. Pending 타임아웃 재핑(reaping): 만료된 pending → error 전이",
+    "5. Timer 진행: fl-set-interval 만료 체크 → 콜백 실행"
+  ]
+
+  atomics_slots: {
+    ctrl_0: "writePos — Worker가 기록한 바이트 수 (atomic write by worker)",
+    ctrl_1: "readPos  — Main이 읽은 바이트 수 (atomic write by main)",
+    ctrl_2: "notify   — Worker → Main 깨우기 신호 (Atomics.notify)",
+    ctrl_3: "reserved"
+  }
+
+  guarantee: "fl-yield 반환 후 ring buffer는 완전히 드레인된 상태다"
+
+  timing: {
+    min_ms: 0
+    max_ms: "호출자 지정 (권장: 5ms)"
+    default_ms: 5
+    note: "ms=0이면 Atomics.wait 없이 즉시 드레인만 수행"
+  }
+}
+
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; YIELD INVARIANTS — 5개 공식 불변 조건
+;; ═══════════════════════════════════════════════════════════════════════
+
+INVARIANTS {
+  description: "다음 5개 invariant는 FreeLang v11 런타임 전체에 걸쳐 항상 성립해야 한다."
+
+  INV_1 {
+    id: "INV-LOOP-YIELD"
+    name: "Long-Running Loop Must Yield"
+    statement: """
+      응답을 기다리는 루프(polling loop)는 반드시 fl-yield를 포함해야 한다.
+      fl-yield 없는 루프에서 IO 콜백은 절대 발화하지 않는다.
+    """
+    violation_symptom: "RPC 호출 무한 대기, tcp-outbound 'connect' 이벤트 미수신"
+    compliant_pattern: """
+      (loop [$i 0]
+        (when (< $i MAX)
+          (fl-yield 5)        ;; ← 필수
+          (recur (+ $i 1))))
+    """
+    non_compliant_pattern: """
+      (loop [$i 0]
+        (when (< $i MAX)
+          (recur (+ $i 1))))  ;; ← fl-yield 없음 → 콜백 미발화
+    """
+    enforced_by: "코드 리뷰 + 향후 Starvation Detector (YIELD-4)"
+  }
+
+  INV_2 {
+    id: "INV-NO-BLOCKING-SLEEP"
+    name: "Blocking Sleep Forbidden in Async Path"
+    statement: """
+      tcp-server-raw, tcp-outbound 콜백 컨텍스트(이벤트 핸들러 내부)에서
+      Atomics.wait(blocking) 호출 또는 동기 sleep은 금지된다.
+      이 경로에서의 대기는 반드시 fl-yield(non-blocking drain)를 사용해야 한다.
+    """
+    violation_symptom: "이벤트 루프 완전 차단, 모든 TCP 이벤트 미수신"
+    rationale: """
+      server.fl 주석에서 발견된 선행 규칙:
+      'sleep 기반 루프 금지 — Atomics.wait가 이벤트 루프를 완전히 차단함'
+      이를 공식 invariant로 승격한다.
+    """
+    exceptions: """
+      net-sendrecv-pool 의 Worker 코드 내부(별도 스레드)에서는 허용.
+      main thread 컨텍스트에서만 금지.
+    """
+    enforced_by: "코드 리뷰. main thread Atomics.wait 호출 위치 grep으로 감사"
+  }
+
+  INV_3 {
+    id: "INV-SINGLE-READER"
+    name: "Single Reader Owns Progression"
+    statement: """
+      하나의 tcp-outbound 스트림(up-id)에 대해 ring buffer 읽기 권한은
+      단 하나의 sliding window parser에만 있다.
+      동일 up-id에 복수의 콜백(파서)을 연결하면 스트림 순서 보장이 깨진다.
+    """
+    origin: "rpc-client.fl 헤더 문서 'Single Reader Invariant'의 공식 승격"
+    violation_symptom: "패킷 경계 오탐, 동일 데이터 중복 처리, JSON 파싱 오류"
+    enforced_by: """
+      tcp-outbound 호출 시 up-id → handler 역매핑(-cli-registry)을 단일 atom으로 유지.
+      동일 up-id 재등록 시 기존 핸들러 교체 금지.
+    """
+  }
+
+  INV_4 {
+    id: "INV-CALLBACK-REQUIRES-YIELD"
+    name: "Callback Execution Requires Scheduler Progression"
+    statement: """
+      tcp-outbound, tcp-server-raw에 등록된 FreeLang 콜백은
+      fl-yield 호출 내부(tick sequence step 3)에서만 실행된다.
+      콜백이 다시 IO를 기다리는 경우, 그 콜백 내부에서도 fl-yield를 호출해야 한다.
+    """
+    corollary: """
+      콜백 등록(tcp-outbound 호출) 직후 fl-yield 없이 결과를 참조하면
+      콜백이 아직 실행되지 않은 상태다 → 결과는 nil 또는 :idle 상태.
+    """
+    compliant_pattern: """
+      (tcp-outbound host port "my-handler")
+      ;; "connect" 이벤트 대기
+      (loop [$w 0]
+        (when (and (= (state) :connecting) (< $w 200))
+          (fl-yield 5)   ;; ← 여기서 "connect" 콜백 실행됨
+          (recur (+ $w 1))))
+    """
+  }
+
+  INV_5 {
+    id: "INV-PENDING-AFTER-YIELD"
+    name: "Pending Resolution May Only Occur After Yield Opportunity"
+    statement: """
+      pending map에 등록된 요청(req-id)의 결과는 오직 fl-yield 이후에만
+      :results 맵에 나타날 수 있다.
+      fl-yield 없이 :results를 폴링하는 루프는 무의미하다(stale read).
+    """
+    corollary: """
+      pending 타임아웃 재핑(INV-LOOP-YIELD의 step 4)도 yield 시점에만 발생한다.
+      즉, 타임아웃은 yield가 발생해야만 감지된다.
+    """
+    enforced_by: "rpc-call-timeout 루프에서 fl-yield 없는 폴링 금지 패턴 제거"
+  }
+}
+
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; YIELD-AWARE PRIMITIVES TABLE
+;; ═══════════════════════════════════════════════════════════════════════
+
+PRIMITIVES {
+  description: "FreeLang v11 yield 의미론을 준수하는 핵심 primitive 목록"
+
+  table: [
+    {
+      primitive: "fl-yield"
+      signature: "(fl-yield ms)"
+      semantics: "Scheduler tick: Atomics.wait(ms) → ring buffer drain → callback dispatch"
+      blocks_event_loop: false
+      impl_status: "YIELD-2에서 구현 예정"
+      invariants: ["INV-LOOP-YIELD", "INV-CALLBACK-REQUIRES-YIELD", "INV-PENDING-AFTER-YIELD"]
+    }
+    {
+      primitive: "fl-sleep"
+      signature: "(fl-sleep ms)"
+      semantics: "timer + yield: fl-yield를 ms/5 회 반복 (5ms 단위)"
+      blocks_event_loop: false
+      note: "Node.js setTimeout 기반 구현 금지. fl-yield 루프로 구현해야 INV-2 준수"
+      impl_status: "미구현 (fl-yield 구현 후)"
+    }
+    {
+      primitive: "fl-await"
+      signature: "(fl-await pending-ref timeout-ms)"
+      semantics: "pending-ref가 non-nil이 될 때까지 fl-yield 반복"
+      blocks_event_loop: false
+      impl_status: "미구현"
+    }
+    {
+      primitive: "fl-select"
+      signature: "(fl-select sources timeout-ms)"
+      semantics: "복수 소스 중 최초 도착 이벤트를 fl-yield로 대기"
+      blocks_event_loop: false
+      impl_status: "미구현 (미래 확장)"
+    }
+    {
+      primitive: "tcp-outbound"
+      signature: "(tcp-outbound host port handler-fn-name)"
+      semantics: "IO Worker에 connect 명령 전달 → up-id 반환. connect 이벤트는 yield 시 발화"
+      blocks_event_loop: false
+      impl_status: "YIELD-2에서 구현 예정"
+      invariants: ["INV-SINGLE-READER", "INV-CALLBACK-REQUIRES-YIELD"]
+    }
+    {
+      primitive: "tcp-server-raw"
+      signature: "(tcp-server-raw port handler-fn-name)"
+      semantics: "IO Worker에 TCP listen 명령. accept/data/close 이벤트는 yield 시 발화"
+      blocks_event_loop: false
+      impl_status: "fl-gateway에서 검증됨. YIELD-2 Worker 통합으로 공식화"
+      invariants: ["INV-CALLBACK-REQUIRES-YIELD", "INV-NO-BLOCKING-SLEEP"]
+    }
+    {
+      primitive: "tcp-write"
+      signature: "(tcp-write conn-id data)"
+      semantics: "IO Worker에 write 명령. 동기 반환. 실제 전송은 Worker가 처리"
+      blocks_event_loop: false
+      impl_status: "YIELD-2에서 구현 예정"
+    }
+    {
+      primitive: "tcp-drop"
+      signature: "(tcp-drop conn-id)"
+      semantics: "IO Worker에 close 명령. close 이벤트는 yield 시 발화"
+      blocks_event_loop: false
+      impl_status: "YIELD-2에서 구현 예정"
+    }
+    {
+      primitive: "fl-set-interval"
+      signature: "(fl-set-interval ms fn-name)"
+      semantics: "fl-yield tick sequence step 5에서 만료 체크 → 콜백 실행"
+      blocks_event_loop: false
+      impl_status: "기존 구현 (Node.js setInterval 기반). YIELD 통합 시 재검토 필요"
+    }
+  ]
+}
+
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; STARVATION DETECTION (미구현 — YIELD-4)
+;; ═══════════════════════════════════════════════════════════════════════
+
+STARVATION_DETECTOR {
+  status: "planned (YIELD-4)"
+  description: """
+    IO Worker가 ring buffer에 이벤트를 기록했으나 main thread가 fl-yield를
+    호출하지 않아 이벤트가 드레인되지 않는 상태를 탐지한다.
+  """
+
+  detection_condition: """
+    Worker가 데이터를 ring buffer에 기록한 시점(write_ts)부터
+    main이 readPos를 진행시킨 시점(read_ts)까지의 차이:
+      drain_latency = read_ts - write_ts > STARVATION_THRESHOLD_MS
+  """
+
+  threshold_ms: 200
+  note: """
+    200ms = 20 * 10ms (fl-yield 권장 주기 10ms 기준 20회 누락).
+    이 값을 초과하면 INV-LOOP-YIELD 위반이 거의 확실하다.
+  """
+
+  event_format: {
+    type: "scheduler.starvation"
+    source: "runtime"
+    data: {
+      loop_ms: "마지막 fl-yield 이후 경과 시간 (ms)"
+      pending_events: "드레인 대기 중인 이벤트 수"
+      drain_lag_ms: "write_ts ~ 현재 시간 차이"
+    }
+  }
+
+  action_on_detect: [
+    "bus-publish! scheduler.starvation 이벤트",
+    "/proc/scheduler 에 starvation 카운터 갱신",
+    "콘솔 경고 출력 (debug 모드)"
+  ]
+}
+
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; PROCFS SCHEDULER INTROSPECTION (미구현 — YIELD-5)
+;; ═══════════════════════════════════════════════════════════════════════
+
+PROCFS_SCHEDULER {
+  status: "planned (YIELD-5)"
+  description: "실시간 스케줄러 상태를 /proc/scheduler 가상 파일로 노출"
+
+  mount_path: "/proc/scheduler"
+  handler: "proc-scheduler"
+
+  fields: {
+    yield_count: "현재 세션의 총 fl-yield 호출 횟수"
+    yield_freq_hz: "초당 fl-yield 호출 빈도 (rolling 10s)"
+    last_yield_ms: "마지막 fl-yield로부터 경과 시간 (ms)"
+    pending_count: "현재 pending map에 등록된 요청 수"
+    active_callbacks: "등록된 IO 콜백 수 (tcp-outbound + tcp-server-raw)"
+    starvation_count: "감지된 starvation 이벤트 누적 수"
+    starvation_last_ms: "마지막 starvation 이후 경과 시간 (ms, 없으면 nil)"
+    ring_buffer_usage_pct: "ring buffer 사용률 (writePos - readPos) / 8MB * 100"
+  }
+
+  integration: "freelang-procfs/procfs.fl의 proc-dispatch에 'scheduler' 케이스 추가"
+}
+
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; IMPLEMENTATION CHECKLIST
+;; ═══════════════════════════════════════════════════════════════════════
+
+IMPLEMENTATION {
+  order: [
+    {task: "YIELD-1", scope: "IO Worker SAB 설계", invariants_enabled: []},
+    {task: "YIELD-2", scope: "fl-yield + tcp-outbound/write/drop", invariants_enabled: ["INV-1","INV-2","INV-3","INV-4","INV-5"]},
+    {task: "YIELD-3", scope: "빌드 + 단위 검증", validates: "INV-1 INV-4 INV-5"},
+    {task: "YIELD-4", scope: "Starvation Detector", validates: "INV-1 INV-2"},
+    {task: "YIELD-5", scope: "Procfs /proc/scheduler", observes: "all invariants"}
+  ]
+
+  validation_criteria: """
+    YIELD-3 검증 기준 (INV 충족 판정):
+    1. (fl-yield 5) 단독 호출 → 오류 없음, 0~5ms 소요
+    2. tcp-outbound로 echo 서버 연결 → fl-yield 루프 내 "connect" 이벤트 수신
+    3. RPC call(rpc-call-timeout) → fl-yield 루프로 응답 수신 성공
+    4. fl-yield 없는 루프에서 IO 이벤트 미수신 확인 (negataive test)
+    5. 기존 tcp-server-raw 회귀 없음 (fl-gateway 연기능 정상)
+  """
+}
+
+
+;; ═══════════════════════════════════════════════════════════════════════
+;; KNOWN CONSTRAINTS
+;; ═══════════════════════════════════════════════════════════════════════
+
+CONSTRAINTS {
+  C1: """
+    fl-yield 내 Atomics.wait 는 SharedArrayBuffer NOTIFY_SLOT(ctrl[2])에 대해서만 허용.
+    main thread에서 다른 목적의 Atomics.wait 사용 = INV-2 위반.
+  """
+
+  C2: """
+    ring buffer(8MB) 포화 시 Worker는 이벤트를 드롭한다.
+    이는 데이터 손실이다. 향후 백프레셔(backpressure) 메커니즘 필요.
+    현 단계: 포화 시 Worker가 starvation 이벤트 발생 (YIELD-4 구현 후).
+  """
+
+  C3: """
+    fl-yield ms 인자는 최소 0, 최대 권장값 100ms.
+    너무 큰 값(>500ms)은 타임아웃 정확도를 낮춘다.
+    rpc-call의 기본값 5ms(RPC-YIELD-MS)가 표준 참조값.
+  """
+
+  C4: """
+    tcp-server-raw는 YIELD-2 이전에 이미 fl-gateway에서 사용 중.
+    기존 구현(Node.js net.createServer 기반)과 YIELD-2 Worker 기반 구현의
+    인터페이스는 동일해야 한다 (conn-id, handler(type,id,data) 시그니처 불변).
+  """
+}

@@ -1,0 +1,9 @@
+;; YIELD-3 검증 #1: (fl-yield 5) 단독 호출 — 오류 없음, 0~5ms 소요
+(define t0 (now-ms))
+(fl-yield 5)
+(define t1 (now-ms))
+(define elapsed (- t1 t0))
+(println (str "fl-yield(5) elapsed_ms=" elapsed))
+(if (and (>= elapsed 0) (<= elapsed 20))
+  (println "[PASS] #1 fl-yield basic")
+  (println (str "[FAIL] #1 elapsed out of range: " elapsed)))

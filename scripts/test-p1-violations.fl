@@ -1,0 +1,123 @@
+;; P1 Linter Test Cases
+;; Expected: 6 violations detected
+
+;; ============================================================
+;; P1-1: DB 절대경로 (1 violation)
+;; ============================================================
+
+;; ❌ Violation: db-query 상대경로
+(try
+  (db-query "schema.db" "SELECT * FROM users")
+  (catch $e nil))
+
+;; ✅ OK: 절대경로
+(try
+  (db-query "/home/kimjin/kim/db/schema.db" "SELECT * FROM users")
+  (catch $e nil))
+
+;; ============================================================
+;; P1-2: HTTP 응답 json-parse (1 violation)
+;; ============================================================
+
+;; ❌ Violation: http-get 응답 직접 (get) 사용
+(try
+  (let [[$resp (http-get "http://api.example.com/users")]]
+    (str "Status: " (get $resp "status")))
+  (catch $e nil))
+
+;; ✅ OK: json-parse 사용
+(try
+  (let [[$resp (http-get "http://api.example.com/users")]
+        [$data (json-parse $resp)]]
+    (str "Status: " (get $data "status")))
+  (catch $e nil))
+
+;; ============================================================
+;; P1-3: 라우트 params 구조 (1 violation)
+;; ============================================================
+
+;; ❌ Violation: 중첩 get (get (get ...))
+(try
+  (let [[$id (get (get $req "params") "id")]]
+    (db-get "/home/kimjin/kim/db/schema.db" {:id $id}))
+  (catch $e nil))
+
+;; ✅ OK: req-param 헬퍼
+(try
+  (let [[$id (req-param $req "id")]]
+    (db-get "/home/kimjin/kim/db/schema.db" {:id $id}))
+  (catch $e nil))
+
+;; ============================================================
+;; P1-4: 문자열 보간 (1 violation)
+;; ============================================================
+
+;; ❌ Violation: (str) 인자 4개 이상
+(str "name=" $name "&age=" $age "&email=" $email "&city=" $city)
+
+;; ✅ OK: 백틱 보간
+(str `name=${$name}&age=${$age}&email=${$email}&city=${$city}`)
+
+;; ============================================================
+;; P1-5: 타입 안전성 (1 violation)
+;; ============================================================
+
+;; ❌ Violation: db-get 결과 nil 체크 없음
+(try
+  (let [[$user (db-get "/home/kimjin/kim/db/schema.db" {:id 1})]]
+    (str "Name: " (get $user "name")))
+  (catch $e nil))
+
+;; ✅ OK: nil 체크 있음
+(try
+  (let [[$user (db-get "/home/kimjin/kim/db/schema.db" {:id 1})]]
+    (if $user
+      (str "Name: " (get $user "name"))
+      "Unknown"))
+  (catch $e nil))
+
+;; ============================================================
+;; P1-6: 에러 처리 (1 violation)
+;; ============================================================
+
+;; ❌ Violation: http-post try-catch 없음
+(http-post "http://api.example.com/users" {:name "John"})
+
+;; ✅ OK: try-catch 있음
+(try
+  (http-post "http://api.example.com/users" {:name "John"})
+  (catch $e
+    (do
+      (println "ERROR: 요청 실패:" $e)
+      nil)))
+
+;; ============================================================
+;; 정상 코드 (모두 OK)
+;; ============================================================
+
+;; ✅ OK: db-query 절대경로 + try-catch
+(try
+  (db-query "/home/kimjin/kim/db/schema.db" "SELECT * FROM logs")
+  (catch $e nil))
+
+;; ✅ OK: http-get json-parse + try-catch
+(try
+  (let [[$resp (http-get "http://api.example.com")]]
+    (let [[$data (json-parse $resp)]]
+      (get $data "status")))
+  (catch $e nil))
+
+;; ✅ OK: req-param + try-catch
+(try
+  (let [[$user-id (req-param $req "user-id")]]
+    (db-get "/home/kimjin/kim/db/schema.db" {:id $user-id}))
+  (catch $e nil))
+
+;; ✅ OK: 보간 2-3개 인자
+(str "id=" $id "&name=" $name)
+
+;; ✅ OK: safe-get으로 nil 처리
+(try
+  (let [[$record (db-get "/home/kimjin/kim/db/schema.db" {:id 1})]]
+    (safe-get $record "value"))
+  (catch $e nil))

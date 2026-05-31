@@ -1,0 +1,92 @@
+;; Test Suite for Closure Capture (Phase B-2)
+;; Tests 6 closure patterns to validate capture semantics
+
+;; ── Pattern 1: No Capture (Pure Function) ──
+(defn test-pure-fn []
+  (let [[$inc (fn [$x] (+ $x 1))]]
+    (if (= ($inc 5) 6)
+      "✅ Pattern 1: Pure function (no capture) PASS"
+      "❌ Pattern 1 FAIL")))
+
+;; ── Pattern 2: Single Variable Capture ──
+(defn make-adder [$n]
+  (fn [$x] (+ $x $n)))
+
+(defn test-single-capture []
+  (let [[$add5 (make-adder 5)]
+        [$result ($add5 3)]]
+    (if (= $result 8)
+      "✅ Pattern 2: Single variable capture PASS"
+      (str "❌ Pattern 2 FAIL (expected 8, got " $result ")"))))
+
+;; ── Pattern 3: Multiple Variable Capture ──
+(defn make-multiplier [$x $y]
+  (fn [$z] (* $x $y $z)))
+
+(defn test-multiple-capture []
+  (let [[$mult (make-multiplier 2 3)]
+        [$result ($mult 4)]]
+    ;; 2 * 3 * 4 = 24
+    (if (= $result 24)
+      "✅ Pattern 3: Multiple variable capture PASS"
+      (str "❌ Pattern 3 FAIL (expected 24, got " $result ")"))))
+
+;; ── Pattern 4: Nested Closure ──
+(defn make-power [$base]
+  (fn [$exp]
+    (fn [$mul]
+      (* (pow $base $exp) $mul))))
+
+(defn pow [$b $e]
+  (if (<= $e 0) 1
+    (* $b (pow $b (- $e 1)))))
+
+(defn test-nested-capture []
+  (let [[$power2 (make-power 2)]
+        [$power2-3 ($power2 3)]
+        [$result ($power2-3 10)]]
+    ;; 2^3 = 8, 8 * 10 = 80
+    (if (= $result 80)
+      "✅ Pattern 4: Nested closure PASS"
+      (str "❌ Pattern 4 FAIL (expected 80, got " $result ")"))))
+
+;; ── Pattern 5: Closure in Filter ──
+(defn filter-greater-than [$threshold]
+  (fn [$x] (> $x $threshold)))
+
+(defn test-closure-in-filter []
+  (let [[$gt5 (filter-greater-than 5)]
+        [$items [1 3 5 7 9]]
+        ;; Manually filter since we may not have HOF yet
+        [$result (if ($gt5 7) "pass" "fail")]]
+    (if (= $result "pass")
+      "✅ Pattern 5: Closure in filter context PASS"
+      "❌ Pattern 5 FAIL")))
+
+;; ── Pattern 6: Closure Recursion ──
+(defn countdown-maker [$start]
+  (fn [$n]
+    (if (<= $n 0)
+      "done"
+      (let [[$next (countdown-maker (- $n 1))]]
+        ($next (- $n 1))))))
+
+(defn test-recursive-closure []
+  (let [[$countdown (countdown-maker 3)]
+        [$result ($countdown 2)]]
+    (if (= $result "done")
+      "✅ Pattern 6: Recursive closure PASS"
+      (str "❌ Pattern 6 FAIL (got " $result ")"))))
+
+;; ── Main test runner ──
+(defn run-closure-tests []
+  (do
+    (println (test-pure-fn))
+    (println (test-single-capture))
+    (println (test-multiple-capture))
+    (println (test-nested-capture))
+    (println (test-closure-in-filter))
+    (println (test-recursive-closure))
+    "Closure tests completed"))
+
+(run-closure-tests)

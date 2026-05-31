@@ -1,9 +1,11 @@
 #ifndef FREELANG_RUNTIME_H
 #define FREELANG_RUNTIME_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
+#include <setjmp.h>
 
 /* ── ABI 헌법 (self/ABI.md) ── */
 
@@ -40,6 +42,27 @@ typedef struct {
     uint32_t len;
     char     data[];
 } FLString;
+
+/* ── S5: Heap Object System ── */
+
+typedef struct {
+    FLValue key;
+    FLValue val;
+} FLMapEntry;
+
+typedef struct {
+    FLObject  base;   /* type = FL_VECTOR */
+    uint32_t  len;
+    uint32_t  cap;
+    FLValue*  data;
+} FLVector;
+
+typedef struct {
+    FLObject    base;  /* type = FL_MAP */
+    uint32_t    len;
+    uint32_t    cap;
+    FLMapEntry* entries;
+} FLMap;
 
 /* ── 값 생성 ── */
 FLValue fl_int(int64_t v);
@@ -81,5 +104,223 @@ FLValue fl_print(FLValue v);
 /* ── 파일 I/O ── */
 FLValue fl_file_read(FLValue path);
 FLValue fl_file_write(FLValue path, FLValue content);
+
+/* ── Vector ── */
+FLValue fl_vec_new(void);
+FLValue fl_vec_from(FLValue* items, uint32_t n);
+FLValue fl_vec_get(FLValue vec, FLValue idx);
+FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val);
+FLValue fl_vec_push(FLValue vec, FLValue val);
+FLValue fl_vec_len(FLValue vec);
+FLValue fl_vec_first(FLValue vec);
+FLValue fl_vec_rest(FLValue vec);
+FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
+
+/* ── Map ── */
+FLValue fl_map_new(void);
+FLValue fl_map_from_pairs(FLValue* kv, uint32_t n); /* n = 쌍의 수 */
+FLValue fl_map_get(FLValue map, FLValue key);
+FLValue fl_map_set(FLValue map, FLValue key, FLValue val);
+FLValue fl_map_len(FLValue map);
+
+/* ── S7: Closure ── */
+typedef struct FLClosure {
+    FLObject base;   /* type = FL_FN */
+    FLValue (*call)(struct FLClosure* self, int argc, FLValue* argv);
+    uint32_t nenv;
+    FLValue  env[];  /* flexible array — captured values */
+} FLClosure;
+
+FLValue fl_fn_new(FLValue (*call)(FLClosure*, int, FLValue*),
+                  uint32_t nenv, FLValue* env);
+FLValue fl_fn_call(FLValue fn, int argc, FLValue* argv);
+
+/* ── S8: 고차함수 ── */
+FLValue fl_map_fn(FLValue fn, FLValue vec);
+FLValue fl_filter_fn(FLValue fn, FLValue vec);
+FLValue fl_reduce_fn(FLValue fn, FLValue init, FLValue vec);
+
+/* ── S9: 맵 accessor ── */
+FLValue fl_map_keys(FLValue map);
+FLValue fl_map_vals(FLValue map);
+FLValue fl_map_entries(FLValue map);
+
+/* ── S22: argv ── */
+void    fl_init_argv(int argc, char** argv);
+FLValue fl_get_argv(void);
+
+/* ── S12: bridge builtins (FL generic) ── */
+FLValue null_p(FLValue v);
+FLValue get(FLValue obj, FLValue key);
+FLValue length(FLValue obj);
+FLValue char_at(FLValue str, FLValue idx);
+
+/* ── S15: stdlib bridge ── */
+FLValue fl_floor(FLValue x);
+FLValue fl_ceil(FLValue x);
+FLValue fl_abs(FLValue x);
+FLValue fl_math_sqrt(FLValue x);
+FLValue fl_sleep_ms(FLValue ms);
+FLValue fl_now(void);
+FLValue fl_now_ms(void);
+FLValue string_p(FLValue v);
+FLValue array_p(FLValue v);
+FLValue list_p(FLValue v);
+FLValue map_p(FLValue v);
+FLValue fn_p(FLValue v);
+FLValue type_of(FLValue v);
+FLValue str_replace(FLValue s, FLValue from, FLValue to);
+FLValue split(FLValue s, FLValue sep);
+FLValue join(FLValue vec, FLValue sep);
+FLValue range(FLValue start, FLValue end);
+FLValue char_code_at(FLValue s, FLValue idx);
+FLValue substring(FLValue s, FLValue start, FLValue end);
+FLValue trim(FLValue s);
+FLValue index_of(FLValue vec, FLValue val);
+FLValue str_index_of(FLValue s, FLValue sub);
+
+/* ── S26: atom (mutable cell) ── */
+FLValue fl_atom_new(FLValue init);
+FLValue fl_atom_deref(FLValue atom);
+FLValue fl_atom_reset(FLValue atom, FLValue val);
+
+/* ── S26: stdlib bridge ── */
+FLValue fl_includes_item(FLValue vec, FLValue item);
+FLValue fl_str_includes(FLValue s, FLValue sub);
+FLValue fl_str_starts_with(FLValue s, FLValue prefix);
+FLValue fl_str_ends_with(FLValue s, FLValue suffix);
+FLValue fl_string_p(FLValue v);
+FLValue fl_number_p(FLValue v);
+FLValue fl_boolean_p(FLValue v);
+FLValue fl_integer_p(FLValue v);
+FLValue fl_float_p(FLValue v);
+FLValue fl_array_p(FLValue v);
+FLValue fl_map_p(FLValue v);
+FLValue fl_fn_p(FLValue v);
+FLValue fl_empty_p(FLValue v);
+FLValue fl_not_empty_p(FLValue v);
+FLValue fl_nil_or_empty_p(FLValue v);
+FLValue fl_str_to_num(FLValue s);
+FLValue fl_html_escape(FLValue s);
+FLValue fl_get_in(FLValue m, FLValue keys);
+FLValue fl_map_vals_fn(FLValue fn, FLValue map);
+FLValue fl_sort_by(FLValue fn, FLValue vec);
+FLValue fl_obj_omit(FLValue map, FLValue keys);
+FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
+FLValue fl_vec_last(FLValue vec);
+FLValue fl_vec_first(FLValue vec);
+FLValue fl_vec_rest(FLValue vec);
+FLValue fl_map_del(FLValue map, FLValue key);
+FLValue fl_map_merge(FLValue a, FLValue b);
+FLValue fl_concat(FLValue a, FLValue b);
+
+/* ── S27: FL 소스 → AST (cgc-bridge.c + parser.c에서 제공) ── */
+FLValue fl_parse(FLValue src);
+
+/* ── JSON ── */
+FLValue fl_json_parse(FLValue src);
+FLValue fl_json_stringify(FLValue val);
+
+/* ── 비트 연산 ── */
+FLValue fl_bit_xor(FLValue a, FLValue b);
+FLValue fl_bit_and(FLValue a, FLValue b);
+FLValue fl_bit_or(FLValue a, FLValue b);
+FLValue fl_bit_shl(FLValue a, FLValue b);
+FLValue fl_bit_shr(FLValue a, FLValue b);
+
+/* ── _fl_process_* ── */
+FLValue _fl_process_getcwd(void);
+FLValue _fl_process_chdir(FLValue path);
+FLValue _fl_process_pid(void);
+FLValue _fl_process_ppid(void);
+FLValue _fl_process_kill(FLValue pid);
+FLValue _fl_process_exists(FLValue pid);
+FLValue _fl_process_wait(FLValue pid);
+FLValue _fl_process_run(FLValue cmd);
+FLValue _fl_process_run_args(FLValue cmd, FLValue args);
+FLValue _fl_run_inherit(FLValue cmd);
+FLValue _fl_process_exec(FLValue cmd);
+FLValue _fl_process_exec_args(FLValue cmd, FLValue args);
+FLValue _fl_process_spawn(FLValue cmd, FLValue args);
+
+/* ── _fl_file_* / _fl_env_* / str_join ── */
+FLValue _fl_file_append(FLValue path, FLValue content);
+FLValue file_exists(FLValue path);
+FLValue _fl_file_delete(FLValue path);
+FLValue _fl_file_copy(FLValue src, FLValue dst);
+FLValue _fl_file_rename(FLValue old, FLValue nw);
+FLValue _fl_file_size(FLValue path);
+FLValue _fl_file_modified(FLValue path);
+FLValue _fl_file_mkdir(FLValue path);
+FLValue _fl_file_rmdir(FLValue path);
+FLValue _fl_file_list(FLValue path);
+FLValue _fl_file_is_file(FLValue path);
+FLValue _fl_file_is_dir(FLValue path);
+FLValue _fl_env_get(FLValue key);
+FLValue _fl_env_set(FLValue key, FLValue val);
+FLValue _fl_env_all(void);
+FLValue str_join(FLValue sep, FLValue vec);
+
+/* ── N-08: 컬렉션 함수 ── */
+FLValue sort(FLValue vec);
+FLValue reverse(FLValue vec);
+FLValue flatten(FLValue vec);
+FLValue distinct(FLValue vec);
+FLValue take(FLValue n, FLValue vec);
+FLValue drop(FLValue n, FLValue vec);
+FLValue zip(FLValue a, FLValue b);
+FLValue partition(FLValue n, FLValue vec);
+FLValue interpose(FLValue sep, FLValue vec);
+FLValue group_by(FLValue fn, FLValue vec);
+FLValue frequencies(FLValue vec);
+FLValue keys(FLValue map);
+FLValue vals(FLValue map);
+FLValue entries(FLValue map);
+FLValue dissoc(FLValue map, FLValue key);
+FLValue select_keys(FLValue map, FLValue ks);
+FLValue fl_min2(FLValue a, FLValue b);
+FLValue fl_max2(FLValue a, FLValue b);
+
+/* ── N-07: 문자열 함수 ── */
+FLValue str_split(FLValue s, FLValue sep);
+FLValue str_to_upper(FLValue s);
+FLValue str_to_lower(FLValue s);
+FLValue str_trim(FLValue s);
+FLValue str_pad_left(FLValue s, FLValue width, FLValue ch);
+FLValue str_pad_right(FLValue s, FLValue width, FLValue ch);
+FLValue str_repeat(FLValue s, FLValue n);
+FLValue uuid(void);
+
+/* ── 암호화 (crypto.c) ── */
+FLValue fl_jwt_sign(FLValue payload_map, FLValue secret, FLValue exp_sec);
+FLValue fl_jwt_verify(FLValue token, FLValue secret);
+FLValue fl_jwt_expired(FLValue token);
+FLValue fl_hash_password(FLValue pw);
+FLValue fl_verify_password(FLValue pw, FLValue hash);
+
+/* ── N-06: SQLite3 DB ── */
+FLValue fl_db_open(FLValue path);
+FLValue fl_db_close(FLValue handle);
+FLValue fl_db_query(FLValue handle, FLValue sql, FLValue params);
+FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params);
+
+/* ── N-05: HTTP 서버 (POSIX socket) ── */
+FLValue fl_http_route(FLValue method, FLValue pattern, FLValue handler);
+FLValue fl_http_start(FLValue port);
+FLValue fl_http_stop(void);
+FLValue fl_resp_html(FLValue body);
+FLValue fl_resp_json(FLValue val);
+FLValue fl_resp_status(FLValue code, FLValue msg);
+FLValue fl_resp_redirect(FLValue url);
+FLValue fl_resp_html_cookie(FLValue body, FLValue cookie);
+FLValue fl_resp_set_cookie(FLValue name, FLValue value, FLValue opts);
+
+/* ── try/catch 인프라 ── */
+#define FL_TRY_MAX 64
+typedef struct { jmp_buf buf; FLValue err; } FLTryFrame;
+extern FLTryFrame fl_try_stack[FL_TRY_MAX];
+extern int fl_try_top;
+void fl_throw(FLValue err);
+FLValue fl_make_error(const char* type, const char* msg);
 
 #endif /* FREELANG_RUNTIME_H */

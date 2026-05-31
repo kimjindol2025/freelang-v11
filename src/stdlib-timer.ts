@@ -130,5 +130,78 @@ export function createTimerModule(interpreter: any) {
         throw new Error(`timer_clear_all failed: ${err.message}`);
       }
     },
+
+    // fl-timeout ms fn -> number — (fl-timeout 1000 (fn [] ...))
+    "fl-timeout": (ms: number, fn: any): number => {
+      if (typeof ms !== "number" || ms < 0) throw new Error(`fl-timeout: ms must be non-negative number, got ${ms}`);
+      if (!fn) throw new Error(`fl-timeout: fn required`);
+      const timerId = nextTimerId++;
+      const callback = () => {
+        try { interpreter.callFunctionValue(fn, []); } catch (err: any) { console.error(`fl-timeout[${timerId}] error:`, err.message); }
+        timerRegistry.delete(timerId);
+      };
+      timerRegistry.set(timerId, setTimeout(callback, ms));
+      return timerId;
+    },
+
+    // fl-interval ms fn -> number — (fl-interval 1000 (fn [] ...))
+    "fl-interval": (ms: number, fn: any): number => {
+      if (typeof ms !== "number" || ms < 1) throw new Error(`fl-interval: ms must be positive number, got ${ms}`);
+      if (!fn) throw new Error(`fl-interval: fn required`);
+      const timerId = nextTimerId++;
+      const callback = () => {
+        try { interpreter.callFunctionValue(fn, []); } catch (err: any) { console.error(`fl-interval[${timerId}] error:`, err.message); }
+      };
+      timerRegistry.set(timerId, setInterval(callback, ms));
+      return timerId;
+    },
+
+    // fl-cancel-timer id -> boolean — cancels both timeout and interval
+    "fl-cancel-timer": (timerId: number): boolean => {
+      const nodeTimer = timerRegistry.get(timerId);
+      if (nodeTimer === undefined) return false;
+      clearTimeout(nodeTimer as any);
+      clearInterval(nodeTimer as any);
+      timerRegistry.delete(timerId);
+      return true;
+    },
+
+    // fl-run-loop ms -> number — setInterval 기반 자동 event queue drain (S41)
+    // 매 ms마다 __flEventQueue를 완전히 비운다. TCP 서버와 함께 사용.
+    "fl-run-loop": (ms: number): number => {
+      if (typeof ms !== "number" || ms < 1) throw new Error(`fl-run-loop: ms must be positive, got ${ms}`);
+      const timerId = nextTimerId++;
+      const callback = () => {
+        const q: any[] = (globalThis as any).__flEventQueue ?? [];
+        if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
+        while (q.length > 0) {
+          const ev = q.shift();
+          try {
+            const r = interpreter.callUserFunction(ev.handler, ev.args);
+            const o = r != null ? String(r) : "";
+            if (o && ev.sock && !ev.sock.destroyed) {
+              try { ev.sock.write(o.endsWith("\n") ? o : o + "\n"); } catch (we: any) {
+                (globalThis as any).__flErrorQueue.push(["io-err", "recoverable", "write", we.message]);
+              }
+            }
+          } catch (e: any) {
+            const isFatal = e.message?.includes("Maximum call stack") || e.message?.includes("out of memory");
+            (globalThis as any).__flErrorQueue.push(["io-err", isFatal ? "fatal" : "recoverable", "handler", e.message]);
+            if (ev.sock && !ev.sock.destroyed) try { ev.sock.write(`ERR ${e.message}\n`); } catch {}
+          }
+        }
+      };
+      timerRegistry.set(timerId, setInterval(callback, ms));
+      return timerId;
+    },
+
+    // fl-run-loop-stop id -> boolean — run-loop 중단
+    "fl-run-loop-stop": (timerId: number): boolean => {
+      const nodeTimer = timerRegistry.get(timerId);
+      if (nodeTimer === undefined) return false;
+      clearInterval(nodeTimer as any);
+      timerRegistry.delete(timerId);
+      return true;
+    },
   };
 }

@@ -1,0 +1,24 @@
+;; Gap2/3 독립 검증 (서버 없음)
+
+;; Gap2: 파일 지속성
+(define db-path "/tmp/gap2-test.db")
+(define db1 (db-open db-path))
+(db-exec db1 "CREATE TABLE IF NOT EXISTS t (v TEXT)" [])
+(db-exec db1 "DELETE FROM t" [])
+(db-exec db1 "INSERT INTO t VALUES (?)" ["hello"])
+(db-close db1)
+
+(define db2 (db-open db-path))
+(define rows (db-query db2 "SELECT v FROM t" []))
+(if (= (get (get rows 0) "v") "hello")
+  (println "Gap2: PASS — file persist OK")
+  (println "Gap2: FAIL"))
+
+;; Gap3: 에러 경로
+(define bad (db-query db2 "SELECT * FROM no_such_table" []))
+(if (= (length bad) 0)
+  (println "Gap3: PASS — bad table returns empty")
+  (println "Gap3: FAIL"))
+
+(db-close db2)
+(println "ALL GAP CHECKS DONE")

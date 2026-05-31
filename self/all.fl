@@ -66,22 +66,22 @@
 ;; ── 스킵 (whitespace + ; line comment)
 
 (defn skip-comment-loop [$cur]
-  (loop [$cur $cur]
-    (if (or (at-end? $cur) (= (peek $cur) "\n"))
-      (if (at-end? $cur) $cur (advance $cur))
-      (recur (advance $cur)))))
+  (loop [$st $cur]
+    (if (or (at-end? $st) (= (peek $st) "\n"))
+      (if (at-end? $st) $st (advance $st))
+      (recur (advance $st)))))
 
 (defn skip-comment [$st]
   (skip-comment-loop $st))
 
 (defn skip-ws-loop [$cur]
-  (loop [$cur $cur]
-    (if (at-end? $cur) $cur
-      (let [[$c (peek $cur)]]
+  (loop [$st $cur]
+    (if (at-end? $st) $st
+      (let [[$c (peek $st)]]
         (cond
-          [(is-space? $c) (recur (advance $cur))]
-          [(= $c ";")     (recur (skip-comment $cur))]
-          [true           $cur])))))
+          [(is-space? $c) (recur (advance $st))]
+          [(= $c ";")     (recur (skip-comment $st))]
+          [true           $st])))))
 
 (defn skip-ws [$st]
   (skip-ws-loop $st))
@@ -89,15 +89,15 @@
 ;; ── 숫자 (정수/실수/음수)
 
 (defn read-number-iter [$cur $res_acc $dot $line $col]
-  (loop [$cur $cur $res_acc $res_acc $dot $dot]
-    (if (at-end? $cur) (emit $cur "Number" $res_acc $line $col)
-      (let [[$c (peek $cur)]]
+  (loop [$st $cur $acc $res_acc $has_dot $dot]
+    (if (at-end? $st) (emit $st "Number" $acc $line $col)
+      (let [[$c (peek $st)]]
         (cond
           [(is-digit? $c)
-           (recur (advance $cur) (str $res_acc $c) $dot)]
-          [(and (= $c ".") (not $dot))
-           (recur (advance $cur) (str $res_acc $c) true)]
-          [true (emit $cur "Number" $res_acc $line $col)])))))
+           (recur (advance $st) (str $acc $c) $has_dot)]
+          [(and (= $c ".") (not $has_dot))
+           (recur (advance $st) (str $acc $c) true)]
+          [true (emit $st "Number" $acc $line $col)])))))
 
 (defn read-number-body [$st $acc $has-dot $line $col]
   (read-number-iter $st $acc $has-dot $line $col))
@@ -113,17 +113,17 @@
   [(= $c "\"") "\""] [(= $c "\\") "\\"] [true $c]))
 
 (defn read-string-iter [$cur $res_acc $line $col]
-  (loop [$cur $cur $res_acc $res_acc]
-    (if (at-end? $cur) (emit $cur "String" $res_acc $line $col)
-      (let [[$c (peek $cur)]]
+  (loop [$st $cur $acc $res_acc]
+    (if (at-end? $st) (emit $st "String" $acc $line $col)
+      (let [[$c (peek $st)]]
         (cond
           [(= $c "\"")
-           (emit (advance $cur) "String" $res_acc $line $col)]
+           (emit (advance $st) "String" $acc $line $col)]
           [(= $c "\\")
-           (let [[$st2 (advance $cur)] [$c2 (peek $st2)]]
-             (recur (advance $st2) (str $res_acc (translate-esc $c2))))]
+           (let [[$st2 (advance $st)] [$c2 (peek $st2)]]
+             (recur (advance $st2) (str $acc (translate-esc $c2))))]
           [true
-           (recur (advance $cur) (str $res_acc $c))])))))
+           (recur (advance $st) (str $acc $c))])))))
 
 (defn read-string-body [$st $acc $line $col]
   (read-string-iter $st $acc $line $col))
@@ -136,12 +136,12 @@
 ;; ── 심볼 / 변수 / 키워드 (모두 symbol-char 연속)
 
 (defn read-symbol-iter [$cur $res_acc $line $col $kind]
-  (loop [$cur $cur $res_acc $res_acc]
-    (if (at-end? $cur) (emit $cur $kind $res_acc $line $col)
-      (let [[$c (peek $cur)]]
+  (loop [$st $cur $acc $res_acc]
+    (if (at-end? $st) (emit $st $kind $acc $line $col)
+      (let [[$c (peek $st)]]
         (if (is-symbol-char? $c)
-          (recur (advance $cur) (str $res_acc $c))
-          (emit $cur $kind $res_acc $line $col))))))
+          (recur (advance $st) (str $acc $c))
+          (emit $st $kind $acc $line $col))))))
 
 (defn read-symbol-body-kind [$st $acc $line $col $kind]
   (read-symbol-iter $st $acc $line $col $kind))
@@ -184,8 +184,8 @@
 ;; ── 메인 루프 — 모든 토큰 수집
 
 (defn lex-loop [$cur]
-  (loop [$cur $cur]
-    (let [[$ws (skip-ws $cur)]]
+  (loop [$st $cur]
+    (let [[$ws (skip-ws $st)]]
       (if (at-end? $ws)
         (get $ws :tokens)
         (recur (read-token $ws))))))
@@ -482,8 +482,7 @@
         [(= $op "loop")
          ;; loop: (loop [[$i 0] (< $i 10) (+ $i 1)] body...)
          ;; 형식: (loop [init-binding condition update] body)
-         (let [[$loop-array (if (> (length $rest) 0) (get $rest 0) null)]
-               [$body-start (if (> (length $rest) 1) (get $rest 1) null)]]
+         (let [[$loop-array (if (> (length $rest) 0) (get $rest 0) null)]]
            (if (null? $loop-array)
              (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
              (if (not (= (get $loop-array :kind) "array"))
@@ -1044,6 +1043,12 @@
     "const _fl_server_start = (port) => { const http=require('http'); http.createServer(async(req,res)=>{ const r=__fl_routes.find(r=>r.method===req.method&&r.path===require('url').parse(req.url).pathname); if(r){const result=await(typeof r.fn==='string'?eval(r.fn):r.fn)(req);res.end(String(result));}else{res.statusCode=404;res.end('Not Found');} }).listen(port);console.log('Server on '+port); };"
     "const server_get = _fl_server_get;"
     "const server_start = _fl_server_start;"
+    "const _fl_runLoopReg = new Map(); let _fl_rlNextId = 9000; const _fl_initQ = () => { if(!globalThis.__flEventQueue) globalThis.__flEventQueue=[]; if(!globalThis.__flErrorQueue) globalThis.__flErrorQueue=[]; };"
+    "var fl_event_tick = () => { _fl_initQ(); const q=globalThis.__flEventQueue; if(q.length===0) return 0; const ev=q.shift(); try { const r=typeof ev.handler==='function'?ev.handler(...(ev.args||[])):null; const o=r!=null?String(r):''; if(o&&ev.sock&&!ev.sock.destroyed) try{ev.sock.write(o.endsWith('\\n')?o:o+'\\n');}catch(we){globalThis.__flErrorQueue.push(['io-err','recoverable','write',we.message]);} } catch(e) { const fatal=e.message?.includes('Maximum call stack')||e.message?.includes('out of memory'); globalThis.__flErrorQueue.push(['io-err',fatal?'fatal':'recoverable','handler',e.message]); if(ev.sock&&!ev.sock.destroyed) try{ev.sock.write('ERR '+e.message+'\\n');}catch{} } return 1; };"
+    "var fl_event_drain = () => { _fl_initQ(); let cnt=0; while(globalThis.__flEventQueue.length>0){fl_event_tick();cnt++;} return cnt; };"
+    "var fl_event_queue_size = () => (globalThis.__flEventQueue||[]).length;"
+    "var fl_run_loop = (ms) => { if(typeof ms!=='number'||ms<1) throw new Error('fl-run-loop: ms must be positive, got '+ms); const id=_fl_rlNextId++; _fl_runLoopReg.set(id,setInterval(()=>{_fl_initQ();while(globalThis.__flEventQueue.length>0)fl_event_tick();},ms)); return id; };"
+    "var fl_run_loop_stop = (id) => { const t=_fl_runLoopReg.get(id); if(t===undefined) return false; clearInterval(t); _fl_runLoopReg.delete(id); return true; };"
   ))
 
 (defn runtime-prelude []
@@ -1154,8 +1159,7 @@
     (+ (* hash 33) (char-code-at s i)) (+ i 1))))
 
 (defn hash-fnv1a [s]
-  (let [[fnv-offset 2166136261]
-      [fnv-prime 16777619]]
+  (let [[fnv-offset 2166136261]]
   (hash-fnv-loop (str s) 0 fnv-offset)))
 (defn hash-fnv-loop [s i hash]
   (if (>= i (length s)) (% (abs hash) 2147483647)
@@ -1377,9 +1381,15 @@
           (let [[$input (get $argv 1)]
                 [$extra (slice $argv 2 (length $argv))]]
             (do-run $input $extra))
-          (let [[$input (get $argv 0)]
-                [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
-            (compile-file $input $output))))))))
+          (if (= $cmd "compile")
+            (let [[$input (get $argv 1)]
+                  [$output (if (and (>= (length $argv) 4) (= (get $argv 2) "-o"))
+                              (get $argv 3)
+                              (str $input ".out.js"))]]
+              (compile-file $input $output))
+            (let [[$input (get $argv 0)]
+                  [$output (if (>= (length $argv) 2) (get $argv 1) (str $input ".out.js"))]]
+              (compile-file $input $output)))))))))
 
 ;; Entry point trigger
 (cli-main)

@@ -1,0 +1,29 @@
+;; YIELD-3 검증 #4: fl-yield 없이 IO 이벤트 미수신
+(println "step-1 start")
+(define log-path "/tmp/yield3-neg.log")
+(file-write log-path "")
+(println "step-2 log cleared")
+
+(defn neg-handler [t u d]
+  (file-append log-path (str t "\n")))
+
+(define up (tcp-outbound "127.0.0.1" 1 "neg-handler"))
+(println (str "step-3 up=" up))
+
+;; busy loop 100ms — fl-yield 없음
+(define t0 (now-ms))
+(loop [i 0]
+  (if (< (- (now-ms) t0) 100)
+    (recur (+ i 1))
+    i))
+(println "step-4 busy loop done")
+
+(define logged (file-read log-path))
+(println (str "step-5 logged=[" logged "]"))
+
+(if (or (nil? logged) (= logged ""))
+  (println "[PASS] #4 negative — no events without fl-yield")
+  (println (str "[FAIL] #4 events leaked: " logged)))
+
+(tcp-drop up)
+(println "step-6 done")

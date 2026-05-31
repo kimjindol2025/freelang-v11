@@ -1,0 +1,28 @@
+;; tests/unit/stdlib/map.test.fl — Map Library Unit Tests
+;; 10개 테스트 (맵 함수)
+
+(load "/home/kimjin/freelang-v11/tests/lib/assert.fl")
+
+(test-section "Map Tests")
+
+(define $m {"name" "Alice" "age" 30})
+
+;; 조회
+(assert-eq (get $m "name") "Alice" "get string")
+(assert-eq (get $m "age") 30 "get number")
+(assert-nil (get $m "missing") "get missing key")
+
+;; 갱신
+(define $m2 (assoc $m "age" 31))
+(assert-eq (get $m2 "age") 31 "assoc update")
+(assert-eq (get $m "age") 30 "original unchanged")
+
+;; 키 제거
+(define $m3 (dissoc $m "age"))
+(assert-nil (get $m3 "age") "dissoc removed")
+(assert-eq (get $m3 "name") "Alice" "dissoc kept")
+
+;; 키 목록
+(assert-eq (length (keys $m)) 2 "keys count")
+
+(println "✅ Map tests passed")

@@ -1,0 +1,184 @@
+(define passed (atom 0))
+(define failed (atom 0))
+(defn pass! [label] (println (str "  ✅ " label)) (swap! passed + 1))
+(defn
+  fail!
+  [label msg]
+  (println (str "  ❌ FAIL: " label " — " msg))
+  (swap! failed + 1))
+(defn
+  assert-throws
+  [label thunk]
+  (try
+    (do
+      (thunk)
+      (fail! label "예외 발생해야 하는데 통과됨"))
+    (catch e (pass! label))))
+(defn
+  assert-eq
+  [label expected actual]
+  (if (= (str expected) (str actual))
+    (pass! label)
+    (fail! label (str "expected=" expected " got=" actual))))
+(defn assert-true [label val] (assert-eq label true val))
+(defn assert-false [label val] (assert-eq label false val))
+(defn
+  assert-includes
+  [label substr str-val]
+  (if (str-includes str-val substr)
+    (pass! label)
+    (fail! label (str "'" substr "' not found in '" str-val "'"))))
+(defn
+  assert-not-includes
+  [label substr str-val]
+  (if (not (str-includes str-val substr))
+    (pass! label)
+    (fail! label (str "'" substr "' should NOT be in '" str-val "'"))))
+(println "")
+(println "=== FreeLang v11 보안 패치 검증 테스트 ===")
+(println "")
+(println "[ C-1 ] shell-safe — 인자 배열 실행")
+(let [out (shell-safe "echo" ["hello"])]
+  (assert-includes "shell-safe 정상 실행" "hello" out))
+(assert-throws
+  "shell-safe 비배열 args 거부"
+  (fn [] (shell-safe "echo" "not-an-array")))
+(assert-throws "shell-safe 빈 프로그램 거부" (fn [] (shell-safe "" ["arg"])))
+(println "")
+(println "[ C-3 ] db 식별자 검증 — 테이블명·컬럼명")
+(define TEST_DB "/tmp/fl-security-test.db")
+(db-exec
+  {:type "sqlite" :path TEST_DB}
+  "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)"
+  [])
+(assert-throws
+  "db-insert 악성 테이블명 차단 (세미콜론)"
+  (fn [] (db-insert TEST_DB "users; DROP TABLE users; --" {:name "x"})))
+(assert-throws
+  "db-insert 악성 테이블명 차단 (공백)"
+  (fn [] (db-insert TEST_DB "users WHERE 1=1" {:name "x"})))
+(assert-throws
+  "db-insert 악성 컬럼명 차단"
+  (fn [] (db-insert TEST_DB "users" {"name; DROP TABLE users" "x"})))
+(assert-throws
+  "db-count 악성 테이블명 차단"
+  (fn [] (db-count TEST_DB "users; DROP TABLE users")))
+(println "")
+(println "[ C-3 ] db WHERE 절 — 문자열 차단 / Map 허용")
+(assert-throws
+  "db-delete-row WHERE 문자열 '1=1' 차단"
+  (fn [] (db-delete-row TEST_DB "users" "1=1")))
+(assert-throws
+  "db-delete-row WHERE 문자열 'id=1 OR 1=1' 차단"
+  (fn [] (db-delete-row TEST_DB "users" "id=1 OR 1=1")))
+(assert-throws
+  "db-update WHERE 문자열 차단"
+  (fn [] (db-update TEST_DB "users" {:name "hack"} "id=1 OR 1=1")))
+(db-insert TEST_DB "users" {:name "target" :age 30})
+(let [before (db-count TEST_DB "users")]
+  (db-delete-row TEST_DB "users" {:name "target"})
+  (let [after (db-count TEST_DB "users")]
+    (assert-eq "db-delete-row Map WHERE 정상 동작" (- before 1) after)))
+(db-insert TEST_DB "users" {:name "update-target" :age 25})
+(db-update TEST_DB "users" {:age 26} {:name "update-target"})
+(db-delete-row TEST_DB "users" {:name "update-target"})
+(pass! "db-update Map WHERE 정상 동작")
+(println "")
+(println "[ C-4 ] db-run — 컬럼명 검증")
+(assert-throws
+  "db-run 악성 컬럼명 차단 (세미콜론)"
+  (fn []
+    (db-run
+      TEST_DB
+      "select"
+      {:from "users" :select ["*; DROP TABLE users; --"]})))
+(assert-throws
+  "db-run 악성 테이블명 차단"
+  (fn [] (db-run TEST_DB "select" {:from "users; DROP TABLE users"})))
+(assert-throws
+  "db-run 공백 포함 컬럼명 차단"
+  (fn [] (db-run TEST_DB "select" {:from "users" :select ["name OR 1=1"]})))
+(define TEST_DB_RUN "/tmp/fl-security-dbrun.db")
+(db-exec
+  {:type "sqlite" :path TEST_DB_RUN}
+  "CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY, name TEXT)"
+  [])
+(db-insert TEST_DB_RUN "items" {:name "test"})
+(let [rows (db-run TEST_DB_RUN "select" {:from "items" :select ["*"]})]
+  (assert-true "db-run 정상 select 동작" (not (nil? rows))))
+(println "")
+(println "[ H-4 ] CSRF 토큰 — timingSafeEqual 검증")
+(let [secret "test-secret-key-2026" token (auth-csrf-token secret)]
+  (assert-true "유효한 CSRF 토큰 통과" (auth-csrf-verify token secret))
+  (assert-false "가짜 토큰 차단" (auth-csrf-verify "fake.token" secret))
+  (assert-false "잘못된 형식 차단" (auth-csrf-verify "invalid" secret))
+  (assert-false "빈 토큰 차단" (auth-csrf-verify "" secret))
+  (assert-false "다른 secret으로 차단" (auth-csrf-verify token "wrong-secret"))
+  (assert-false
+    "조작된 서명 차단"
+    (auth-csrf-verify
+      (str (first (str-split token ".")) ".aaaaaaaaaaaaaaaa")
+      secret)))
+(println "")
+(println "[ M-2 ] Redirect — CR/LF 헤더 인젝션 필터")
+(let [
+    resp
+    (server-redirect "/safe
+Set-Cookie: injected=1")
+    loc
+    (get (get resp "headers") "Location")
+  ]
+  (assert-not-includes "CR 제거됨" "" loc)
+  (assert-not-includes "LF 제거됨" "
+" loc)
+  (pass! "헤더 인젝션 차단 (CR/LF 제거 확인)"))
+(let [
+    resp
+    (server-redirect "/path
+X-Injected: evil")
+    loc
+    (get (get resp "headers") "Location")
+  ]
+  (assert-not-includes "LF만 있을 때도 제거" "
+" loc))
+(println "")
+(println "[ M-3 ] 쿠키 domain — 속성 위조 차단")
+(assert-throws
+  "domain CR/LF 인젝션 차단"
+  (fn [] (server-set-cookie "s" "v" {:domain "evil.com
+Set-Cookie: x=1"})))
+(assert-throws
+  "domain 세미콜론 차단"
+  (fn [] (server-set-cookie "s" "v" {:domain "evil.com; Path=/injected"})))
+(assert-throws
+  "domain 슬래시 차단"
+  (fn [] (server-set-cookie "s" "v" {:domain "evil/injected"})))
+(let [cookie (server-set-cookie "session" "abc" {:domain "myapp.com"})]
+  (assert-includes "유효한 domain 통과" "Domain=myapp.com" cookie))
+(let [cookie (server-set-cookie "session" "abc" {:domain "sub.myapp.com"})]
+  (assert-includes "서브도메인 domain 통과" "Domain=sub.myapp.com" cookie))
+(println "")
+(println "[ L-1 ] JWT decode — auth-jwt-verify 와 구분")
+(let [
+    secret
+    "jwt-test-secret"
+    token
+    (auth-jwt-sign {:user_id 1 :role "admin"} secret 3600)
+  ]
+  (assert-true
+    "auth-jwt-verify 유효 토큰 통과"
+    (not (nil? (auth-jwt-verify token secret))))
+  (assert-false
+    "auth-jwt-verify 잘못된 시크릿 차단"
+    (not (nil? (auth-jwt-verify token "wrong"))))
+  (let [decoded (auth-jwt-decode token)]
+    (assert-eq "auth-jwt-decode 페이로드 파싱" 1 (get decoded "user_id"))))
+(println "")
+(println "─────────────────────────────────────────────────────")
+(let [p (deref passed) f (deref failed)]
+  (println (str "결과: " p " PASS / " f " FAIL"))
+  (if (= f 0)
+    (println "✅ 전체 보안 패치 검증 통과")
+    (do
+      (println (str "❌ " f "개 검증 실패"))
+      (error (str f "개 보안 패치 검증 실패")))))

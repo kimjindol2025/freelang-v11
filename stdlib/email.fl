@@ -1,0 +1,167 @@
+;; stdlib/email.fl — SMTP/SendGrid 이메일 클라이언트 (v11.0.0)
+;; (load "stdlib/email.fl")
+;;
+;; 사용법:
+;;   ;; SMTP 설정
+;;   (define mail (email-init-smtp "smtp.gmail.com" 587 "user@gmail.com" "app-password"))
+;;   (email-send mail "from@example.com" "to@example.com" "Subject" "Body")
+;;
+;;   ;; SendGrid 설정 (더 간단함)
+;;   (define mail (email-init-sendgrid "sg_xxxxxxxxx"))
+;;   (email-send mail "from@akl.kr" "to@example.com" "Subject" "Body")
+
+(load "/home/kimjin/freelang-v11/stdlib/http-client.fl")
+
+;; ── SMTP 설정 (Node.js nodemailer) ────────────────────────────────────────────
+
+(defn email-init-smtp [$host $port $user $pass]
+  "SMTP 설정 초기화
+   예: (email-init-smtp \"smtp.gmail.com\" 587 \"user@gmail.com\" \"password\")"
+  {"type" "smtp"
+   "host" $host
+   "port" $port
+   "user" $user
+   "pass" $pass})
+
+;; ── SendGrid 설정 ────────────────────────────────────────────────────────────
+
+(defn email-init-sendgrid [$api-key]
+  "SendGrid API 키로 초기화
+   예: (email-init-sendgrid \"SG_xxxxxxxxxx\")"
+  {"type" "sendgrid"
+   "api_key" $api-key})
+
+;; ── 발송 함수 ────────────────────────────────────────────────────────────────
+
+(defn email-send [$cfg $from $to $subject $body]
+  "이메일 발송 (텍스트)
+   반환: {:ok true :id \"...\"} 또는 {:ok false :error \"...\"}"
+  (cond
+    (= (get $cfg "type") "sendgrid")
+    (-sendgrid-send $cfg $from $to $subject $body nil)
+
+    (= (get $cfg "type") "smtp")
+    (-smtp-send $cfg $from $to $subject $body nil)
+
+    :else
+    {:ok false :error "Unknown email type"}))
+
+(defn email-send-html [$cfg $from $to $subject $html]
+  "이메일 발송 (HTML)
+   반환: {:ok true :id \"...\"} 또는 {:ok false :error \"...\"}"
+  (cond
+    (= (get $cfg "type") "sendgrid")
+    (-sendgrid-send $cfg $from $to $subject nil $html)
+
+    (= (get $cfg "type") "smtp")
+    (-smtp-send $cfg $from $to $subject nil $html)
+
+    :else
+    {:ok false :error "Unknown email type"}))
+
+;; ── 재시도 헬퍼 ──────────────────────────────────────────────────────────────
+
+(defn -exponential-backoff [$attempt]
+  "지수 백오프 계산 (밀리초): 1초, 2초, 4초, ..."
+  (let [$base 1000]
+    (int (* $base (pow 2 $attempt)))))
+
+(defn -should-retry-email? [$status]
+  "이메일 전송 실패 시 재시도 가능 여부 판단
+   재시도 가능: 타임아웃(0), Rate Limit(429), Service Unavailable(503), 5xx
+   재시도 불가: 인증오류(401), 잘못된 수신자(400)"
+  (or (= $status 0)     ;; 타임아웃/연결 오류
+      (= $status 429)   ;; Rate limit
+      (= $status 503)   ;; Service unavailable
+      (>= $status 500)))  ;; Server error (5xx)
+
+;; ── SendGrid 구현 ────────────────────────────────────────────────────────────
+
+(defn -sendgrid-send [$cfg $from $to $subject $text $html]
+  "SendGrid API 호출 (단일 시도)"
+  (let [$payload (json-stringify
+          {"personalizations" [{"to" [{"email" $to}]}]
+           "from" {"email" $from}
+           "subject" $subject
+           "content" [(if $html
+                       {"type" "text/html" "value" $html}
+                       {"type" "text/plain" "value" $text})]})
+        $headers {"Authorization" (str "Bearer " (get $cfg "api_key"))
+                  "Content-Type" "application/json"}
+        $result (http-post "https://api.sendgrid.com/v3/mail/send" $payload $headers)]
+    (if (get $result :ok)
+      {:ok true :id (str (now-ms))}
+      {:ok false :error (str "SendGrid error: " (get $result :status))
+       :status (get $result :status)
+       :retryable (-should-retry-email? (get $result :status))})))
+
+;; ── SMTP 구현 (nodemailer wrapper) ────────────────────────────────────────────
+
+(defn -smtp-send [$cfg $from $to $subject $text $html]
+  "로컬 SMTP 호출 (nodemailer 사용)
+   예제 전용 - 실운영은 email-scheduler 서비스 사용"
+  ;; NOTE: 실제 SMTP 전송은 중앙 email-scheduler 서비스 권장
+  ;; 이 함수는 간단한 테스트/로컬 개발용
+  (try
+    (let [$service-url "http://localhost:40200/api/send-email"
+          $payload (json-stringify
+            {"from" $from
+             "to" $to
+             "subject" $subject
+             "text" $text
+             "html" $html})
+          $result (http-post $service-url $payload {"Content-Type" "application/json"})]
+      (if (get $result :ok)
+        {:ok true :id (str (now-ms))}
+        {:ok false :error (str "SMTP service error: " (get $result :status))}))
+    (catch $e
+      {:ok false :error (str "SMTP unavailable: " $e)})))
+
+;; ── 헬퍼: Gmail 설정 ──────────────────────────────────────────────────────────
+
+(defn email-gmail [$user $app-password]
+  "Gmail SMTP 설정 (App Password)
+   참고: https://support.google.com/accounts/answer/185833"
+  (email-init-smtp "smtp.gmail.com" 587 $user $app-password))
+
+;; ── 헬퍼: 대량 발송 ──────────────────────────────────────────────────────────────
+
+(defn email-batch-send [$cfg $from $recipients $subject $body]
+  "대량 발송 (recipients = [{:to \"...\" :name \"Alice\"}])
+   반환: {:ok true :sent N :results [...]}"
+  (let [$results (map (fn [$r]
+          (email-send $cfg $from (get $r :to) $subject $body))
+        $recipients)
+        $success (filter (fn [$r] (get $r :ok)) $results)]
+    {:ok true
+     :sent (length $success)
+     :failed (- (length $recipients) (length $success))
+     :results $results}))
+
+;; ── 헬퍼: 재시도 ────────────────────────────────────────────────────────────
+
+(defn email-with-retry [$cfg $from $to $subject $body $max-retries]
+  "재시도 포함 이메일 발송 (지수 백오프)
+   - 재시도 가능: 타임아웃(0), 429, 503, 5xx
+   - 재시도 불가: 401(인증), 400(잘못된 주소) 즉시 실패"
+  (loop [$attempt 0]
+    (if (> $attempt $max-retries)
+      {:ok false :error "Max retries exceeded" :attempts $attempt}
+      (let [$result (email-send $cfg $from $to $subject $body)
+            $status (get $result :status)]
+        (if (get $result :ok)
+          {:ok true :id (get $result :id) :attempts (+ $attempt 1)}
+          ;; 실패: 재시도 가능 여부 확인
+          (if (and (-should-retry-email? $status) (< $attempt $max-retries))
+            ;; 재시도 가능 + 재시도 횟수 남음
+            (let [$wait (-exponential-backoff $attempt)]
+              (println (str "[email] Retry attempt " (+ $attempt 1) "/" $max-retries
+                           " after " $wait "ms (status=" $status ")"))
+              (sleep $wait)
+              (recur (+ $attempt 1)))
+            ;; 재시도 불가 또는 재시도 횟수 초과
+            {:ok false
+             :error (str (get $result :error) " - " (if (get $result :retryable) "retries exhausted" "non-retryable"))
+             :status $status
+             :attempts (+ $attempt 1)
+             :retryable (get $result :retryable)}))))))

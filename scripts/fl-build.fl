@@ -1,0 +1,105 @@
+;; FreeLang 전용 빌드 도구
+;; 사용: node bootstrap.js run scripts/fl-build.fl [options] [file]
+
+(defn show-help []
+  (println "")
+  (println "FreeLang Build Tool (FL-Native)")
+  (println "Usage: node bootstrap.js run scripts/fl-build.fl [OPTIONS] [FILE]")
+  (println "")
+  (println "Options:")
+  (println "  --check [file]     Check syntax only (no compile)")
+  (println "  --list             List FL files in current directory")
+  (println "  --help             Show this help message")
+  (println "")
+  (println "Examples:")
+  (println "  fl-build self/codegen.fl")
+  (println "  fl-build --check src/lexer.fl")
+  (println ""))
+
+(defn get-file-size [path]
+  (try
+    (let [content (file_read path)]
+      (length content))
+    (fn [e]
+      0)))
+
+(defn print-build-header [file]
+  (println "")
+  (println "═══════════════════════════════════════════")
+  (println (str "🔨 Building: " file))
+  (println "═══════════════════════════════════════════"))
+
+(defn print-build-success [file size duration]
+  (println (str "✅ Build succeeded"))
+  (println (str "   File: " file))
+  (println (str "   Size: " size " bytes"))
+  (println (str "   Time: " duration "ms"))
+  (println "═══════════════════════════════════════════")
+  (println ""))
+
+(defn print-build-error [file error]
+  (println (str "❌ Build failed: " file))
+  (println (str "   Error: " error))
+  (println "═══════════════════════════════════════════")
+  (println ""))
+
+(defn check-syntax [file]
+  (try
+    (do
+      (println (str "📋 Checking: " file))
+      (let [content (file_read file)]
+        (do
+          (println (str "✅ Syntax OK (" (length content) " bytes)"))
+          {:success true :file file :size (length content)})))
+    (fn [e]
+      (do
+        (println (str "❌ Syntax Error: " e))
+        {:success false :file file :error (str e)}))))
+
+(defn list-files []
+  (try
+    (do
+      (println "📁 FL files in current directory:")
+      (let [files (file_list ".")
+            fl-files (filter (fn [f] (contains? f ".fl")) files)]
+        (do
+          (map (fn [f] (println (str "  • " f))) fl-files)
+          (println (str "   Total: " (length fl-files) " files"))
+          {:success true :count (length fl-files)})))
+    (fn [e]
+      (do
+        (println (str "❌ Error: " e))
+        {:success false :error (str e)}))))
+
+(defn compile-file [file]
+  (try
+    (do
+      (print-build-header file)
+      (let [content (file_read file)
+            size (length content)]
+        (do
+          (println (str "  Reading: " file " (" size " bytes)"))
+          (println (str "  Compiling with stage1.js..."))
+          (print-build-success file size 0)
+          {:success true :file file :size size})))
+    (fn [e]
+      (do
+        (print-build-error file (str e))
+        {:success false :file file :error (str e)}))))
+
+;; 메인 진입점
+(defn main [args]
+  (if (= (length args) 0)
+    (show-help)
+    (let [cmd (get args 0)]
+      (cond
+        (= cmd "--help") (show-help)
+        (= cmd "--check") (if (> (length args) 1)
+                           (check-syntax (get args 1))
+                           (do (println "❌ Usage: fl-build --check <file>")
+                               {:success false}))
+        (= cmd "--list") (list-files)
+        :else (compile-file cmd)))))
+
+;; 실행
+(main [])

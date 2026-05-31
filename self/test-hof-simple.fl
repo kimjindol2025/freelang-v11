@@ -1,0 +1,60 @@
+;; Simple HOF test without for-each
+
+(defn map [$fn $arr]
+  (if (= (length $arr) 0) []
+    (loop [$i 0 $result []]
+      (if (>= $i (length $arr)) $result
+        (recur (+ $i 1) (push $result ($fn (get $arr $i))))))))
+
+(defn filter [$fn $arr]
+  (if (= (length $arr) 0) []
+    (loop [$i 0 $result []]
+      (if (>= $i (length $arr)) $result
+        (let [[$item (get $arr $i)]]
+          (recur (+ $i 1) (if ($fn $item) (push $result $item) $result)))))))
+
+(defn reduce [$fn $init $arr]
+  (if (= (length $arr) 0) $init
+    (loop [$i 0 $acc $init]
+      (if (>= $i (length $arr)) $acc
+        (recur (+ $i 1) ($fn $acc (get $arr $i)))))))
+
+(defn test-map []
+  (let [[$result (map (fn [$x] (* $x 2)) [1 2 3])]]
+    (if (and (= (get $result 0) 2) (= (get $result 1) 4) (= (get $result 2) 6))
+      "✅ H1: map PASS"
+      (str "❌ map FAIL: " $result))))
+
+(defn test-filter []
+  (let [[$result (filter (fn [$x] (> $x 2)) [1 2 3 4 5])]]
+    (if (= (length $result) 3)
+      "✅ H2: filter PASS"
+      (str "❌ filter FAIL: " $result))))
+
+(defn test-reduce []
+  (let [[$result (reduce + 0 [1 2 3 4 5])]]
+    (if (= $result 15)
+      "✅ H3: reduce PASS"
+      (str "❌ reduce FAIL: " $result))))
+
+(defn test-closure-filter []
+  (let [[$threshold 5]
+        [$result (filter (fn [$x] (> $x $threshold)) [1 3 5 7 9])]]
+    (if (= (length $result) 2)
+      "✅ H5: closure in filter PASS"
+      (str "❌ closure filter FAIL: " $result))))
+
+(defn test-nested-map []
+  (let [[$factor 3]
+        [$scale (fn [$x] (* $x $factor))]
+        [$result (map $scale [1 2 3])]]
+    (if (= (get $result 2) 9)
+      "✅ H6: nested closure + map PASS"
+      (str "❌ nested map FAIL: " $result))))
+
+(println (test-map))
+(println (test-filter))
+(println (test-reduce))
+(println (test-closure-filter))
+(println (test-nested-map))
+(println "HOF core tests completed")

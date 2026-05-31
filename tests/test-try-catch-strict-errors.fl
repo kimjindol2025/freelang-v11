@@ -1,0 +1,5 @@
+;; ❌ ERROR CASE 1: lambda instead of catch
+;; This should fail at parse time with Strict syntax error
+(try
+  (+ 1 2)
+  (fn [e] {:error e}))

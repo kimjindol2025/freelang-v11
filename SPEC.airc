@@ -1,0 +1,632 @@
+{
+  "$": "airc-spec",
+  "version": "1.0.0",
+  "project": "freelang-v11",
+  "date": "2026-05-20",
+  "cmd": "python3 -c \"import json; d=json.load(open('SPEC.airc')); print('what:', d['identity']['what']); print('hot:', d['hot'])\"",
+
+  "identity": {
+    "what": "AI 에이전트가 안정적으로 실행할 수 있는 결정론적 DSL",
+    "why": "AI가 생성한 코드가 세션마다 다르게 동작하는 문제를 없애기 위해",
+    "for": "AI 에이전트 (Claude). 인간은 감독자",
+    "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
+  },
+
+  "hot": "phase2-dynamic",
+
+  "constitution": {
+    "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
+    "2": "identity는 잠긴다. 변경은 사용자 협의 필수. Claude 단독 변경 금지",
+    "3": "hot이 가리키는 task가 지금 당장 해야 할 일이다",
+    "4": "오류·실수도 nodes에 기록한다. 성공만 기록하지 않는다",
+    "5": "노드는 삭제하지 않는다. void 처리만 허용",
+    "6": "why 없는 lock·decision 등록 불가"
+  },
+
+  "nodes": {
+
+    "task-001": {
+      "t": "task",
+      "v": "SPEC.airc 현행화 — 현재 진행 중인 작업 hot으로 설정",
+      "entry": ["SPEC.airc"],
+      "check": ["python3 -c \"import json; json.load(open('SPEC.airc')); print('OK')\""],
+      "verified": true,
+      "next": []
+    },
+
+    "task-effect-enforcement": {
+      "t": "task",
+      "v": "Runtime Effect Enforcement MVP — 선언된 :effects와 실제 실행을 런타임에서 강제",
+      "entry": ["docs/DESIGN-EFFECT-ENFORCEMENT.md"],
+      "scope": [
+        "src/effect-types.ts (신규)",
+        "src/builtin-effects.ts (신규)",
+        "src/effect-enforcer.ts (신규)",
+        "src/eval-call-function.ts (수정 — 4개 진입점 gate hook)",
+        "src/runtime-events.ts (수정 — effect-violation 이벤트 타입 추가)"
+      ],
+      "implementation_order": [
+        "1. effect-types.ts",
+        "2. builtin-effects.ts (registry 안정화 우선)",
+        "3. effect-enforcer.ts (registry 기반 검증)",
+        "4. eval-call-function hooks",
+        "5. builtin dispatch gate",
+        "6. runtime-events 확장",
+        "7. 테스트 5종",
+        "8. 회귀 1018개",
+        "9. bootstrap SHA 비교",
+        "10. 블로그/Gogs"
+      ],
+      "order_rationale": "registry가 흔들리면 enforcer 시그니처도 흔들린다. runtime-events 확장은 실제 violation 데이터가 나온 뒤 schema 확정.",
+      "commits": [
+        "C1: docs",
+        "C2: types + registry",
+        "C3: enforcer 엔진 + EFFECT_STACK_TRACE",
+        "C4-1: callUserFunction + callFunctionValue + finally invariant (sync core)",
+        "C4-2: TCO/Raw 4종 (callUserFunctionTCO/callFunctionValueTCO/Raw 2종)",
+        "C4-3: callAsyncFunctionValue + callFunction dispatch + final bypass audit",
+        "C5: runtime-events effect-violation 연동",
+        "C6: T1~T5 + 1129 회귀 + unauthorized builtin matrix",
+        "C7: bootstrap SHA + 블로그/Gogs",
+        "C8 (후속): EFFECT_CATALOG ↔ BUILTIN_EFFECTS taxonomy normalization"
+      ],
+      "split_rationale": "리서치(C4 직전)에서 진입점이 4개가 아닌 8개임을 발견. async/TCO/raw/native fast-path가 한 변곡점에 묶이면 regression provenance가 흐려진다. 의미론 경계(sync일반/trampoline/async-dispatch)로 3분할.",
+      "priority_invariants": [
+        "1. stack leak impossible (push/pop pairing)",
+        "2. enforcement correctness",
+        "3. taxonomy consistency (C8 후속)"
+      ],
+      "branch": "feature/effect-enforcement",
+      "branch_policy": "C1부터 feature/effect-enforcement에서 진행. C7 후 squash 없이 merge.",
+      "success": [
+        "T1: pure→io = FAIL (EffectViolation)",
+        "T2: io→io = PASS",
+        "T3: pure→pure = PASS",
+        "T4: pure→net = FAIL",
+        "T5: runtime-events에 effect-violation 1건 기록",
+        "회귀: 1192+ jest tests PASS (TS + interpreter)",
+        "C7 runtime determinism: jest 결과 + verify-build-deterministic trivial PASS (bootstrap out-of-scope per dec-010)"
+      ],
+      "verified": false,
+      "next": []
+    },
+
+    "dec-001": {
+      "t": "decision",
+      "v": "외부 npm 패키지 0개. Node.js 내장 모듈만 허용",
+      "why": ["의존성이 생기면 버전 충돌·보안 취약점이 AI 코드에 전파된다", "결정론적 실행을 보장하려면 런타임이 고정되어야 한다"],
+      "lock": true
+    },
+
+    "dec-002": {
+      "t": "decision",
+      "v": "단일 파서·단일 문법. 복수 구현 공존 금지",
+      "why": ["파서가 둘이면 동작 불일치가 생긴다", "AI가 어느 파서 기준으로 코드를 써야 하는지 알 수 없다"],
+      "lock": true
+    },
+
+    "dec-003": {
+      "t": "decision",
+      "v": "컴파일러 결함에 스펙을 맞추는 우회 금지. 결함은 런타임에서 고친다",
+      "why": ["우회책이 쌓이면 언어 정의가 오염된다", "AI가 우회책을 정상 패턴으로 학습한다"],
+      "lock": true
+    },
+
+    "dec-004": {
+      "t": "decision",
+      "v": "bootstrap.js가 단일 진입점. 직접 편집 금지, src/ TS에서 esbuild로 생성",
+      "why": ["bootstrap.js를 직접 수정하면 다음 빌드에서 덮어씌워진다"],
+      "lock": true
+    },
+
+    "dec-005": {
+      "t": "decision",
+      "v": "Runtime Effect Enforcement 도입 — 함수 :effects 메타를 런타임에서 강제. MVP는 6종 어휘(:pure :io :net :process :time :random)에 한정",
+      "why": [
+        "선언과 실제 실행의 불일치는 AI 생성 코드의 replay 보장을 깨뜨린다",
+        "정적 :effects 검사(cli.ts)는 경고일 뿐 실행 차단력이 없다",
+        "deterministic runtime DSL 목표의 첫 enforcement layer"
+      ],
+      "lock": false
+    },
+
+    "dec-006": {
+      "t": "decision",
+      "v": "effect metadata absent = legacy unrestricted. 메타가 부재한 함수는 enforcement 검사를 skip한다",
+      "why": [
+        "self-host bootstrap과 기존 1018개 테스트가 즉시 깨지지 않아야 점진 도입이 가능하다",
+        "메타 부재 함수에 묵시적 pure를 부여하면 기존 IO 사용 코드가 모두 위반으로 잡힌다",
+        "future strict 모드에서는 이 escape hatch를 닫을 수 있다"
+      ],
+      "lock": true
+    },
+
+    "dec-007": {
+      "t": "decision",
+      "v": "모든 callable entry는 단일 enforcement gate를 통과한다 (callUserFunction, callFunctionValue, builtin dispatch, TCO 경로)",
+      "why": [
+        "builtin 우회로가 생기면 enforcement 철학 자체가 무너진다",
+        "TCO 경로 누락은 silent bypass를 만든다",
+        "단일 gate는 introspection·테스트·replay 통합점을 보장한다"
+      ],
+      "lock": true
+    },
+
+    "dec-008": {
+      "t": "decision",
+      "v": "async 는 event boundary — sync 진입 시점만 frame 유지. Promise.then continuation 에서는 frame 재구성 금지",
+      "why": [
+        "async continuation 은 caller stack 과 분리된 logical chain",
+        "Promise 안에서 frame 재구성하면 phantom frame 생성·event duplication·trace 왜곡",
+        "stack model 은 sync 한정, async 는 chain metadata 로만 추적 (future)"
+      ],
+      "lock": true
+    },
+
+    "audit-c4-final": {
+      "t": "audit",
+      "v": "C4 final bypass audit — single gate invariant 완전성 검증",
+      "checks": [
+        "1. 모든 entry path enforceCall 통과 — 8개 진입점 + fast paths 전부 hook 완료 (C4-1/C4-2/C4-3)",
+        "2. async 단일 sync boundary 만 frame — callAsyncFunctionValue 의 Promise.then 안 frame 손대지 않음",
+        "3. builtin dispatch frame 변경 없음 — callFunction.builtin-function 은 enforce 만, push/pop 없음",
+        "4. interpreter wrapper 우회 없음 — callUserFunctionRaw/callFunctionValueRaw/callAsyncFunctionValue wrapper 는 export 함수 호출만, 우회 경로 없음"
+      ],
+      "entry_points_hooked": [
+        "callUserFunction (sync user fn, C4-1)",
+        "callFunctionValue (sync function-value, C4-1)",
+        "callUserFunctionTCO (trampoline user, C4-2)",
+        "callFunctionValueTCO (trampoline function-value, C4-2)",
+        "callUserFunctionRaw (tco.ts raw, C4-2)",
+        "callFunctionValueRaw (tco.ts raw, C4-2)",
+        "callAsyncFunctionValue (async sync entry only, C4-3)",
+        "callFunction (dispatch, builtin-function kind enforce, C4-3)"
+      ],
+      "result": "PARTIAL → PASS (C4-4 후 정정)",
+      "verified_by": "1184 jest tests (C4-3 시점)",
+      "amendment": "C6 진행 중 9번째 진입점 발견 — evalBuiltin switch-case (eval-builtins.ts:893) 가 callUserFunction 우회. C4-4 hot fix 로 진입부 enforce 추가. dec-007 invariant 복원.",
+      "date": "2026-05-20"
+    },
+
+    "audit-c4-4": {
+      "t": "audit",
+      "v": "C4-4 evalBuiltin gate unify — missing architectural layer 완성",
+      "discovery": "C6 E2E 디버깅 중 발견. println 같은 builtin이 evalBuiltin switch-case (e.g. case \"println\": process.stdout.write) 로 직접 dispatch 되어 callUserFunction 통과 안 함 → 우리 C4-1/2/3 enforce 도달 못함.",
+      "fix": "eval-builtins.ts:893 evalBuiltin 진입부에 _enforceEffect(normalizedOp, span) 추가. frame push 없음 (builtin 즉시 return). enforceCall 3상 의미론으로 idempotent — default case 가 callUserFunction 호출 시 중복 enforce 되어도 안전 (event dedup collapse).",
+      "result": "PASS",
+      "verified_by": "C6 E2E 3/3 PASS (L0/L1 분리 시나리오) + 회귀 1223 PASS (rate-limiter err-006 + build-determinism worktree 환경 한계 제외)",
+      "date": "2026-05-21"
+    },
+
+    "arch-l0-l1-layers": {
+      "t": "decision",
+      "v": "Effect enforcement 는 2-layer defense — L0 static pre-filter + L1 runtime correctness. 둘 다 보존.",
+      "why": [
+        "L0 (eval-special-forms.ts:checkEffects + EFFECT_CATALOG): defn 시점 fast-fail, cheap, obvious io pattern 차단",
+        "L1 (effect-enforcer.ts + 9 entry hooks): 호출 시점 frame stack 기반 정확한 검증",
+        "L0 제거 시 cold path 검증 사라짐, trivial error 도 execution 까지 감",
+        "L0/L1 통합 시 'partial static analysis engine' 재설계 — C8급 작업으로 폭증"
+      ],
+      "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "dec-009": {
+      "t": "decision",
+      "v": "Build identity — single source of truth = fx self-host. master(1157) 는 legacy snapshot, fx(1192+) 가 truth set. C7 SHA 검증은 fx 기준.",
+      "why": [
+        "build identity 가 2개면 deterministic SHA 검증 불가능 (C7 자체가 막힘)",
+        "메모리(project_freelang_v11_baseline.md) 가 이미 fx = truth 확정 (2026-05-21)",
+        "effect enforcement 8 commit + 9th entry hook 모두 fx 기준으로 검증됨",
+        "esbuild minified 경로는 deprecate 후보 — 단일 build pipeline 유지"
+      ],
+      "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "dec-010": {
+      "t": "decision",
+      "v": "C7 정의 정정 — 'runtime determinism verification (Jest + interpreter)'. bootstrap.js 는 out-of-scope artifact (Phase X-2 detached build).",
+      "why": [
+        "Phase X-2 에서 bootstrap.js 가 빌드 pipeline 에서 의도적으로 detach 됨 (esbuild 제거)",
+        "Layer 1 (TS + interpreter + jest 1192 PASS) 이 runtime truth — Layer 2 (bootstrap.js artifact) 는 무관",
+        "기존 'bootstrap SHA 변동 최소' 기준은 build = TS esbuild 산출물이라는 옛 dec-004 전제. dec-009 이후 무효",
+        "bootstrap.js 재생성 / esbuild 복원은 별도 architecture decision (C8 이후 후속)"
+      ],
+      "scope_in": ["TS source", "jest 1192+", "interpreter behavior", "effect enforcement L0/L1"],
+      "scope_out": ["bootstrap.js SHA", "browser.js SHA", "self/all.fl compile output"],
+      "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "audit-c7-runtime-determinism": {
+      "t": "audit",
+      "v": "C7 runtime determinism verification — dec-010 정의 기준",
+      "evidence": {
+        "jest_total": "1223 PASS (worktree fx 환경, rate-limiter err-006 + build-determinism worktree 환경 한계 제외)",
+        "effect_enforcement_suites": "6/6 PASS, 73 tests (C4-1:11 + C4-2:7 + C4-3:9 + C5:8 + C6 matrix:35 + C6 e2e:3)",
+        "deterministic_runtime": "동일 입력 (TS source + interpreter) → 동일 jest 결과 — runtime layer 결정성 확인",
+        "bootstrap_artifact": "Phase X-2 per design 변경 없음 (out-of-scope per dec-010)"
+      },
+      "result": "PASS",
+      "next": ["master 병합", "블로그 포스팅", "C8 후속"],
+      "date": "2026-05-21"
+    },
+
+    "dec-011": {
+      "t": "decision",
+      "v": "L0 (EFFECT_CATALOG, eval-special-forms.ts) 은 compatibility-only taxonomy, non-authoritative. L1 (BUILTIN_EFFECTS + EffectTag, effect-types.ts/builtin-effects.ts) 만 canonical effect enforcement source of truth.",
+      "why": [
+        "L0 10종 vs L1 6종 어휘 불일치 mismatch 가 누적되면 enforcement 의미가 흔들린다",
+        "L0 확장은 taxonomy explosion → enforcement dilution 으로 이어진다 (graveyard 경고 :db/:gpu/:fs-*)",
+        "L0 는 정책 힌트·legacy hooks 흡수용. 신규 effect 는 L1 에서 흡수하고 L0 는 alias 만 추가",
+        "dec-005 6종 어휘 lock 의 운영 메커니즘 — 어휘 폭발 차단",
+        "arch-l0-l1-layers 의 'L0/L1 둘 다 보존' 결정과 양립 — 보존하되 판정권은 L1 단일"
+      ],
+      "alias_table": {
+        "http": "net",
+        "file-read": "io",
+        "file-write": "io",
+        "db-read": "io",
+        "db-write": "io",
+        "shell": "process",
+        "server": "net",
+        "io": "io",
+        "time": "time",
+        "random": "random"
+      },
+      "lock": true,
+      "date": "2026-05-21"
+    },
+
+    "task-effect-taxonomy": {
+      "t": "task",
+      "v": "C8 — L0/L1 taxonomy normalization. L0 를 L1 에 수렴시키는 정리 작업 (새 설계 아님, 경계 고정)",
+      "entry": ["SPEC.airc"],
+      "scope": [
+        "src/effect-aliases.ts (신규) — toCanonical(l0: string): EffectTag",
+        "src/eval-special-forms.ts (수정) — EFFECT_CATALOG hole 보강 + 함수명 alias",
+        "src/__tests__/effect-taxonomy-consistency.test.ts (신규) — drift 회귀 차단"
+      ],
+      "commits": [
+        "C8-1: SPEC.airc + dec-011 LOCK + graveyard final 승격 + hot 갱신 + lock 배열 확장",
+        "C8-2: effect-aliases.ts + toCanonical (canonical mapping)",
+        "C8-3: EFFECT_CATALOG hole 보강 (file-append-line, db-transaction, ws-send=http, process-spawn=shell, now-ms, sleep, uuid) + 함수명 alias (db-exec=db-write, rand=random)",
+        "C8-4: consistency test + jest 1192+ 회귀"
+      ],
+      "decisions_pinned": [
+        "ws-send → http (L0). L1=net 으로 alias 흡수. 신규 카테고리 금지",
+        "함수명 alias (db-exec/rand) 는 L0 catalog 확장으로 흡수. L1 BUILTIN_EFFECTS 영향 없음",
+        "graveyard :db/:gpu/:fs-* 세분화 final:true 승격 — future strict mode 에서도 L0 확장 금지"
+      ],
+      "branch": "feature/effect-taxonomy",
+      "branch_policy": "fx HEAD 8a5ded96 (feature/effect-enforcement frozen) 에서 분기. master 디렉토리 미접촉.",
+      "success": [
+        "BUILTIN_EFFECTS 전 키에 대해 L0 catalog 등록 보장 (양방향 hole 없음)",
+        "toCanonical(EFFECT_CATALOG[name]) ⊆ BUILTIN_EFFECTS[name] 의 EffectTag set (consistency)",
+        "jest 1192+ PASS (회귀)",
+        "bootstrap.js 무관 (dec-010 scope_out)"
+      ],
+      "verified": true,
+      "next": []
+    },
+
+    "audit-c8-taxonomy": {
+      "t": "audit",
+      "v": "C8 L0/L1 taxonomy normalization — dec-011 LOCK 적용 후 정합성 검증",
+      "evidence": {
+        "commits": [
+          "2a875d3e C8-1: SPEC.airc + dec-011 LOCK + graveyard final + lock 배열",
+          "6e440543 docs(plan): C8 effect-taxonomy PLAN — 11절 1절 보완",
+          "20c2705f C8-2: effect-aliases.ts + toCanonical (38줄)",
+          "4206b29d C8-3: EFFECT_CATALOG hole 7건 + alias 2건 + kebab 사전 누락 3건",
+          "2fd43578 C8-4: consistency test 72 cases — drift 회귀 자동 차단"
+        ],
+        "jest_total": "1313 PASS, 7 FAIL (사전 known: rate-limiter err-006 + build-determinism worktree 한계)",
+        "c8_suites": "effect-aliases 18 + effect-taxonomy-consistency 72 = 90 신규 PASS",
+        "consistency": "BUILTIN_EFFECTS 23 키 ⊆ EFFECT_CATALOG 66 entries, hole=0, mismatch=0",
+        "l0_vocabulary_size": "10 (alias_table 정의역과 정확히 일치)",
+        "regression": "본 C8 작업으로 인한 신규 fail 0 건. C7 baseline 1223 + 신규 90 = 1313",
+        "blog": "post #1156 (C8-1), 후속 통합 블로그 예정",
+        "branch": "feature/effect-taxonomy @ gogs.dclub.kr/kim/freelang-v11 (HEAD 2fd43578)"
+      },
+      "invariants_verified": [
+        "L1 BUILTIN_EFFECTS = canonical truth (변경 없음)",
+        "L0 EFFECT_CATALOG = compatibility-only (alias 만 확장)",
+        "effect-types.ts EffectTag 6 종 변경 없음",
+        "runtime enforcement gate (9 entry hooks) 변경 없음",
+        "bootstrap.js out-of-scope (dec-010)",
+        "auto consistency test 72 cases — 미래 drift 차단 보장"
+      ],
+      "result": "PASS",
+      "next": ["통합 블로그 (C8-2~C8-4)", "master 병합 (사용자 release cycle)", "tasks.dclub.kr t_1779339704348 done"],
+      "date": "2026-05-21"
+    },
+
+    "err-001": {
+      "t": "error",
+      "v": "server_req_header/get 반환값 null이 (= $v nil)로 false 평가됨",
+      "cause": "nil과 null이 내부적으로 다른 타입으로 처리됨",
+      "fix": "4중 검사 헬퍼 표준화 — null·nil·빈문자열·false 모두 처리",
+      "repeat_risk": "high"
+    },
+
+    "err-002": {
+      "t": "error",
+      "v": "update extra-args + define+fn 조합에서 변수 저장 오류",
+      "cause": "런타임 버그 (2026-05-19 수정 완료)",
+      "fix": "해당 패턴 workaround 불필요. 런타임에서 수정됨",
+      "repeat_risk": "low"
+    },
+
+    "err-003": {
+      "t": "error",
+      "v": "tcp-server-raw 동일 프로세스에서 listen 미발화 — outbound가 ECONNREFUSED",
+      "cause": "IO Worker로 listen 명령 전달 후 net.createServer().listen() 호출이 실제로 일어나지 않거나 fl-yield와 별도 시점에 일어남",
+      "fix": "조사 필요. 외부 Node.js 서버로 우회 검증 가능. PAIN p18 참조",
+      "repeat_risk": "high",
+      "found": "YIELD-3 검증 #2 (2026-05-20)"
+    },
+
+    "err-004": {
+      "t": "error",
+      "v": "tcp-outbound·rpc-client-call 사용 후 process 자연 종료 안 됨 (EXIT=124)",
+      "cause": "035e9a6c IO Worker unref 패치에도 ring buffer Atomics.wait·setInterval 잔존",
+      "fix": "조사 필요. CI에서는 외부 timeout 사용. PAIN p19 참조",
+      "repeat_risk": "high",
+      "found": "YIELD-3 검증 #2·#3"
+    },
+
+    "err-005": {
+      "t": "error",
+      "v": "bootstrap.js shebang 자동 중복 prepend → SyntaxError",
+      "cause": "외부 백그라운드 에이전트(미식별)가 빌드 산출물에 shebang 자동 추가, 이미 있어도 중복",
+      "fix": "git checkout bootstrap.js 로 복원. 빌드/실행 전 head -2 확인. PAIN p20 참조",
+      "repeat_risk": "high",
+      "found": "YIELD-3 검증 중 2회 재발"
+    },
+
+    "err-006": {
+      "t": "error",
+      "v": "rate-limiter test 6/7 FAIL (server.close is not a function / status 404)",
+      "cause": "회귀 아님 — d3b2432b 도입 시점부터 broken. server_start (portOrConfig)→string 시그니처와 테스트의 (port, handler)→http.Server 가정 불일치",
+      "fix": "테스트를 실제 시그니처에 맞게 재작성 권장 (route 미리 등록 + __activeServer.server.close()). PAIN p21 참조",
+      "repeat_risk": "low",
+      "found": "YIELD-3 git log 추적"
+    },
+
+    "task-yield-3-done": {
+      "t": "decision",
+      "v": "YIELD-3 빌드+단위 검증 4/5 PASS — fl-yield·tcp-outbound·rpc-client-call·negative test 모두 동작",
+      "evidence": "tests/yield3-1-basic.fl tests/yield3-2-echo.fl tests/yield3-3-rpc.fl tests/yield3-4-negative.fl",
+      "remaining": "INV-1/INV-4/INV-5 충족, 부수 이슈 err-003~err-006는 별도 추적",
+      "date": "2026-05-20"
+    },
+
+    "phase2-dynamic": {
+      "t": "decision",
+      "v": "Phase 2 — Dynamic Topology Convergence Correctness",
+      "mission": "steady-state 기능 성공이 아니라 transition window에서 topology consistency 유지 검증",
+      "essence": "연결 고정(steady state) 상태에서 끊김 없이 동작하는 것 ≠ 올바른 시스템. topology 변경 중(transition window)에서도 consistency를 유지하고 stale state를 확실하게 제거하는 것이 진정한 correctness",
+      "evaluation_axes": [
+        "1. deterministic lifecycle — 어떤 조건에서든 lifecycle이 일정한 상태 전이로 진행",
+        "2. topology correctness — transition 중에도 old/new snapshot 상태가 혼재하지 않음",
+        "3. stale-state elimination — 과거 revision은 반드시 버려지고 replay 금지"
+      ],
+      "principles": [
+        "authoritative full snapshot only — 증분 업데이트·delta replay 금지. 항상 full snapshot으로만 갱신",
+        "immutable snapshot build — snapshot 생성 중 상태 변경 금지. build 후 atomic swap만 허용",
+        "atomic snapshot swap — old/new snapshot 교체 시 원자성 보장. 중간 상태 노출 금지",
+        "old/new snapshot coexistence 허용 — transition 중 inflight request는 old snapshot으로 처리 후 완료",
+        "reconnect → full sync only — 재연결 시 since=0부터 전체 snapshot 받기만. 증분 동기화 금지"
+      ],
+      "delivery_model": [
+        "at-least-once watch delivery 허용 — 중복 이벤트는 revision으로 판별 후 collapse",
+        "revision = logical clock — monotonic increment, crash recovery 불필요",
+        "incoming_revision <= current_revision → discard — stale event 자동 버림",
+        "duplicate revision → no-op collapse — 동일 revision 재수신 시 무시"
+      ],
+      "forbidden": [
+        "incremental mutation — 기존 snapshot 구조 일부 수정 금지",
+        "delta replay — 변경분만 반영하는 replay 금지",
+        "partial update optimization — '효율'을 위한 부분 업데이트 금지",
+        "bidirectional coupling — client/upstream 간 push/pull 혼용 금지"
+      ],
+      "critical_tests": [
+        "ct-1: swap during inflight request — 요청 처리 중 topology swap 발생 시, 기존 upstream에서 완료하고 새 요청부터 새 upstream 사용",
+        "ct-2: removed upstream inflight drain — 제거된 upstream의 inflight request를 graceful 완료 후 연결 종료",
+        "ct-3: stale revision discard — 과거 revision 재수신 시 자동 버림. 상태 변화 없음",
+        "ct-4: duplicated event collapse — 동일 revision 이벤트 다중 수신 시 중복 처리 안 됨"
+      ],
+      "lock": true,
+      "date": "2026-05-23"
+    },
+
+    "task-step-1": {
+      "t": "task",
+      "v": "Step 1 — Registry Watch Endpoint (GET /watch?since=N)",
+      "description": "authoritative full snapshot 반환 엔드포인트. revision counter 포함. at-least-once delivery 시뮬레이션을 위해 중복 호출 시에도 동일 revision 반환",
+      "entry": ["src/registry-watch.ts (신규)"],
+      "scope": [
+        "GET /watch?since=N",
+        "snapshot: {upstreams: [...], services: [...], revision: N}",
+        "revision >= since이면 full snapshot 반환 (중복 허용)",
+        "내부 revision counter (atomic increment)"
+      ],
+      "success": [
+        "GET /watch?since=0 → {upstreams: [all], revision: 1}",
+        "GET /watch?since=1 (동일 revision) → {upstreams: [same], revision: 1} (no-op)",
+        "GET /watch?since=2 (미래) → 404 or empty (클라이언트 책임: since 재설정)"
+      ],
+      "verified": false,
+      "next": ["task-step-2"]
+    },
+
+    "task-step-2": {
+      "t": "task",
+      "v": "Step 2 — Registry Client (registry-client.fl)",
+      "description": "long-poll 패턴으로 watch 엔드포인트 구독. 재연결 jitter 50~500ms. 연결 끊김 시 since=0 (full sync)",
+      "entry": ["registry-client.fl (신규)"],
+      "scope": [
+        "(define watcher (registry-client-start url))",
+        "long-poll 루프: GET /watch?since=N",
+        "성공: snapshot.revision 저장 → 다음은 since=snapshot.revision으로 호출",
+        "실패: exponential backoff (50ms~500ms jitter)",
+        "reconnect: since=0 (강제 full sync)"
+      ],
+      "success": [
+        "최초 호출: since=0 → full snapshot 수신",
+        "다음 호출: since=1 (= snapshot.revision)",
+        "네트워크 실패 후 reconnect: since=0 강제 (delta 아님)"
+      ],
+      "verified": false,
+      "next": ["task-step-3"]
+    },
+
+    "task-step-3": {
+      "t": "task",
+      "v": "Step 3 — Immutable Snapshot Build",
+      "description": "topology/runtime state 분리. snapshot build 후 swap 준비 (원자성 보장 전 단계)",
+      "entry": ["src/snapshot-builder.ts (신규)"],
+      "scope": [
+        "(build-snapshot incoming-upstreams incoming-services)",
+        "새 upstreams 배열 생성 (기존 state 읽기만, 수정 금지)",
+        "새 services 맵 생성",
+        "반환: {upstreams: [...], services: {...}, revision: N} (immutable)"
+      ],
+      "success": [
+        "기존 snapshot 상태 변경 없음 (read-only)",
+        "새 snapshot = 새 배열/맵 객체 (다른 참조)",
+        "revision 단조 증가"
+      ],
+      "verified": false,
+      "next": ["task-step-4"]
+    },
+
+    "task-step-4": {
+      "t": "task",
+      "v": "Step 4 — Atomic Snapshot Swap (lb-replace-upstreams!)",
+      "description": "old/new snapshot atomic replace. inflight request는 old snapshot에서 완료",
+      "entry": ["src/lb-replace-upstreams.ts (신규)"],
+      "scope": [
+        "(lb-replace-upstreams! new-upstreams)",
+        "swap: current-upstreams ← new-upstreams (원자 연산)",
+        "old-upstreams.graceful-close() → inflight drain (non-blocking)",
+        "new request: new-upstreams 사용",
+        "invariant: current-upstreams는 항상 유효한 snapshot 중 하나"
+      ],
+      "success": [
+        "swap 전: old가 current",
+        "swap 직후: new가 current, old는 drain 중",
+        "inflight request (old)는 완료될 때까지 유지",
+        "ct-1 통과: swap 중 inflight → graceful 완료"
+      ],
+      "verified": false,
+      "next": ["task-step-5"]
+    },
+
+    "task-step-5": {
+      "t": "task",
+      "v": "Step 5 — Revision & Stale Guard",
+      "description": "stale revision discard + duplicate collapse. monotonic clock 기반 state machine",
+      "entry": ["src/revision-guard.ts (신규)"],
+      "scope": [
+        "(guard-stale-revision incoming-revision current-revision)",
+        "incoming >= current: accept (state update)",
+        "incoming < current: discard (ct-3)",
+        "incoming == current (재수신): no-op (ct-4)",
+        "revision overflow: monotonic 32-bit unsigned"
+      ],
+      "success": [
+        "ct-3 통과: old revision 버림",
+        "ct-4 통과: duplicate revision collapse",
+        "state machine deterministic"
+      ],
+      "verified": false,
+      "next": ["task-step-6"]
+    },
+
+    "task-step-6": {
+      "t": "task",
+      "v": "Step 6 — Reconnect Full Sync (Delta Replay 금지)",
+      "description": "재연결 시 authoritative snapshot만 허용. delta/incremental 동기화 금지",
+      "entry": ["src/client-reconnect.ts (신규)"],
+      "scope": [
+        "reconnect detect: network error or timeout",
+        "action: since=0 강제 (graveyard 진입하는 순간 '증분 동기화' 허용 금지)",
+        "old snapshot → new snapshot: atomic replace only",
+        "delta 계산·replay: forbidden"
+      ],
+      "success": [
+        "reconnect → GET /watch?since=0 (전체 snapshot)",
+        "state 불일치 자동 해소",
+        "delta replay 코드 0줄"
+      ],
+      "verified": false,
+      "next": ["task-step-7"]
+    },
+
+    "task-step-7": {
+      "t": "task",
+      "v": "Step 7 — E2E Critical Tests (ct-1~4)",
+      "description": "transition-window correctness 검증. ct-1~4 모두 PASS",
+      "entry": ["tests/phase2-e2e.test.ts (신규)"],
+      "scope": [
+        "ct-1: swap during inflight request",
+        "ct-2: removed upstream inflight drain",
+        "ct-3: stale revision discard",
+        "ct-4: duplicated event collapse"
+      ],
+      "test_matrix": [
+        "ct-1: 요청 처리 중 snapshot swap, 기존 upstream에서 완료 확인",
+        "ct-2: 제거된 upstream에서 inflight 요청 graceful 완료 후 close",
+        "ct-3: revision(1) 재수신 시 상태 변화 없음",
+        "ct-4: revision(2) 다중 수신 시 중복 처리 없음"
+      ],
+      "success": [
+        "jest 모든 ct-* PASS",
+        "기존 jest suite 회귀 0 fail",
+        "bootstrap.js 재생성 (Phase X-2 아티팩트)",
+        "블로그 포스팅 (500자 이상)"
+      ],
+      "verified": false,
+      "next": []
+    }
+
+  },
+
+  "lock": [
+    {"rule": "외부 npm 0개", "why": "결정론적 실행 보장"},
+    {"rule": "복수 파서 공존 금지", "why": "언어 정의 단일성"},
+    {"rule": "컴파일러 결함 우회 금지", "why": "스펙 오염 방지"},
+    {"rule": "bootstrap.js 직접 편집 금지", "why": "빌드 산출물이므로 덮어씌워짐"},
+    {"rule": "effect metadata absent = legacy unrestricted", "why": "self-host bootstrap 및 기존 테스트 호환 보장"},
+    {"rule": "모든 callable entry는 단일 effect gate 통과", "why": "builtin 우회 차단·TCO silent bypass 방지"},
+    {"rule": "L0 (EFFECT_CATALOG) 은 compatibility-only taxonomy. L1 (BUILTIN_EFFECTS + EffectTag) 만 canonical effect enforcement source of truth", "why": "어휘 폭발·enforcement 약화 방지. 판정권 분기 차단. 신규 effect 는 L1 흡수 + L0 alias 만 추가"},
+    {"rule": "Phase 2 — incremental mutation / delta replay / partial update optimization 금지", "why": "transition window 에서 topology consistency 깨짐. authoritative full snapshot only"},
+    {"rule": "Phase 2 — bidirectional coupling (push/pull 혼용) 금지", "why": "client/upstream 간 state 일관성 보장 불가"},
+    {"rule": "Phase 2 — reconnect 시 증분 동기화 금지. since=0 (full sync) 강제", "why": "stale state 누적. authoritative refresh only"}
+  ],
+
+  "graveyard": [
+    {"idea": "외부 npm 패키지 허용", "why": "의존성 지옥 + 결정론 파괴", "final": true},
+    {"idea": "복수 파서 공존", "why": "동작 불일치 발생. AI가 어느 기준으로 코드를 써야 할지 모름", "final": true},
+    {"idea": "compile-time purity inference", "why": "현 단계에선 과함. runtime explicit enforcement만으로 시작. 추론은 오탐·미탐 부담이 크다", "final": true},
+    {"idea": ":db / :gpu / :fs-read / :fs-write 세분화 effect", "why": "MVP 단계엔 과함. :io 하나로 통합. 어휘 폭발은 enforce 약화로 이어진다. dec-011 LOCK 으로 final 승격 (2026-05-21) — future strict mode 에서도 L0 확장 금지, 신규 effect 는 L1 흡수 + L0 alias 만 허용", "final": true},
+    {"idea": "capability graph (effect polymorphism·algebraic effects)", "why": "타입 시스템 동반 필요. MVP 경계를 무너뜨린다", "final": false},
+    {"idea": "builtin object에 _effects 어트리뷰트 부착", "why": "hidden mutation·serialization drift·accidental overwrite 위험. 별도 registry Map이 안전", "final": true},
+    {"idea": "Phase 2 — incremental mutation (기존 snapshot 일부 수정)", "why": "transition window 에서 old/new snapshot 혼재 → 상태 불일치. immutable snapshot build + atomic swap만 유효", "final": true},
+    {"idea": "Phase 2 — delta replay (변경분만 반영)", "why": "stale state 누적 + deterministic lifecycle 파괴. full snapshot 기반 authoritative 갱신만 허용", "final": true},
+    {"idea": "Phase 2 — partial update optimization ('효율' 위해 부분만 갱신)", "why": "incremental mutation 동일 문제. transition window correctness 보장 불가", "final": true},
+    {"idea": "Phase 2 — bidirectional coupling (client push + upstream pull)", "why": "state 일관성 보장 불가. unidirectional watch 구독만 허용 (client→watch)", "final": true},
+    {"idea": "Phase 2 — reconnect 시 증분 동기화", "why": "stale state 누적. 항상 since=0 (full sync) 강제. at-least-once 중복 허용하되 revision으로 collapse", "final": true}
+  ],
+
+  "handoff": {
+    "step1": "cmd 실행 → identity·hot 확인",
+    "step2": "graveyard 확인 → 이미 버린 방향인지 체크",
+    "step3": "hot 노드 실행",
+    "step4": "오류 발생 시 error 노드로 기록",
+    "step5": "identity 변경 필요 시 사용자에게 먼저 물어라"
+  }
+}

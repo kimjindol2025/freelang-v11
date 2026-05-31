@@ -1,0 +1,151 @@
+;; PHASE B-3: Higher-Order Function (HOF) Implementation
+;; Goal: map, filter, reduce, for-each stdlib functions
+
+;; ── H1: Basic map ──
+(defn map [$fn $arr]
+  "변환: 배열의 각 요소에 함수 적용
+
+  Example:
+    (map (fn [x] (* x 2)) [1 2 3]) → [2 4 6]
+  "
+  (if (or (null? $arr) (= (length $arr) 0))
+    []
+    (loop [$i 0 $result []]
+      (if (>= $i (length $arr))
+        $result
+        (recur (+ $i 1)
+          (push $result ($fn (get $arr $i))))))))
+
+;; ── H2: Basic filter ──
+(defn filter [$fn $arr]
+  "선택: 함수가 true인 요소만 유지
+
+  Example:
+    (filter (fn [x] (> x 2)) [1 2 3 4 5]) → [3 4 5]
+  "
+  (if (or (null? $arr) (= (length $arr) 0))
+    []
+    (loop [$i 0 $result []]
+      (if (>= $i (length $arr))
+        $result
+        (let [[$item (get $arr $i)]]
+          (recur (+ $i 1)
+            (if ($fn $item)
+              (push $result $item)
+              $result)))))))
+
+;; ── H3: Basic reduce ──
+(defn reduce [$fn $init $arr]
+  "집계: 축적값(accumulator)을 업데이트하며 순회
+
+  Example:
+    (reduce + 0 [1 2 3 4 5]) → 15
+    (reduce (fn [acc x] (* acc x)) 1 [2 3 4]) → 24
+  "
+  (if (or (null? $arr) (= (length $arr) 0))
+    $init
+    (loop [$i 0 $acc $init]
+      (if (>= $i (length $arr))
+        $acc
+        (recur (+ $i 1)
+          ($fn $acc (get $arr $i)))))))
+
+;; ── H4: Basic for-each (side effects) ──
+(defn for-each [$fn $arr]
+  "반복: 부작용을 위한 순회 (return 값은 무시)
+
+  Example:
+    (for-each (fn [x] (println x)) [1 2 3])
+    ; prints: 1 2 3
+    ; returns: nil
+  "
+  (if (or (null? $arr) (= (length $arr) 0))
+    nil
+    (loop [$i 0]
+      (if (>= $i (length $arr))
+        nil
+        (do
+          ($fn (get $arr $i))
+          (recur (+ $i 1)))))))
+
+;; ── TEST: H1 map ──
+(defn test-map-basic []
+  (let [[$result (map (fn [$x] (* $x 2)) [1 2 3])]]
+    (if (and (= (get $result 0) 2)
+             (= (get $result 1) 4)
+             (= (get $result 2) 6))
+      "✅ H1: map PASS"
+      (str "❌ H1 FAIL (got " $result ")"))))
+
+;; ── TEST: H2 filter ──
+(defn test-filter-basic []
+  (let [[$result (filter (fn [$x] (> $x 2)) [1 2 3 4 5])]]
+    (if (and (= (length $result) 3)
+             (= (get $result 0) 3)
+             (= (get $result 1) 4)
+             (= (get $result 2) 5))
+      "✅ H2: filter PASS"
+      (str "❌ H2 FAIL (got " $result ")"))))
+
+;; ── TEST: H3 reduce ──
+(defn test-reduce-basic []
+  (let [[$result (reduce + 0 [1 2 3 4 5])]]
+    (if (= $result 15)
+      "✅ H3: reduce PASS"
+      (str "❌ H3 FAIL (expected 15, got " $result ")"))))
+
+;; ── TEST: H4 for-each ──
+(defn test-for-each-basic []
+  (let [[$arr []]
+        [$_ (for-each (fn [$x] (push $arr $x)) [10 20 30])]]
+    (if (and (= (length $arr) 3)
+             (= (get $arr 0) 10))
+      "✅ H4: for-each PASS"
+      (str "❌ H4 FAIL (got " $arr ")"))))
+
+;; ── TEST: H5 closure in filter ──
+(defn test-closure-filter []
+  (let [[$threshold 5]
+        [$result (filter (fn [$x] (> $x $threshold)) [1 3 5 7 9])]]
+    (if (and (= (length $result) 2)
+             (= (get $result 0) 7)
+             (= (get $result 1) 9))
+      "✅ H5: closure in filter PASS"
+      (str "❌ H5 FAIL (got " $result ")"))))
+
+;; ── TEST: H6 nested closure + map ──
+(defn test-nested-closure-map []
+  (let [[$factor 3]
+        [$scale (fn [$x] (* $x $factor))]
+        [$result (map $scale [1 2 3])]]
+    (if (and (= (get $result 0) 3)
+             (= (get $result 1) 6)
+             (= (get $result 2) 9))
+      "✅ H6: nested closure + map PASS"
+      (str "❌ H6 FAIL (got " $result ")"))))
+
+;; ── TEST: H7 JS == C parity (structure only) ──
+(defn test-parity-structure []
+  "검증: JS와 C 코드생성이 동일 구조
+  (실제 C 컴파일은 별도 단계)
+  "
+  (let [[$map-fn (fn [$f $a] (map $f $a))]
+        [$filter-fn (fn [$f $a] (filter $f $a))]]
+    (if (and (= (length ($map-fn (fn [$x] $x) [1 2])) 2)
+             (= (length ($filter-fn (fn [$x] true) [1 2])) 2))
+      "✅ H7: parity structure PASS"
+      "❌ H7 FAIL")))
+
+;; ── TEST RUNNER ──
+(defn run-hof-tests []
+  (do
+    (println (test-map-basic))
+    (println (test-filter-basic))
+    (println (test-reduce-basic))
+    (println (test-for-each-basic))
+    (println (test-closure-filter))
+    (println (test-nested-closure-map))
+    (println (test-parity-structure))
+    "HOF tests completed"))
+
+(run-hof-tests)

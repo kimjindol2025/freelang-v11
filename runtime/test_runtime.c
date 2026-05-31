@@ -80,6 +80,50 @@ int main(void) {
     CHECK(read.tag == FL_STRING, "fl_file_read tag");
     CHECK(strcmp(((FLString*)read.obj)->data, "test content") == 0, "fl_file_read data");
 
+    /* ── Vector ── */
+    FLValue vn = fl_vec_new();
+    CHECK(vn.tag == FL_VECTOR, "fl_vec_new tag");
+    CHECK(fl_vec_len(vn).i == 0, "fl_vec_new len");
+
+    FLValue items[3] = { fl_int(10), fl_int(20), fl_int(30) };
+    FLValue vf = fl_vec_from(items, 3);
+    CHECK(fl_vec_len(vf).i == 3, "fl_vec_from len");
+    CHECK(fl_vec_get(vf, fl_int(0)).i == 10, "fl_vec_get 0");
+    CHECK(fl_vec_get(vf, fl_int(2)).i == 30, "fl_vec_get 2");
+
+    FLValue vp = fl_vec_push(vf, fl_int(40));
+    CHECK(fl_vec_len(vf).i == 3, "fl_vec_push original unchanged");
+    CHECK(fl_vec_len(vp).i == 4, "fl_vec_push new len");
+    CHECK(fl_vec_get(vp, fl_int(3)).i == 40, "fl_vec_push new elem");
+
+    FLValue vs = fl_vec_set(vf, fl_int(1), fl_int(99));
+    CHECK(fl_vec_get(vf, fl_int(1)).i == 20, "fl_vec_set original unchanged");
+    CHECK(fl_vec_get(vs, fl_int(1)).i == 99, "fl_vec_set new val");
+
+    FLValue voob = fl_vec_get(vf, fl_int(99));
+    CHECK(voob.tag == FL_NIL, "fl_vec_get OOB returns nil");
+
+    /* ── Map ── */
+    FLValue mn = fl_map_new();
+    CHECK(mn.tag == FL_MAP, "fl_map_new tag");
+    CHECK(fl_map_len(mn).i == 0, "fl_map_new len");
+
+    FLValue kv[4] = { fl_str_val("a"), fl_int(1), fl_str_val("b"), fl_int(2) };
+    FLValue mf = fl_map_from_pairs(kv, 2);
+    CHECK(fl_map_len(mf).i == 2, "fl_map_from_pairs len");
+    CHECK(fl_map_get(mf, fl_str_val("a")).i == 1, "fl_map_get a");
+    CHECK(fl_map_get(mf, fl_str_val("b")).i == 2, "fl_map_get b");
+    CHECK(fl_map_get(mf, fl_str_val("z")).tag == FL_NIL, "fl_map_get missing");
+
+    FLValue ms = fl_map_set(mf, fl_str_val("c"), fl_int(3));
+    CHECK(fl_map_len(mf).i == 2, "fl_map_set original unchanged");
+    CHECK(fl_map_len(ms).i == 3, "fl_map_set new len");
+    CHECK(fl_map_get(ms, fl_str_val("c")).i == 3, "fl_map_set new val");
+
+    FLValue mu = fl_map_set(mf, fl_str_val("a"), fl_int(99));
+    CHECK(fl_map_len(mu).i == 2, "fl_map_set upsert len unchanged");
+    CHECK(fl_map_get(mu, fl_str_val("a")).i == 99, "fl_map_set upsert val");
+
     /* ── 수치 출력 ── */
     printf("fl_println: ");
     fl_println(fl_int(42));

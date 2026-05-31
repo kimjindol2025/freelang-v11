@@ -1,0 +1,113 @@
+FREEDOC {
+  version: 1
+  spec: "2026-05"
+}
+
+IDENTITY {
+  what: freelang_v11
+  domain: ai_native_language
+  lang: nodejs_interpreter
+  purpose: ai_agents_programming
+}
+
+POSITION {
+  status: done
+  stage: "6/6"
+  current: v11.7.11_stable
+  next: [v12_hot_reload, v12_macro_system]
+  note: "v11.7.11: stdlib 86개 함수 완성. L3 자가호스팅 고정점 달성 (s2==s3 SHA256)"
+}
+
+MAP {
+  entry: bootstrap.js
+  compiler: src/compiler.ts
+  stdlib: src/eval-builtins.ts
+  tools: bin
+  test: src/__tests__
+  docs: CLAUDE.md
+  ref: docs/STDLIB_REFERENCE.md
+  cli: bin/freelang
+}
+
+FIXED {
+  runtime: nodejs
+  version: "11.7.11"
+  deps: 4
+  deps_detail: "@types/jest, @types/node, jest, ts-jest"
+  compiler_size: "57KB"
+  bootstrap_size: "892KB"
+  build_time: "<100ms"
+  stdlib_functions: 86
+  stdlib_aliases: 260
+  c_compiler_stages: "S8-S11"
+  self_hosting: "L3_fixed_point"
+  test_coverage: "1129/1129 (100%)"
+  perf: "376M_ops_sec"
+}
+
+STDLIB {
+  core: [println, print, defn, fn, let, if, cond, when, case, do]
+  collection: [map, filter, reduce, length, get, assoc, keys, values, range, take, drop, sort, sort-by, reverse, obj-merge, get-in, assoc-in, update-in, dissoc, every?, any?, none?, some, map-indexed, group-by, frequencies, zip, distinct, conj, into, find-first]
+  array_v117: [unique, flatten-one, sum, product, chunk, average, compact, random-element, nth-last, take-last]
+  string: [str, str-replace, str-split, str-trim, str-to-upper, str-to-lower, str-includes, str-starts-with, str-ends-with, str-blank?, str-format, str-repeat, str-lines, str-pad-left, str-pad-right, str-truncate, str-index-of, str-replace-all, starts-with, ends-with, str-repeat-n]
+  format: [format-number, format-decimal, format-percent]
+  math: [+, -, *, /, %, inc, dec, min, max, abs, round, floor, ceil, pow, sqrt, clamp, quot, rem, int, rand, rand-int]
+  type: [type-of, nil?, empty?, number?, string?, boolean?, array?, map?, fn?, integer?, float?, keyword?, str-blank?, nil-or-empty?]
+  logic: [and, or, not, =, !=, <, >, <=, >=, ??, ?.]
+  control: [try, throw, loop, recur, dotimes, doseq, for]
+  server: [server-start, server-html, server-json, server-status, server-redirect, server-file, server-html-cookie, server-set-cookie, server-get, server-post, server-put, server-delete, server-patch]
+  server_v117: [server-req-files, server-req-fields]
+  auth: [auth-jwt-sign, auth-jwt-verify, auth-jwt-decode, auth-jwt-expired, auth-hash-password, auth-verify-password, auth-password-needs-rehash, auth-csrf-token, auth-csrf-verify, auth-bearer-extract, auth-apikey-valid]
+  db: [db-query, db-exec, db-transaction]
+  file: [file-read, file-write, file-append, file-exists, file-delete, file-append-line]
+  util: [println, uuid, now-ms, sleep, json-parse, json-stringify, html-escape, js-escape, fl-env-get, re-test]
+  cron: [cron-schedule, cron-cancel, cron-list, cron-clear]
+  validate_v117: [check-arg-type, validate-args]
+}
+
+STDLIB_NOTES {
+  map_order: "fn 먼저 — (map fn arr) O / (map arr fn) X"
+  take_order: "n 먼저 — (take n coll) O / (take coll n) X"
+  sort_by_order: "fn 먼저 — (sort-by fn arr) O / (sort-by arr fn) X"
+  dollar_prefix: "$ 선택사항 — 없어도 동작"
+  assoc_multi: "(assoc m k1 v1 k2 v2 ...) 다중 인자 지원 (v11.7.1+)"
+  cron_expr: "5-field cron — 분 시 일 월 요일"
+  kebab_case: "권장 — snake_case alias도 동작"
+  nil_null: "server-req-header/get null → (= v nil) false 평가 주의"
+}
+
+FAILURE {
+  bracket_consistency_cause: ai_error_rate_high
+  bracket_consistency_fixed: true
+  automatic_type_detection_cause: manual_casting
+  automatic_type_detection_fixed: true
+  parameter_marker_cause: ambiguity_prefix
+  parameter_marker_fixed: optional
+  serialization_cause: json_overhead
+  serialization_fixed: auto
+  self_hosting_cause: circular_dependency
+  self_hosting_fixed: proven
+}
+
+CONSTRAINT {
+  rules: [
+    ai_first_principle
+    one_file_complete
+    npm_minimal_required_only
+    auto_serialization
+    bracket_consistency
+  ]
+  note: "Phase X (npm 최소화): 9개→4개 (56% 감소) 달성. L3 자가호스팅 + C S8-S11 완성"
+}
+
+CLAIM {
+  claims: [
+    ai_first_citizen
+    not_competing_python
+    ai_writes_better
+    automatic_beats_manual
+    native_tooling_replaces_npm
+    l3_self_hosting_proven
+    npm_minimal_not_zero
+  ]
+}

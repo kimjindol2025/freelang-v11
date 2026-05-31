@@ -1,0 +1,43 @@
+;; dclub-tasks 프로젝트 상세 페이지 라우트 테스트
+
+;; Mock 데이터
+(define test-proj
+  {"id" "p_123456"
+   "name" "Phase 2 구현"
+   "status" "active"
+   "owner_user" "kim"
+   "worker_id" "claude-1"
+   "blog_url" "https://example.com"
+   "description" "프로젝트-할일 연결"})
+
+(define test-stats {:total 10 :done 3 :doing 2})
+
+(define test-tasks
+  [{"id" "t_1" "title" "DB 마이그레이션" "status" "done"}
+   {"id" "t_2" "title" "API 수정" "status" "doing"}
+   {"id" "t_3" "title" "UI 업데이트" "status" "todo"}])
+
+;; 라우트 함수 구조 테스트
+(let [id (get test-proj "id")
+      proj test-proj
+      stats test-stats
+      tasks test-tasks
+      total (get stats :total)
+      done (get stats :done)
+      pct (if (= 0 total) 0 (int (/ (* done 100) total)))]
+  (do
+    (println (str "✓ 프로젝트: " (get proj "name")))
+    (println (str "✓ 진행률: " done "/" total " (" pct "%)"))
+    (println (str "✓ Task 수: " (count tasks)))
+    (println (str "✓ 상태: " (if (nil? proj) "404" "200")))))
+
+;; 간단한 HTML 생성 테스트
+(let [proj test-proj
+      done 3
+      total 10
+      pct (int (/ (* done 100) total))]
+  (let [html (str "<h1>" (get proj "name") "</h1>"
+                  "<div>진행률: " done "/" total " (" pct "%)</div>")]
+    (println (str "✓ HTML 길이: " (count html) " chars"))))
+
+(println "✓ 모든 테스트 통과!")

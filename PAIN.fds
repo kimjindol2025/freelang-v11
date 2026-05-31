@@ -1,0 +1,209 @@
+FREEDOC {
+  version: "1.2.4"
+  spec: "1.2"
+}
+
+IDENTITY {
+  what: freelang-pain-points
+  domain: language-design
+  lang: FreeLang
+  desc: "FreeLang v11 실사용 중 발견한 불편함·함정·개선 후보 목록"
+}
+
+POSITION {
+  status: open
+  stage: "draft"
+  current: collecting
+  next: [prioritize, design, implement]
+}
+
+PROBLEM {
+  who: freelang-developers
+  pain: "타입 없음·함수명 불일치·파서 함정·에러 노출·변이 불가 혼동"
+  cost: "디버깅 시간 증가·런타임까지 버그 발견 불가·AI 코드 생성 오류 반복"
+}
+
+FRICTION {
+  p1-no-type-system: {
+    what: "컴파일 타임 타입 검사 없음"
+    example: "(get nil 'x') → 런타임 에러, 컴파일 타임 경고 없음"
+    impact: high
+    workaround: "nil-or-empty? 수동 가드 모든 입력부에 삽입"
+  }
+
+  p2-stdlib-naming-inconsistency: {
+    what: "str-length 없음, length 사용 — 하지만 str-split·str-trim·str-contains? 는 str- 접두사 있음"
+    example: "(str-length s) → error / (length s) → ok"
+    impact: high
+    workaround: "항상 length 사용, str- 접두사 믿지 말 것"
+  }
+
+  p3-reserved-word-collision: {
+    what: "analyze 예약어 — 함수명으로 못 씀"
+    example: "(defn analyze ...) → Unexpected token: Analyze"
+    impact: medium
+    workaround: "run-analysis 같은 대체명 사용"
+  }
+
+  p4-no-regex: {
+    what: "정규식 없음"
+    example: "str-match / re-find 계열 함수 없음"
+    impact: medium
+    workaround: "str-contains? + str-index-of + str-slice 조합으로 수동 파싱"
+  }
+
+  p5-slice-no-bounds-check: {
+    what: "str-slice 범위 초과 시 런타임 에러, 방어 없음"
+    example: "(str-slice s 5 3) → crash"
+    impact: medium
+    workaround: "슬라이스 전 length 체크 수동"
+  }
+
+  p6-nth-empty-crash: {
+    what: "(nth [] 0) → 런타임 에러"
+    example: "(first []) → nil 이지만 (nth [] 0) → error"
+    impact: medium
+    workaround: "empty? 체크 후 nth 호출"
+  }
+
+  p7-conj-immutable-confusion: {
+    what: "conj가 새 배열 반환, 원본 불변 — 변이 기대하면 버그"
+    example: "(let [v []] (conj v 1) v) → [] (변화 없음)"
+    impact: high
+    workaround: "let 바인딩으로 재할당: (let [v (conj v 1)] ...)"
+  }
+
+  p8-db-exec-string-vs-map: {
+    what: "db-exec 첫 인자 문자열 → MariaDB, 맵 → SQLite — 조용히 다른 DB 연결"
+    example: "(db-exec '/path/db.db' ...) → MariaDB 소켓 연결 시도"
+    impact: high
+    workaround: "(define DB {'path' '/path/db.db'}) 맵 형태 강제"
+  }
+
+  p9-unicode-parser-break: {
+    what: "박스 드로잉 문자 등 비ASCII → 파서 크래시"
+    example: ";; ─────── (U+2500) → parse error"
+    impact: low
+    workaround: "주석에 ASCII만 사용"
+  }
+
+  p10-error-message-leakage: {
+    what: "런타임 에러 스택이 HTTP 응답에 그대로 노출"
+    example: "{error: '[run-analysis][parse-diff][map]...'}"
+    impact: medium
+    workaround: "서버 레벨 try/catch + 내부 에러 숨김 미들웨어"
+  }
+
+  p11-no-destructuring: {
+    what: "Map 구조분해 self-hosting에서 미완성 — bootstrap 경유만 동작"
+    example: "(let [{a :a} m] ...) → bootstrap ok, self 미지원"
+    impact: low
+    workaround: "(get m 'a') 명시적 접근"
+  }
+
+  p12-no-binary-file-io: {
+    what: "바이너리 파일 I/O 없음 — file-read/write가 utf-8 텍스트 전용"
+    status: resolved
+    resolved-by: "stdlib-fd.ts (fd-open/seek/read-bytes/write-bytes/close) + stdlib-binary.ts (buf-f64le 등) 이미 구현"
+    impact: high
+  }
+
+  p14-sleep-blocks-event-loop: {
+    what: "sleep이 Atomics.wait(동기 스핀)으로 구현 → Node.js 이벤트 루프 완전 블로킹"
+    example: "tcp-outbound 연결 후 sleep으로 응답 대기 → connect/data 콜백 발화 불가"
+    impact: critical
+    need: "Pending Map + Reaper 구현 불가. 비동기 TCP 클라이언트 패턴 전체가 막힘"
+    workaround: "(fl-event-drain) polling 루프로 대체 — sleep 없이 이벤트 큐 소진 반복"
+    fix-target: "sleep을 setTimeout 기반 비블로킹으로 교체. 또는 (fl-yield) 함수 추가 — 한 틱 이벤트 루프 양보"
+  }
+
+  p15-shell-exec-space-in-path: {
+    what: "shell-exec: 공백 포함 경로에서 빈 결과 반환"
+    example: "(shell-exec \"find /home/kimjin/kim/Desktop/kim/... -name FREEDOC.fds\") → 빈 문자열"
+    impact: high
+    cause: "execSync(cmd) 직접 호출 — sh -c 없이 실행 시 공백으로 토큰 분리됨"
+    workaround: "(shell-exec-result cmd) 사용 → spawnSync(sh -c cmd) 방식으로 안전"
+    fix-target: "shell-exec 내부를 spawnSync(sh -c) 방식으로 교체. 또는 shell-exec 문서에 공백 경로 제한 명시"
+  }
+
+  p16-shell-exec-in-defn: {
+    what: "defn 내부에서 shell-exec 호출 시 빈 결과 반환"
+    example: "(defn find-files [] (shell-exec \"find ...\")) → 항상 빈 문자열"
+    impact: medium
+    cause: "정확한 원인 미확인 — cwd 컨텍스트 또는 스코프 캡처 문제로 추정"
+    workaround: "최상위 let 바인딩에서 직접 호출. defn 내부 shell-exec 회피."
+    fix-target: "원인 규명 후 수정"
+  }
+
+  p17-check-parens-escape-quote: {
+    what: "check-parens.py: 문자열 내 이스케이프 따옴표를 괄호로 오계산"
+    example: "(str-replace-all x \"\\\"\" \"\") → check-parens.py가 미닫힘 오류 보고"
+    impact: medium
+    cause: "check-parens.py가 문자열 내부 이스케이프 시퀀스를 올바르게 처리 안 함"
+    workaround: "이스케이프 따옴표 대신 변수 우회: (define Q (str-slice \"X\\\"Y\" 1 2))"
+    fix-target: "check-parens.py 문자열 이스케이프 처리 수정"
+  }
+
+  p13-define-redefine-warning: {
+    what: "(define x ...) 를 같은 스코프에서 반복하면 재정의 경고 발생"
+    example: "(define store (metric-write store ...)) → ⚠️ store 이미 정의됨"
+    impact: medium
+    need: "불변 패턴 강제로 인해 함수 반환값으로 상태 갱신 시 매번 경고"
+    workaround: "atom + swap! 패턴 사용"
+    fix-target: "FL_V12 모드에서 atom 강제, v11 경고 억제 옵션 또는 let 재바인딩 지원"
+  }
+
+  p18-tcp-server-raw-same-process-no-listen: {
+    what: "tcp-server-raw 호출 후 600ms fl-yield 했음에도 동일 프로세스 tcp-outbound가 ECONNREFUSED"
+    example: "(tcp-server-raw 19999 'srv-h') + (fl-yield 100) + (tcp-outbound '127.0.0.1' 19999 'cli-h') → cli-h가 'error','close' 수신, srv-h는 발화 0회"
+    impact: high
+    cause: "tcp-server-raw가 메인 스레드 net.createServer().listen() 사용 (eval-builtins.ts:1819). fl-yield의 Atomics.wait가 메인 스레드를 점유하면 libuv accept 콜백 발화 불가. YIELD-SEMANTICS 명시: 'tcp-server-raw도 YIELD-2 Worker 통합' — 실구현 미반영"
+    workaround: "테스트·검증 시 echo·RPC 서버를 외부 Node.js 프로세스로 분리"
+    fix-target: "tcp-server-raw 구현을 IO Worker 기반으로 이전 (현재 tcp-outbound가 사용하는 __ensureIoWorker 패턴). accept/data/close 이벤트도 ring buffer 경유 → fl-yield drain. eval-builtins.ts 1779~1822 재작성"
+    found: "YIELD-3 검증 #2"
+  }
+
+  p19-io-worker-process-hang: {
+    what: "tcp-outbound·rpc-client-call 사용 후 메인 코드 종료해도 process가 자연 종료되지 않음 (EXIT=124 timeout kill)"
+    example: "tests/yield3-2-echo.fl, yield3-3-rpc.fl 모두 [PASS] 출력 후에도 process 살아있음"
+    impact: medium
+    cause: "035e9a6c 'IO Worker unref()' 패치 후에도 ring buffer Atomics.wait·setInterval 등의 잔존 핸들 가능성"
+    workaround: "외부 timeout으로 강제 종료, CI에서는 child process timeout 설정"
+    fix-target: "IO Worker 종료 경로 점검: (1) tcp-drop 후 worker가 모든 socket close하는지, (2) ring buffer notify 슬롯 Atomics.wait 해제 호출, (3) keepalive setInterval unref 일관성"
+    found: "YIELD-3 검증 #2·#3"
+  }
+
+  p20-bootstrap-shebang-duplicate: {
+    what: "bootstrap.js 첫 줄 '#!/usr/bin/env node'가 외부 자동화에 의해 주기적으로 한 줄 더 prepend → SyntaxError"
+    example: "head -2 bootstrap.js → '#!/usr/bin/env node' 두 줄. 두 번째 # 토큰에서 파싱 실패"
+    impact: medium
+    cause: "외부 백그라운드 에이전트(미식별)가 산출물에 shebang 자동 추가 → 이미 있어도 중복 prepend"
+    workaround: "git checkout bootstrap.js 로 복원. 빌드/실행 직전 head -2 확인"
+    fix-target: "원인 에이전트 식별 후 중복 검사 추가. 빌드 산출물 보호(chmod a-w) 검토"
+    found: "YIELD-3 검증 중 2회 재발"
+  }
+
+  p21-rate-limiter-test-broken-by-design: {
+    what: "src/__tests__/rate-limiter.test.ts 6/7 FAIL — server.close is not a function, status 404"
+    example: "expect(status1).toBe(200) 받는 값 404. afterEach의 server.close() → TypeError"
+    impact: medium
+    cause: "**회귀 아님 — 작성 시점부터 broken**. d3b2432b(2026-05-04) 도입 시점에도 server_start 시그니처는 (portOrConfig)→string. 테스트는 (port, handler)→http.Server를 가정. 두 번째 인자(handler) 무시 → 라우트 미등록 → 404. 반환값 string에 .close() 호출 → TypeError"
+    workaround: "테스트를 격리하거나 server-get/post로 라우트 등록 후 server-start만 호출하는 패턴으로 재작성"
+    fix-target: "두 가지 정식 해결안: (1) 테스트를 실제 시그니처에 맞게 재작성: route 미리 등록 → server_start(port) 호출 → __activeServer.server.close() 사용. (2) server_start 시그니처를 http.Server 반환으로 변경 — 대규모 변경, AKL 등 의존 코드 다수 영향. (1) 권장"
+    found: "YIELD-3 npm run test:fast 1151/1157 — git log 추적 결과 d3b2432b 작성 시점부터 broken"
+  }
+}
+
+CONSTRAINT {
+  rules: [
+    collected-from-real-usage-not-hypothetical,
+    each-item-has-workaround-until-fixed,
+    impact-rated-high-medium-low
+  ]
+}
+
+DECISION {
+  format: freeDoc-FRICTION-block
+  scope: freelang-v11-as-of-2026-05
+  next-action: prioritize-and-design-fixes-in-separate-session
+}

@@ -1,0 +1,6 @@
+;; tests/e2e/hello.fl — D1: Basic Arithmetic
+;; Golden reference: compile output should remain identical across recompilations
+
+(println "Hello, world!")
+(println (+ 1 2))
+(println (* 3 4))

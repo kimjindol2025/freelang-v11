@@ -1,0 +1,96 @@
+;; typecheck-step1.test.fl — Unit tests for Step 1 (정적 분석)
+
+(load "stdlib/fl-typecheck.fl")
+
+(defn test-check-file-syntax-valid []
+  "Test 1: checkParens with valid file"
+  (let [
+    [$result (check-file-syntax "stdlib/fl-typecheck.fl")]
+  ]
+    (assert (get $result "ok") "Valid file should pass")))
+
+(defn test-check-file-syntax-invalid []
+  "Test 2: checkParens with invalid parens"
+  (let [
+    [$content "(defn bad-fn [] (+ 1 2)"]  ;; missing closing paren
+    [$result (checkParens $content)]
+  ]
+    (assert (not (get $result "valid")) "Invalid parens should fail")))
+
+(defn test-collect-type-defs-defn []
+  "Test 3: Collect defn definitions"
+  (let [
+    [$content "(defn my-func [$x] $x)\n(defn other-func [$a $b] (+ $a $b))"]
+    [$result (collect-type-defs $content)]
+    [$defs (get $result "defs")]
+  ]
+    (assert (= (length $defs) 2) (+ "Should find 2 defns, found " (length $defs)))))
+
+(defn test-collect-type-defs-fn []
+  "Test 4: Collect fn definitions"
+  (let [
+    [$content "(fn [$x] (* $x 2))"]
+    [$result (collect-type-defs $content)]
+    [$defs (get $result "defs")]
+  ]
+    (assert (>= (length $defs) 0) "Should handle fn expressions")))
+
+(defn test-get-fn-meta-exists []
+  "Test 5: Query existing function meta"
+  (let [
+    [$meta (get-fn-meta "add-numbers")]  ;; stdlib function
+  ]
+    (assert (not (nil? $meta)) "Should find meta for stdlib function")))
+
+(defn test-get-fn-meta-not-exists []
+  "Test 6: Query non-existing function meta"
+  (let [
+    [$meta (get-fn-meta "nonexistent-function-xyz")]
+  ]
+    (assert (nil? $meta) "Should return nil for non-existing function")))
+
+(defn test-validate-function-meta-valid []
+  "Test 7: Validate function with complete meta"
+  (let [
+    [$meta {:returns "number" :effects [:io] :doc "test"}]
+    [$result (validate-function-meta "test-fn" $meta)]
+  ]
+    (assert (get $result "valid") "Should validate complete meta")))
+
+(defn test-validate-function-meta-invalid []
+  "Test 8: Validate function with missing returns"
+  (let [
+    [$meta {:effects [:io] :doc "test"}]  ;; missing returns
+    [$result (validate-function-meta "test-fn" $meta)]
+  ]
+    (assert (not (get $result "valid")) "Should invalidate incomplete meta")))
+
+;; Run all tests
+
+(println "Running Step 1 Unit Tests...")
+(test-check-file-syntax-valid)
+(println "✓ Test 1: checkParens valid file")
+
+(test-check-file-syntax-invalid)
+(println "✓ Test 2: checkParens invalid parens")
+
+(test-collect-type-defs-defn)
+(println "✓ Test 3: Collect defn definitions")
+
+(test-collect-type-defs-fn)
+(println "✓ Test 4: Collect fn definitions")
+
+(test-get-fn-meta-exists)
+(println "✓ Test 5: Get meta for existing function")
+
+(test-get-fn-meta-not-exists)
+(println "✓ Test 6: Get meta for non-existing function")
+
+(test-validate-function-meta-valid)
+(println "✓ Test 7: Validate complete meta")
+
+(test-validate-function-meta-invalid)
+(println "✓ Test 8: Validate incomplete meta")
+
+(println "")
+(println "All Step 1 tests passed! ✅")

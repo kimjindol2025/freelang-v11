@@ -1,0 +1,5 @@
+;; tests/e2e/loop.fl — D2: Loop and Accumulation
+;; Golden reference: reduce function and range
+
+(define $sum (reduce (fn [$acc $i] (+ $acc $i)) 0 (range 10)))
+(println $sum)

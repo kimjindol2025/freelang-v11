@@ -17,6 +17,7 @@ import { Interpreter } from "./interpreter";
 import { SExpr, Literal } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
 import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase C: strict 모드
+import { enforceCall as _enforceEffect } from "./effect-enforcer"; // C4-4: missing arch layer
 
 // Phase 후속: list/map 깊은 동등성 (T77 palindrome에서 발견된 한계 해결)
 function flDeepEq(a: any, b: any): boolean {
@@ -120,6 +121,27 @@ import { evalRefactorSelf, evalAlign, evalPredict_PHASE144, evalCuriosity, evalE
 // fl-parse: FL 소스 문자열 → AST 배열 (셀프 호스팅용)
 import { lex as _flLex } from "./lexer";
 import { parse as _flParse } from "./parser";
+import {
+  recordEvent, getEvents, clearEvents,
+  RuntimeEvent, EventSeverity,
+  newTraceId, setRuntimeFilter, clearRuntimeFilter, getRuntimeFilter,
+} from "./runtime-events";
+import { getContracts, clearContracts, defineContract as _defineContract } from "./runtime-contracts";
+import {
+  getRuntimeMode, setRuntimeMode, getRuntimePolicy,
+  recoverRuntime, resetGovernance, consumeClearEventsRequest,
+  autoTransitionMode,
+} from "./runtime-governance";
+import { getBudgetViolationCount, resetBudget } from "./runtime-budget";
+import {
+  getActiveContexts, abortContext, getCurrentContextId,
+  resetContexts, isContextAborted,
+} from "./runtime-context";
+import { getWatchdogAlerts, checkStall, getRecentAlerts, resetWatchdog } from "./runtime-watchdog";
+import { storeAppendRun, storeLoadRuns, storeClear, newRunId, storeGetDefaultPath } from "./runtime-store";
+import { computeHistory, replayHistory } from "./runtime-history";
+import { computeReputation, computeAllReputations } from "./runtime-reputation";
+import { computeIntelligence } from "./runtime-intelligence";
 
 // ── Native FL Interpreter Helpers ─────────────────────────────────────────
 // fl-interp 네이티브 빌트인용 헬퍼. TS 스택 오버플로우 없이 FL 코드 평가.
@@ -407,7 +429,12 @@ function flExecOpNative(op: string, vals: any[]): any {
       const fs = require("fs");
       const path = require("path");
       try {
-        const resolvedPath = path.resolve(process.cwd(), filePath);
+        // v11.7.12: 현재 파일 기준 상대경로 지원
+        const currentFile = (interp as any).currentFilePath;
+        const baseDir = currentFile && !path.isAbsolute(filePath)
+          ? path.dirname(currentFile)
+          : process.cwd();
+        const resolvedPath = path.resolve(baseDir, filePath);
         const src = fs.readFileSync(resolvedPath, "utf-8");
         // Use lex and parse builtins that are already available
         const { lex } = require("./lexer");
@@ -716,10 +743,169 @@ function cacheEvict(ch: CacheHandle): void {
 const _globalCache = makeCacheHandle(10000);
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ══════════════════════════════════════════════════════════════════════════════
+// IO Worker — YIELD Runtime (YIELD-1: SAB 설계 + 인라인 Worker 코드)
+//
+// 아키텍처: YIELD-SEMANTICS.fds 명세 준수
+//   Main thread (synchronous interpreter) ←→ IO Worker (async TCP)
+//   SharedArrayBuffer ring buffer로 Worker→Main 이벤트 전달
+//   fl-yield 호출 시 ring buffer drain → callback dispatch
+//
+// SAB Layout:
+//   ctrlBuf (Int32Array, 4 slots × 4B = 16B):
+//     ctrl[0] = writePos  — Worker가 기록 후 전진 (byte offset)
+//     ctrl[1] = readPos   — Main이 읽은 후 전진 (byte offset)
+//     ctrl[2] = notify    — Worker → Main 신호 (Atomics.notify)
+//     ctrl[3] = reserved
+//   dataBuf (8MB ring buffer):
+//     각 이벤트: [4B length LE][JSON bytes]
+//     wrap sentinel: length = 0xFFFFFFFF → readPos를 0으로 리셋
+// ══════════════════════════════════════════════════════════════════════════════
+
+const IO_CTRL_SLOTS = 4;
+const IO_CTRL_SIZE  = IO_CTRL_SLOTS * 4; // 16 bytes
+const IO_DATA_SIZE  = 8 * 1024 * 1024;  // 8MB
+
+const IO_SLOT_WRITE  = 0; // ctrl[0]: writePos (Worker owns)
+const IO_SLOT_READ   = 1; // ctrl[1]: readPos  (Main owns)
+const IO_SLOT_NOTIFY = 2; // ctrl[2]: notify   (Worker writes, Main waits)
+// ctrl[3] reserved
+
+const _ioWorkerCode = `
+const { workerData, parentPort } = require('worker_threads');
+const net = require('net');
+
+const ctrl = new Int32Array(workerData.ctrlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const DATA_SIZE = ${IO_DATA_SIZE};
+const WP = ${IO_SLOT_WRITE};
+const NOTIFY = ${IO_SLOT_NOTIFY};
+
+// push: JSON 이벤트를 ring buffer에 기록하고 Main을 깨움
+// wrap sentinel(0xFFFFFFFF) 패턴으로 버퍼 끝 처리
+function push(eventStr) {
+  const encoded = Buffer.from(eventStr, 'utf8');
+  const totalLen = 4 + encoded.length;
+  let wp = Atomics.load(ctrl, WP);
+  // 현재 위치에 이벤트가 들어가지 않으면 wrap sentinel 기록 후 0으로 이동
+  if (wp + totalLen > DATA_SIZE - 8) {
+    data.writeUInt32LE(0xFFFFFFFF, wp);
+    wp = 0;
+  }
+  data.writeUInt32LE(encoded.length, wp);
+  encoded.copy(data, wp + 4);
+  Atomics.store(ctrl, WP, wp + totalLen);
+  Atomics.store(ctrl, NOTIFY, 1);
+  Atomics.notify(ctrl, NOTIFY);
+}
+
+// 소켓 레지스트리: id → { sock, handler }
+const sockets = new Map();
+// 서버 레지스트리: port → net.Server
+const servers = new Map();
+
+parentPort.on('message', (msg) => {
+  const { cmd } = msg;
+
+  if (cmd === 'tcp-outbound') {
+    const { id, host, port, handler } = msg;
+    const sock = new net.Socket();
+    sockets.set(id, { sock, handler });
+    sock.connect(port, host);
+    sock.on('connect', () =>
+      push(JSON.stringify({ ev: 'connect', id, handler })));
+    sock.on('data', (chunk) =>
+      push(JSON.stringify({ ev: 'data', id, handler, hex: chunk.toString('hex') })));
+    sock.on('close', () => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'close', id, handler }));
+    });
+    sock.on('error', (e) => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'error', id, handler, msg: e.message }));
+    });
+  }
+
+  if (cmd === 'tcp-write') {
+    const entry = sockets.get(msg.id);
+    if (entry && !entry.sock.destroyed) {
+      entry.sock.write(Buffer.from(msg.hex, 'hex'));
+    }
+  }
+
+  if (cmd === 'tcp-drop') {
+    const entry = sockets.get(msg.id);
+    if (entry) { entry.sock.destroy(); sockets.delete(msg.id); }
+  }
+
+  if (cmd === 'tcp-server-raw') {
+    const { port, handler } = msg;
+    if (servers.has(port)) return;
+    let seq = 0;
+    const server = net.createServer((sock) => {
+      const cid = 'conn_' + port + '_' + (++seq);
+      sockets.set(cid, { sock, handler });
+      push(JSON.stringify({ ev: 'accept', id: cid, handler }));
+      sock.on('data', (chunk) =>
+        push(JSON.stringify({ ev: 'data', id: cid, handler, hex: chunk.toString('hex') })));
+      sock.on('close', () => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'close', id: cid, handler }));
+      });
+      sock.on('error', (e) => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'error', id: cid, handler, msg: e.message }));
+      });
+    });
+    server.listen(port, () =>
+      push(JSON.stringify({ ev: 'listening', id: port, handler })));
+    servers.set(port, server);
+  }
+
+  if (cmd === 'tcp-server-stop') {
+    const server = servers.get(msg.port);
+    if (server) { server.close(); servers.delete(msg.port); }
+  }
+});
+`;
+
+// __ensureIoWorker: IO Worker를 lazy 초기화한다.
+// 동일 Worker 인스턴스를 globalThis에 보관 (프로세스 수명 동안 단일 Worker).
+function __ensureIoWorker(): void {
+  if ((globalThis as any).__ioWorker) return;
+  const { Worker: IoWorker } = require("worker_threads");
+  const ctrlBuf = new SharedArrayBuffer(IO_CTRL_SIZE);
+  const dataBuf = new SharedArrayBuffer(IO_DATA_SIZE);
+  const ctrl = new Int32Array(ctrlBuf);
+  Atomics.store(ctrl, IO_SLOT_WRITE,  0);
+  Atomics.store(ctrl, IO_SLOT_READ,   0);
+  Atomics.store(ctrl, IO_SLOT_NOTIFY, 0);
+  const worker = new IoWorker(_ioWorkerCode, {
+    eval: true,
+    workerData: { ctrlBuf, dataBuf },
+  });
+  worker.on("error", (e: any) => {
+    process.stderr.write(`[IO Worker] error: ${e.message}\n`);
+    (globalThis as any).__ioWorker = null;
+  });
+  worker.unref();
+  (globalThis as any).__ioWorker   = worker;
+  (globalThis as any).__ioCtrlBuf  = ctrlBuf;
+  (globalThis as any).__ioDataBuf  = dataBuf;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // AI-First #3: snake_case ↔ kebab-case 양방향 허용
   // 내부 구현은 kebab-case 기준 — snake_case 입력 시 자동 변환
   const normalizedOp = op.replace(/_/g, '-');
+
+  // C4-4: missing architectural layer completion (dec-007 invariant 복원).
+  // evalBuiltin switch-case 직접 dispatch 는 callUserFunction 우회 → 여기서 한 번 enforce.
+  // frame push 없음 (builtin 은 즉시 return). enforceCall 은 idempotent (3상 처리) —
+  // default case 가 callUserFunction 호출 시 중복 enforce 되어도 안전 (event는 dedup collapse).
+  _enforceEffect(normalizedOp, expr ? { file: (expr as any).file ?? "", line: (expr as any).line ?? 0, col: (expr as any).col ?? 0 } : undefined);
 
   // Phase X-2: Deprecation 경고 (snake_case 호출 시) — FL_NO_DEPRECATION_WARN=1 로 끄기 가능
   if (normalizedOp !== op && op !== 'server_start' && !process.env.FL_NO_DEPRECATION_WARN) {
@@ -781,7 +967,12 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
       const fs = require("fs");
       const path = require("path");
       try {
-        const resolvedPath = path.resolve(process.cwd(), filePath);
+        // v11.7.12: 현재 파일 기준 상대경로 지원
+        const currentFile = (interp as any).currentFilePath;
+        const baseDir = currentFile && !path.isAbsolute(filePath)
+          ? path.dirname(currentFile)
+          : process.cwd();
+        const resolvedPath = path.resolve(baseDir, filePath);
 
         // 모듈 캐시 — watch 모드(-w)가 아닐 때 재파싱 방지
         const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
@@ -936,10 +1127,15 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
           filePath = filePath + ".fl";
         }
 
-        // Resolve path (relative to current working directory or absolute)
+        // Resolve path (relative to current file or current working directory or absolute)
+        // v11.7.12: 현재 파일 기준 상대경로 지원
+        const currentFile = (interp as any).currentFilePath;
+        const baseDir = currentFile && !path.isAbsolute(filePath)
+          ? path.dirname(currentFile)
+          : process.cwd();
         const resolvedPath = path.isAbsolute(filePath)
           ? filePath
-          : path.resolve(process.cwd(), filePath);
+          : path.resolve(baseDir, filePath);
 
         // Phase L1.5: Check module cache first (deterministic semantics)
         if (MODULE_CACHE.has(resolvedPath)) {
@@ -1188,6 +1384,618 @@ loop().catch(e => {
       return resp.data;
     }
 
+    // rpc-client-call: 바이너리 RPC 클라이언트 (Worker Thread + Pending Map)
+    // 헤더 9B: [Type 1B][Req_ID 2B LE][Func_ID 2B LE][Length 4B LE]
+    // args: host port fn_id args_json timeout?
+    case "rpc-client-call": case "rpc_client_call": {
+      const _rHost = String(args[0] ?? "localhost");
+      const _rPort = Number(args[1] ?? 30390);
+      const _rFnId = Number(args[2] ?? 0);
+      const _rArgs = typeof args[3] === "string" ? args[3] : JSON.stringify(args[3] ?? null);
+      const _rTimeout = Number(args[4] ?? 10000);
+
+      if (!(globalThis as any).__rpcClientWorker) {
+        const { Worker: RpcWorker } = require("worker_threads");
+        const rpcCtrlBuf = new SharedArrayBuffer(4);
+        const rpcDataBuf = new SharedArrayBuffer(8 * 1024 * 1024);
+        Atomics.store(new Int32Array(rpcCtrlBuf), 0, 0);
+        const rpcWorkerCode = `
+const { workerData } = require('worker_threads');
+const net = require('net');
+const control = new Int32Array(workerData.controlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const HEADER = 9;
+const T_REQ = 0x01, T_RES = 0x02;
+const MAX_PKT = 10 * 1024 * 1024;
+const conns = new Map(); // key → {socket, buf, pending}
+
+function encodeReq(req_id, fn_id, payload) {
+  const pb = Buffer.from(payload, 'utf8');
+  const h = Buffer.allocUnsafe(HEADER);
+  h[0] = T_REQ;
+  h.writeUInt16LE(req_id, 1);
+  h.writeUInt16LE(fn_id, 3);
+  h.writeUInt32LE(pb.length, 5);
+  return Buffer.concat([h, pb]);
+}
+
+function getConn(host, port) {
+  const key = host + ':' + port;
+  if (conns.has(key)) {
+    const c = conns.get(key);
+    if (!c.socket.destroyed && c.socket.writable) return Promise.resolve(c);
+    conns.delete(key);
+  }
+  return new Promise((resolve, reject) => {
+    const c = { socket: null, buf: Buffer.alloc(0), pending: new Map() };
+    c.socket = net.createConnection({ host, port });
+    c.socket.on('connect', () => { conns.set(key, c); resolve(c); });
+    c.socket.on('data', chunk => {
+      c.buf = Buffer.concat([c.buf, chunk]);
+      while (c.buf.length >= HEADER) {
+        const plen = c.buf.readUInt32LE(5);
+        if (plen > MAX_PKT) { c.socket.destroy(); conns.delete(key); return; }
+        if (c.buf.length < HEADER + plen) break;
+        const type = c.buf[0];
+        const rid  = c.buf.readUInt16LE(1);
+        const pay  = c.buf.slice(HEADER, HEADER + plen).toString('utf8');
+        c.buf = c.buf.slice(HEADER + plen);
+        if (type === T_RES && c.pending.has(rid)) {
+          const cb = c.pending.get(rid); c.pending.delete(rid); cb(pay);
+        }
+      }
+    });
+    c.socket.on('error', e => { reject(e); conns.delete(key); });
+    c.socket.on('close', () => conns.delete(key));
+    setTimeout(() => reject(new Error('connect timeout')), 5000);
+  });
+}
+
+function sendRpc(host, port, fn_id, req_id, argsJson, timeout) {
+  return new Promise(async (resolve, reject) => {
+    let c; try { c = await getConn(host, port); } catch(e) { return reject(e); }
+    const frame = encodeReq(req_id, fn_id, argsJson);
+    const timer = setTimeout(() => { c.pending.delete(req_id); reject(new Error('rpc timeout')); }, timeout);
+    c.pending.set(req_id, result => { clearTimeout(timer); resolve(result); });
+    c.socket.write(frame);
+  });
+}
+
+async function loop() {
+  let seq = 0;
+  while (true) {
+    Atomics.wait(control, 0, 0);
+    const flag = Atomics.load(control, 0);
+    if (flag === -1) break;
+    const rlen = data.readInt32LE(0);
+    const rstr = data.toString('utf8', 4, 4 + rlen);
+    let resp;
+    try {
+      const req = JSON.parse(rstr);
+      seq = (seq + 1) & 0xFFFF;
+      const rawResult = await sendRpc(req.host, req.port, req.fn_id, seq, req.args, req.timeout || 10000);
+      let result; try { result = JSON.parse(rawResult); } catch { result = rawResult; }
+      resp = { ok: true, result };
+    } catch(e) { resp = { ok: false, error: e.message }; }
+    const rs = JSON.stringify(resp);
+    data.writeInt32LE(rs.length, 0); data.write(rs, 4, 'utf8');
+    Atomics.store(control, 0, 2); Atomics.notify(control, 0);
+    Atomics.wait(control, 0, 2);
+  }
+}
+loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); });
+`;
+        const rpcWorker = new RpcWorker(rpcWorkerCode, {
+          eval: true,
+          workerData: { controlBuf: rpcCtrlBuf, dataBuf: rpcDataBuf },
+        });
+        rpcWorker.on("error", () => { (globalThis as any).__rpcClientWorker = null; });
+        (globalThis as any).__rpcClientWorker = rpcWorker;
+        (globalThis as any).__rpcClientCtrlBuf = rpcCtrlBuf;
+        (globalThis as any).__rpcClientDataBuf = rpcDataBuf;
+      }
+
+      const _rc = new Int32Array((globalThis as any).__rpcClientCtrlBuf);
+      const _rd = Buffer.from((globalThis as any).__rpcClientDataBuf);
+      const _rReqStr = JSON.stringify({ host: _rHost, port: _rPort, fn_id: _rFnId, args: _rArgs, timeout: _rTimeout });
+      _rd.writeInt32LE(_rReqStr.length, 0);
+      _rd.write(_rReqStr, 4, "utf8");
+      Atomics.store(_rc, 0, 1);
+      Atomics.notify(_rc, 0);
+      const _rWait = Atomics.wait(_rc, 0, 1, _rTimeout + 2000);
+      if (_rWait === "timed-out") return null;
+      const _rRespLen = _rd.readInt32LE(0);
+      const _rResp = JSON.parse(_rd.toString("utf8", 4, 4 + _rRespLen));
+      Atomics.store(_rc, 0, 0);
+      if (!_rResp.ok) throw new Error(_rResp.error ?? "rpc error");
+      return _rResp.result;
+    }
+
+    // ── Capability Registry ────────────────────────────────────────────
+    // globalThis.__flCapRegistry: { [name]: { enabled: boolean, builtins: string[] } }
+    // self-host/bootstrap 동일 registry 사용. capability 단위로 enable/disable.
+    // Note: helpers are inlined per-case to avoid switch-jump TDZ issues.
+
+    // (capability-list) → ["tcp" "file" "http" "db" "process" ...]
+    case "capability-list": {
+      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = { tcp:{enabled:true,builtins:["tcp-server-start","tcp-server-stop","tcp-send","tcp-server-running?","fl-event-tick","fl-event-drain","fl-event-queue-size","fl-error-drain","fl-error-queue-size","fl-run-loop","fl-run-loop-stop"]},file:{enabled:true,builtins:["file-read","file-write","file-append","file-append-line","file-exists?","file-delete","file-mkdir","dir-list","dir-exists?"]},http:{enabled:true,builtins:["http-get","server-start","server-html","server-json","server-status","server-redirect","server-file","server-html-cookie","server-set-cookie"]},db:{enabled:true,builtins:["db-query","db-exec","db-transaction"]},process:{enabled:true,builtins:["fl-env-get","sleep","now-ms","uuid"]} };
+      return Object.keys((globalThis as any).__flCapRegistry);
+    }
+
+    // (capability-enabled? name) → true | false
+    case "capability-enabled?": {
+      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = { tcp:{enabled:true,builtins:[]},file:{enabled:true,builtins:[]},http:{enabled:true,builtins:[]},db:{enabled:true,builtins:[]},process:{enabled:true,builtins:[]} };
+      const _capName = String(args[0] ?? "");
+      return !!((globalThis as any).__flCapRegistry[_capName]?.enabled);
+    }
+
+    // (capability-builtins name) → ["builtin1" ...]
+    case "capability-builtins": {
+      if (!(globalThis as any).__flCapRegistry) return [];
+      const _capName = String(args[0] ?? "");
+      return (globalThis as any).__flCapRegistry[_capName]?.builtins ?? [];
+    }
+
+    // (capability-disable name) → "ok" | "not-found"
+    case "capability-disable": {
+      if (!(globalThis as any).__flCapRegistry) return "not-found";
+      const _capName = String(args[0] ?? "");
+      const _reg = (globalThis as any).__flCapRegistry;
+      if (!_reg[_capName]) return "not-found";
+      _reg[_capName].enabled = false;
+      return "ok";
+    }
+
+    // (capability-enable name) → "ok" | "not-found"
+    case "capability-enable": {
+      if (!(globalThis as any).__flCapRegistry) return "not-found";
+      const _capName = String(args[0] ?? "");
+      const _reg = (globalThis as any).__flCapRegistry;
+      if (!_reg[_capName]) return "not-found";
+      _reg[_capName].enabled = true;
+      return "ok";
+    }
+
+    // (capability-register name builtins) → "ok"
+    case "capability-register": {
+      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = {};
+      const _capName = String(args[0] ?? "");
+      const _builtins: string[] = Array.isArray(args[1]) ? args[1].map(String) : [];
+      (globalThis as any).__flCapRegistry[_capName] = { enabled: true, builtins: _builtins };
+      return "ok";
+    }
+
+    // ── Event Queue + IO Error Queue (reactor model) ──────────────────
+    // IO layer enqueues; VM tick drains. Evaluator never entered from IO thread.
+    // event: { handler: string, args: any[], sock: any | null }
+    // io-error: ["io-err" severity source message] — nonfatal handler errors
+
+    // (fl-event-tick) → number (events processed: 0 or 1)
+    case "fl-event-tick": {
+      const _capReg1 = (globalThis as any).__flCapRegistry;
+      if (_capReg1) { for (const [_n,_c] of Object.entries(_capReg1) as any[]) { if ((_c as any).builtins.includes("fl-event-tick") && !(_c as any).enabled) return `[capability-denied ${_n}]`; } }
+      const _q1: any[] = (globalThis as any).__flEventQueue ?? [];
+      if (_q1.length === 0) return 0;
+      const _ev1 = _q1.shift();
+      if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
+      try {
+        const _r1 = (interp as any).callUserFunction(_ev1.handler, _ev1.args);
+        const _o1 = _r1 != null ? String(_r1) : "";
+        if (_o1 && _ev1.sock && !_ev1.sock.destroyed) try { _ev1.sock.write(_o1.endsWith("\n") ? _o1 : _o1 + "\n"); } catch (we: any) {
+          (globalThis as any).__flErrorQueue.push(["io-err", "recoverable", "write", we.message]);
+        }
+      } catch (e: any) {
+        // handler logic throw → recoverable; evaluator internal error → fatal
+        const isFatal = e.message?.includes("Maximum call stack") || e.message?.includes("out of memory");
+        (globalThis as any).__flErrorQueue.push(["io-err", isFatal ? "fatal" : "recoverable", "handler", e.message]);
+        if (_ev1.sock && !_ev1.sock.destroyed) try { _ev1.sock.write(`ERR ${e.message}\n`); } catch {}
+      }
+      return 1;
+    }
+
+    // (fl-event-drain) → number (total events processed)
+    case "fl-event-drain": {
+      const _capReg2 = (globalThis as any).__flCapRegistry;
+      if (_capReg2) { for (const [_n,_c] of Object.entries(_capReg2) as any[]) { if ((_c as any).builtins.includes("fl-event-drain") && !(_c as any).enabled) return `[capability-denied ${_n}]`; } }
+      const _q2: any[] = (globalThis as any).__flEventQueue ?? [];
+      if (!((globalThis as any).__flErrorQueue)) (globalThis as any).__flErrorQueue = [];
+      let _cnt = 0;
+      while (_q2.length > 0) {
+        const _ev2 = _q2.shift(); _cnt++;
+        try {
+          const _r2 = (interp as any).callUserFunction(_ev2.handler, _ev2.args);
+          const _o2 = _r2 != null ? String(_r2) : "";
+          if (_o2 && _ev2.sock && !_ev2.sock.destroyed) try { _ev2.sock.write(_o2.endsWith("\n") ? _o2 : _o2 + "\n"); } catch (we: any) {
+            (globalThis as any).__flErrorQueue.push(["io-err", "recoverable", "write", we.message]);
+          }
+        } catch (e: any) {
+          const isFatal = e.message?.includes("Maximum call stack") || e.message?.includes("out of memory");
+          (globalThis as any).__flErrorQueue.push(["io-err", isFatal ? "fatal" : "recoverable", "handler", e.message]);
+          if (_ev2.sock && !_ev2.sock.destroyed) try { _ev2.sock.write(`ERR ${e.message}\n`); } catch {}
+        }
+      }
+      return _cnt;
+    }
+
+    // (fl-event-queue-size) → number
+    case "fl-event-queue-size": {
+      return ((globalThis as any).__flEventQueue ?? []).length;
+    }
+
+    // (fl-error-drain) → [["io-err" severity source msg] ...]  clears error queue
+    case "fl-error-drain": {
+      const eq: any[] = (globalThis as any).__flErrorQueue ?? [];
+      (globalThis as any).__flErrorQueue = [];
+      return eq;
+    }
+
+    // (fl-error-queue-size) → number
+    case "fl-error-queue-size": {
+      return ((globalThis as any).__flErrorQueue ?? []).length;
+    }
+
+    // (fl-error-fatal?) → true if any fatal error in queue
+    case "fl-error-fatal?": {
+      const eq: any[] = (globalThis as any).__flErrorQueue ?? [];
+      return eq.some((e: any) => Array.isArray(e) && e[1] === "fatal");
+    }
+
+    // (fl-error-severity err) → "fatal" | "recoverable"
+    // err: ["io-err" severity source msg]
+    case "fl-error-severity": {
+      const e = args[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[1]) : null;
+    }
+
+    // (fl-error-source err) → "queue-overflow" | "handler" | "write"
+    case "fl-error-source": {
+      const e = args[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[2]) : null;
+    }
+
+    // (fl-error-message err) → message string
+    case "fl-error-message": {
+      const e = args[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[3]) : null;
+    }
+
+    // (fl-error-filter severity) → errors matching severity, clears them from queue
+    // severity: "fatal" | "recoverable" | "all"
+    case "fl-error-filter": {
+      const sev = String(args[0] ?? "all");
+      const eq: any[] = (globalThis as any).__flErrorQueue ?? [];
+      if (sev === "all") {
+        (globalThis as any).__flErrorQueue = [];
+        return eq;
+      }
+      const matched = eq.filter((e: any) => Array.isArray(e) && e[1] === sev);
+      (globalThis as any).__flErrorQueue = eq.filter((e: any) => !(Array.isArray(e) && e[1] === sev));
+      return matched;
+    }
+
+    // (fl-queue-cap) → current cap
+    // (fl-queue-cap n) → set cap to n, return old cap
+    case "fl-queue-cap": {
+      const prev = (globalThis as any).__flQueueCap ?? 10000;
+      if (args[0] != null) {
+        const n = Number(args[0]);
+        if (n > 0) (globalThis as any).__flQueueCap = n;
+      }
+      return prev;
+    }
+
+    // ── TCP Server (FL-Cache / raw TCP daemon) ────────────────────────
+    // registry: { [port]: { server, sockets: Set, stopped: boolean } }
+    // IO data → __flEventQueue (never calls evaluator directly)
+    // (tcp-server-start port handler-name) → "ok" | "already-running" | "[capability-denied tcp]"
+    case "tcp-server-start": {
+      const _capReg3 = (globalThis as any).__flCapRegistry;
+      if (_capReg3) { for (const [_n,_c] of Object.entries(_capReg3) as any[]) { if (_c.builtins.includes("tcp-server-start") && !_c.enabled) return `[capability-denied ${_n}]`; } }
+      const port = Number(args[0] ?? 30390);
+      const handlerName = String(args[1] ?? "");
+      const reg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
+      if (!(globalThis as any).__tcpServers) (globalThis as any).__tcpServers = reg;
+      if (reg[port] && !reg[port].stopped) return "already-running";
+      if (!(globalThis as any).__flEventQueue) (globalThis as any).__flEventQueue = [];
+
+      const net = require("net");
+      const entry = { server: null as any, sockets: new Set<any>(), stopped: false };
+      reg[port] = entry;
+
+      let connSeq = 0;
+      entry.server = net.createServer((sock: any) => {
+        if (entry.stopped) { sock.destroy(); return; }
+        const connId = `conn_${++connSeq}`;
+        entry.sockets.add(sock);
+        sock.setEncoding("utf8");
+        let buf = "";
+        sock.on("data", (chunk: string) => {
+          if (entry.stopped) { sock.destroy(); return; }
+          buf += chunk;
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            // reactor contract: enqueue only, never call evaluator from IO
+            // fatal boundary: queue cap 초과 시 drop newest + [io-err fatal queue-overflow]
+            const _q = (globalThis as any).__flEventQueue;
+            const _cap = (globalThis as any).__flQueueCap ?? 10000;
+            if (_q.length >= _cap) {
+              if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+              (globalThis as any).__flErrorQueue.push(["io-err", "fatal", "queue-overflow", `queue full (cap=${_cap}), dropping event from ${connId}`]);
+              if (sock && !sock.destroyed) try { sock.write(`ERR queue-overflow\n`); } catch {}
+            } else {
+              _q.push({ handler: handlerName, args: [connId, trimmed], sock });
+            }
+          }
+        });
+        sock.on("close", () => entry.sockets.delete(sock));
+        sock.on("error", () => { entry.sockets.delete(sock); sock.destroy(); });
+      });
+      entry.server.listen(port, "0.0.0.0");
+      entry.server.on("error", () => {
+        entry.stopped = true;
+        delete reg[port];
+      });
+      return "ok";
+    }
+
+    // (tcp-server-stop port) → "ok" | "not-running"
+    case "tcp-server-stop": {
+      const port = Number(args[0] ?? 30390);
+      const reg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
+      const entry = reg[port];
+      if (!entry || entry.stopped) return "not-running";
+      // lifecycle 계약: stop 즉시 기존 연결 모두 종료 (orphan 방지)
+      entry.stopped = true;
+      for (const sock of entry.sockets) { try { sock.destroy(); } catch {} }
+      entry.sockets.clear();
+      entry.server.close();
+      delete reg[port];
+      return "ok";
+    }
+
+    // (tcp-send host port line) → response-string | nil
+    // 단순 line 기반 요청-응답 (한 줄 송신 → 한 줄 수신)
+    case "tcp-send": {
+      const host = String(args[0] ?? "localhost");
+      const port = Number(args[1] ?? 30390);
+      const line = String(args[2] ?? "");
+      const timeout = Number(args[3] ?? 3000);
+
+      const { spawnSync } = require("child_process");
+      const script = `
+const net = require('net');
+const r = JSON.parse(require('fs').readFileSync(0,'utf8'));
+const sock = net.createConnection({host:r.host,port:r.port});
+let resp='',done=false;
+sock.setEncoding('utf8');
+sock.on('connect',()=>sock.write(r.line+(r.line.endsWith('\\n')?'':'\\n')));
+sock.on('data',c=>{resp+=c;if(resp.includes('\\n')&&!done){done=true;sock.destroy();process.stdout.write(resp.trim());process.exit(0);}});
+sock.on('error',()=>process.exit(1));
+sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.write(resp.trim());process.exit(resp?0:1);}});
+`;
+      try {
+        const r = spawnSync(process.execPath, ["-e", script], {
+          input: JSON.stringify({ host, port, line, timeout }),
+          timeout: timeout + 500, encoding: "utf-8" as any,
+        });
+        if (r.error || r.status !== 0) return null;
+        const out = (r.stdout ?? "").trim();
+        return out.length ? out : null;
+      } catch { return null; }
+    }
+
+    // (tcp-server-running? port) → true | false
+    case "tcp-server-running?": {
+      const port = Number(args[0] ?? 30390);
+      const entry = (globalThis as any).__tcpServers?.[port];
+      return !!(entry && !entry.stopped);
+    }
+
+    // (tcp-server-raw port "handler") → "ok"
+    // raw chunk TCP 서버. 핸들러 호출 규약 (항상 3 인자):
+    //   handler("connect", connId, "")       — 신규 연결
+    //   handler("data",    connId, chunk)    — raw 데이터 수신 (binary encoding)
+    //   handler("close",   connId, "")       — 연결 종료
+    case "tcp-server-raw": {
+      const _rrCapReg = (globalThis as any).__flCapRegistry;
+      if (_rrCapReg) { for (const [_n,_c] of Object.entries(_rrCapReg) as any[]) { if ((_c as any).builtins.includes("tcp-server-raw") && !(_c as any).enabled) return `[capability-denied ${_n}]`; } }
+      const _rrPort = Number(args[0] ?? 30390);
+      const _rrHandler = String(args[1] ?? "");
+      const _rrReg: Record<number, any> = (globalThis as any).__tcpServers ?? {};
+      if (!(globalThis as any).__tcpServers) (globalThis as any).__tcpServers = _rrReg;
+      if (_rrReg[_rrPort] && !_rrReg[_rrPort].stopped) return "already-running";
+      if (!(globalThis as any).__flEventQueue) (globalThis as any).__flEventQueue = [];
+      if (!(globalThis as any).__flConnSocks) (globalThis as any).__flConnSocks = {};
+      const _rrNet = require("net");
+      const _rrEntry = { server: null as any, sockets: new Set<any>(), stopped: false };
+      _rrReg[_rrPort] = _rrEntry;
+      let _rrSeq = 0;
+      _rrEntry.server = _rrNet.createServer((sock: any) => {
+        if (_rrEntry.stopped) { sock.destroy(); return; }
+        const _rrConnId = `conn_${++_rrSeq}`;
+        _rrEntry.sockets.add(sock);
+        (globalThis as any).__flConnSocks[_rrConnId] = sock;
+        const _rrEnq = (evArgs: any[]) => {
+          try {
+            callFnVal(_rrHandler, evArgs);
+          } catch (e: any) {
+            if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+            (globalThis as any).__flErrorQueue.push(["io-err","recoverable","handler",String(e.message ?? e)]);
+          }
+        };
+        _rrEnq(["connect", _rrConnId, ""]);
+        sock.on("data", (chunk: Buffer) => {
+          if (_rrEntry.stopped) return;
+          _rrEnq(["data", _rrConnId, chunk.toString("binary")]);
+        });
+        const _rrOnEnd = () => {
+          _rrEntry.sockets.delete(sock);
+          delete (globalThis as any).__flConnSocks[_rrConnId];
+          _rrEnq(["close", _rrConnId, ""]);
+        };
+        sock.on("close", _rrOnEnd);
+        sock.on("error", _rrOnEnd);
+      });
+      _rrEntry.server.listen(_rrPort, "0.0.0.0");
+      _rrEntry.server.on("error", () => { _rrEntry.stopped = true; delete _rrReg[_rrPort]; });
+      return "ok";
+    }
+
+    // (tcp-outbound host port "handler") → upstream-id (즉시 반환, 연결은 비동기)
+    // __ensureIoWorker() 기반 (YIELD-SEMANTICS.fds INV-3, INV-4 준수).
+    //   handler("connect", upstreamId, "")         — 연결 성공
+    //   handler("data",    upstreamId, hexChunk)    — 응답 수신 (hex string)
+    //   handler("close",   upstreamId, "")          — 종료
+    //   handler("error",   upstreamId, message)     — 연결 실패
+    case "tcp-outbound": {
+      const _obHost = String(args[0] ?? "localhost");
+      const _obPort = Number(args[1] ?? 80);
+      const _obHandler = String(args[2] ?? "");
+      __ensureIoWorker();
+      if (!(globalThis as any).__ioUpstreams) {
+        (globalThis as any).__ioUpstreams = new Set<string>();
+        (globalThis as any).__ioUpstreamSeq = 0;
+      }
+      const _upId = `upstream_${++(globalThis as any).__ioUpstreamSeq}`;
+      (globalThis as any).__ioUpstreams.add(_upId);
+      (globalThis as any).__ioWorker.postMessage({ cmd: "tcp-outbound", id: _upId, host: _obHost, port: _obPort, handler: _obHandler });
+      return _upId;
+    }
+
+    // (tcp-write conn-id data) → "ok" | "error" | "not-found"
+    // IO Worker 아웃바운드(__ioUpstreams), 인바운드(__flConnSocks), 구형(__flUpstreams)
+    case "tcp-write": {
+      const _twId = String(args[0] ?? "");
+      const _twData = String(args[1] ?? "");
+      if ((globalThis as any).__ioUpstreams?.has(_twId)) {
+        (globalThis as any).__ioWorker?.postMessage({ cmd: "tcp-write", id: _twId, hex: Buffer.from(_twData, "binary").toString("hex") });
+        return "ok";
+      }
+      const _twSock = (globalThis as any).__flConnSocks?.[_twId]
+                   ?? (globalThis as any).__flUpstreams?.[_twId];
+      if (!_twSock || _twSock.destroyed) return "not-found";
+      try {
+        _twSock.write(Buffer.from(_twData, "binary"));
+        return "ok";
+      } catch (e: any) {
+        if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+        (globalThis as any).__flErrorQueue.push(["io-err","recoverable","write",`${_twId}: ${String(e.message)}`]);
+        return "error";
+      }
+    }
+
+    // (tcp-drop conn-id) → "ok" | "not-found"
+    case "tcp-drop": {
+      const _tdId = String(args[0] ?? "");
+      if ((globalThis as any).__ioUpstreams?.has(_tdId)) {
+        (globalThis as any).__ioUpstreams.delete(_tdId);
+        (globalThis as any).__ioWorker?.postMessage({ cmd: "tcp-drop", id: _tdId });
+        return "ok";
+      }
+      const _tdIn = (globalThis as any).__flConnSocks?.[_tdId];
+      if (_tdIn) {
+        try { _tdIn.destroy(); } catch {}
+        delete (globalThis as any).__flConnSocks[_tdId];
+        return "ok";
+      }
+      const _tdOut = (globalThis as any).__flUpstreams?.[_tdId];
+      if (_tdOut) {
+        try { _tdOut.destroy(); } catch {}
+        delete (globalThis as any).__flUpstreams[_tdId];
+        return "ok";
+      }
+      return "not-found";
+    }
+
+    // (fl-set-interval ms "handler-name") → interval-id
+    // Node.js setInterval로 주기적으로 FL 핸들러 호출. 이벤트 루프 비블로킹.
+    case "fl-set-interval": {
+      const _siMs = Math.max(1, Number(args[0] ?? 1000));
+      const _siHandler = String(args[1] ?? "");
+      if (!(globalThis as any).__flIntervals) (globalThis as any).__flIntervals = {};
+      if (!(globalThis as any).__flIntervalSeq) (globalThis as any).__flIntervalSeq = 0;
+      const _siId = `interval_${++(globalThis as any).__flIntervalSeq}`;
+      const _siHandle = setInterval(() => {
+        try {
+          if (_siHandler) callFnVal(_siHandler, []);
+        } catch (e: any) {
+          if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+          (globalThis as any).__flErrorQueue.push(["io-err","recoverable","handler",String(e.message ?? e)]);
+        }
+      }, _siMs);
+      (globalThis as any).__flIntervals[_siId] = _siHandle;
+      return _siId;
+    }
+
+    // (fl-clear-interval interval-id) → "ok" | "not-found"
+    case "fl-clear-interval": {
+      const _ciId = String(args[0] ?? "");
+      const _ciHandle = (globalThis as any).__flIntervals?.[_ciId];
+      if (!_ciHandle) return "not-found";
+      clearInterval(_ciHandle);
+      delete (globalThis as any).__flIntervals[_ciId];
+      return "ok";
+    }
+
+    // ── fl-yield — Scheduler Tick (YIELD-SEMANTICS.fds Scheduler Tick Model) ──
+    // SAB ctrl layout (YIELD-SPEC 4-slot):
+    //   ctrl[0]=writePos, ctrl[1]=readPos, ctrl[2]=notify(Atomics.wait), ctrl[3]=reserved
+    // Tick sequence: Atomics.wait(ctrl,2,0,ms) → drain readPos~writePos → callFnVal
+
+    // (fl-yield [timeout-ms]) → number (처리된 이벤트 수)
+    case "fl-yield": {
+      const _fyMs = Math.max(0, Number(args[0] ?? 1));
+
+      // IO Worker가 없으면 즉시 반환 (INV-1: 무해한 no-op)
+      if (!(globalThis as any).__ioWorker) return 0;
+
+      const _fyCtrl = new Int32Array((globalThis as any).__ioCtrlBuf as SharedArrayBuffer);
+      const _fyBuf  = Buffer.from((globalThis as any).__ioDataBuf as SharedArrayBuffer);
+
+      // Scheduler Tick Step 1: Worker 신호 대기 (최대 ms)
+      Atomics.wait(_fyCtrl, IO_SLOT_NOTIFY, 0, _fyMs);
+      Atomics.store(_fyCtrl, IO_SLOT_NOTIFY, 0); // notify 클리어
+
+      // Scheduler Tick Step 2: ring buffer drain (readPos → writePos)
+      const _fyEvents: Array<{ev: string; id: string; handler: string; hex?: string; msg?: string}> = [];
+      let _fyRp = Atomics.load(_fyCtrl, IO_SLOT_READ);
+      const _fyWp = Atomics.load(_fyCtrl, IO_SLOT_WRITE);
+
+      while (_fyRp !== _fyWp) {
+        const _fyLen = _fyBuf.readUInt32LE(_fyRp);
+        if (_fyLen === 0xFFFFFFFF) { _fyRp = 0; continue; } // wrap sentinel
+        if (_fyLen === 0 || _fyRp + 4 + _fyLen > IO_DATA_SIZE) break;
+        try {
+          _fyEvents.push(JSON.parse(_fyBuf.toString("utf8", _fyRp + 4, _fyRp + 4 + _fyLen)));
+        } catch {}
+        _fyRp += 4 + _fyLen;
+        if (_fyRp >= IO_DATA_SIZE) _fyRp = 0;
+      }
+      Atomics.store(_fyCtrl, IO_SLOT_READ, _fyRp); // readPos 전진
+
+      // Scheduler Tick Step 3: callback dispatch
+      let _fyCnt = 0;
+      for (const _fyEv of _fyEvents) {
+        const _fyEvType = _fyEv.ev;
+        const _fyHandler = _fyEv.handler;
+        if (!_fyHandler) continue;
+        // data 이벤트: hex → binary string 변환 (기존 코드 호환)
+        const _fyData = _fyEvType === "data" ? Buffer.from(_fyEv.hex ?? "", "hex").toString("binary")
+                      : _fyEv.msg ?? "";
+        try {
+          callFnVal(_fyHandler, [_fyEvType, _fyEv.id, _fyData]);
+          _fyCnt++;
+        } catch (e: any) {
+          if (!(globalThis as any).__flErrorQueue) (globalThis as any).__flErrorQueue = [];
+          (globalThis as any).__flErrorQueue.push(["io-err","recoverable","handler",String(e.message ?? e)]);
+        }
+      }
+      return _fyCnt;
+    }
+
     // Arithmetic
     case "+": {
       const bi = args.findIndex((v: any) => v === null || v === undefined || typeof v !== "number");
@@ -1253,6 +2061,531 @@ loop().catch(e => {
       const val = args.length > 1 ? args[1] : args[0];
       process.stderr.write("[tap] " + label + toDisplay(val) + "\n");
       return val;
+    }
+    case "debug": {
+      // (debug value) → [DEBUG] value 출력 후 value 반환
+      // (debug "label" value) → [DEBUG label] value 출력 후 value 반환
+      const hasLabel = args.length > 1;
+      const debugLabel = hasLabel ? String(args[0]) : "";
+      const debugVal = hasLabel ? args[1] : args[0];
+      const debugPrefix = debugLabel ? `[DEBUG ${debugLabel}]` : "[DEBUG]";
+      process.stderr.write(`${debugPrefix} ${toDisplay(debugVal)}\n`);
+      recordEvent({
+        type: "debug", timestamp: Date.now(),
+        file: (interp as any).currentFilePath,
+        line: expr.line ?? (interp as any).currentLine,
+        label: debugLabel || undefined,
+        value: debugVal
+      });
+      return debugVal;
+    }
+    case "runtime-events": {
+      // (runtime-events) → 전체
+      // (runtime-events :type :trace) / (runtime-events :label "db") / (runtime-events :last 20)
+      if (args.length === 0) return getEvents();
+      const reOpts: Record<string, any> = {};
+      for (let i = 0; i + 1 < args.length; i += 2) {
+        const k = String(args[i]).replace(/^:/, "");
+        reOpts[k] = args[i + 1];
+      }
+      let reEvs = getEvents();
+      if (reOpts.type !== undefined) {
+        const t = String(reOpts.type).replace(/^:/, "");
+        reEvs = reEvs.filter(e => e.type === t);
+      }
+      if (reOpts.label !== undefined) {
+        const l = String(reOpts.label);
+        reEvs = reEvs.filter(e => e.label === l);
+      }
+      if (reOpts.last !== undefined) {
+        const n = Number(reOpts.last);
+        if (!isNaN(n) && n > 0) reEvs = reEvs.slice(-n);
+      }
+      if (reOpts.severity !== undefined) {
+        const sevRank: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
+        const minR = sevRank[String(reOpts.severity).replace(/^:/, "")] ?? 0;
+        reEvs = reEvs.filter(e => (sevRank[e.severity ?? "info"] ?? 0) >= minR);
+      }
+      return reEvs;
+    }
+    case "clear-runtime-events":
+      clearEvents();
+      return null;
+    case "runtime-summary": {
+      const rsEvs = getEvents();
+      const rsTrace = rsEvs.filter(e => e.type === "trace");
+      const rsTms = rsTrace.map(e => e.elapsedMs ?? 0);
+      const rsAvg = rsTms.length ? Math.round(rsTms.reduce((a, b) => a + b, 0) / rsTms.length) : null;
+      const rsMax = rsTms.length ? Math.max(...rsTms) : null;
+      const rsSevCounts: Record<string, number> = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rsEvs) rsSevCounts[e.severity ?? "info"] = (rsSevCounts[e.severity ?? "info"] ?? 0) + 1;
+      const rsCollapsed = rsEvs.filter(e => e.collapsed).length;
+      const result: Record<string, any> = {
+        "event-count": rsEvs.length,
+        "debug-count": rsEvs.filter(e => e.type === "debug").length,
+        "trace-count": rsTrace.length,
+        "assert-fail-count": rsEvs.filter(e => e.type === "assert-fail").length,
+        "runtime-error-count": rsEvs.filter(e => e.type === "runtime-error").length,
+        "severity-counts": rsSevCounts,
+        "collapsed-count": rsCollapsed,
+      };
+      if (rsAvg !== null) result["avg-trace-ms"] = rsAvg;
+      if (rsMax !== null) result["max-trace-ms"] = rsMax;
+      return result;
+    }
+    case "runtime-analyze": {
+      const raEvs = getEvents();
+      const issues: any[] = [];
+
+      // Rule 1: nil-instability — 2회 이상 nil 관련 runtime-error
+      const nilErrors = raEvs.filter(e =>
+        e.type === "runtime-error" &&
+        (e.message?.includes("nil") || e.message?.includes("null") ||
+         e.message?.includes("Cannot read") || e.errorKind?.includes("nil"))
+      );
+      if (nilErrors.length >= 2) {
+        issues.push({
+          "likely-cause": "nil-instability",
+          "confidence": Math.min(0.5 + nilErrors.length * 0.15, 0.99),
+          "message": `Repeated nil-access detected (${nilErrors.length}회)`,
+          "suggestion": "(nil? x) 확인 또는 assert 추가",
+          "evidence-count": nilErrors.length,
+        });
+      }
+
+      // Rule 2: slow-operation — trace elapsed > 100ms
+      const slowTraces = raEvs.filter(e => e.type === "trace" && (e.elapsedMs ?? 0) > 100);
+      if (slowTraces.length > 0) {
+        const maxMs = Math.max(...slowTraces.map(e => e.elapsedMs ?? 0));
+        issues.push({
+          "likely-cause": "slow-operation",
+          "confidence": 0.85,
+          "message": `Trace latency high (max: ${maxMs}ms, count: ${slowTraces.length})`,
+          "hotspot": slowTraces.reduce((a, e) => (e.elapsedMs ?? 0) > (a.elapsedMs ?? 0) ? e : a).expr ?? "?",
+          "suggestion": "I/O 병목 확인 또는 캐시 적용",
+        });
+      }
+
+      // Rule 3: assertion-storm — 3회 이상 assert-fail
+      const assertFails = raEvs.filter(e => e.type === "assert-fail");
+      if (assertFails.length >= 3) {
+        issues.push({
+          "likely-cause": "assertion-storm",
+          "confidence": 0.9,
+          "message": `Multiple assertion failures (${assertFails.length}회)`,
+          "suggestion": "데이터 흐름 검토 필요",
+          "evidence-count": assertFails.length,
+        });
+      }
+
+      // Rule 4: error-spike — runtime-error 5회 이상
+      const runtimeErrors = raEvs.filter(e => e.type === "runtime-error");
+      if (runtimeErrors.length >= 5) {
+        issues.push({
+          "likely-cause": "error-spike",
+          "confidence": Math.min(0.6 + runtimeErrors.length * 0.05, 0.99),
+          "message": `High runtime-error rate (${runtimeErrors.length}회)`,
+          "suggestion": "에러 원인 클러스터링 후 근본 수정 필요",
+          "evidence-count": runtimeErrors.length,
+        });
+      }
+
+      if (issues.length === 0) {
+        return [{ "likely-cause": "healthy", "confidence": 1.0, "message": "이상 패턴 없음" }];
+      }
+      return issues;
+    }
+    case "save-runtime-events": {
+      const savePath = String(args[0]);
+      const saveFs = require("fs");
+      saveFs.writeFileSync(savePath, JSON.stringify(getEvents(), null, 2), "utf-8");
+      return savePath;
+    }
+    case "load-runtime-events": {
+      const loadPath = String(args[0]);
+      const loadFs = require("fs");
+      const loaded: RuntimeEvent[] = JSON.parse(loadFs.readFileSync(loadPath, "utf-8"));
+      clearEvents();
+      for (const ev of loaded) recordEvent(ev);
+      return loaded.length;
+    }
+    case "runtime-diff": {
+      const rdA: RuntimeEvent[] = Array.isArray(args[0]) ? args[0] : [];
+      const rdB: RuntimeEvent[] = Array.isArray(args[1]) ? args[1] : [];
+      const rdSum = (evs: RuntimeEvent[]) => {
+        const tms = evs.filter(e => e.type === "trace").map(e => e.elapsedMs ?? 0);
+        return {
+          total: evs.length,
+          errors: evs.filter(e => e.type === "runtime-error").length,
+          fails: evs.filter(e => e.type === "assert-fail").length,
+          avgMs: tms.length ? Math.round(tms.reduce((a, b) => a + b, 0) / tms.length) : 0,
+        };
+      };
+      const sA = rdSum(rdA);
+      const sB = rdSum(rdB);
+      return {
+        "improvement": sB.errors < sA.errors,
+        "runtime-error-delta": sB.errors - sA.errors,
+        "assert-fail-delta": sB.fails - sA.fails,
+        "trace-ms-delta": sB.avgMs - sA.avgMs,
+        "event-count-delta": sB.total - sA.total,
+        "summary-a": { "runtime-errors": sA.errors, "avg-trace-ms": sA.avgMs },
+        "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs },
+      };
+    }
+    case "runtime-health": {
+      const rhEvs = getEvents();
+      const total = rhEvs.length || 1;
+      const errorCount  = rhEvs.filter(e => e.type === "runtime-error").length;
+      const failCount   = rhEvs.filter(e => e.type === "assert-fail").length;
+      const violations  = rhEvs.filter(e => (e.type as string) === "contract-violation");
+      const traceCount  = rhEvs.filter(e => e.type === "trace").length;
+      const collapseCount = rhEvs.filter(e => e.collapsed).length;
+
+      let score = 1.0;
+      score -= ((errorCount + failCount) / total) * 0.4;
+      score -= (violations.length / Math.max(total, 10)) * 0.3;
+      if (traceCount > 100) score -= Math.min(0.2, (traceCount - 100) / 500);
+      if (collapseCount > 5)  score -= Math.min(0.1, (collapseCount - 5) / 100);
+      score = Math.round(Math.max(0, Math.min(1, score)) * 100) / 100;
+
+      // health 기반 자동 mode 전환
+      const recentBurstCount = violations.filter(e => {
+        return (Date.now() - e.timestamp) < 10000;
+      }).length;
+      autoTransitionMode(score, recentBurstCount);
+
+      const status = score >= 0.9 ? "healthy" : score >= 0.7 ? "degraded" : score >= 0.5 ? "warning" : "critical";
+      const warnCount  = rhEvs.filter(e => e.severity === "warn").length;
+      const errCount   = rhEvs.filter(e => e.severity === "error" || e.severity === "fatal").length;
+
+      return {
+        "score": score,
+        "status": status,
+        "mode": getRuntimeMode(),
+        "warnings": warnCount,
+        "errors": errCount,
+        "recent-contract-violations": violations.slice(-5).map(e => ({
+          "contract": (e as any).contractName,
+          "message": e.message,
+          "severity": e.severity,
+        })),
+      };
+    }
+    // ── Phase 10: Persistent Runtime Memory ───────────────────────────────
+    case "runtime-store-save": {
+      const rstPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      // build run record from current session
+      const rstEvs = getEvents();
+      const rstSummaryEvs = rstEvs.filter(e => e.type === "trace");
+      const rstMs = rstSummaryEvs.map(e => e.elapsedMs ?? 0);
+      const rstSev: Record<string, number> = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rstEvs) rstSev[e.severity ?? "info"] = (rstSev[e.severity ?? "info"] ?? 0) + 1;
+      const rstSummary: Record<string, unknown> = {
+        "event-count": rstEvs.length,
+        "trace-count": rstSummaryEvs.length,
+        "runtime-error-count": rstEvs.filter(e => e.type === "runtime-error").length,
+        "assert-fail-count": rstEvs.filter(e => e.type === "assert-fail").length,
+        "severity-counts": rstSev,
+        "avg-trace-ms": rstMs.length ? Math.round(rstMs.reduce((a, b) => a + b, 0) / rstMs.length) : null,
+        "max-trace-ms": rstMs.length ? Math.max(...rstMs) : null,
+      };
+      const rstViolations: Array<{contractName: string; count: number}> = [];
+      const rstViolMap: Record<string, number> = {};
+      for (const e of rstEvs) {
+        if ((e.type as string) === "contract-violation" && e.contractName) {
+          rstViolMap[e.contractName] = (rstViolMap[e.contractName] ?? 0) + 1;
+        }
+      }
+      for (const [cn, cnt] of Object.entries(rstViolMap)) rstViolations.push({ contractName: cn, count: cnt });
+      const rstNow = Date.now();
+      storeAppendRun({
+        runId: newRunId(),
+        startMs: rstEvs.length > 0 ? rstEvs[0].timestamp : rstNow,
+        endMs: rstNow,
+        durationMs: rstEvs.length > 0 ? rstNow - rstEvs[0].timestamp : 0,
+        summary: rstSummary,
+        issues: [],
+        violations: rstViolations,
+        mode: getRuntimeMode(),
+        budgetExceeded: rstEvs.some(e => (e.type as string) === "budget-exceeded"),
+      }, rstPath);
+      return rstPath;
+    }
+    case "runtime-store-load": {
+      const rslPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return storeLoadRuns(rslPath);
+    }
+    case "runtime-store-clear": {
+      const rscPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      storeClear(rscPath);
+      return true;
+    }
+    case "runtime-replay-history": {
+      const rrhPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return replayHistory(rrhPath);
+    }
+    case "runtime-history": {
+      const rhisPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return computeHistory(rhisPath);
+    }
+    case "runtime-reputation": {
+      const rrepName = String(args[0] ?? "").replace(/^:/, "");
+      const rrepPath = args[1] != null ? String(args[1]) : storeGetDefaultPath();
+      if (!rrepName) return computeAllReputations(rrepPath);
+      return computeReputation(rrepName, rrepPath);
+    }
+    case "runtime-intelligence": {
+      const riPath = args[0] != null ? String(args[0]) : storeGetDefaultPath();
+      return computeIntelligence(riPath);
+    }
+    // ──────────────────────────────────────────────────────────────────────
+    case "runtime-mode": {
+      return getRuntimeMode();
+    }
+    case "set-runtime-mode": {
+      const modeArg = String(args[0]).replace(/^:/, "");
+      const validModes = ["normal", "degraded", "protected", "panic"];
+      if (!validModes.includes(modeArg)) {
+        throw new Error(`set-runtime-mode: invalid mode "${modeArg}". Use :normal/:degraded/:protected/:panic`);
+      }
+      const prevMode = getRuntimeMode();
+      setRuntimeMode(modeArg as any);
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime mode: ${prevMode} → ${modeArg}`,
+        label: modeArg,
+      });
+      return modeArg;
+    }
+    case "runtime-policy": {
+      const policy = getRuntimePolicy() as Record<string, unknown>;
+      policy["active-contracts"] = getContracts().length;
+      return policy;
+    }
+    case "runtime-recover":
+    case "recover-runtime": {
+      const modeBeforeRecover = getRuntimeMode();
+      recoverRuntime();
+      resetBudget();
+      resetContexts();
+      resetWatchdog();
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime recovered: ${modeBeforeRecover} → normal`,
+        label: "normal",
+      });
+      return "normal";
+    }
+    case "runtime-resources": {
+      const rrEvs = getEvents();
+      const now = Date.now();
+      const recentEvs = rrEvs.filter(e => now - e.timestamp < 1000);
+      const stallAlert = checkStall(rrEvs.length);
+      if (stallAlert) {
+        recordEvent({
+          type: "watchdog-alert",
+          timestamp: now,
+          message: `Watchdog: ${stallAlert.kind} (elapsed=${stallAlert.elapsedMs}ms)`,
+          label: stallAlert.kind,
+          value: stallAlert,
+        });
+      }
+      return {
+        "active-contexts":   getActiveContexts().length,
+        "event-buffer-size": rrEvs.length,
+        "trace-rate":        recentEvs.filter(e => e.type === "trace").length,
+        "watchdog-alerts":   getWatchdogAlerts(),
+        "budget-violations": getBudgetViolationCount(),
+        "runtime-mode":      getRuntimeMode(),
+      };
+    }
+    case "runtime-contexts": {
+      return getActiveContexts().map(c => ({
+        "id":         c.id,
+        "start-ms":   c.startMs,
+        "elapsed-ms": c.elapsedMs,
+      }));
+    }
+    case "abort-current-runtime":
+    case "abort-runtime-context": {
+      const ctxId = args[0] != null ? String(args[0]) : getCurrentContextId();
+      if (ctxId) {
+        abortContext(ctxId);
+        recordEvent({
+          type: "context-aborted",
+          timestamp: Date.now(),
+          message: `Context aborted: ${ctxId}`,
+          label: ctxId,
+          value: { "context-id": ctxId },
+        });
+      }
+      return ctxId ?? null;
+    }
+    case "runtime-watchdog-alerts": {
+      return getRecentAlerts().map(a => ({
+        "kind":       a.kind,
+        "elapsed-ms": a.elapsedMs,
+        "event-count": a.eventCount,
+      }));
+    }
+    case "runtime-timeline": {
+      const tlEvs = getEvents();
+      const SEV_CHAR: Record<string, string> = { debug: ".", info: "·", warn: "⚠", error: "✖", fatal: "✦" };
+      return tlEvs.map(e => {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()]
+          .map(n => n.toString().padStart(2, "0")).join(":") + "." + d.getMilliseconds().toString().padStart(3, "0");
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 60);
+        return {
+          "time": hms,
+          "type": e.type,
+          "severity": e.severity,
+          "event-id": e.eventId,
+          "trace-id": e.traceId ?? null,
+          "summary": summary,
+          "collapsed": e.collapsed ?? false,
+          "count": e.count ?? 1,
+        };
+      });
+    }
+    case "print-runtime-timeline": {
+      const ptEvs = getEvents();
+      const SEV_CHAR2: Record<string, string> = { debug: ".", info: "·", warn: "⚠", error: "✖", fatal: "✦" };
+      const lines: string[] = [];
+      for (const e of ptEvs) {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()]
+          .map(n => n.toString().padStart(2, "0")).join(":");
+        const sev = SEV_CHAR2[e.severity ?? "info"] ?? "·";
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 50);
+        const col = e.collapsed ? ` ×${e.count}` : "";
+        lines.push(`${hms} ${sev} ${(e.type as string).padEnd(20)} ${summary}${col}`);
+      }
+      process.stderr.write(lines.join("\n") + (lines.length ? "\n" : ""));
+      return null;
+    }
+    case "list-contracts": {
+      return getContracts().map(c => ({
+        "name": c.name,
+        "event-type": c.eventType,
+        "threshold": c.threshold,
+        "window-ms": c.windowMs,
+        "action": c.action,
+        ...(c.errorKind ? { "error-kind": c.errorKind } : {}),
+      }));
+    }
+    case "clear-contracts":
+      clearContracts();
+      return null;
+    case "runtime-snapshot": {
+      const snEvs = getEvents();
+      const snSevCounts: Record<string, number> = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      const snTraceIds = new Set<string>();
+      const snRecentErrors: any[] = [];
+      for (const e of snEvs) {
+        const s = e.severity ?? "info";
+        snSevCounts[s] = (snSevCounts[s] ?? 0) + 1;
+        if (e.traceId) snTraceIds.add(e.traceId);
+        if (s === "error" || s === "fatal") {
+          snRecentErrors.push({ type: e.type, message: e.message, expr: e.expr, line: e.line });
+        }
+      }
+      return {
+        "event-count": snEvs.length,
+        "severity-counts": snSevCounts,
+        "active-trace-ids": [...snTraceIds].slice(-10),
+        "recent-errors": snRecentErrors.slice(-5),
+        "active-filter": getRuntimeFilter(),
+      };
+    }
+    case "set-runtime-filter": {
+      const sfSev = String(args[0]).replace(/^:/, "") as EventSeverity;
+      if (!["debug","info","warn","error","fatal"].includes(sfSev)) {
+        throw new Error(`set-runtime-filter: invalid severity "${sfSev}". Use :debug/:info/:warn/:error/:fatal`);
+      }
+      setRuntimeFilter(sfSev);
+      return sfSev;
+    }
+    case "clear-runtime-filter":
+      clearRuntimeFilter();
+      return null;
+    case "runtime-replay-check": {
+      // (runtime-replay-check events-file source-file)
+      const rrEvFile  = String(args[0]);
+      const rrSrcFile = String(args[1]);
+      const rrFs = require("fs");
+      const refEvs: RuntimeEvent[] = JSON.parse(rrFs.readFileSync(rrEvFile, "utf-8"));
+      const rrSrc = rrFs.readFileSync(rrSrcFile, "utf-8");
+
+      // 현재 buffer 보존 → 재실행 → 비교 → 복구
+      const savedEvs = getEvents();
+      clearEvents();
+      try {
+        const rrToks = _flLex(rrSrc);
+        const rrAst  = _flParse(rrToks);
+        (interp as any).interpret(rrAst);
+      } catch { /* 에러가 있어도 이벤트는 수집됨 */ }
+      const newEvs = getEvents();
+
+      // 원래 buffer 복구
+      clearEvents();
+      for (const ev of savedEvs) recordEvent(ev);
+
+      // 비교: type + expr (타임스탬프/value 제외)
+      const toKey = (e: RuntimeEvent) => `${e.type}|${e.expr ?? ""}|${e.severity}`;
+      const refKeys = refEvs.map(toKey);
+      const newKeys = newEvs.map(toKey);
+      const total = Math.max(refKeys.length, newKeys.length);
+      let matches = 0;
+      const diffs: any[] = [];
+      for (let i = 0; i < Math.min(refKeys.length, newKeys.length); i++) {
+        if (refKeys[i] === newKeys[i]) {
+          matches++;
+        } else if (diffs.length < 10) {
+          diffs.push({
+            index: i,
+            ref:    { type: refEvs[i].type, expr: refEvs[i].expr },
+            actual: { type: newEvs[i]?.type, expr: newEvs[i]?.expr },
+          });
+        }
+      }
+      return {
+        "match-rate":  total > 0 ? Math.round((matches / total) * 100) / 100 : 1.0,
+        "diff-count":  diffs.length + Math.abs(refEvs.length - newEvs.length),
+        "ref-event-count": refEvs.length,
+        "new-event-count": newEvs.length,
+        "nondeterministic-events": diffs,
+      };
+    }
+    case "assert": {
+      // (assert cond) 또는 (assert cond "메시지")
+      // 참이면 true 반환, 거짓이면 AssertionError throw
+      const assertCond = args[0];
+      const assertMsg = args.length > 1 ? String(args[1]) : undefined;
+      if (!assertCond) {
+        let assertExpr = "?";
+        try {
+          assertExpr = (interp as any).context.macroExpander.astToString(expr.args[0]);
+        } catch {}
+        const assertLine = expr.line ?? (interp as any).currentLine;
+        const assertFile = (interp as any).currentFilePath ?? "<unknown>";
+        const assertDetail = assertMsg ? `\n  msg:   ${assertMsg}` : "";
+        recordEvent({
+          type: "assert-fail", timestamp: Date.now(),
+          file: assertFile, line: assertLine,
+          expr: assertExpr, message: assertMsg, value: assertCond
+        });
+        throw new FLRuntimeError(
+          ErrorCodes.RUNTIME,
+          `AssertionError:\n  expr:  ${assertExpr}\n  value: ${toDisplay(assertCond)}${assertDetail}`,
+          { expected: "truthy", got: String(assertCond) },
+          assertFile, assertLine, 0
+        );
+      }
+      return true;
     }
     case "print-err":
       process.stderr.write(args.map((a: any) => toDisplay(a)).join(" ") + "\n");
@@ -1769,6 +3102,8 @@ loop().catch(e => {
     case "char-code":
       if (typeof args[0] === "string" && args[0].length > 0) return args[0].charCodeAt(0);
       throw new Error(`char-code expects non-empty string`);
+    case "char-from-code":
+      return String.fromCharCode(Math.floor(Number(args[0]) & 0xFF));
     case "substring":
       return typeof args[0] === "string"
         ? args[0].substring(Math.floor(args[1] || 0), Math.floor(args[2] || args[0].length))
@@ -2058,7 +3393,7 @@ loop().catch(e => {
       if (uKey && typeof uKey === "object" && (uKey as any).kind === "keyword") uKey = (uKey as any).name;
       else if (typeof uKey === "string" && uKey.startsWith(":")) uKey = uKey.slice(1);
       const cur = uMap && typeof uMap === "object" ? uMap[uKey] ?? null : null;
-      const next = callFnVal(uFn, [cur]);
+      const next = callFnVal(uFn, [cur, ...args.slice(3)]);
       return { ...uMap, [uKey]: next };
     }
 
@@ -2201,6 +3536,29 @@ loop().catch(e => {
         return _getDef;
       }
       return _getDef;
+    }
+    case "safe-get": case "safe_get": {
+      // (safe-get map key)          — nil이면 에러 throw (필수 필드)
+      // (safe-get map key default)  — nil이면 default 반환 (선택 필드)
+      let sgKey: any = args[1];
+      if (sgKey !== null && typeof sgKey === "object" && (sgKey as any).kind === "keyword") sgKey = (sgKey as any).name;
+      const sgHasDefault = args.length >= 3;
+      const sgDefault = sgHasDefault ? args[2] : undefined;
+      let sgVal: any = null;
+      if (args[0] instanceof Map) {
+        const sgK = String(sgKey).replace(/^:/, "");
+        sgVal = args[0].has(sgK) ? args[0].get(sgK) : null;
+      } else if (args[0] !== null && typeof args[0] === "object") {
+        const sgK = typeof sgKey === "string" && sgKey.startsWith(":") ? sgKey.slice(1) : String(sgKey);
+        sgVal = args[0][sgK] !== undefined ? args[0][sgK] : (args[0][String(sgKey)] !== undefined ? args[0][String(sgKey)] : null);
+      } else if (Array.isArray(args[0])) {
+        sgVal = typeof sgKey === "number" ? (args[0][sgKey] ?? null) : null;
+      }
+      if (sgVal === null || sgVal === undefined) {
+        if (sgHasDefault) return sgDefault;
+        throw new Error(`safe-get: key '${sgKey}' is nil — use (safe-get map key default) for optional fields`);
+      }
+      return sgVal;
     }
     case "block-items":
       // Array 블록에서 items 추출 (셀프 호스팅용)
@@ -2648,6 +4006,24 @@ loop().catch(e => {
         return String(ka).localeCompare(String(kb));
       });
     }
+    case "group-by": case "group_by": {
+      // (group-by keyfn coll) → map<string, list>
+      // keyfn: fn 또는 string(필드명 단축)
+      if (!Array.isArray(args[1])) return {};
+      const gbFn = args[0];
+      const gbArr = args[1] as any[];
+      const gbIsField = typeof gbFn === "string";
+      const gbExtract = gbIsField
+        ? (x: any) => (x !== null && typeof x === "object") ? String(x[gbFn] ?? x[":" + gbFn] ?? "null") : "null"
+        : (x: any) => String(callFnVal(gbFn, [x]) ?? "null");
+      const gbResult: Record<string, any[]> = {};
+      for (const item of gbArr) {
+        const k = gbExtract(item);
+        if (!gbResult[k]) gbResult[k] = [];
+        gbResult[k].push(item);
+      }
+      return gbResult;
+    }
     case "zip": {
       // (zip arr1 arr2) → [[a1 b1] [a2 b2] ...]
       const a = Array.isArray(args[0]) ? args[0] : [];
@@ -2737,6 +4113,10 @@ loop().catch(e => {
       const buf = new SharedArrayBuffer(4);
       Atomics.wait(new Int32Array(buf), 0, 0, ms);
       return null;
+    }
+    case "fl-async-sleep": {
+      const ms = Math.max(0, Number(args[0] ?? 0));
+      return new Promise(resolve => setTimeout(resolve, ms));
     }
     case "push":
       if (!Array.isArray(args[0])) return [args[1]];

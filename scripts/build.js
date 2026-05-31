@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// FreeLang v11 build script — Node API로 esbuild 호출 (bin wrapper 우회)
-// v11.10: 빌드 전에 stdlib 시그니처 JSON 을 생성해서 번들에 embed (fn-doc 배포 대응)
-const esbuild = require("esbuild");
+// FreeLang v11 build script — esbuild bundle (production build path)
+// docs/PLAN-build-pipeline-unify.md (BP-3) — esbuild 정식화 2026-05-21
+// docs/BUILD-SYSTEM.md — 3-track 구조 (Production / Runtime / Experimental)
+// 빌드 전 stdlib 시그니처 JSON 생성 후 번들에 embed (fn-doc 배포 대응)
 const fs = require("fs");
 const path = require("path");
+const { execSync } = require("child_process");
 
 // 1) stdlib 시그니처 추출 → src/_stdlib-signatures.json
 function extractSignatures() {
@@ -50,81 +52,59 @@ try {
 
 const isWatch = process.argv.includes("--watch") || process.argv.includes("-w");
 
-const nodeConfig = {
-  entryPoints: ["src/cli.ts"],
-  bundle: true,
-  platform: "node",
-  target: "node18",
-  outfile: "bootstrap.js",
-  loader: { ".json": "json" },
-  minify: !isWatch,
-  minifyWhitespace: !isWatch,
-  minifyIdentifiers: !isWatch,
-  minifySyntax: !isWatch,
-  external: [
-    "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
-    "tls", "net", "fs", "path", "child_process", "os",
-    "http", "https", "url", "util", "stream", "buffer",
-    "crypto", "readline", "events", "vm", "tty", "assert",
-    "worker_threads", "zlib", "dgram", "dns", "https",
-    "http2", "perf_hooks", "inspector", "v8", "module",
-  ],
-  logLevel: "info",
-};
+// bootstrap.js bundle (production build path) — docs/BUILD-SYSTEM.md 참조
+const REPO = path.resolve(__dirname, "..");
+const NODE_EXTERNALS = [
+  "tls", "net", "fs", "path", "child_process", "os",
+  "http", "https", "url", "util", "stream", "buffer",
+  "crypto", "readline", "events", "vm", "tty", "assert",
+  "worker_threads", "zlib", "dgram", "dns", "http2",
+  "perf_hooks", "inspector", "v8", "module",
+  "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
+];
+
+function bootstrapOpts() {
+  return {
+    absWorkingDir: REPO,
+    entryPoints: ["src/cli.ts"],
+    bundle: true,
+    platform: "node",
+    target: "node18",
+    outfile: "bootstrap.js",
+    loader: { ".json": "json" },
+    minify: false,
+    external: NODE_EXTERNALS,
+    logLevel: "info",
+  };
+}
+
+function buildBootstrap() {
+  const esbuild = require("esbuild");
+  return esbuild.build(bootstrapOpts()).then(() => {
+    const size = fs.statSync(path.join(REPO, "bootstrap.js")).size;
+    console.log(`bootstrap=built size=${Math.round(size / 1024)}KB`);
+  });
+}
+
+function watchBootstrap() {
+  const esbuild = require("esbuild");
+  return esbuild.context(bootstrapOpts()).then((ctx) => ctx.watch()).then(() => {
+    console.log("bootstrap=watching (Ctrl+C to stop)");
+  });
+}
 
 // Node.js 빌드
 let nodeBuild;
 if (isWatch) {
-  nodeBuild = esbuild.context(nodeConfig).then(ctx => {
-    ctx.watch();
-    console.log("bootstrap=watch TS 변경 시 자동 재빌드 (Ctrl+C 로 종료)");
-  });
+  nodeBuild = watchBootstrap();
 } else {
-  nodeBuild = esbuild.build(nodeConfig)
-    .then(() => console.log("bootstrap=built"))
-    .catch((err) => { console.error("bootstrap=failed error=" + err.message); process.exit(1); });
+  nodeBuild = buildBootstrap();
 }
 
-// 브라우저 빌드
-const browserBuild = esbuild.build({
-  entryPoints: ["src/browser-entry.ts"],
-  bundle: true,
-  platform: "browser",
-  target: ["chrome90", "firefox88", "safari14"],
-  outfile: "browser.js",
-  globalName: "FreeLang",
-  loader: { ".json": "json" },
-  logLevel: "info",
-  define: {
-    "process.env.NODE_ENV": '"production"',
-    "global": "globalThis",
-    "process.env": "{}",
-    "__dirname": '"/"',
-    "__filename": '"browser.js"',
-  },
-  // Node.js 내장 모듈 → 브라우저 스텁으로 대체
-  alias: {
-    "fs":              "./src/browser-stubs/node-stubs",
-    "path":            "./src/browser-stubs/path-stubs",
-    "crypto":          "./src/browser-stubs/crypto-stubs",
-    "child_process":   "./src/browser-stubs/child-process-stubs",
-    "readline":        "./src/browser-stubs/misc-stubs",
-    "net":             "./src/browser-stubs/misc-stubs",
-    "os":              "./src/browser-stubs/misc-stubs",
-    "http":            "./src/browser-stubs/misc-stubs",
-    "https":           "./src/browser-stubs/misc-stubs",
-    "events":          "./src/browser-stubs/misc-stubs",
-    "stream":          "./src/browser-stubs/misc-stubs",
-    "url":             "./src/browser-stubs/misc-stubs",
-    "util":            "./src/browser-stubs/misc-stubs",
-    "buffer":          "./src/browser-stubs/misc-stubs",
-    "vm":              "./src/browser-stubs/misc-stubs",
-    "tty":             "./src/browser-stubs/misc-stubs",
-    "assert":          "./src/browser-stubs/misc-stubs",
-    "worker_threads":  "./src/browser-stubs/misc-stubs",
-    "tls":             "./src/browser-stubs/misc-stubs",
-  },
-}).then(() => console.log("browser.js=built"))
-  .catch((err) => { console.error("browser.js=failed error=" + err.message); });
+// 브라우저 빌드: Phase X-2에서 esbuild 제거, 추후 구현 예정
+// (현재 bootstrap.js는 Node.js 전용, 브라우저는 별도 모듈 필요)
+const browserBuild = Promise.resolve().then(() => {
+  console.log("browser.js=skipped (requires esbuild, Phase X-3 planned)");
+});
 
 Promise.all([nodeBuild, browserBuild]).then(() => console.log("all=done"));

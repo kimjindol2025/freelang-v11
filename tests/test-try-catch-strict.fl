@@ -1,0 +1,71 @@
+;; FreeLang v11.7.11 Strict Try-Catch 테스트
+;; 허용/불허 패턴 검증
+
+(println "[TEST] Strict Try-Catch Syntax")
+(println "")
+
+;; ============================================
+;; ✅ CASE 1: try without body (catch only)
+;; ============================================
+(println "[CASE 1] try without body (catch only)")
+(try
+  (catch [e]
+    (println "Caught error:")))
+(println "✅ CASE 1 passed")
+(println "")
+
+;; ============================================
+;; ✅ CASE 2: try with single body expression
+;; ============================================
+(println "[CASE 2] try with single body expression")
+(try
+  (+ 1 2)
+  (catch [e]
+    (println "Caught error")))
+(println "✅ CASE 2 passed")
+(println "")
+
+;; ============================================
+;; ✅ CASE 3: try with do block (multiple expressions)
+;; ============================================
+(println "[CASE 3] try with do block (multiple body expressions)")
+(try
+  (do
+    (+ 1 2)
+    (* 3 4))
+  (catch [e]
+    (println "Caught error")))
+(println "✅ CASE 3 passed")
+(println "")
+
+;; ============================================
+;; ✅ CASE 4: try with finally (no catch)
+;; ============================================
+(println "[CASE 4] try with finally (no catch)")
+(try
+  (+ 1 2)
+  (finally
+    (println "Cleanup")))
+(println "✅ CASE 4 passed")
+(println "")
+
+;; ============================================
+;; ✅ CASE 5: try with both catch and finally
+;; ============================================
+(println "[CASE 5] try with both catch and finally")
+(try
+  (+ 1 2)
+  (catch [e]
+    (println "Error handler"))
+  (finally
+    (println "Cleanup")))
+(println "✅ CASE 5 passed")
+(println "")
+
+(println "")
+(println "========================================")
+(println "✅ All valid syntax patterns passed!")
+(println "========================================")
+(println "")
+(println "Note: Error cases (lambda instead of catch)")
+(println "      will be tested in separate files")

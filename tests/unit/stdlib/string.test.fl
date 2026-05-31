@@ -1,0 +1,35 @@
+;; tests/unit/stdlib/string.test.fl — String Library Unit Tests
+;; 16개 테스트 (문자열 함수)
+
+(load "/home/kimjin/freelang-v11/tests/lib/assert.fl")
+
+(test-section "String Tests")
+
+;; 기본 연결
+(assert-eq (str "a" "b") "ab" "str concat basic")
+(assert-eq (str "Hello" " " "World") "Hello World" "str multi-arg")
+(assert-eq (str 1 2 3) "123" "str numbers")
+
+;; 대소문자
+(assert-eq (str-to-upper "hello") "HELLO" "str-to-upper")
+(assert-eq (str-to-lower "HELLO") "hello" "str-to-lower")
+
+;; 분할
+(assert-eq (length (str-split "a,b,c" ",")) 3 "str-split count")
+(assert-eq (get (str-split "hello world" " ") 0) "hello" "str-split first")
+
+;; 검사
+(assert-true (str-includes "hello world" "world") "str-includes true")
+(assert-false (str-includes "hello" "xyz") "str-includes false")
+(assert-true (str-starts-with "hello" "hel") "str-starts-with")
+(assert-true (str-ends-with "hello" "llo") "str-ends-with")
+
+;; 변환
+(assert-eq (str-trim "  hello  ") "hello" "str-trim")
+(assert-eq (str-replace "hello" "l" "r") "herro" "str-replace")
+
+;; 길이
+(assert-eq (length "hello") 5 "string length")
+(assert-eq (length "") 0 "empty string length")
+
+(println "✅ String tests passed")

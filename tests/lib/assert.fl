@@ -1,0 +1,43 @@
+;; assert.fl — L1 Unit Test Framework
+;; 기본 assert 함수 모음 (7개)
+;; 사용: (load "../../lib/assert.fl") in test file
+
+;;; assert-eq: 실제값 == 기대값
+(defn assert-eq [$actual $expected $name]
+  (if (= $actual $expected)
+    (println (str "  ✅ " $name))
+    (throw (str "  ❌ FAIL " $name ": expected=" $expected " got=" $actual))))
+
+;;; assert-ne: 실제값 != 기대값
+(defn assert-ne [$actual $not-expected $name]
+  (if (not (= $actual $not-expected))
+    (println (str "  ✅ " $name))
+    (throw (str "  ❌ FAIL " $name ": expected not=" $not-expected " but got=" $actual))))
+
+;;; assert-true: 값이 true
+(defn assert-true [$value $name]
+  (if $value
+    (println (str "  ✅ " $name))
+    (throw (str "  ❌ FAIL " $name ": expected true got " $value))))
+
+;;; assert-false: 값이 false
+(defn assert-false [$value $name]
+  (if (not $value)
+    (println (str "  ✅ " $name))
+    (throw (str "  ❌ FAIL " $name ": expected false got " $value))))
+
+;;; assert-nil: 값이 nil
+(defn assert-nil [$value $name]
+  (if (nil? $value)
+    (println (str "  ✅ " $name))
+    (throw (str "  ❌ FAIL " $name ": expected nil got " $value))))
+
+;;; assert-not-nil: 값이 nil이 아님
+(defn assert-not-nil [$value $name]
+  (if (not (nil? $value))
+    (println (str "  ✅ " $name))
+    (throw (str "  ❌ FAIL " $name ": expected not-nil but got nil"))))
+
+;;; test-section: 섹션 헤더 출력
+(defn test-section [$name]
+  (println (str "📋 " $name)))

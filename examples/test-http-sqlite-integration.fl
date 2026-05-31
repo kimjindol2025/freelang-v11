@@ -1,0 +1,44 @@
+;; N-05 + N-06 통합 E2E: HTTP + SQLite + JSON 스택 검증
+
+;; ── Gap 2: 파일 DB 지속성 ──────────────────────────────────────────
+(define db-path "/tmp/n06-test.db")
+(define db1 (db-open db-path))
+(db-exec db1 "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, age INTEGER)" [])
+(db-exec db1 "DELETE FROM users" [])
+(db-exec db1 "INSERT INTO users (name, age) VALUES (?, ?)" ["alice" 30])
+(db-exec db1 "INSERT INTO users (name, age) VALUES (?, ?)" ["bob" 25])
+(db-close db1)
+(println "Gap2: file write OK")
+
+(define db2 (db-open db-path))
+(define persisted (db-query db2 "SELECT * FROM users ORDER BY id" []))
+(if (= (length persisted) 2)
+  (println "Gap2: persist OK — 2 rows survived close+reopen")
+  (println "Gap2: FAIL"))
+
+;; ── Gap 3: 에러 경로 ────────────────────────────────────────────────
+(define err-rows (db-query db2 "SELECT * FROM no_such_table" []))
+(if (= (length err-rows) 0)
+  (println "Gap3: error path OK — bad table returns empty")
+  (println "Gap3: FAIL"))
+
+;; ── HTTP + SQLite 통합 서버 ──────────────────────────────────────────
+(server-get "/users" (fn [req]
+  (let [rows (db-query db2 "SELECT id, name, age FROM users ORDER BY id" [])]
+    (server-json {"users" rows "count" (length rows)}))))
+
+(server-post "/users" (fn [req]
+  (let [body (get req "body")
+        name (get body "name")
+        age  (get body "age")]
+    (if (= name nil)
+      (server-status 400 "name required")
+      (let [_ok (db-exec db2 "INSERT INTO users (name, age) VALUES (?, ?)" [name age])
+            created (db-query db2 "SELECT * FROM users WHERE name = ? ORDER BY id DESC" [name])]
+        (server-json {"created" (get created 0) "ok" true}))))))
+
+(server-start 19766)
+(println "Integration: HTTP server on :19766")
+(sleep 5000)
+(db-close db2)
+(println "Integration: DONE")

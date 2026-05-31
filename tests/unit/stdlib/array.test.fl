@@ -1,0 +1,28 @@
+;; tests/unit/stdlib/array.test.fl — Array Library Unit Tests
+;; 13개 테스트 (배열 함수)
+
+(load "/home/kimjin/freelang-v11/tests/lib/assert.fl")
+
+(test-section "Array Tests")
+
+;; 기본
+(assert-eq (length [1 2 3]) 3 "array length")
+(assert-eq (get [10 20 30] 1) 20 "array get")
+(assert-eq (first [1 2 3]) 1 "first")
+(assert-eq (last [1 2 3]) 3 "last")
+
+;; 변환
+(assert-eq (map (fn [$x] (* $x 2)) [1 2 3]) [2 4 6] "map double")
+(assert-eq (filter (fn [$x] (> $x 2)) [1 2 3 4]) [3 4] "filter gt2")
+(assert-eq (reduce (fn [$acc $x] (+ $acc $x)) 0 [1 2 3]) 6 "reduce sum")
+
+;; 조작
+(assert-eq (push [1 2] 3) [1 2 3] "push")
+(assert-eq (reverse [1 2 3]) [3 2 1] "reverse")
+(assert-eq (take 2 [1 2 3 4]) [1 2] "take")
+(assert-eq (drop 2 [1 2 3 4]) [3 4] "drop")
+
+;; 범위
+(assert-eq (range 3) [0 1 2] "range n")
+
+(println "✅ Array tests passed")

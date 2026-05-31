@@ -1,0 +1,20 @@
+{
+  "depth": 10,
+  "pass": 1,
+  "fail": 9,
+  "elapsed_seconds": 4,
+  "baseline_sha256": "703f7b83b32d306589ed15a3bae36c072bcd468db925de19e778fcbee21b1888",
+  "timestamp": "2026-05-16T15:29:35Z",
+  "stages": [
+    {"stage": 1, "sha256": "703f7b83b32d306589ed15a3bae36c072bcd468db925de19e778fcbee21b1888", "match": true},
+    {"stage": 2, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 3, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 4, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 5, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 6, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 7, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 8, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 9, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false},
+    {"stage": 10, "sha256": "8604dd90a1b362f127d45708349b4b50277f73823e7b4e9b742d1a43de9d17bc", "match": false}
+  ]
+}

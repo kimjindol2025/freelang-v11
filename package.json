@@ -1,58 +1,32 @@
 {
   "name": "freelang-editor",
-  "version": "11.7.10",
-  "description": "FreeLang Editor — AI-Native Language with Built-in DevTools & WebSocket. [v11.7.10: Array Complete + 1129 tests]",
+  "version": "11.8.0",
+  "description": "FreeLang v11 — AI-Native Self-Hosting Language. Node.js-free native build via bin/cgc-bin.",
   "keywords": [
     "ai",
     "language",
     "freelang",
     "s-expression",
     "ai-native",
-    "claude",
-    "agent"
+    "self-hosting",
+    "native"
   ],
   "author": "Claude Code (Anthropic)",
   "license": "MIT",
   "homepage": "https://gogs.dclub.kr/kim/freelang-v11",
-  "main": "dist/index.js",
-  "bin": {
-    "v9": "dist/cli.js"
-  },
   "scripts": {
-    "build": "node scripts/build.js",
-    "watch": "node scripts/build.js --watch",
-    "docs:gen": "node scripts/gen-stdlib-docs.js",
-    "compile": "node --stack-size=8000 stage1.js",
-    "compile:self": "node --stack-size=8000 stage1.js self/all.fl stage1-new.js",
-    "verify:fixed-point": "bash scripts/verify-fixed-point-deep.sh",
-    "verify:build-deterministic": "bash scripts/verify-build-deterministic.sh",
-    "verify:self-host": "bash scripts/verify-self-host.sh tier2",
-    "test": "jest --config .config/jest.fast.config.js --passWithNoTests",
-    "test:fast": "jest --config .config/jest.fast.config.js --passWithNoTests",
-    "test:full": "jest --config .config/jest.config.js --passWithNoTests",
-    "test:watch": "jest --config .config/jest.fast.config.js --watch",
-    "test:coverage": "jest --config .config/jest.config.js --coverage",
-    "test:ci": "jest --config .config/jest.config.js --ci --coverage --maxWorkers=2",
-    "benchmark": "node scripts/benchmark.js",
-    "dev": "node bootstrap.js run app/page.fl",
-    "start": "node bootstrap.js serve app/",
-    "server": "node bootstrap.js serve app/",
-    "freelang": "node bootstrap.js run",
-    "fl": "node bootstrap.js run",
-    "repl": "node bootstrap.js repl"
+    "fl": "bash scripts/fl-native.sh run",
+    "fl-build": "bash scripts/fl-native.sh build",
+    "fl-version": "bash scripts/fl-native.sh --version",
+    "install-native": "make install-native",
+    "test-native": "make test-native",
+    "verify-fixpoint": "bash scripts/verify-l4-fixpoint.sh",
+    "verify-all": "make verify-all",
+    "compile:self": "node --stack-size=8000 stage1.js self/all.fl stage1-new.js"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "@types/node": "^20.19.37",
-    "better-sqlite3": "^12.9.0",
-    "esbuild": "^0.21.5",
+    "@types/jest": "^30.0.0",
     "jest": "^29.7.0",
-    "mongodb": "^7.2.0",
-    "mysql2": "^3.22.3",
-    "sharp": "^0.34.5",
-    "ts-jest": "^29.4.6",
-    "ts-node": "^10.9.0",
-    "typescript": "^5.3.0"
-  },
-  "dependencies": {}
+    "ts-jest": "^29.4.11"
+  }
 }

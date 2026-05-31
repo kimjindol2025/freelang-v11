@@ -1,0 +1,30 @@
+;; YIELD-3 검증 #2: tcp-outbound → fl-yield 루프 내 connect 이벤트 수신
+(println "step-1 start")
+(define log-path "/tmp/yield3-echo.log")
+(file-write log-path "")
+
+(defn cli-handler [t up-id data]
+  (file-append log-path (str t "\n")))
+
+(println "step-2 connecting to external echo at 127.0.0.1:19998")
+
+(define up (tcp-outbound "127.0.0.1" 19998 "cli-handler"))
+(println (str "step-3 outbound up=" up))
+
+;; fl-yield loop — 최대 500ms 또는 connect 수신까지
+(define deadline (+ (now-ms) 500))
+(loop [i 0]
+  (if (and (< (now-ms) deadline)
+           (= (str-includes (file-read log-path) "connect") false))
+    (do (fl-yield 10) (recur (+ i 1)))
+    i))
+
+(define logged (file-read log-path))
+(println (str "step-4 logged=[" logged "]"))
+
+(if (str-includes logged "connect")
+  (println "[PASS] #2 connect event received via fl-yield")
+  (println "[FAIL] #2 connect event NOT received"))
+
+(tcp-drop up)
+(println "step-5 done")
