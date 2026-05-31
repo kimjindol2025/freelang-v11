@@ -12,7 +12,7 @@
     "not": "범용 프로그래밍 언어. Node.js/Python 대체 아님"
   },
 
-  "hot": "phase2-dynamic",
+  "hot": "task-error-quality",
 
   "constitution": {
     "1": "AI 전용. 인간 가독성을 위한 구조 타협 금지",
@@ -566,6 +566,125 @@
       "next": ["task-step-7"]
     },
 
+    "milestone-native-ai-runtime": {
+      "t": "decision",
+      "v": "Native AI Runtime 달성 — 2026-05-31",
+      "achieved": [
+        "FL → C → ELF 체인 완성 (cgc-bin 323KB)",
+        "L4 고정점: SHA256 90d01409... 3세대 동일",
+        "HTTP 클라이언트: fl_http_get/post_headers (curl subprocess)",
+        "(load ...) 컴파일 타임 인라인 — 재귀 지원",
+        "stdlib/ai.fl: ai-complete, OAuth/API key 자동 감지",
+        "stdlib/agent.fl: ReAct 루프, 내장 tool (http_get/post, file_read/write)",
+        "실 검증: FreeLang Native ELF → Claude haiku → '1 + 1 = **2**'"
+      ],
+      "architecture": {
+        "Layer1": "runtime/http-client.c — HTTP/HTTPS (curl subprocess)",
+        "Layer2": "stdlib/ai.fl — ai-complete, ai-openai (FL 코드)",
+        "Layer3": "stdlib/agent.fl — agent-run, ReAct loop (FL 코드)"
+      },
+      "honest_gaps": [
+        "에러 메시지 약함 — 줄 번호만, 원인 파악 어려움",
+        "인자 순서 불일치 — (map fn arr) vs (take n coll) 등 AI도 자주 틀림",
+        "스트리밍 없음 — ai-complete가 전체 응답 기다림",
+        "Native REPL 없음 — 즉시 실험 불가",
+        "병렬 실행 없음 — agent 동시 실행 불가",
+        "인간 없이 자율 운영: 아직 불가. 에러 시 AI가 원인 파악 어려움"
+      ],
+      "lock": true,
+      "date": "2026-05-31"
+    },
+
+    "dec-native-ai-arch": {
+      "t": "decision",
+      "v": "AI 기능은 C가 아닌 FL 표준 라이브러리로 구현. C 레이어는 범용 HTTP/IO만.",
+      "why": [
+        "모델별 API (Anthropic/OpenAI/Gemini/Ollama)를 C에 박으면 교체 시 전체 재빌드",
+        "FL 코드로 작성하면 (load ...) 한 줄로 교체 가능",
+        "C 레이어: HTTP, JSON, File, Process — 범용 기반만",
+        "AI 레이어: FL 코드 — 모델 추가·교체가 파일 수정으로 끝남"
+      ],
+      "lock": true,
+      "date": "2026-05-31"
+    },
+
+    "task-error-quality": {
+      "t": "task",
+      "v": "에러 메시지 품질 개선 — AI 자율 디버깅 가능 수준",
+      "why": "현재 줄 번호만 나옴. AI가 에러 원인을 스스로 파악하지 못하면 인간 없는 자율 운영 불가.",
+      "scope": [
+        "cgc-bin: 컴파일 에러 시 원인 + 제안 출력 (예: 'arg order: (map fn arr) not (map arr fn)')",
+        "runtime: 런타임 에러에 FL 스택 트레이스 (함수명 + 줄 번호)",
+        "타입 에러: 'expected string, got nil at function foo line 42'",
+        "undefined 변수: 유사 이름 제안 ('did you mean: http-get?')"
+      ],
+      "success": [
+        "AI가 에러 메시지만 보고 원인을 3번 이내에 찾을 수 있음",
+        "인간 개입 없이 간단한 버그는 AI가 자력 수정 가능"
+      ],
+      "verified": false,
+      "next": ["task-arg-consistency"]
+    },
+
+    "task-arg-consistency": {
+      "t": "task",
+      "v": "인자 순서 일관성 정비 — AI 실수율 감소",
+      "why": "CLAUDE.md에 '절대 금지 패턴 TOP 10'이 있다는 자체가 설계 불일치의 증거. AI도 자주 틀림.",
+      "audit": [
+        "(map fn arr) vs (filter fn arr) — fn 먼저 ✅",
+        "(take n coll) vs (drop n coll) — n 먼저 ✅",
+        "(sort-by fn arr) — fn 먼저인데 직관과 반대",
+        "(str-replace s old new) — 순서 애매"
+      ],
+      "scope": [
+        "전체 stdlib 인자 순서 감사",
+        "불일치 항목 문서화 (변경 여부는 사용자 협의)",
+        "cgc-bin이 틀린 순서 감지 시 경고 출력"
+      ],
+      "verified": false,
+      "next": ["task-streaming-response"]
+    },
+
+    "task-streaming-response": {
+      "t": "task",
+      "v": "ai-complete 스트리밍 지원 — (ai-stream prompt handler)",
+      "why": "현재 ai-complete은 전체 응답을 기다림. agent loop에서 느린 응답이 블로킹됨.",
+      "scope": [
+        "http-client.c: chunked transfer streaming 콜백 지원",
+        "stdlib/ai.fl: (ai-stream prompt handler) — 토큰 단위로 handler 호출",
+        "stdlib/agent.fl: agent-stream 변형"
+      ],
+      "constraint": "popen 방식으로는 스트리밍 어려움 — libcurl-dev 설치 후 C API로 전환 필요",
+      "verified": false,
+      "next": ["task-parallel-agent"]
+    },
+
+    "task-parallel-agent": {
+      "t": "task",
+      "v": "agent 병렬 실행 — (agent-parallel [task1 task2 ...])",
+      "why": "현재 agent는 단일 스레드 순차 실행. 멀티 에이전트 워크플로우 불가.",
+      "scope": [
+        "process.c: fork/exec 기반 병렬 실행",
+        "stdlib/agent.fl: (agent-parallel tasks) — 각 task를 별도 프로세스로 실행 후 결과 수집",
+        "IPC: 파일 기반 또는 pipe"
+      ],
+      "verified": false,
+      "next": ["task-repl-native"]
+    },
+
+    "task-repl-native": {
+      "t": "task",
+      "v": "Native REPL — (repl) 명령으로 즉시 실험 가능",
+      "why": "현재 native에서 즉시 실험 불가. AI가 새 코드를 검증하려면 파일 작성 → 빌드 → 실행 cycle 필요.",
+      "scope": [
+        "cgc-bin: --repl 플래그",
+        "stdin에서 FL 코드 읽기 → 컴파일 → 실행 → 결과 출력 루프",
+        "history 지원"
+      ],
+      "verified": false,
+      "next": []
+    },
+
     "task-step-7": {
       "t": "task",
       "v": "Step 7 — E2E Critical Tests (ct-1~4)",
@@ -619,7 +738,10 @@
     {"idea": "Phase 2 — delta replay (변경분만 반영)", "why": "stale state 누적 + deterministic lifecycle 파괴. full snapshot 기반 authoritative 갱신만 허용", "final": true},
     {"idea": "Phase 2 — partial update optimization ('효율' 위해 부분만 갱신)", "why": "incremental mutation 동일 문제. transition window correctness 보장 불가", "final": true},
     {"idea": "Phase 2 — bidirectional coupling (client push + upstream pull)", "why": "state 일관성 보장 불가. unidirectional watch 구독만 허용 (client→watch)", "final": true},
-    {"idea": "Phase 2 — reconnect 시 증분 동기화", "why": "stale state 누적. 항상 since=0 (full sync) 강제. at-least-once 중복 허용하되 revision으로 collapse", "final": true}
+    {"idea": "Phase 2 — reconnect 시 증분 동기화", "why": "stale state 누적. 항상 since=0 (full sync) 강제. at-least-once 중복 허용하되 revision으로 collapse", "final": true},
+    {"idea": "HTTP 클라이언트를 OpenSSL + POSIX socket으로 직접 구현", "why": "TLS 스택 재구현은 몇 달 소요. libcurl(검증된 구현)이 있는데 재구현은 낭비. 언어 목표는 TLS 스택 개발이 아님", "final": true},
+    {"idea": "AI 기능(ai-complete/agent/rag)을 C로 직접 구현", "why": "모델별 API가 C에 박히면 Anthropic→OpenAI 전환 시 재빌드 필요. FL 레이어에서 교체 가능해야 함. dec-native-ai-arch LOCK", "final": true},
+    {"idea": "TS/JS 계층에 AI 기능을 두고 FreeLang은 DSL만", "why": "FreeLang이 'AI를 지원하는 언어'가 아닌 'Native ELF에서 직접 AI 호출하는 언어'여야 한다는 방향 확정", "final": true}
   ],
 
   "handoff": {
