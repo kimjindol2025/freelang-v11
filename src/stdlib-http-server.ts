@@ -787,9 +787,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
 
       server.on("error", (err: any) => {
         if (err.code === "EADDRINUSE") {
-          console.warn(`[server] 포트 ${port} 이미 사용 중 — 서버 시작 건너뜀`);
+          console.error(`[server] 포트 ${port} 이미 사용 중 — PM2 재시작 위해 종료`);
+          process.exit(1);
         } else {
           console.error(`[server] 서버 오류: ${err.message}`);
+          process.exit(1);
         }
       });
       server.listen(port);

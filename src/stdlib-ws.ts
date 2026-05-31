@@ -212,10 +212,11 @@ export function createWsModule(callFn: CallFn) {
 
       tcpServer.on("error", (err: any) => {
         if (err.code === "EADDRINUSE") {
-          console.warn(`[ws] 포트 ${port} 이미 사용 중 — WS 서버 시작 건너뜀`);
-          tcpServer = null;
+          console.error(`[ws] 포트 ${port} 이미 사용 중 — PM2 재시작 위해 종료`);
+          process.exit(1);
         } else {
           console.error(`[ws] 서버 오류: ${err.message}`);
+          process.exit(1);
         }
       });
       tcpServer.listen(port);
