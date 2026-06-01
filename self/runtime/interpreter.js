@@ -46,6 +46,7 @@ function getKeywordTokenType(text) {
 function lex(source) {
   const tokens = [];
   let i = 0, line = 1, col = 1;
+  let lastStringStart = null;
   while (i < source.length) {
     const ch = source[i];
     if (/\s/.test(ch)) {
@@ -62,9 +63,25 @@ function lex(source) {
       while (i < source.length && source[i] !== "\n") i++;
       continue;
     }
+    if (ch === '"' && source[i+1] === '"' && source[i+2] === '"') {
+      const startLine = line, startCol = col;
+      lastStringStart = { line, col };
+      i += 3; col += 3;
+      let value = '';
+      while (i < source.length) {
+        if (source[i] === '"' && source[i+1] === '"' && source[i+2] === '"') {
+          i += 3; col += 3; break;
+        }
+        if (source[i] === '\n') { line++; col = 1; } else { col++; }
+        value += source[i]; i++;
+      }
+      tokens.push({ type: "String" /* String */, value, line: startLine, col: startCol });
+      continue;
+    }
     if (ch === '"') {
       const start = i;
       const startCol = col;
+      lastStringStart = { line, col };
       i++;
       col++;
       let value = "";
@@ -211,9 +228,12 @@ function lex(source) {
       continue;
     }
     const unicodeHint = ch.charCodeAt(0) > 127
-      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — 유니코드·따옴표를 자유롭게 쓰려면 """...""" 삼중따옴표 사용. 실제 원인은 이 위치가 아닐 수 있음 — 앞쪽 문자열에서 닫히지 않은 "를 확인하세요)`
+      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — 유니코드는 """...""" 안에서만 자유롭게 사용 가능)`
       : '';
-    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}${unicodeHint}`);
+    const strHint = lastStringStart
+      ? ` → 마지막으로 열린 문자열: ${lastStringStart.line}번줄 ${lastStringStart.col}열 — 그 근처에서 닫히지 않은 " 또는 """ 확인`
+      : '';
+    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}${unicodeHint}${strHint}`);
   }
   tokens.push({ type: "EOF" /* EOF */, value: "", line, col });
   return tokens;
