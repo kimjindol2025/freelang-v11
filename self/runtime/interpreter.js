@@ -211,7 +211,7 @@ function lex(source) {
       continue;
     }
     const unicodeHint = ch.charCodeAt(0) > 127
-      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — FL 문자열 밖에서 유니코드 사용 불가. HTML 엔티티 사용: &middot; &rarr; &check;)`
+      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — 유니코드·따옴표를 자유롭게 쓰려면 """...""" 삼중따옴표 사용. 실제 원인은 이 위치가 아닐 수 있음 — 앞쪽 문자열에서 닫히지 않은 "를 확인하세요)`
       : '';
     throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}${unicodeHint}`);
   }
