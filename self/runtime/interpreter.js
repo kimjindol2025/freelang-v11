@@ -210,7 +210,10 @@ function lex(source) {
       tokens.push({ type: tokenType, value, line, col: startCol });
       continue;
     }
-    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}`);
+    const unicodeHint = ch.charCodeAt(0) > 127
+      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — FL 문자열 밖에서 유니코드 사용 불가. HTML 엔티티 사용: &middot; &rarr; &check;)`
+      : '';
+    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}${unicodeHint}`);
   }
   tokens.push({ type: "EOF" /* EOF */, value: "", line, col });
   return tokens;
