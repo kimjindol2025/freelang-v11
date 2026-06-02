@@ -1,0 +1,83 @@
+;; demo-store-v2.fl — store/query, store/find-page, store/bulk-insert! 검증
+(load "/root/freelang-v11/lib/validate.fl")
+(load "/root/freelang-v11/lib/result.fl")
+(load "/root/freelang-v11/lib/query.fl")
+(load "/root/freelang-v11/lib/store.fl")
+
+(define DB "/tmp/demo-store-v2.db")
+
+(define users
+  (store/define DB "users"
+    {:name {"required" true "type" "string" "max-length" 80}
+     :age  {"type" "number" "min" 0}}
+    ["id INTEGER PRIMARY KEY AUTOINCREMENT"
+     "name TEXT NOT NULL"
+     "age INTEGER"
+     "team TEXT"]))
+
+(store/migrate users)
+
+;; ── 1. store/bulk-insert! ────────────────────────────────────
+
+(define br
+  (store/bulk-insert! users
+    [{:name "Alice"  :age 30 :team "backend"}
+     {:name "Bob"    :age 25 :team "frontend"}
+     {:name "Carol"  :age 28 :team "backend"}
+     {:name "Dave"   :age 35 :team "frontend"}
+     {:name "Eve"    :age 22 :team "backend"}]))
+
+(println (str "✅ bulk-insert ok=" (res/ok? br)))
+(println (str "   inserted=" (res/val br)))
+
+;; 검증 실패 케이스
+(define br-fail
+  (store/bulk-insert! users
+    [{:name "Good"  :age 20}
+     {:name ""      :age -1}]))
+(println (str "✅ bulk-fail ok=" (res/ok? br-fail)))
+(println (str "   error=" (res/err-msg br-fail)))
+
+;; ── 2. store/query ───────────────────────────────────────────
+
+(define q1 (store/query users {:where "age > ?" :args [25]}))
+(println (str "✅ query age>25 count=" (length q1)))
+
+(define q2 (store/query users {:where "team = ?" :args ["backend"] :order "age" :dir "ASC"}))
+(println (str "✅ query backend ordered count=" (length q2)))
+(println (str "   youngest=" (get (get q2 0) "name") " age=" (get (get q2 0) "age")))
+
+(define q3 (store/query users {:order "age" :dir "DESC" :limit 3}))
+(println (str "✅ query top-3 oldest count=" (length q3)))
+(println (str "   1st=" (get (get q3 0) "name") " age=" (get (get q3 0) "age")))
+
+;; ── 3. store/q + query.fl 빌더 연동 ─────────────────────────
+;; store/exec-q로 SQLite db_query 브릿지
+
+(define qb-result
+  (store/exec-q users
+    (-> (store/q users)
+        (q/where "age >= ?" [28])
+        (q/where "team = ?" ["backend"])
+        (q/order-by "name" "ASC"))))
+
+(println (str "✅ query-builder count=" (length qb-result)))
+(println (str "   first=" (get (get qb-result 0) "name")))
+
+;; ── 4. store/find-page ───────────────────────────────────────
+
+(define page1 (store/find-page users {} 1 3))
+(println (str "✅ find-page p1: data=" (length (get page1 "data"))
+              " total=" (get page1 "total")
+              " pages=" (get page1 "pages")))
+
+(define page2 (store/find-page users {} 2 3))
+(println (str "✅ find-page p2: data=" (length (get page2 "data"))))
+
+;; 조건 + 페이징
+(define be-page (store/find-page users {:team "backend"} 1 2))
+(println (str "✅ find-page backend p1: data=" (length (get be-page "data"))
+              " total=" (get be-page "total")))
+
+(println "")
+(println "ALL PASS ✅")

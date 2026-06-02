@@ -22,6 +22,11 @@
 ;;   (store/delete! users {:id 1})
 ;;   (store/count users)
 ;;   (store/tx (store/db users) (fn [] ...))
+;;
+;;   (store/query users {:where "age > ?" :args [30] :order "age" :limit 10})
+;;   (store/find-page users {:status "active"} 1 20)
+;;   (store/bulk-insert! users [{:name "A"} {:name "B"}])
+;;   (-> (store/q users) (q/where "age > ?" [30]) (q/exec (store/db users)))
 ;; ─────────────────────────────────────────────────────────────
 
 ;; ── store 정의 ───────────────────────────────────────────────
@@ -140,6 +145,76 @@
     (let [result (body-fn)]
       (store/commit db-path)
       (res/ok result))))
+
+;; ── QUERY (WHERE 문자열 + 정렬/페이징 opts) ─────────────────
+;; opts: {:where "age > ?" :args [30] :order "name" :dir "ASC"
+;;        :limit 10 :offset 0}
+
+(defn store/query [store opts]
+  (let [db    (get store :db)
+        table (get store :table)
+        where (?? (get opts :where) "")
+        args  (?? (get opts :args) [])
+        order (get opts :order)
+        dir   (?? (get opts :dir) "ASC")
+        lim   (get opts :limit)
+        off   (get opts :offset)
+        sql   (str "SELECT * FROM " table
+                   (if (= where "") "" (str " WHERE " where))
+                   (if (nil? order) "" (str " ORDER BY " order " " dir))
+                   (if (nil? lim) "" (str " LIMIT " lim))
+                   (if (nil? off) "" (str " OFFSET " off)))]
+    (db_query db sql args)))
+
+;; query.fl 빌더 진입점
+;; (store/exec-q users (-> (store/q users) (q/where "age > ?" [30]) (q/order-by "name" "ASC")))
+(defn store/q [store]
+  (q/from (get store :table)))
+
+;; q/exec는 MariaDB db-query를 호출하므로 SQLite용 브릿지 필요
+(defn store/exec-q [store q]
+  (db_query (get store :db) (q/build-select q) (get q :params)))
+
+;; ── FIND-PAGE ────────────────────────────────────────────────
+;; returns {:data [...] :page N :total N :pages N :per N}
+;; q/paginate은 MariaDB 전용이므로 db_query로 직접 구현
+
+(defn store/find-page [store where page per-page]
+  (let [db     (get store :db)
+        table  (get store :table)
+        w      (store/-where-sql where)
+        offset (* (- page 1) per-page)
+        sql    (str "SELECT * FROM " table (get w :sql)
+                    " LIMIT " per-page " OFFSET " offset)
+        total  (store/count-where store where)
+        pages  (ceil (/ total per-page))
+        data   (db_query db sql (get w :params))]
+    {:data data :page page :total total :pages pages :per per-page}))
+
+;; ── BULK INSERT ──────────────────────────────────────────────
+;; 전체 행 선검증 → 트랜잭션으로 일괄 삽입
+;; 첫 번째 검증 실패 시 즉시 res/err 반환 (삽입 없음)
+
+(defn store/bulk-insert! [store rows]
+  (let [schema (get store :schema)
+        errors (filter
+                 (fn [e] (not (nil? e)))
+                 (map (fn [row]
+                        (let [v (if (nil? schema)
+                                  {:ok true}
+                                  (vld/schema row schema))]
+                          (if (vld/ok? v) nil (vld/error-str v))))
+                      rows))]
+    (if (not (empty? errors))
+      (res/err (first errors))
+      (store/tx (get store :db)
+        (fn []
+          (reduce
+            (fn [_ row]
+              (db_insert (get store :db) (get store :table) row))
+            nil
+            rows)
+          (length rows))))))
 
 ;; ── RAW ─────────────────────────────────────────────────────
 
