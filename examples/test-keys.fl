@@ -1,0 +1,10 @@
+(define m {:name "alice" :age 30})
+(define ks (keys m))
+(println (str "keys=" (str ks)))
+(println (str "first key=" (first ks)))
+(println (str "type=" (type-of (first ks))))
+
+;; str-replace 테스트
+(define k (first ks))
+(println (str "key as str=" (str k)))
+(println (str "replaced=" (str-replace (str k) ":" "")))

@@ -1,0 +1,14 @@
+(load "lib/validate.fl")
+(load "lib/result.fl")
+
+(define schema {:name {"required" true "type" "string" "max-length" 50}
+                :age {"type" "number" "min" 0 "max" 150}})
+
+(define r1 (vld/schema {:name "alice" :age 30} schema))
+(println (str "valid=" (vld/ok? r1)))
+
+(define r2 (vld/schema {:name "" :age 200} schema))
+(println (str "invalid ok?=" (vld/ok? r2)))
+(println (str "errors=" (str (vld/errors r2))))
+
+(println "LOAD OK")
