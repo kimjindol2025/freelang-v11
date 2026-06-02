@@ -1,0 +1,373 @@
+// FreeLang v9: Lexer for S-Expression
+
+import { Token, TokenType as T } from "./token";
+
+// Phase 6: Map keywords to token types
+// Phase 9a: Added search, fetch keywords
+// Phase 9b: Added learn, recall, remember, forget keywords
+// Phase 9c: Added observe, analyze, decide, act, verify keywords
+const KEYWORDS: Map<string, T> = new Map([
+  ["MODULE", T.Module],
+  ["TYPECLASS", T.TypeClass],
+  ["INSTANCE", T.Instance],
+  // import는 일반 함수로 처리 (파서 등록 불필요)
+  ["open", T.Open],
+  // Phase 9a: Search functionality keywords
+  ["search", T.Search],
+  ["fetch", T.Fetch],
+  // Phase 9b: Learning functionality keywords
+  ["learn", T.Learn],
+  ["recall", T.Recall],
+  ["remember", T.Remember],
+  ["forget", T.Forget],
+  // Phase 9c: Reasoning functionality keywords
+  ["observe", T.Observe],
+  ["analyze", T.Analyze],
+  ["decide", T.Decide],
+  ["act", T.Act],
+  ["verify", T.Verify],
+  // Phase 9c: Conditional branching keywords
+  ["if", T.If],
+  ["when", T.When],
+  ["then", T.Then],
+  ["else", T.Else],
+  // Phase 9c: Loop control keywords
+  ["repeat", T.Repeat],
+  ["until", T.Until],
+  ["while", T.While],
+  // Phase 11: Web DSL keywords
+  ["PAGE", T.Page],
+  ["API", T.Api],
+  ["ROUTE", T.Route],
+  ["COMPONENT", T.Component],
+  ["FORM", T.Form],
+  ["STATE", T.State],
+  ["COMPUTED", T.Computed],
+  ["WATCH", T.Watch],
+  ["METHOD", T.Method],
+  ["RENDER", T.Render],
+  ["HANDLER", T.Handler],
+  ["VALIDATION", T.Validation],
+  ["LAYOUT", T.Layout],
+  ["MIDDLEWARE", T.Middleware],
+  ["SUSPENSE", T.Suspense],
+  ["SLOT", T.Slot],
+  ["METADATA", T.Metadata],
+  // Phase 11: Enterprise backend keywords
+  ["SERVICE", T.Service],
+  ["CONTROLLER", T.Controller],
+  ["GUARD", T.Guard],
+  ["PIPE", T.Pipe],
+  // Phase 11: Database ORM keywords
+  ["MODEL", T.Model],
+  ["QUERY", T.Query],
+  ["MIGRATION", T.Migration],
+  ["REPOSITORY", T.Repository],
+  ["DATABASE", T.Database],
+  // Phase 11: Cache & Messaging keywords
+  ["CACHE", T.Cache],
+  ["CACHED", T.Cached],
+  ["KAFKA", T.Kafka],
+  ["PRODUCER", T.Producer],
+  ["CONSUMER", T.Consumer],
+  ["QUEUE", T.Queue],
+  ["RABBITMQ", T.RabbitMQ],
+  // Phase 11: Authentication keywords
+  ["JWT", T.JWT],
+  ["OAUTH", T.OAuth],
+  // Phase 11: Deployment keywords
+  ["DOCKERFILE", T.Dockerfile],
+  ["DOCKER-COMPOSE", T.DockerCompose],
+  ["K8S-DEPLOYMENT", T.K8sDeployment],
+  ["K8S-SERVICE", T.K8sService],
+  ["K8S-INGRESS", T.K8sIngress],
+  // Phase 11: Cloud keywords
+  ["AWS", T.AWS],
+  ["AWS-S3", T.AwsS3],
+  ["AWS-LAMBDA", T.AwsLambda],
+  ["AWS-RDS", T.AwsRds],
+  ["AWS-SQS", T.AwsSqs],
+  ["GCP", T.GCP],
+  ["GCP-CLOUD-RUN", T.GcpCloudRun],
+  ["GCP-BIGQUERY", T.GcpBigquery],
+  ["AZURE", T.Azure],
+  ["AZURE-FUNCTION", T.AzureFunction],
+  ["AZURE-COSMOS", T.AzureCosmos],
+  // Note: browse, cache are treated as regular symbols, not keywords
+]);
+
+function getKeywordTokenType(text: string): T | null {
+  return KEYWORDS.get(text) ?? null;
+}
+
+export function lex(source: string): Token[] {
+  const tokens: Token[] = [];
+  let i = 0, line = 1, col = 1;
+
+  while (i < source.length) {
+    const ch = source[i];
+
+    // Whitespace
+    if (/\s/.test(ch)) {
+      if (ch === "\n") {
+        line++;
+        col = 1;
+      } else {
+        col++;
+      }
+      i++;
+      continue;
+    }
+
+    // Comment: ; or ;; to end of line (single ; for self-hosting .fl files)
+    if (ch === ";") {
+      while (i < source.length && source[i] !== "\n") i++;
+      continue;
+    }
+
+    // Raw string: """...""" (따옴표/역슬래시 이스케이프 없음 — HTML/JS 임베드용)
+    if (ch === '"' && source[i + 1] === '"' && source[i + 2] === '"') {
+      const startCol = col;
+      i += 3; col += 3;
+      let value = "";
+      while (i < source.length) {
+        if (source[i] === '"' && source[i + 1] === '"' && source[i + 2] === '"') {
+          i += 3; col += 3;
+          break;
+        }
+        if (source[i] === "\n") { line++; col = 1; } else { col++; }
+        value += source[i];
+        i++;
+      }
+      tokens.push({ type: T.String, value, line, col: startCol });
+      continue;
+    }
+
+    // String: "..."
+    if (ch === '"') {
+      const start = i;
+      const startCol = col;
+      i++;
+      col++;
+      let value = "";
+
+      while (i < source.length && source[i] !== '"') {
+        if (source[i] === "\\" && i + 1 < source.length) {
+          i++;
+          col++;
+          const esc = source[i];
+          switch (esc) {
+            case "n": value += "\n"; break;
+            case "t": value += "\t"; break;
+            case "r": value += "\r"; break;
+            case "\\": value += "\\"; break;
+            case '"': value += '"'; break;
+            case "x": {
+              // \xNN hex escape
+              const hex = source.slice(i + 1, i + 3);
+              if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+                value += String.fromCharCode(parseInt(hex, 16));
+                i += 2; col += 2;
+              } else {
+                value += "x";
+              }
+              break;
+            }
+            default: value += esc;
+          }
+          i++;
+          col++;
+        } else {
+          if (source[i] === "\n") {
+            line++;
+            col = 1;
+          } else {
+            col++;
+          }
+          value += source[i];
+          i++;
+        }
+      }
+
+      if (i >= source.length) {
+        throw new Error(`Unterminated string at line ${line}, col ${startCol}`);
+      }
+
+      i++; col++; // closing "
+      tokens.push({ type: T.String, value, line, col: startCol });
+      continue;
+    }
+
+    // Brackets
+    if (ch === "[") {
+      tokens.push({ type: T.LBracket, value: "[", line, col });
+      i++;
+      col++;
+      continue;
+    }
+    if (ch === "]") {
+      tokens.push({ type: T.RBracket, value: "]", line, col });
+      i++;
+      col++;
+      continue;
+    }
+
+    // Parentheses
+    if (ch === "(") {
+      tokens.push({ type: T.LParen, value: "(", line, col });
+      i++;
+      col++;
+      continue;
+    }
+    if (ch === ")") {
+      tokens.push({ type: T.RParen, value: ")", line, col });
+      i++;
+      col++;
+      continue;
+    }
+
+    // Braces: Map literal delimiters
+    if (ch === "{") {
+      tokens.push({ type: T.LBrace, value: "{", line, col });
+      i++;
+      col++;
+      continue;
+    }
+    if (ch === "}") {
+      tokens.push({ type: T.RBrace, value: "}", line, col });
+      i++;
+      col++;
+      continue;
+    }
+
+    // Pipe: Or-pattern separator, or |> pipeline operator
+    if (ch === "|") {
+      const startCol = col;
+      // Phase 68: |> pipeline operator
+      if (i + 1 < source.length && source[i + 1] === ">") {
+        tokens.push({ type: T.Symbol, value: "|>", line, col: startCol });
+        i += 2;
+        col += 2;
+      } else {
+        tokens.push({ type: T.Symbol, value: "|", line, col: startCol });
+        i++;
+        col++;
+      }
+      continue;
+    }
+
+    // Colon: Phase 6 token separator (not keyword prefix)
+    if (ch === ":") {
+      const startCol = col;
+      tokens.push({ type: T.Colon, value: ":", line, col: startCol });
+      i++;
+      col++;
+      continue;
+    }
+
+    // Type hint: ^typename (e.g. ^number, ^string, ^map)
+    // Parsed as a special symbol token — parser will skip it gracefully
+    if (ch === "^") {
+      const startCol = col;
+      i++; col++;
+      let hint = "";
+      while (i < source.length && /[a-zA-Z0-9_\-?]/.test(source[i])) {
+        hint += source[i]; i++; col++;
+      }
+      // Emit as Symbol "^typename" — parser skips it as a type hint
+      tokens.push({ type: T.Symbol, value: "^" + hint, line, col: startCol });
+      continue;
+    }
+
+    // Deref shorthand: @varname → (deref varname)  [v12 #19]
+    if (ch === "@") {
+      const startCol = col;
+      i++; col++;
+      let varname = "";
+      while (i < source.length && /[a-zA-Z0-9_\-?!]/.test(source[i])) {
+        varname += source[i]; i++; col++;
+      }
+      if (varname.length === 0) throw new Error(`Expected atom name after @ at line ${line}, col ${startCol}`);
+      // @x → (deref x) : LParen + Symbol("deref") + Symbol(x) + RParen
+      tokens.push({ type: T.LParen, value: "(", line, col: startCol });
+      tokens.push({ type: T.Symbol, value: "deref", line, col: startCol });
+      tokens.push({ type: T.Symbol, value: varname, line, col: startCol });
+      tokens.push({ type: T.RParen, value: ")", line, col: startCol });
+      continue;
+    }
+
+    // Variable: $varname
+    if (ch === "$") {
+      const start = i;
+      const startCol = col;
+      i++;
+      col++;
+
+      let varname = "";
+      while (i < source.length && /[a-zA-Z0-9_\-?]/.test(source[i])) {
+        varname += source[i];
+        i++;
+        col++;
+      }
+
+      if (varname.length === 0) {
+        throw new Error(`Expected variable name after $ at line ${line}, col ${startCol}`);
+      }
+
+      tokens.push({ type: T.Variable, value: varname, line, col: startCol });
+      continue;
+    }
+
+    // Number: digits with optional decimal (Phase 11: Added negative number support)
+    if (/\d/.test(ch) || (ch === "-" && i + 1 < source.length && /\d/.test(source[i+1]))) {
+      const start = i;
+      const startCol = col;
+
+      if (ch === "-") {
+        i++;
+        col++;
+      }
+
+      while (i < source.length && /[\d.]/.test(source[i])) {
+        i++;
+        col++;
+      }
+
+      const value = source.slice(start, i);
+      tokens.push({ type: T.Number, value, line, col: startCol });
+      continue;
+    }
+
+    // Symbol: letters, hyphens, etc. (includes & for pattern rest element)
+    // NOTE: ':' excluded - it's a separate Colon token for qualified identifiers
+    // NOTE: '|' excluded - it's a separate Pipe token for or-patterns
+    // NOTE: '.' included for field access: env.vars, node.op (self-hosting .fl files)
+    // NOTE: '?' as start char: allows ?. nil-safe accessor
+    if (/[a-zA-Z_<>=!+\-*&/%?]/.test(ch)) {
+      const start = i;
+      const startCol = col;
+
+      while (i < source.length && /[a-zA-Z0-9_<>=!+\-*/?&.%]/.test(source[i])) {
+        i++;
+        col++;
+      }
+
+      const value = source.slice(start, i);
+
+      // Phase 6: Check for keywords
+      const keywordType = getKeywordTokenType(value);
+      const tokenType = keywordType ?? T.Symbol;
+
+      tokens.push({ type: tokenType, value, line, col: startCol });
+      continue;
+    }
+
+    const unicodeHint = ch.charCodeAt(0) > 127
+      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — 문자열 안에서는 HTML 엔티티 사용 권장, e.g. &amp;middot; &amp;rarr; &amp;check;)`
+      : '';
+    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}${unicodeHint}`);
+  }
+
+  tokens.push({ type: T.EOF, value: "", line, col });
+  return tokens;
+}
