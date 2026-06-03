@@ -2701,8 +2701,9 @@ var init_errors = __esm({
     };
     FunctionNotFoundError = class _FunctionNotFoundError extends Error {
       constructor(functionName, file, line, col, hint) {
-        const hintStr = hint ? ` ${hint}` : "";
-        super(`Function not found: ${functionName}${hintStr}`);
+        const fileStr = file ? ` (${require("path").basename(file)}${line ? `:${line}` : ""})` : "";
+        const hintStr = hint ? `\n  힌트: ${hint}` : "";
+        super(`'${functionName}' 함수 없음${fileStr}${hintStr}`);
         this.functionName = functionName;
         this.file = file;
         this.line = line;
@@ -2821,17 +2822,47 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 function suggestSimilar(name, candidates) {
-  let best = null;
-  let bestDist = Infinity;
   const threshold = name.length > 4 ? 3 : 2;
+  const results = [];
   for (const candidate of candidates) {
     const dist = levenshtein(name.toLowerCase(), candidate.toLowerCase());
-    if (dist <= threshold && dist < bestDist) {
-      bestDist = dist;
-      best = candidate;
-    }
+    if (dist <= threshold) results.push({ name: candidate, dist });
   }
-  return best;
+  results.sort((a, b) => a.dist - b.dist);
+  const top = results.slice(0, 3).map(r => r.name);
+  return top.length > 0 ? top : null;
+}
+function suggestSimilarOne(name, candidates) {
+  const top = suggestSimilar(name, candidates);
+  return top ? top[0] : null;
+}
+function userFnCandidates(allKeys, fnMap) {
+  return allKeys.filter(k => {
+    if (k.startsWith("__") || k.startsWith("page_") || k.includes("__inner") || k.startsWith("_fl_") || k.length <= 1) return false;
+    if (!fnMap) return true;
+    const fn = fnMap.get(k);
+    if (!fn) return false;
+    // 사용자 정의 함수: body가 JS 함수가 아닌 AST 노드
+    return fn.body && typeof fn.body !== "function" && !fn._builtin && !fn._call;
+  });
+}
+function buildFnNotFoundHint(baseName, allKeys, alias, fnMap) {
+  if (alias) return `'${baseName}'는 없습니다. 대신 '${alias.correct}'를 사용하세요.\n  사용법: ${alias.usage}`;
+  const user = userFnCandidates(allKeys, fnMap);
+  // 먼저 사용자 정의 함수에서 유사 후보 검색
+  const similarsUser = suggestSimilar(baseName, user);
+  if (similarsUser && similarsUser.length > 0) {
+    return `비슷한 함수: ${similarsUser.map(s => `'${s}'`).join(", ")}`;
+  }
+  // 사용자 정의 함수 중 유사 없으면 전체에서 검색
+  const similarsAll = suggestSimilar(baseName, allKeys.filter(k => !k.startsWith("__") && !k.includes("__inner")));
+  if (similarsAll && similarsAll.length > 0) {
+    return `비슷한 함수: ${similarsAll.map(s => `'${s}'`).join(", ")}`;
+  }
+  const recent = user.slice(-5).filter(k => k !== baseName);
+  return recent.length > 0
+    ? `정의된 함수: ${recent.join(", ")}`
+    : `'${baseName}' 함수가 정의되어 있는지 확인하세요.`;
 }
 var KNOWN_ALIASES;
 var init_error_formatter = __esm({
@@ -22304,14 +22335,7 @@ function _callUserFunctionInterpPath(interp2, name, args3) {
   if (!func) {
     const candidates = [...interp2.context.functions.keys()];
     const alias = KNOWN_ALIASES[baseName] ?? KNOWN_ALIASES[baseName.replace(/-/g, "_")] ?? KNOWN_ALIASES[baseName.replace(/_/g, "-")];
-    let hint;
-    if (alias) {
-      hint = `'${baseName}'\uB294 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2E0 '${alias.correct}'\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
-  \uC0AC\uC6A9\uBC95: ${alias.usage}`;
-    } else {
-      const similar = suggestSimilar(baseName, candidates);
-      hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
-    }
+    const hint = buildFnNotFoundHint(baseName, candidates, alias, interp2.context.functions);
     throw new FunctionNotFoundError(
       baseName,
       interp2.currentFilePath,
@@ -22351,7 +22375,12 @@ function _callUserFunctionInterpPath(interp2, name, args3) {
     const paramNames = func.params.map(
       (p) => typeof p === "string" ? p.replace(/^\$/, "") : p?.kind === "variable" ? p.name.replace(/^\$/, "") : "\u2026"
     );
-    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
+    const missing = paramNames.slice(args3.length);
+    throw new Error(
+      `'${baseName}': \uc778\uc790 ${func.params.length}\uac1c \ud544\uc694, ${args3.length}\uac1c \uc804\ub2ec\ub428\n` +
+      `  \uc2dc\uadf8\ub2c8\ucc98: (${baseName} ${paramNames.join(" ")})\n` +
+      `  \ub204\ub77d\ub41c \uc778\uc790: ${missing.join(", ")}`
+    );
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
     const _stack3 = interp2.callStack ?? [];
@@ -22620,8 +22649,7 @@ function callUserFunctionTCO(interp2, name, args3) {
       }
       if (!func) {
         const candidates = [...interp2.context.functions.keys()];
-        const similar = suggestSimilar(baseName, candidates);
-        const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+        const hint = buildFnNotFoundHint(baseName, candidates, null, interp2.context.functions);
         throw new FunctionNotFoundError(baseName, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0, void 0, hint);
       }
       if (func._call) return func._call(...currentArgs);
