@@ -15095,6 +15095,48 @@ function flExecOpNative(op, vals) {
       }
       return cur !== void 0 ? cur : defaultVal;
     }
+    case "get!": {
+      if (v0 === null || v0 === void 0) throw new Error(`get!: nil\uC5D0\uC11C \uD0A4 '${v1}' \uC811\uADFC \uBD88\uAC00`);
+      let k2 = v1;
+      if (k2 !== null && typeof k2 === "object" && k2.kind === "keyword") k2 = k2.name;
+      const normalized2 = typeof k2 === "string" && k2.startsWith(":") ? k2.slice(1) : String(k2);
+      let val2;
+      if (Array.isArray(v0)) val2 = v0[k2];
+      else if (v0 instanceof Map) val2 = v0.has(normalized2) ? v0.get(normalized2) : void 0;
+      else if (typeof v0 === "object") val2 = v0[normalized2] !== void 0 ? v0[normalized2] : v0[k2];
+      if (val2 === void 0 || val2 === null) {
+        const keys = Array.isArray(v0) ? `\uAE38\uC774 ${v0.length}\uC778 \uBC30\uC5F4`
+          : v0 instanceof Map ? `\uD0A4: ${[...v0.keys()].map(k => `"${k}"`).join(", ")}`
+          : typeof v0 === "object" ? `\uD0A4: ${Object.keys(v0).map(k => `"${k}"`).join(", ")}`
+          : "\uC54C \uC218 \uC5C6\uC74C";
+        throw new Error(`get!: \uD0A4 "${k2}" \uC5C6\uC74C\n  ${keys}`);
+      }
+      return val2;
+    }
+    case "get-in!": {
+      if (!Array.isArray(v1)) throw new Error(`get-in!: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      let cur2 = v0;
+      for (let ki = 0; ki < v1.length; ki++) {
+        const k3 = v1[ki];
+        if (cur2 === null || cur2 === void 0) {
+          const path2 = v1.slice(0, ki).join(" \u2192 ");
+          throw new Error(`get-in!: ${path2 || "\uB8E8\uD2B8"}\uC5D0\uC11C nil \u2014 \uD0A4 "${k3}" \uC811\uADFC \uBD88\uAC00`);
+        }
+        const key2 = typeof k3 === "string" && k3.startsWith(":") ? k3.slice(1) : k3;
+        const prev = cur2;
+        if (Array.isArray(cur2)) cur2 = cur2[key2] !== void 0 ? cur2[key2] : null;
+        else if (cur2 !== null && typeof cur2 === "object") cur2 = cur2[key2] !== void 0 ? cur2[key2] : null;
+        if ((cur2 === null || cur2 === void 0) && ki < v1.length - 1) {
+          const availKeys = Array.isArray(prev) ? `\uAE38\uC774 ${prev.length}` : typeof prev === "object" && prev ? `\uD0A4: ${Object.keys(prev).map(k => `"${k}"`).join(", ")}` : "";
+          throw new Error(`get-in!: \uD0A4 "${k3}" \uC5C6\uC74C\n  ${availKeys}`);
+        }
+      }
+      if (cur2 === null || cur2 === void 0) {
+        const lastKey = v1[v1.length - 1];
+        throw new Error(`get-in!: \uD0A4 "${lastKey}" \uC5C6\uC74C`);
+      }
+      return cur2;
+    }
     case "append":
       return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice":
@@ -18117,6 +18159,41 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return _getDef;
       }
       return _getDef;
+    }
+    case "get!": {
+      const g1v = args3[0]; const g1k = args3[1];
+      if (g1v === null || g1v === void 0) throw new Error(`get!: nil에서 키 '${g1k}' 접근 불가`);
+      const g1n = typeof g1k === "string" && g1k.startsWith(":") ? g1k.slice(1) : String(g1k);
+      let g1r;
+      if (Array.isArray(g1v)) g1r = g1v[g1k];
+      else if (g1v instanceof Map) g1r = g1v.has(g1n) ? g1v.get(g1n) : void 0;
+      else if (typeof g1v === "object") g1r = g1v[g1n] !== void 0 ? g1v[g1n] : g1v[g1k];
+      if (g1r === void 0 || g1r === null) {
+        const g1keys = Array.isArray(g1v) ? `길이 ${g1v.length}인 배열`
+          : g1v instanceof Map ? `키: ${[...g1v.keys()].map(k => `"${k}"`).join(", ")}`
+          : typeof g1v === "object" ? `키: ${Object.keys(g1v).map(k => `"${k}"`).join(", ")}` : "";
+        throw new Error(`get!: 키 "${g1k}" 없음\n  ${g1keys}`);
+      }
+      return g1r;
+    }
+    case "get-in!": {
+      if (!Array.isArray(args3[1])) throw new Error(`get-in!: 두 번째 인자는 키 배열`);
+      let gi1cur = args3[0];
+      for (let gi1i = 0; gi1i < args3[1].length; gi1i++) {
+        const gi1k = args3[1][gi1i];
+        if (gi1cur === null || gi1cur === void 0) throw new Error(`get-in!: 경로 ${args3[1].slice(0,gi1i).join("→") || "루트"}에서 nil`);
+        const gi1n = typeof gi1k === "string" && gi1k.startsWith(":") ? gi1k.slice(1) : gi1k;
+        const gi1prev = gi1cur;
+        if (Array.isArray(gi1cur)) gi1cur = gi1cur[gi1n] !== void 0 ? gi1cur[gi1n] : null;
+        else if (gi1cur instanceof Map) gi1cur = gi1cur.has(String(gi1n)) ? gi1cur.get(String(gi1n)) : null;
+        else if (typeof gi1cur === "object") gi1cur = gi1cur[gi1n] !== void 0 ? gi1cur[gi1n] : null;
+        if (gi1cur === null && gi1i < args3[1].length - 1) {
+          const gi1keys = typeof gi1prev === "object" && gi1prev && !Array.isArray(gi1prev) ? `키: ${Object.keys(gi1prev).map(k => `"${k}"`).join(", ")}` : "";
+          throw new Error(`get-in!: 키 "${gi1k}" 없음\n  ${gi1keys}`);
+        }
+      }
+      if (gi1cur === null || gi1cur === void 0) throw new Error(`get-in!: 키 "${args3[1][args3[1].length-1]}" 없음`);
+      return gi1cur;
     }
     case "safe-get":
     case "safe_get": {
