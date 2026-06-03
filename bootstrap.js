@@ -30365,20 +30365,19 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     // server_json [status] obj -> response object
     // (server_json data)        → 200 JSON
     // (server_json 201 data)    → 201 JSON
-    "server_json": (statusOrBody, maybeBody) => {
-      const isStatus = typeof statusOrBody === "number" && statusOrBody >= 100 && statusOrBody < 600;
+    "server_json": (body, status = 200) => {
       return {
         __fl_response: true,
-        status: isStatus ? statusOrBody : 200,
+        status: status,
         contentType: "application/json",
-        body: isStatus ? maybeBody : statusOrBody
+        body
       };
     },
     // server_text text -> response object
-    "server_text": (body) => {
+    "server_text": (body, status = 200) => {
       return {
         __fl_response: true,
-        status: 200,
+        status: status,
         contentType: "text/plain",
         body
       };
@@ -41843,26 +41842,26 @@ var FLExecutor = class {
    */
   injectHTTPServerHelpers() {
     const ctx = this.interpreter.context;
-    ctx["server_json"] = (body) => {
+    ctx["server_json"] = (body, status = 200) => {
       return {
         __fl_response: true,
-        status: 200,
+        status: status,
         contentType: "application/json",
         body
       };
     };
-    ctx["server_html"] = (body) => {
+    ctx["server_html"] = (body, status = 200) => {
       return {
         __fl_response: true,
-        status: 200,
+        status: status,
         contentType: "text/html; charset=utf-8",
         body
       };
     };
-    ctx["server_text"] = (body) => {
+    ctx["server_text"] = (body, status = 200) => {
       return {
         __fl_response: true,
-        status: 200,
+        status: status,
         contentType: "text/plain",
         body
       };
