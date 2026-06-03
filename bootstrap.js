@@ -4760,7 +4760,8 @@ function evalSpecialForm(interp2, op, expr2) {
       name,
       params: fnValue.params,
       body: fnValue.body,
-      capturedEnv: fnValue.capturedEnv
+      capturedEnv: fnValue.capturedEnv,
+      filePath: interp2.currentFilePath ?? null
     };
     if (fnValue.paramDefaults) funcDef.paramDefaults = fnValue.paramDefaults;
     if (fnValue.paramAnnotations) funcDef.paramAnnotations = fnValue.paramAnnotations;
@@ -22539,7 +22540,8 @@ ${tail}` : "")
   const _argsBrief = args3.slice(0, 5).map(
     (a) => a === null ? "nil" : Array.isArray(a) ? `[${a.length}]` : typeof a === "object" ? "{obj}" : typeof a === "function" ? "<fn>" : typeof a === "string" ? a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"` : String(a)
   );
-  const _stackEntry = { name: baseName, line: interp2.currentLine, args: _argsBrief };
+  const _stackEntry = { name: baseName, line: interp2._pendingCallLine ?? interp2.currentLine, args: _argsBrief, file: interp2._pendingCallFile ?? interp2.currentFilePath ?? null, defFile: func.filePath ?? null };
+  interp2._pendingCallLine = null; interp2._pendingCallFile = null;
   if (process.env.FL_TRACE === "1") {
     console.error(`[trace] ${"  ".repeat(Math.min(interp2.callDepth, 20))}\u2192 ${baseName}(${_argsBrief.join(", ")}) (line ${interp2.currentLine})`);
   }
@@ -40121,7 +40123,7 @@ var Interpreter = class _Interpreter {
     return null;
   }
   evalSExpr(expr2) {
-    if (expr2.line !== void 0) this.currentLine = expr2.line;
+    if (expr2.line !== void 0) { this.currentLine = expr2.line; this._callSiteLine = expr2.line; }
     let op = expr2.op;
     if (typeof op !== "string") {
       op = op?.name ? op.name : String(op);
@@ -40350,6 +40352,8 @@ var Interpreter = class _Interpreter {
       }
     }
     const args3 = expr2.args.map((arg) => this.eval(arg));
+    this._pendingCallLine = expr2.line ?? this.currentLine;
+    this._pendingCallFile = this.currentFilePath;
     if (args3.length >= 1 && typeof args3[0] === "string") {
       const qualifiedName = `${op}:${args3[0]}`;
       if (this.context.functions.has(qualifiedName)) {
@@ -42806,10 +42810,17 @@ init_eval_special_forms();
 init_stdlib_property();
 function formatCallStack(stack) {
   if (!stack || stack.length === 0) return "";
+  const path19 = require("path");
   const frames = stack.slice().reverse().slice(0, 10);
-  return "\n\x1B[2m\uCF5C \uC2A4\uD0DD:\x1B[0m\n" + frames.map(
-    (f, i) => `  \x1B[2m${i === 0 ? "\u2192" : " "} ${f.name ?? f.fn ?? "?"} (line ${f.line})\x1B[0m`
-  ).join("\n");
+  return "\n\x1B[2m\uCF5C \uC2A4\uD0DD:\x1B[0m\n" + frames.map((f, i) => {
+    const fn = f.name ?? f.fn ?? "?";
+    const callFile = f.file ? path19.basename(f.file) : null;
+    const defFile  = f.defFile ? path19.basename(f.defFile) : null;
+    const loc = callFile ? `\x1B[36m${callFile}:${f.line ?? "?"}\x1B[0m` : `line ${f.line ?? "?"}`;
+    const defHint = defFile && defFile !== callFile ? ` \x1B[2m[${defFile}\uC5D0\uC11C \uC815\uC758]\x1B[0m` : "";
+    const arrow = i === 0 ? "\x1B[31m\u2192\x1B[0m" : "\x1B[2m \x1B[0m";
+    return `  ${arrow} \x1B[1m${fn}\x1B[0m ${loc}${defHint}`;
+  }).join("\n");
 }
 function mapJsError(msg) {
   if (msg.includes("Cannot read properties of null") || msg.includes("Cannot read properties of undefined")) {
