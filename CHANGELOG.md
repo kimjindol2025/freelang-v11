@@ -1,6 +1,20 @@
 # Changelog
 
 
+## v11.9.1 — 언어 레벨 SSRF 가드 (2026-06-03)
+
+### 보안
+- **`http-get`/`http-post` 등 모든 HTTP 빌트인에 SSRF 가드 내장** — flsc가 앱 레벨(`crawl-url-safe?`)에서 막던 SSRF를 런타임 빌트인으로 환원. 모든 FL 앱이 별도 코드 없이 보호됨.
+- **정책(allowlist 방식)**:
+  - 클라우드 메타데이터(`169.254.x`)·unspecified(`0.0.0.0`/`::`)·link-local(`fe80:`) — **항상 차단** (allowlist로도 해제 불가)
+  - 사설/loopback(`localhost`/`127.*`/`10.*`/`192.168.*`/`172.16~31.*`/`::1`/`fc·fd`) — 기본 차단, `FL_HTTP_ALLOW="host1,host2"`로 명시 허용
+  - `FL_HTTP_ALLOW="*"` — 사설 전체 허용(메타데이터는 여전히 차단)
+  - 외부 공인 IP — 항상 통과
+- **차단 반환**: 기존 실패 형태와 동일한 `{:status 0 :body "" :error "SSRF blocked: <host> ..."}` (호출부 호환)
+- 단일 가드 함수 `flSsrfBlockReason`을 3개 진입점(메인 eval·self-host eval·`nodeHttpRequest`)에 연결.
+- v1 한계: 리터럴 호스트명 검사(flsc 패리티). DNS rebinding(이름→사설 IP)은 후속 과제.
+
+
 ## v11.9.0 — Phase 4 완료 (2026-06-01)
 
 ### 달성

@@ -15313,6 +15313,8 @@ function flExecOpNative(op, vals) {
     case "http-get":
     case "http_get": {
       const url2 = String(v0 ?? "");
+      const __ssrf = flSsrfBlockReason(url2);
+      if (__ssrf) return { status: 0, body: "", headers: {}, error: __ssrf };
       try {
         const { execSync: execSync2 } = require("child_process");
         const { writeFileSync: writeFileSync14, unlinkSync: unlinkSync5 } = require("fs");
@@ -21569,6 +21571,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         case "http-get":
         case "http_get": {
           const url2 = String(args3[0] ?? "");
+          const __ssrf = flSsrfBlockReason(url2);
+          if (__ssrf) return { status: 0, body: "", headers: {}, error: __ssrf };
           try {
             const { execSync: execSync2 } = require("child_process");
             const { writeFileSync: writeFileSync14, unlinkSync: unlinkSync5 } = require("fs");
@@ -25958,7 +25962,50 @@ function createErrorModule() {
 
 // src/stdlib-http.ts
 var import_child_process = require("child_process");
+// ── SSRF Guard (language-level, v11.9.x) ──────────────────────────────
+// Allowlist policy: private/loopback ranges are blocked by default; cloud
+// metadata (169.254.x / fe80:) and the unspecified address (0.0.0.0 / ::)
+// are ALWAYS blocked (not overridable). FL_HTTP_ALLOW="host1,host2" opts
+// specific private hosts back in; FL_HTTP_ALLOW="*" permits all private ranges
+// (metadata/unspecified stay always-blocked regardless of the allowlist).
+// Returns an error string if the URL must be blocked, or null if allowed.
+// NOTE v1: matches the literal hostname only (parity with flsc crawl-url-safe?);
+// DNS-rebinding (name → private IP) is a known follow-up, not covered here.
+function flSsrfBlockReason(rawUrl) {
+  let host;
+  try {
+    host = (new URL(String(rawUrl)).hostname || "").toLowerCase();
+  } catch {
+    return null;
+  }
+  if (!host) return null;
+  if (host[0] === "[" && host[host.length - 1] === "]") host = host.slice(1, -1);
+  const isIPv6 = host.includes(":");
+  if (host === "0.0.0.0" || host === "::" || host.startsWith("169.254.") || host.startsWith("fe80:")) {
+    return `SSRF blocked: ${host} (reserved/metadata)`;
+  }
+  const allowEnv = (process.env.FL_HTTP_ALLOW || "").trim();
+  if (allowEnv === "*") return null;
+  if (allowEnv) {
+    const allow = allowEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (allow.includes(host)) return null;
+  }
+  let isPrivate;
+  if (isIPv6) {
+    isPrivate = host === "::1" || host.startsWith("fc") || host.startsWith("fd");
+  } else {
+    const priv172 = host.startsWith("172.") && (() => {
+      const oct = parseInt(host.slice(4).split(".")[0], 10);
+      return oct >= 16 && oct <= 31;
+    })();
+    isPrivate = host === "localhost" || host.startsWith("127.") || host.startsWith("10.") || host.startsWith("192.168.") || priv172;
+  }
+  if (isPrivate) return `SSRF blocked: ${host} (private range; set FL_HTTP_ALLOW to permit)`;
+  return null;
+}
 function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4) {
+  const __ssrf = flSsrfBlockReason(url2);
+  if (__ssrf) return { status: 0, body: "", error: __ssrf };
   try {
     const headersObj = {};
     if (headers && typeof headers === "object") {

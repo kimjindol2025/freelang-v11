@@ -1,0 +1,23 @@
+; SSRF 가드 회귀 테스트 (v11.9.1)
+; 실행: node bootstrap.js run tests/test-ssrf-guard.fl
+; allowlist 검증: FL_HTTP_ALLOW=localhost node bootstrap.js run tests/test-ssrf-guard.fl
+(defn blocked? [result]
+  (str-starts-with (?? (get result "error") "") "SSRF blocked"))
+
+(defn check [label expect-blocked result]
+  (let [b (blocked? result)]
+    (if (= b expect-blocked)
+      (println "  ✅ " label)
+      (println "  ✖ " label " (expected blocked=" expect-blocked " got=" b ")"))))
+
+(println "[ SSRF 가드 ] 기본 정책 (FL_HTTP_ALLOW 미설정 가정)")
+; 항상 차단
+(check "메타데이터 169.254 차단" true  (http-get "http://169.254.169.254/latest/meta-data/"))
+(check "0.0.0.0 차단"          true  (http-get "http://0.0.0.0:8080/"))
+; 사설 — 기본 차단
+(check "localhost 차단"        true  (http-get "http://localhost:1/"))
+(check "10.x 사설 차단"        true  (http-get "http://10.0.0.5/"))
+(check "192.168.x 사설 차단"   true  (http-get "http://192.168.1.1/"))
+(check "172.20 사설 차단"      true  (http-get "http://172.20.1.1/"))
+; 사설 아님 — 가드 통과(연결 실패 error는 SSRF 차단 아님)
+(check "172.32 통과"           false (http-get "http://172.32.0.1/"))
