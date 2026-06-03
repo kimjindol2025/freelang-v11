@@ -15144,7 +15144,7 @@ function flExecOpNative(op, vals) {
     case "str":
     case "concat":
       return vals.map((v) => {
-        if (v === null || v === void 0) return "null";
+        if (v === null || v === void 0) return "";
         if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
         const isPlainObj = typeof v === "object" && !Array.isArray(v) && !(v instanceof Map) && v?.kind !== "function-value" && v?.kind !== "closure";
         if (Array.isArray(v) || isPlainObj) {
@@ -15209,16 +15209,45 @@ function flExecOpNative(op, vals) {
     }
     case "first":
       return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
+    case "first!":
+      if (!Array.isArray(v0) || v0.length === 0) {
+        const detail = v0 === null || v0 === void 0 ? "nil 전달됨" : `빈 배열 (길이 0)`;
+        throw new Error(`first!: 첫 번째 원소 없음 — ${detail}`);
+      }
+      return v0[0];
     case "second":
       return Array.isArray(v0) ? v0[1] !== void 0 ? v0[1] : null : null;
     case "last":
       return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
+    case "last!":
+      if (!Array.isArray(v0) || v0.length === 0) {
+        const detail2 = v0 === null || v0 === void 0 ? "nil 전달됨" : `빈 배열 (길이 0)`;
+        throw new Error(`last!: 마지막 원소 없음 — ${detail2}`);
+      }
+      return v0[v0.length - 1];
     case "rest":
       return Array.isArray(v0) ? v0.slice(1) : [];
     case "nth":
       return Array.isArray(v0) && args[1] !== void 0 ? v0[Number(args[1])] !== void 0 ? v0[Number(args[1])] : null : null;
     case "not=":
       return args[0] !== args[1];
+    case "or!": {
+      for (let _oi = 0; _oi < args.length - 1; _oi++) {
+        const _ov = args[_oi];
+        if (_ov !== null && _ov !== void 0 && _ov !== false) return _ov;
+      }
+      const _last = args[args.length - 1];
+      if (_last === null || _last === void 0 || _last === false)
+        throw new Error(`or!: 모든 값이 nil/false — 이 위치에서 nil은 허용되지 않습니다`);
+      return _last;
+    }
+    case "assert-not-nil": {
+      if (v0 === null || v0 === void 0) {
+        const msg = v1 !== null && v1 !== void 0 ? String(v1) : "nil 불가";
+        throw new Error(`assert-not-nil: ${msg}`);
+      }
+      return v0;
+    }
     // Phase C: nil-safe wrapper들 — default 값 반환 (Phase A의 E_TYPE_NIL 회피)
     case "get-or": {
       let k = v1;
@@ -15692,6 +15721,29 @@ function evalBuiltin(interp2, op, args3, expr2) {
   };
   const toDisplay2 = (val) => interp2.toDisplayString(val);
   switch (normalizedOp2) {
+    case "first!": {
+      const a0 = args3[0];
+      if (!Array.isArray(a0) || a0.length === 0) throw new Error(`first!: 첫 번째 원소 없음 — ${a0 === null || a0 === void 0 ? "nil 전달됨" : "빈 배열"}`);
+      return a0[0];
+    }
+    case "last!": {
+      const a0 = args3[0];
+      if (!Array.isArray(a0) || a0.length === 0) throw new Error(`last!: 마지막 원소 없음 — ${a0 === null || a0 === void 0 ? "nil 전달됨" : "빈 배열"}`);
+      return a0[a0.length - 1];
+    }
+    case "or!": {
+      for (let i = 0; i < args3.length - 1; i++) {
+        const v = args3[i];
+        if (v !== null && v !== void 0 && v !== false) return v;
+      }
+      const last = args3[args3.length - 1];
+      if (last === null || last === void 0 || last === false) throw new Error(`or!: 모든 값이 nil/false — 이 위치에서 nil은 허용되지 않습니다`);
+      return last;
+    }
+    case "assert-not-nil": {
+      if (args3[0] === null || args3[0] === void 0) throw new Error(`assert-not-nil: ${args3[1] !== null && args3[1] !== void 0 ? String(args3[1]) : "nil 불가"}`);
+      return args3[0];
+    }
     // atom: 변경 가능한 참조 컨테이너
     case "atom": {
       return { value: args3[0] !== void 0 ? args3[0] : null };
@@ -17318,7 +17370,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return null;
     case "str":
       return args3.map((a) => {
-        if (a === null || a === void 0) return "null";
+        if (a === null || a === void 0) return "";
         if (typeof a === "string" || typeof a === "number" || typeof a === "boolean") return String(a);
         const isPlainObj = typeof a === "object" && !Array.isArray(a) && !(a instanceof Map) && a?.kind !== "function-value" && a?.kind !== "closure";
         if (Array.isArray(a) || isPlainObj) {
@@ -31722,6 +31774,37 @@ function createMariadbModule(callFn) {
         else delete process.env.MARIADB_PORT;
         cachedSock = null;
       }
+    },
+    "db-one": (db, sql, params = []) => {
+      let rows;
+      if (isSqliteConfig(db)) rows = sqliteQuery(getSqlitePath(db), sql, params);
+      else if (typeof db === "string" && db.startsWith("pool_"))
+        rows = poolCall({ type: "query", poolId: db, sql, params }).rows ?? [];
+      else {
+        const dbName = getMariadbName(db);
+        const m2 = db instanceof Map ? db : new Map(Object.entries(db));
+        const su = process.env.MARIADB_USER, sp = process.env.MARIADB_PASS;
+        const sh = process.env.MARIADB_HOST, spo = process.env.MARIADB_PORT;
+        if (m2.get("user")) process.env.MARIADB_USER = String(m2.get("user"));
+        if (m2.get("password")) process.env.MARIADB_PASS = String(m2.get("password"));
+        if (m2.get("host")) process.env.MARIADB_HOST = String(m2.get("host"));
+        if (m2.get("port")) process.env.MARIADB_PORT = String(m2.get("port"));
+        try {
+          cachedSock = null;
+          rows = parseRows(runMariadb(dbName, bindParams(sql, params))).map((r) => {
+            const rm = new Map();
+            for (const [k, v] of Object.entries(r)) rm.set(k, v);
+            return rm;
+          });
+        } finally {
+          if (su !== void 0) process.env.MARIADB_USER = su; else delete process.env.MARIADB_USER;
+          if (sp !== void 0) process.env.MARIADB_PASS = sp; else delete process.env.MARIADB_PASS;
+          if (sh !== void 0) process.env.MARIADB_HOST = sh; else delete process.env.MARIADB_HOST;
+          if (spo !== void 0) process.env.MARIADB_PORT = spo; else delete process.env.MARIADB_PORT;
+          cachedSock = null;
+        }
+      }
+      return (rows && rows.length > 0) ? rows[0] : null;
     },
     "db-exec": (db, sql, params = []) => {
       if (isSqliteConfig(db)) return sqliteExec(getSqlitePath(db), sql, params);
