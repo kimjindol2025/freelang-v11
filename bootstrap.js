@@ -5768,17 +5768,32 @@ Test Results: ${r.passed}/${total} passed`);
     const macroName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
     const paramsNode = expr2.args[1];
     const params = [];
+    let restName = null;
+    let seenAmpersand = false;
     if (paramsNode.kind === "block" && paramsNode.type === "Array") {
       const items = paramsNode.fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
+          if (item.kind === "literal" && item.type === "symbol" && item.value === "&") {
+            seenAmpersand = true; continue;
+          }
+          if (item.kind === "variable" && item.name === "&") {
+            seenAmpersand = true; continue;
+          }
+          if (seenAmpersand) {
+            const rn = item.kind === "variable" ? item.name.replace(/^\$/, "") : String(item.value ?? item.name ?? "rest");
+            restName = rn;
+            params.push("$&rest");
+            break;
+          }
           if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
           else if (item.kind === "literal") params.push("$" + item.value);
         }
       }
     }
-    const body = expr2.args[2];
-    ctx.macroExpander.define(macroName, params, body);
+    const body = expr2.args.length >= 3 ? (expr2.args.length === 3 ? expr2.args[2] : { kind: "sexpr", op: "do", args: expr2.args.slice(2) }) : { kind: "literal", type: "null", value: null };
+    const macroDef = { name: macroName, params, body, restName };
+    ctx.macroExpander.macros.set(macroName, macroDef);
     return null;
   }
   if (op === "macroexpand") {
@@ -37519,10 +37534,18 @@ var MacroExpander = class {
         const macro = this.macros.get(op);
         const expandedArgs = sexpr.args.map((arg) => this.expand(arg));
         const bindings = /* @__PURE__ */ new Map();
-        for (let i = 0; i < macro.params.length; i++) {
-          const paramName = macro.params[i];
+        const restIdx = macro.params.indexOf("$&rest");
+        const fixedParams = restIdx === -1 ? macro.params : macro.params.slice(0, restIdx);
+        for (let i = 0; i < fixedParams.length; i++) {
+          const paramName = fixedParams[i];
           const key = paramName.startsWith("$") ? paramName : "$" + paramName;
           bindings.set(key, expandedArgs[i] ?? { kind: "literal", type: "null", value: null });
+        }
+        if (restIdx !== -1) {
+          const restArgs = expandedArgs.slice(fixedParams.length);
+          const restBlock = { kind: "block", type: "Array", fields: new Map([["items", restArgs]]) };
+          bindings.set("$&rest", restBlock);
+          if (macro.restName) bindings.set("$" + macro.restName, restBlock);
         }
         const hygieneMap = /* @__PURE__ */ new Map();
         const hygieneBody = this.renameLocals(macro.body, bindings, hygieneMap);
@@ -37585,10 +37608,34 @@ var MacroExpander = class {
     }
     if (template.kind === "sexpr") {
       const sexpr = template;
-      return {
-        ...sexpr,
-        args: sexpr.args.map((arg) => this.substitute(arg, bindings))
-      };
+      // splice 마커 처리 — (splice x) 는 x의 items를 부모 args에 펼침
+      if (sexpr.op === "splice") {
+        const spliceArg = this.substitute(sexpr.args[0], bindings);
+        if (spliceArg.kind === "block" && spliceArg.type === "Array") {
+          const items = spliceArg.fields.get("items") ?? [];
+          return { kind: "__splice__", items };
+        }
+        return { kind: "__splice__", items: [spliceArg] };
+      }
+      // args 치환 (splice 마커 펼치기 포함)
+      const newArgs = [];
+      for (const arg of sexpr.args) {
+        const sub = this.substitute(arg, bindings);
+        if (sub.kind === "__splice__") newArgs.push(...sub.items);
+        else newArgs.push(sub);
+      }
+      const opKey = "$" + sexpr.op;
+      if (bindings.has(opKey)) {
+        const opVal = bindings.get(opKey);
+        if (opVal.kind === "literal" && opVal.type === "symbol") {
+          return { ...sexpr, op: opVal.value, args: newArgs };
+        }
+        if (opVal.kind === "variable") {
+          return { ...sexpr, op: opVal.name.replace(/^\$/, ""), args: newArgs };
+        }
+        return { kind: "sexpr", op: "call", args: [opVal, ...newArgs] };
+      }
+      return { ...sexpr, args: newArgs };
     }
     if (template.kind === "block") {
       const block = template;
@@ -39918,6 +39965,10 @@ var Interpreter = class _Interpreter {
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr2);
+    if (this.context.macroExpander.has(op)) {
+      const expanded = this.context.macroExpander.expand(expr2);
+      return this.eval(expanded);
+    }
     if (op === "REFLECT") {
       const interp2 = this;
       const ev = (node) => interp2.eval(node);
@@ -40419,17 +40470,32 @@ var Interpreter = class _Interpreter {
     const macroName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
     const paramsNode = expr2.args[1];
     const params = [];
+    let restName = null;
+    let seenAmpersand = false;
     if (paramsNode.kind === "block" && paramsNode.type === "Array") {
       const items = paramsNode.fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
+          if (item.kind === "literal" && item.type === "symbol" && item.value === "&") {
+            seenAmpersand = true; continue;
+          }
+          if (item.kind === "variable" && item.name === "&") {
+            seenAmpersand = true; continue;
+          }
+          if (seenAmpersand) {
+            const rn = item.kind === "variable" ? item.name.replace(/^\$/, "") : String(item.value ?? item.name ?? "rest");
+            restName = rn;
+            params.push("$&rest");
+            break;
+          }
           if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
           else if (item.kind === "literal") params.push("$" + item.value);
         }
       }
     }
-    const body = expr2.args[2];
-    this.context.macroExpander.define(macroName, params, body);
+    const body = expr2.args.length === 3 ? expr2.args[2] : { kind: "sexpr", op: "do", args: expr2.args.slice(2) };
+    const macroDef = { name: macroName, params, body, restName };
+    this.context.macroExpander.macros.set(macroName, macroDef);
   }
   // Phase 5 Week 2: Register built-in type classes and instances
   // Phase 58: Type class 관련 로직 eval-type-classes.ts로 분리
