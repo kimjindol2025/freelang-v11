@@ -556,6 +556,54 @@ static void emit_node(N* n) {
         { E("str_join("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"str-to-num") || sym(op,"str_to_num"))
         { E("fl_str_to_num("); emit_node(a[0]); E(")"); return; }
+    /* A: fl_fn_call 오류 → 직접 매핑 */
+    if (sym(op,"html-escape") || sym(op,"html_escape"))
+        { E("fl_html_escape("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"sleep"))
+        { E("fl_sleep_ms("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"min")) {
+        for (int i = 0; i < na - 1; i++) E("fl_min2(");
+        emit_node(a[0]);
+        for (int i = 1; i < na; i++) { E(", "); emit_node(a[i]); E(")"); }
+        return; }
+    if (sym(op,"max")) {
+        for (int i = 0; i < na - 1; i++) E("fl_max2(");
+        emit_node(a[0]);
+        for (int i = 1; i < na; i++) { E(", "); emit_node(a[i]); E(")"); }
+        return; }
+    /* B: cname 미스매치 수정 */
+    if (sym(op,"str-starts-with") || sym(op,"str_starts_with"))
+        { E("fl_str_starts_with("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"str-ends-with") || sym(op,"str_ends_with"))
+        { E("fl_str_ends_with("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    /* C: 술어 */
+    if (sym(op,"nil?") || sym(op,"nil_p"))
+        { E("null_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"empty?") || sym(op,"empty_p"))
+        { E("fl_empty_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"not-empty?") || sym(op,"not_empty_p"))
+        { E("fl_not_empty_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"nil-or-empty?") || sym(op,"nil_or_empty_p"))
+        { E("fl_nil_or_empty_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"number?") || sym(op,"number_p"))
+        { E("fl_number_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"boolean?") || sym(op,"boolean_p"))
+        { E("fl_boolean_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"array?") || sym(op,"array_p"))
+        { E("fl_array_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"map?") || sym(op,"map_p"))
+        { E("fl_map_p("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"fn?") || sym(op,"fn_p"))
+        { E("fl_fn_p("); emit_node(a[0]); E(")"); return; }
+    /* C: 컬렉션/맵 */
+    if (sym(op,"get-in") || sym(op,"get_in"))
+        { E("fl_get_in("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"includes-item") || sym(op,"includes_item"))
+        { E("fl_includes_item("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"sort-by") || sym(op,"sort_by"))
+        { E("fl_sort_by("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"obj-omit") || sym(op,"obj_omit"))
+        { E("fl_obj_omit("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"cli-args") || sym(op,"cli_args"))
         { E("fl_get_argv()"); return; }
     /* fn literal */
