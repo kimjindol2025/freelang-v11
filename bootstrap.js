@@ -16115,7 +16115,7 @@ async function loop() {
       resp = { ok: false, error: e.message };
     }
     const respStr = JSON.stringify(resp);
-    data.writeInt32LE(respStr.length, 0);
+    data.writeInt32LE(Buffer.byteLength(respStr, 'utf8'), 0);
     data.write(respStr, 4, 'utf8');
     Atomics.store(control, 0, 2);
     Atomics.notify(control, 0);
@@ -30315,7 +30315,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("X-XSS-Protection", "1; mode=block");
-        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'nonce-${cspNonce}'`);
+        res.setHeader("Content-Security-Policy", `default-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:;`);
         res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         if (method === "OPTIONS") {
           res.writeHead(200);
@@ -31484,7 +31484,7 @@ function loop() {
     try { resp = handle(JSON.parse(reqStr)); }
     catch(e) { resp = { ok: false, error: e.message }; }
     const respStr = JSON.stringify(resp);
-    data.writeInt32LE(respStr.length, 0);
+    data.writeInt32LE(Buffer.byteLength(respStr, 'utf8'), 0);
     data.write(respStr, 4, 'utf8');
     Atomics.store(control, 0, 2);
     Atomics.notify(control, 0);
@@ -31516,8 +31516,9 @@ function poolCall(req) {
   const control = new Int32Array(controlBuf);
   const data = Buffer.from(dataBuf);
   const reqStr = JSON.stringify(req);
-  if (reqStr.length + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
-  data.writeInt32LE(reqStr.length, 0);
+  const reqBytes = Buffer.byteLength(reqStr, 'utf8');
+  if (reqBytes + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
+  data.writeInt32LE(reqBytes, 0);
   data.write(reqStr, 4, "utf8");
   Atomics.store(control, 0, 1);
   Atomics.notify(control, 0);
