@@ -1,6 +1,10 @@
 ;; self/all.fl — FreeLang 컴파일러 (self-hosted)
 ;; 독립선언 v1 달성 (2026-05-12) — L2 고정점 SHA256: 5fe0a3fd...
 
+;; swap! 에서 built-in 함수를 fn 참조로 넘길 수 없으므로 클로저 래퍼 정의
+(defn vec-push [$v $item] (push $v $item))
+(defn add1 [$v $n] (+ $v $n))
+
 ;; ── Lexer ───────────────────────────────────────────────────────────
 ;; 입력: source string
 ;; 출력: tokens list. 각 토큰 = {:kind :value :line :col}
@@ -770,7 +774,7 @@
 (defn cgc-fncall [$fn-c $args]
   (let [[$argc (length $args)]
         [$id @lambda-id-atom]]
-    (swap! lambda-id-atom + 1)
+    (swap! lambda-id-atom add1 1)
     (if (= $argc 0)
       (str "fl_fn_call(" $fn-c ", 0, NULL)")
       (str "(__extension__ ({ FLValue __fl_ca_" $id "[" $argc "] = {"
@@ -1129,8 +1133,8 @@
         [$body-c (cgc $body-node)]
         [$decls (cgc-fn-argv-decls $param-items 0 "")]
         [$fn-name (str "__fl_anon_" $id)]]
-    (swap! lambda-id-atom + 1)
-    (swap! lambda-defs-atom push
+    (swap! lambda-id-atom add1 1)
+    (swap! lambda-defs-atom vec-push
       (str "static FLValue " $fn-name
            "(FLClosure* _self, int _argc, FLValue* argv) {\n"
            "    (void)_self; (void)_argc;\n"
@@ -1216,8 +1220,8 @@
   (let [[$n (cgc-extract-name (get $it $i))]
         [$v (cgc (get $it (+ $i 1)))]
         [$attr (if (str-starts-with $n "_") " __attribute__((unused))" "")]]
-    (swap! known-fncall-targets-atom push $n)
-    (swap! outer-params-atom push $n)
+    (swap! known-fncall-targets-atom vec-push $n)
+    (swap! outer-params-atom vec-push $n)
     (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n $attr " = " $v ";\n")))))
 
 (defn cgc-let-2d [$it $i $acc]
@@ -1226,8 +1230,8 @@
         [$n    (cgc-extract-name (get $p 0))]
         [$v    (cgc (get $p 1))]
         [$attr (if (str-starts-with $n "_") " __attribute__((unused))" "")]]
-    (swap! known-fncall-targets-atom push $n)
-    (swap! outer-params-atom push $n)
+    (swap! known-fncall-targets-atom vec-push $n)
+    (swap! outer-params-atom vec-push $n)
     (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n $attr " = " $v ";\n")))))
 
 (defn cgc-body [$args $i $acc]
@@ -1245,7 +1249,7 @@
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
     (reset! outer-params-atom $pnames)
     (let [[$call-args (cgc-wrapper-call-args $param-items 0 "")]]
-      (swap! wrapper-defs-atom push
+      (swap! wrapper-defs-atom vec-push
         (str "static FLValue __fl_wrap_" $name
              "(FLClosure* _s, int _ac, FLValue* argv) {\n"
              "    (void)_s; (void)_ac;\n"
@@ -1258,8 +1262,8 @@
 (defn cgc-define [$args]
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$val (cgc (get $args 1))]]
-    (swap! known-fncall-targets-atom push $name)
-    (swap! global-decls-atom push (str "static FLValue " $name ";"))
+    (swap! known-fncall-targets-atom vec-push $name)
+    (swap! global-decls-atom vec-push (str "static FLValue " $name ";"))
     (str $name " = " $val ";")))
 
 ;; ── 이진 연산 연쇄 (fl_add(fl_add(a,b),c)) ──
@@ -1326,7 +1330,7 @@
       (if (and (= (get $n :kind) "sexpr") (= (get $n :op) "defn"))
         (let [[$name (c-name (cgc-extract-name (get (get $n :args) 0)))]
               [$ps (cgc-params (get-block-items (get (get $n :args) 1)))]]
-          (swap! known-defns-atom push $name)
+          (swap! known-defns-atom vec-push $name)
           (str $acc
                "FLValue " $name "(" $ps ");\n"
                "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n"))
