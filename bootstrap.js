@@ -30315,7 +30315,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("X-XSS-Protection", "1; mode=block");
-        res.setHeader("Content-Security-Policy", `default-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:;`);
+        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'nonce-${cspNonce}'; img-src 'self' data: blob:; connect-src 'self' ws: wss:;`);
         res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         if (method === "OPTIONS") {
           res.writeHead(200);
@@ -30353,6 +30353,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               const mwStatus = mwResult.status ?? (mwResult.__fl_status ?? 200);
               const headersObj = {};
               if (mwResult.__fl_headers) Object.assign(headersObj, mwResult.__fl_headers);
+              if (mwResult.headers) Object.assign(headersObj, mwResult.headers);
               const mwBody = mwResult.__fl_response ? typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? "") : typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult);
               const mwCT = mwResult.contentType ?? "application/json";
               sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
