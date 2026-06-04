@@ -554,6 +554,8 @@ static void emit_node(N* n) {
         { E("fl_math_sqrt("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"str-join") || sym(op,"str_join"))
         { E("str_join("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"str-to-num") || sym(op,"str_to_num"))
+        { E("fl_str_to_num("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"cli-args") || sym(op,"cli_args"))
         { E("fl_get_argv()"); return; }
     /* fn literal */
