@@ -825,17 +825,23 @@ static char* read_file(const char* path) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) { fputs("usage: freelang <input.fl>\n", stderr); return 1; }
+    if (argc < 2) { fputs("usage: freelang <input.fl> [output.c]\n", stderr); return 1; }
     const char* input = argv[1];
+    const char* output_c = (argc >= 3) ? argv[2] : NULL;
 
     /* runtime directory: same dir as freelang binary */
     char self_path[512]; strncpy(self_path, argv[0], 511);
     char* dir = dirname(self_path);
     char runtime_dir[512]; snprintf(runtime_dir, sizeof(runtime_dir), "%s/runtime", dir);
 
-    /* temp paths */
-    char cfile[512]; snprintf(cfile, sizeof(cfile), "/tmp/fl_out_%d.c", (int)getpid());
-    char binf[512];  snprintf(binf,  sizeof(binf),  "/tmp/fl_out_%d",   (int)getpid());
+    /* temp or explicit C output path */
+    char cfile[512];
+    if (output_c) {
+        strncpy(cfile, output_c, 511);
+    } else {
+        snprintf(cfile, sizeof(cfile), "/tmp/fl_out_%d.c", (int)getpid());
+    }
+    char binf[512]; snprintf(binf, sizeof(binf), "/tmp/fl_out_%d", (int)getpid());
 
     /* lex + parse */
     char* src = read_file(input);
@@ -851,6 +857,9 @@ int main(int argc, char** argv) {
     if (!out) { fputs("error: cannot write temp file\n", stderr); return 1; }
     emit_program();
     fclose(out);
+
+    /* compile-only mode: output.c 지정 시 C 생성 후 종료 */
+    if (output_c) return 0;
 
     /* compile */
     char cmd[8192];
