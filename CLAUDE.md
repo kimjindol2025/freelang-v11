@@ -1,8 +1,15 @@
 # FreeLang v11 — Claude AI 완전 레퍼런스
 
-**버전**: v11.8.0 (Node.js Free) | **최신 갱신**: 2026-05-29  
+**버전**: v11.9.2 (Node.js Free) | **최신 갱신**: 2026-06-04  
 **상태**: ✅ 프로덕션 (Node.js 완전 독립) | **L4 검증**: ✅ 완료 (SHA256 3중) | **AI 신뢰도**: 9.5/10  
-**Node.js 독립성**: ✅ 완료 (bin/cgc-bin + fl-native.sh, Phase F DONE)
+**Node.js 독립성**: ✅ 완료 (cgc-bin aarch64 72KB + bun shebang 교체)
+
+**실행 경로**:
+- Bootstrap(Bun): `bun /root/kim/freelang-v11/bootstrap.js run <file.fl>`
+- Native: `bash /root/kim/freelang-v11/scripts/fl-native.sh run <file.fl>`
+- Build: `bash /root/kim/freelang-v11/scripts/fl-native.sh build <file.fl> -o <bin>`
+
+**cgc-bin stdlib 지원 (v11.9.2)**: atom(@/reset!/swap!) · nil?/empty?/array?/map? 등 술어 · get-in/sort-by/obj-omit · min/max · str-starts-with/ends-with/str-to-num · html-escape/sleep · server-*/http-* · db-open/query/exec · auth-jwt-*/auth-hash-password/auth-verify-password
 
 ---
 

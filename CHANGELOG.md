@@ -1,6 +1,31 @@
 # Changelog
 
 
+## v11.9.2 — cgc-bin Node.js 완전 탈출 + stdlib 확장 (2026-06-04)
+
+### Node.js 독립 완성
+- **Phase A**: bootstrap.js · bin/fl-node · bin/freelang shebang `node` → `bun` 교체
+- **Phase B**: cgc-bin aarch64 재빌드 (72KB 순수 C ELF) + runtime/*.c git 이력 복원
+- **fl-native.sh E2E**: run/build/compile 3모드 전부 검증
+
+### cgc-bin stdlib 대폭 확장 (A~G)
+| 카테고리 | 추가 함수 |
+|---|---|
+| A (매핑 오류 수정) | html-escape, sleep, min, max |
+| B (cname 미스매치) | str-starts-with, str-ends-with |
+| C (술어·컬렉션 14개) | nil? empty? not-empty? nil-or-empty? number? string? boolean? array? map? fn? get-in includes-item sort-by obj-omit |
+| D (atom 시스템) | atom @var deref reset! swap! |
+| E (HTTP 서버) | server-start/get/post/put/delete/patch, server-html/json/status/redirect, server-html-cookie/set-cookie, http-get/post |
+| F (DB/SQLite) | db-open, db-close, db-query, db-exec |
+| G (JWT·auth) | auth-jwt-sign/verify/expired, auth-hash-password, auth-verify-password |
+
+### 버그 수정
+- `fl_to_str` 맵/벡터 출력 포맷: `{b 2}` → `{"b": 2}`, `[hello]` → `["hello"]`
+- `collect_let_bindings`: 단일괄호 `[var expr]` 패턴에서 바인딩 변수가 free variable로 잘못 감지되는 버그 수정
+- `cgc-bin compile-only 모드`: 두 번째 인자 `output.c` 지원 추가 (fl-native.sh 호환)
+- min/max 다중 인자 left-fold 코드젠 수정
+
+
 ## v11.9.1 — 언어 레벨 SSRF 가드 (2026-06-03)
 
 ### 보안

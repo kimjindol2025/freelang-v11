@@ -1,68 +1,64 @@
 FREEDOC {
   version: 1
-  spec: "2026-05"
+  spec: "2026-06"
 }
 
 IDENTITY {
   what: freelang_v11
   domain: ai_native_language
-  lang: nodejs_interpreter
+  lang: c_native_cgc_bin
   purpose: ai_agents_programming
 }
 
 POSITION {
   status: done
-  stage: "6/6"
-  current: v11.7.11_stable
-  next: [v12_hot_reload, v12_macro_system]
-  note: "v11.7.11: stdlib 86개 함수 완성. L3 자가호스팅 고정점 달성 (s2==s3 SHA256)"
+  stage: "L4_complete"
+  current: v11.9.2_node_free
+  next: [v12_hot_reload, v12_macro_system, cgc_mariadb]
+  note: "v11.9.2: cgc-bin Node.js 완전 탈출. A~G 카테고리 stdlib 확장. 서버+DB+JWT 전체 체인 cgc-bin 단독 동작."
 }
 
 MAP {
   entry: bootstrap.js
-  compiler: src/compiler.ts
+  compiler_native: bin/cgc-bin
+  compiler_src: freelang.c
+  runtime_src: runtime/
+  runner_native: scripts/fl-native.sh
   stdlib: src/eval-builtins.ts
   tools: bin
-  test: src/__tests__
   docs: CLAUDE.md
   ref: docs/STDLIB_REFERENCE.md
   cli: bin/freelang
 }
 
 FIXED {
-  runtime: nodejs
-  version: "11.7.11"
-  deps: 4
-  deps_detail: "@types/jest, @types/node, jest, ts-jest"
-  compiler_size: "57KB"
-  bootstrap_size: "892KB"
-  build_time: "<100ms"
-  stdlib_functions: 86
-  stdlib_aliases: 260
-  c_compiler_stages: "S8-S11"
-  self_hosting: "L3_fixed_point"
-  test_coverage: "1129/1129 (100%)"
+  runtime: bun_or_node_optional
+  runtime_native: cgc_bin_c_elf
+  version: "11.9.2"
+  cgc_bin_size: "72KB_aarch64"
+  bootstrap_size: "~1MB_bun"
+  node_dependency: none
+  bun_dependency: "optional_bootstrap_only"
+  stdlib_functions: 113
+  self_hosting: "L4_fixed_point_SHA256_3x"
   perf: "376M_ops_sec"
+  server_db_jwt: "cgc_bin_native"
 }
 
 STDLIB {
-  core: [println, print, defn, fn, let, if, cond, when, case, do]
-  collection: [map, filter, reduce, length, get, assoc, keys, values, range, take, drop, sort, sort-by, reverse, obj-merge, get-in, assoc-in, update-in, dissoc, every?, any?, none?, some, map-indexed, group-by, frequencies, zip, distinct, conj, into, find-first]
-  array_v117: [unique, flatten-one, sum, product, chunk, average, compact, random-element, nth-last, take-last]
-  string: [str, str-replace, str-split, str-trim, str-to-upper, str-to-lower, str-includes, str-starts-with, str-ends-with, str-blank?, str-format, str-repeat, str-lines, str-pad-left, str-pad-right, str-truncate, str-index-of, str-replace-all, starts-with, ends-with, str-repeat-n]
-  format: [format-number, format-decimal, format-percent]
-  math: [+, -, *, /, %, inc, dec, min, max, abs, round, floor, ceil, pow, sqrt, clamp, quot, rem, int, rand, rand-int]
-  type: [type-of, nil?, empty?, number?, string?, boolean?, array?, map?, fn?, integer?, float?, keyword?, str-blank?, nil-or-empty?]
+  core: [println, print, defn, fn, let, if, cond, when, case, do, try, loop, recur]
+  atom: [atom, deref, reset!, swap!]
+  collection: [map, filter, reduce, length, get, assoc, keys, values, range, take, drop, sort, sort-by, reverse, obj-merge, obj-omit, get-in, assoc-in, update-in, dissoc, every?, any?, none?, some, map-indexed, group-by, frequencies, zip, distinct, conj, into, find-first, includes-item, min, max]
+  string: [str, str-replace, str-split, str-trim, str-to-upper, str-to-lower, str-includes, str-starts-with, str-ends-with, str-blank?, str-format, str-repeat, str-lines, str-pad-left, str-pad-right, str-index-of, str-replace-all, str-to-num]
+  type: [type-of, nil?, empty?, not-empty?, nil-or-empty?, number?, string?, boolean?, array?, map?, fn?, integer?, float?, keyword?]
   logic: [and, or, not, =, !=, <, >, <=, >=, ??, ?.]
-  control: [try, throw, loop, recur, dotimes, doseq, for]
-  server: [server-start, server-html, server-json, server-status, server-redirect, server-file, server-html-cookie, server-set-cookie, server-get, server-post, server-put, server-delete, server-patch]
-  server_v117: [server-req-files, server-req-fields]
-  auth: [auth-jwt-sign, auth-jwt-verify, auth-jwt-decode, auth-jwt-expired, auth-hash-password, auth-verify-password, auth-password-needs-rehash, auth-csrf-token, auth-csrf-verify, auth-bearer-extract, auth-apikey-valid]
-  db: [db-query, db-exec, db-transaction]
-  file: [file-read, file-write, file-append, file-exists, file-delete, file-append-line]
-  util: [println, uuid, now-ms, sleep, json-parse, json-stringify, html-escape, js-escape, fl-env-get, re-test]
-  cron: [cron-schedule, cron-cancel, cron-list, cron-clear]
-  validate_v117: [check-arg-type, validate-args]
+  math: [+, -, *, /, %, inc, dec, abs, round, floor, ceil, pow, sqrt, clamp, rand, rand-int]
+  server: [server-start, server-html, server-json, server-status, server-redirect, server-html-cookie, server-set-cookie, server-get, server-post, server-put, server-delete, server-patch]
+  auth: [auth-jwt-sign, auth-jwt-verify, auth-jwt-expired, auth-hash-password, auth-verify-password]
+  db: [db-open, db-close, db-query, db-exec]
+  http_client: [http-get, http-post, http-get-headers, http-post-headers]
+  file: [file-read, file-write, file-append, file-exists, file-delete]
+  util: [println, uuid, now-ms, sleep, json-parse, json-stringify, html-escape, fl-env-get]
 }
 
 STDLIB_NOTES {
@@ -70,44 +66,31 @@ STDLIB_NOTES {
   take_order: "n 먼저 — (take n coll) O / (take coll n) X"
   sort_by_order: "fn 먼저 — (sort-by fn arr) O / (sort-by arr fn) X"
   dollar_prefix: "$ 선택사항 — 없어도 동작"
-  assoc_multi: "(assoc m k1 v1 k2 v2 ...) 다중 인자 지원 (v11.7.1+)"
-  cron_expr: "5-field cron — 분 시 일 월 요일"
-  kebab_case: "권장 — snake_case alias도 동작"
-  nil_null: "server-req-header/get null → (= v nil) false 평가 주의"
+  swap_bang: "(swap! atom fn args...) — fn은 (fn [current] ...) 또는 내장 연산자 모두 동작"
+  cgc_db: "db-open은 SQLite 파일 경로. MariaDB는 bootstrap.js 경로"
+  cgc_server: "server-start는 cgc-bin에서 블로킹 (메인 스레드 점유)"
+}
+
+RUNTIME_PATHS {
+  bootstrap: "bun /root/kim/freelang-v11/bootstrap.js run <file.fl>"
+  native_run: "bash /root/kim/freelang-v11/scripts/fl-native.sh run <file.fl>"
+  native_build: "bash /root/kim/freelang-v11/scripts/fl-native.sh build <file.fl> -o <bin>"
+  cgc_direct: "/root/kim/freelang-v11/bin/cgc-bin <file.fl>"
 }
 
 FAILURE {
-  bracket_consistency_cause: ai_error_rate_high
-  bracket_consistency_fixed: true
-  automatic_type_detection_cause: manual_casting
-  automatic_type_detection_fixed: true
-  parameter_marker_cause: ambiguity_prefix
-  parameter_marker_fixed: optional
-  serialization_cause: json_overhead
-  serialization_fixed: auto
-  self_hosting_cause: circular_dependency
-  self_hosting_fixed: proven
-}
-
-CONSTRAINT {
-  rules: [
-    ai_first_principle
-    one_file_complete
-    npm_minimal_required_only
-    auto_serialization
-    bracket_consistency
-  ]
-  note: "Phase X (npm 최소화): 9개→4개 (56% 감소) 달성. L3 자가호스팅 + C S8-S11 완성"
+  node_dependency: "Phase A~B에서 완전 제거"
+  map_output_format: "fl_to_str 포맷 버그 수정 (2026-06-04)"
+  let_free_vars: "단일괄호 패턴 collect_let_bindings 버그 수정 (2026-06-04)"
+  cgc_x86_only: "aarch64 재빌드로 해결 (2026-06-04)"
 }
 
 CLAIM {
   claims: [
-    ai_first_citizen
-    not_competing_python
-    ai_writes_better
-    automatic_beats_manual
-    native_tooling_replaces_npm
-    l3_self_hosting_proven
-    npm_minimal_not_zero
+    node_free_runtime
+    c_native_72kb_compiler
+    l4_self_hosting_proven
+    server_db_jwt_native
+    bun_optional_only
   ]
 }
