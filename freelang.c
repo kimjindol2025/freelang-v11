@@ -288,6 +288,11 @@ static void emit_node(N* n) {
         if (!strcmp(n->v,"nil") || !strcmp(n->v,"null")) { E("fl_nil()"); return; }
         /* :keyword → string literal */
         if (n->v[0] == ':') { E("fl_str_val(\""); cesc(n->v+1); E("\")"); return; }
+        /* @var → fl_atom_deref(var) */
+        if (n->v[0] == '@' && n->v[1]) {
+            char b[512]; cname(n->v + 1, b, sizeof(b));
+            E("fl_atom_deref(%s)", b); return;
+        }
         char b[512]; cname(n->v, b, sizeof(b));
         /* defn name used as value → wrap as FLValue fn */
         if (is_defn_name(n->v)) { E("fl_fn_new(_wrap_%s, 0, NULL)", b); return; }
@@ -556,6 +561,22 @@ static void emit_node(N* n) {
         { E("str_join("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"str-to-num") || sym(op,"str_to_num"))
         { E("fl_str_to_num("); emit_node(a[0]); E(")"); return; }
+    /* D: atom */
+    if (sym(op,"atom"))
+        { E("fl_atom_new("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"deref"))
+        { E("fl_atom_deref("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"reset!") || sym(op,"reset_e"))
+        { E("fl_atom_reset("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"swap!") || sym(op,"swap_e")) {
+        /* (swap! atom fn args...) → fl_atom_reset(atom, (fn (deref atom) args...)) */
+        E("fl_atom_reset("); emit_node(a[0]); E(", ");
+        N* items[64]; items[0] = a[1];
+        N* da[2]; da[0] = mkn(NA,"deref"); da[1] = a[0];
+        items[1] = mkn2(NL, da, 2);
+        for (int i = 2; i < na; i++) items[i] = a[i];
+        emit_node(mkn2(NL, items, na));
+        E(")"); return; }
     /* A: fl_fn_call 오류 → 직접 매핑 */
     if (sym(op,"html-escape") || sym(op,"html_escape"))
         { E("fl_html_escape("); emit_node(a[0]); E(")"); return; }
