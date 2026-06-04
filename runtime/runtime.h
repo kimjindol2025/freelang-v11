@@ -315,30 +315,9 @@ FLValue fl_resp_redirect(FLValue url);
 FLValue fl_resp_html_cookie(FLValue body, FLValue cookie);
 FLValue fl_resp_set_cookie(FLValue name, FLValue value, FLValue opts);
 
-/* ── 병렬 실행 ── */
-FLValue fl_run_parallel(FLValue fns, FLValue timeout_ms);
-
-/* ── task-native-stdlib-gap P1 ── */
-FLValue fl_every_p(FLValue pred, FLValue vec);
-FLValue fl_any_p(FLValue pred, FLValue vec);
-FLValue fl_none_p(FLValue pred, FLValue vec);
-FLValue fl_find_first(FLValue pred, FLValue vec);
-FLValue fl_count_if(FLValue pred, FLValue vec);
-FLValue fl_repeat(FLValue n, FLValue val);
-FLValue fl_map_indexed(FLValue fn, FLValue vec);
-FLValue fl_mapcat(FLValue fn, FLValue vec);
-FLValue fl_keep(FLValue fn, FLValue vec);
-FLValue fl_comp(FLValue fns_val, FLValue count_val);
-FLValue fl_conj(FLValue coll, FLValue item);
-FLValue fl_into(FLValue coll, FLValue items);
-
 /* ── HTTP 클라이언트 (libcurl) ── */
 /* 반환값: {:status 200 :body "..." :headers {...}} */
 FLValue fl_http_get(FLValue url);
-/* 스트리밍: handler = FL fn(chunk), 반환 {:status N} */
-FLValue fl_http_post_stream(FLValue url, FLValue body, FLValue headers, FLValue handler);
-/* 스트리밍 수집: text_delta만 추출 → {:status N :text "전체"} */
-FLValue fl_http_stream_collect(FLValue url, FLValue body, FLValue headers);
 FLValue fl_http_post(FLValue url, FLValue body, FLValue content_type);
 FLValue fl_http_get_headers(FLValue url, FLValue headers);
 FLValue fl_http_post_headers(FLValue url, FLValue body, FLValue headers);
