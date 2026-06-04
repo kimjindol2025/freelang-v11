@@ -1,2 +1,2 @@
 #!/bin/sh
-exec node --stack-size=65536 "$(dirname "$0")/../self/all.fl.out.js" "$@"
+exec bun "$(dirname "$0")/../self/all.fl.out.js" "$@"
