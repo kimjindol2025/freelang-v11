@@ -672,6 +672,15 @@ static void emit_node(N* n) {
         { E("fl_http_get_headers("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"http-post-headers") || sym(op,"http_post_headers"))
         { E("fl_http_post_headers("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    /* F: DB (SQLite) */
+    if (sym(op,"db-open") || sym(op,"db_open"))
+        { E("fl_db_open("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"db-close") || sym(op,"db_close"))
+        { E("fl_db_close("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"db-query") || sym(op,"db_query"))
+        { E("fl_db_query("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    if (sym(op,"db-exec") || sym(op,"db_exec"))
+        { E("fl_db_exec("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};
