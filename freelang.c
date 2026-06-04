@@ -681,6 +681,17 @@ static void emit_node(N* n) {
         { E("fl_db_query("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     if (sym(op,"db-exec") || sym(op,"db_exec"))
         { E("fl_db_exec("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    /* G: JWT + auth */
+    if (sym(op,"auth-jwt-sign") || sym(op,"auth_jwt_sign"))
+        { E("fl_jwt_sign("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
+    if (sym(op,"auth-jwt-verify") || sym(op,"auth_jwt_verify"))
+        { E("fl_jwt_verify("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"auth-jwt-expired") || sym(op,"auth_jwt_expired"))
+        { E("fl_jwt_expired("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"auth-hash-password") || sym(op,"auth_hash_password"))
+        { E("fl_hash_password("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"auth-verify-password") || sym(op,"auth_verify_password"))
+        { E("fl_verify_password("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};
