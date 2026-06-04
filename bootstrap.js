@@ -2619,7 +2619,7 @@ function logUnknownFunction(name, file, line) {
   } catch {
   }
 }
-var import_fs, FL_ERROR_LOG, FL_BUILTIN_OPS, ModuleError, ModuleNotFoundError, SelectiveImportError, InvalidModuleStructureError, FunctionRegistrationError, FunctionNotFoundError, ErrorCodes, RECOVERY_HINTS, FLRuntimeError, VariableNotFoundError, UnresolvedSymbolError;
+var import_fs, FL_ERROR_LOG, FL_BUILTIN_OPS, FL_BUILTIN_FN_REFS, ModuleError, ModuleNotFoundError, SelectiveImportError, InvalidModuleStructureError, FunctionRegistrationError, FunctionNotFoundError, ErrorCodes, RECOVERY_HINTS, FLRuntimeError, VariableNotFoundError, UnresolvedSymbolError;
 var init_errors = __esm({
   "src/errors.ts"() {
     import_fs = require("fs");
@@ -2644,6 +2644,34 @@ var init_errors = __esm({
       "dec",
       "mod"
     ]);
+    // built-in 함수를 first-class value로 쓸 때 반환할 native JS 함수 맵
+    // (swap! a inc), (map inc arr), (filter nil? xs) 등을 가능하게 함
+    FL_BUILTIN_FN_REFS = {
+      "inc":    (v) => (typeof v === "number" ? v + 1 : v),
+      "dec":    (v) => (typeof v === "number" ? v - 1 : v),
+      "+":      (...a) => a.reduce((s, x) => s + x, 0),
+      "-":      (a, b) => b === undefined ? -a : a - b,
+      "*":      (...a) => a.reduce((s, x) => s * x, 1),
+      "/":      (a, b) => a / b,
+      "mod":    (a, b) => a % b,
+      "not":    (v) => !v,
+      "nil?":   (v) => v === null || v === undefined,
+      "str":    (...xs) => xs.map(x => x === null || x === undefined ? "" : String(x)).join(""),
+      "append": (arr, item) => Array.isArray(arr) ? [...arr, item] : [item],
+      "push":   (arr, item) => Array.isArray(arr) ? [...arr, item] : [item],
+      "first":  (arr) => Array.isArray(arr) && arr.length > 0 ? arr[0] : null,
+      "last":   (arr) => Array.isArray(arr) && arr.length > 0 ? arr[arr.length - 1] : null,
+      "rest":   (arr) => Array.isArray(arr) ? arr.slice(1) : [],
+      "length": (arr) => Array.isArray(arr) ? arr.length : 0,
+      "count":  (arr) => Array.isArray(arr) ? arr.length : 0,
+      "=":      (a, b) => a === b,
+      "not=":   (a, b) => a !== b,
+      ">":      (a, b) => a > b,
+      "<":      (a, b) => a < b,
+      ">=":     (a, b) => a >= b,
+      "<=":     (a, b) => a <= b,
+      "identity": (v) => v,
+    };
     ModuleError = class _ModuleError extends Error {
       constructor(message, moduleName, file, line, col, hint) {
         super(message);
@@ -39994,6 +40022,15 @@ var Interpreter = class _Interpreter {
           const line = lit.line;
           throw new Error(`[E_UNRESOLVED_SYMBOL] '${bareName}' at line ${line || this.currentLine}, col 0 \u2014 set FL_STRICT=0 to silence`);
         }
+        // symbol\uc744 first-class \ud568\uc218 \uac12\uc73c\ub85c \uc0ac\uc6a9\ud560 \ub54c built-in \ubc18\ud658
+        // \uc608: (map inc arr), (swap! a + 1), (filter nil? xs)
+        if (this.context.functions.has(bareName)) {
+          return { kind: "builtin-fn", name: bareName };
+        }
+        const _litAlias = KNOWN_ALIASES[bareName] ?? KNOWN_ALIASES[bareName.replace(/-/g, "_")] ?? KNOWN_ALIASES[bareName.replace(/_/g, "-")];
+        const _litResolved = _litAlias?.correct ?? bareName;
+        const _litNative = FL_BUILTIN_FN_REFS[_litResolved] ?? FL_BUILTIN_FN_REFS[_litResolved.replace(/-/g, "_")];
+        if (_litNative) return _litNative;
       }
       return lit.value;
     }
@@ -40045,6 +40082,14 @@ var Interpreter = class _Interpreter {
       }
       if (this.context.functions.has(varName) || this.context.functions.has("$" + varName)) {
         return { kind: "builtin-fn", name: varName };
+      }
+      // built-in 연산자/함수를 first-class value로 사용 가능하게 함
+      // 예: (swap! a inc), (map inc arr), (swap! a append item)
+      {
+        const _alias = KNOWN_ALIASES[varName] ?? KNOWN_ALIASES[varName.replace(/-/g, "_")] ?? KNOWN_ALIASES[varName.replace(/_/g, "-")];
+        const _resolved = _alias?.correct ?? varName;
+        const _nativeFn = FL_BUILTIN_FN_REFS[_resolved] ?? FL_BUILTIN_FN_REFS[_resolved.replace(/-/g, "_")];
+        if (_nativeFn) return _nativeFn;
       }
       const scopeVars = this.context.variables.getAllVars();
       const similar = suggestSimilar(varName, scopeVars);
