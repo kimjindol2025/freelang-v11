@@ -861,7 +861,7 @@ int main(int argc, char** argv) {
     fclose(out);
 
     /* compile-only mode: output.c 지정 시 C 생성 후 종료 */
-    if (output_c) return 0;
+    if (output_c) { free(src); return 0; }
 
     /* compile */
     char cmd[8192];
