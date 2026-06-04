@@ -389,12 +389,8 @@ FLValue fl_http_start(FLValue port) {
     int opt = 1;
     setsockopt(g_server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-    pthread_t t;
-    pthread_create(&t, NULL, server_loop, NULL);
-    pthread_detach(t);
-    /* 바인드 완료 대기 — 짧게 */
-    struct timespec ts = {0, 50000000}; /* 50ms */
-    nanosleep(&ts, NULL);
+    /* cgc-bin: server_loop를 메인 스레드에서 블로킹 실행 */
+    server_loop(NULL);
     return fl_nil();
 }
 

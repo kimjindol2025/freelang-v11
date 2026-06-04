@@ -173,15 +173,25 @@ static void collect_let_bindings(N* n, SymSet* bound) {
         && !strcmp(n->c[0]->v, "let")) {
         N* bindings = n->c[1];
         if (bindings) {
-            for (int i = 0; i < bindings->nc; i++) {
-                N* item = bindings->c[i];
-                /* double-bracket: [[$k expr] [$j expr]] — item is NV [$k expr] */
-                if (item && (item->k == NV || item->k == NL)
-                    && item->nc >= 1 && item->c[0] && item->c[0]->k == NA) {
-                    sym_add(bound, item->c[0]->v);
-                    if (item->nc >= 2) collect_let_bindings(item->c[1], bound);
-                } else {
-                    collect_let_bindings(item, bound);
+            /* 단일 괄호 [var1 e1 var2 e2]: 첫 아이템이 NA → 짝수 인덱스가 변수명 */
+            int is_flat = (bindings->nc > 0 && bindings->c[0] && bindings->c[0]->k == NA);
+            if (is_flat) {
+                for (int i = 0; i < bindings->nc; i += 2) {
+                    N* var = bindings->c[i];
+                    if (var && var->k == NA) sym_add(bound, var->v);
+                    if (i+1 < bindings->nc) collect_let_bindings(bindings->c[i+1], bound);
+                }
+            } else {
+                /* 이중 괄호 [[var1 e1] [var2 e2]] */
+                for (int i = 0; i < bindings->nc; i++) {
+                    N* item = bindings->c[i];
+                    if (item && (item->k == NV || item->k == NL)
+                        && item->nc >= 1 && item->c[0] && item->c[0]->k == NA) {
+                        sym_add(bound, item->c[0]->v);
+                        if (item->nc >= 2) collect_let_bindings(item->c[1], bound);
+                    } else {
+                        collect_let_bindings(item, bound);
+                    }
                 }
             }
         }
@@ -627,6 +637,41 @@ static void emit_node(N* n) {
         { E("fl_obj_omit("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"cli-args") || sym(op,"cli_args"))
         { E("fl_get_argv()"); return; }
+    /* E: HTTP 서버 라우팅 */
+    if (sym(op,"server-start") || sym(op,"server_start"))
+        { E("fl_http_start("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"server-get") || sym(op,"server_get"))
+        { E("fl_http_route(fl_str_val(\"GET\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"server-post") || sym(op,"server_post"))
+        { E("fl_http_route(fl_str_val(\"POST\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"server-put") || sym(op,"server_put"))
+        { E("fl_http_route(fl_str_val(\"PUT\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"server-delete") || sym(op,"server_delete"))
+        { E("fl_http_route(fl_str_val(\"DELETE\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"server-patch") || sym(op,"server_patch"))
+        { E("fl_http_route(fl_str_val(\"PATCH\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    /* E: HTTP 응답 빌더 */
+    if (sym(op,"server-html") || sym(op,"server_html"))
+        { E("fl_resp_html("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"server-json") || sym(op,"server_json"))
+        { E("fl_resp_json("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"server-status") || sym(op,"server_status"))
+        { E("fl_resp_status("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"server-redirect") || sym(op,"server_redirect"))
+        { E("fl_resp_redirect("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"server-html-cookie") || sym(op,"server_html_cookie"))
+        { E("fl_resp_html_cookie("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"server-set-cookie") || sym(op,"server_set_cookie"))
+        { E("fl_resp_set_cookie("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(na > 2 ? a[2] : NULL); E(")"); return; }
+    /* E: HTTP 클라이언트 */
+    if (sym(op,"http-get") || sym(op,"http_get"))
+        { E("fl_http_get("); emit_node(a[0]); E(")"); return; }
+    if (sym(op,"http-post") || sym(op,"http_post"))
+        { E("fl_http_post("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(na > 2 ? a[2] : NULL); E(")"); return; }
+    if (sym(op,"http-get-headers") || sym(op,"http_get_headers"))
+        { E("fl_http_get_headers("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    if (sym(op,"http-post-headers") || sym(op,"http_post_headers"))
+        { E("fl_http_post_headers("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};
