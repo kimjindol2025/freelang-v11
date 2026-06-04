@@ -78,46 +78,70 @@ static int fl_is_num(FLValue v) {
 
 /* ── 문자열 변환 (출력용) ── */
 
+/* forward declaration */
+const char* fl_to_str(FLValue v, char* buf, size_t sz);
+
+/* repr 모드로 값을 buf[pos]에 쓰고 새 pos 반환 (문자열은 따옴표 포함) */
+static int write_repr(FLValue v, char* buf, int pos, int sz) {
+    if (pos >= sz - 4) return pos;
+    if (v.tag == FL_STRING) {
+        const char* s = ((FLString*)v.obj)->data;
+        int slen = (int)strlen(s);
+        if (pos + slen + 2 >= sz - 2) { memcpy(buf+pos,"...",3); return pos+3; }
+        buf[pos++] = '"';
+        memcpy(buf+pos, s, slen); pos += slen;
+        buf[pos++] = '"';
+        return pos;
+    }
+    char tmp[512];
+    const char* s = fl_to_str(v, tmp, sizeof(tmp));
+    int slen = (int)strlen(s);
+    if (pos + slen >= sz - 2) { memcpy(buf+pos,"...",3); return pos+3; }
+    memcpy(buf+pos, s, slen);
+    return pos + slen;
+}
+
 const char* fl_to_str(FLValue v, char* buf, size_t sz) {
     switch (v.tag) {
         case FL_INT:    snprintf(buf, sz, "%lld", (long long)v.i); return buf;
         case FL_FLOAT:  snprintf(buf, sz, "%g", v.f); return buf;
         case FL_BOOL:   return v.b ? "true" : "false";
         case FL_NIL:    return "nil";
-        case FL_STRING: return ((FLString*)v.obj)->data;
+        case FL_STRING: {
+            /* repr: 따옴표 포함 반환 (fl_print에서 직접 처리로 display 모드 구현) */
+            const char* s = ((FLString*)v.obj)->data;
+            int slen = (int)strlen(s);
+            if (slen + 2 >= (int)sz) { snprintf(buf, sz, "\"...\""); return buf; }
+            buf[0] = '"';
+            memcpy(buf+1, s, slen);
+            buf[slen+1] = '"';
+            buf[slen+2] = '\0';
+            return buf;
+        }
         case FL_VECTOR: {
             FLVector* vec = (FLVector*)v.obj;
-            char tmp[128];
             int pos = 0;
             buf[pos++] = '[';
             for (uint32_t i = 0; i < vec->len && pos < (int)sz - 4; i++) {
-                if (i) buf[pos++] = ' ';
-                const char* s = fl_to_str(vec->data[i], tmp, sizeof(tmp));
-                int tlen = (int)strlen(s);
-                if (pos + tlen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
-                memcpy(buf+pos, s, tlen); pos += tlen;
+                if (i) { buf[pos++] = ','; buf[pos++] = ' '; }
+                pos = write_repr(vec->data[i], buf, pos, (int)sz);
             }
-            buf[pos++] = ']'; buf[pos] = '\0';
+            if (pos < (int)sz - 1) buf[pos++] = ']';
+            buf[pos] = '\0';
             return buf;
         }
         case FL_MAP: {
             FLMap* mp = (FLMap*)v.obj;
-            char tmp[128];
             int pos = 0;
             buf[pos++] = '{';
             for (uint32_t i = 0; i < mp->len && pos < (int)sz - 4; i++) {
-                if (i) buf[pos++] = ' ';
-                const char* ks = fl_to_str(mp->entries[i].key, tmp, sizeof(tmp));
-                int klen = (int)strlen(ks);
-                if (pos + klen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
-                memcpy(buf+pos, ks, klen); pos += klen;
-                buf[pos++] = ' ';
-                const char* vs = fl_to_str(mp->entries[i].val, tmp, sizeof(tmp));
-                int vlen = (int)strlen(vs);
-                if (pos + vlen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
-                memcpy(buf+pos, vs, vlen); pos += vlen;
+                if (i) { buf[pos++] = ','; buf[pos++] = ' '; }
+                pos = write_repr(mp->entries[i].key, buf, pos, (int)sz);
+                if (pos < (int)sz - 3) { buf[pos++] = ':'; buf[pos++] = ' '; }
+                pos = write_repr(mp->entries[i].val, buf, pos, (int)sz);
             }
-            buf[pos++] = '}'; buf[pos] = '\0';
+            if (pos < (int)sz - 1) buf[pos++] = '}';
+            buf[pos] = '\0';
             return buf;
         }
         case FL_FN: return "#<fn>";
@@ -280,14 +304,22 @@ FLValue fl_str_n(int count, ...) {
 /* ── I/O ── */
 
 FLValue fl_println(FLValue v) {
-    char buf[64];
-    puts(fl_to_str(v, buf, sizeof(buf)));
+    if (v.tag == FL_STRING) {
+        puts(((FLString*)v.obj)->data);
+    } else {
+        char buf[4096];
+        puts(fl_to_str(v, buf, sizeof(buf)));
+    }
     return fl_nil();
 }
 
 FLValue fl_print(FLValue v) {
-    char buf[64];
-    fputs(fl_to_str(v, buf, sizeof(buf)), stdout);
+    if (v.tag == FL_STRING) {
+        fputs(((FLString*)v.obj)->data, stdout);
+    } else {
+        char buf[4096];
+        fputs(fl_to_str(v, buf, sizeof(buf)), stdout);
+    }
     return fl_nil();
 }
 
