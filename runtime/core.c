@@ -151,11 +151,17 @@ const char* fl_to_str(FLValue v, char* buf, size_t sz) {
 
 /* ── 산술 ── */
 
+/* 문자열 display 변환 (따옴표 없이) — str/add 연결용 */
+static const char* fl_display(FLValue v, char* buf, size_t sz) {
+    if (v.tag == FL_STRING) return ((FLString*)v.obj)->data;
+    return fl_to_str(v, buf, sz);
+}
+
 FLValue fl_add(FLValue a, FLValue b) {
     if (a.tag == FL_STRING || b.tag == FL_STRING) {
-        char ba[64], bb[64];
-        const char* sa = fl_to_str(a, ba, sizeof(ba));
-        const char* sb = fl_to_str(b, bb, sizeof(bb));
+        char ba[256], bb[256];
+        const char* sa = fl_display(a, ba, sizeof(ba));
+        const char* sb = fl_display(b, bb, sizeof(bb));
         size_t la = strlen(sa), lb = strlen(sb);
         FLString* obj = malloc(sizeof(FLString) + la + lb + 1);
         obj->base.type = FL_STRING; obj->base.rc = 1;
@@ -284,7 +290,7 @@ FLValue fl_str_n(int count, ...) {
     size_t total = 0;
     for (int i = 0; i < count; i++) {
         FLValue v = va_arg(ap, FLValue);
-        parts[i] = fl_to_str(v, bufs[i < 8 ? i : 0], 64);
+        parts[i] = fl_display(v, bufs[i < 8 ? i : 0], 64);
         lens[i] = strlen(parts[i]);
         total += lens[i];
     }
