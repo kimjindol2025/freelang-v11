@@ -692,6 +692,16 @@ static void emit_node(N* n) {
         { E("fl_hash_password("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"auth-verify-password") || sym(op,"auth_verify_password"))
         { E("fl_verify_password("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
+    /* H: str-format / uuid / re-test */
+    if (sym(op,"str-format") || sym(op,"str_format")) {
+        E("fl_str_format("); emit_node(a[0]); E(", ");
+        if (na == 2) { emit_node(a[1]); }
+        else { E("fl_vec_from((FLValue[]){"); emit_args(a+1, na-1); E("}, %d)", na-1); }
+        E(")"); return; }
+    if (sym(op,"uuid"))
+        { E("uuid()"); return; }
+    if (sym(op,"re-test") || sym(op,"re_test"))
+        { E("fl_re_test("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};

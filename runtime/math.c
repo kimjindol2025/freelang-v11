@@ -4,6 +4,10 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <regex.h>
+
+/* forward declaration — defined in core.c */
+const char* fl_to_str(FLValue v, char* buf, size_t sz);
 
 FLValue fl_floor(FLValue x) { return x.tag==FL_FLOAT ? fl_float(floor(x.f)) : x; }
 FLValue fl_ceil(FLValue x)  { return x.tag==FL_FLOAT ? fl_float(ceil(x.f))  : x; }
@@ -342,6 +346,63 @@ FLValue fl_obj_omit(FLValue map, FLValue keys) {
     for (uint32_t i = 0; i < ks->len; i++)
         result = fl_map_del(result, ks->data[i]);
     return result;
+}
+
+/* ── str-format ── */
+FLValue fl_str_format(FLValue fmt, FLValue args) {
+    if (fmt.tag != FL_STRING) return fl_str_val("");
+    const char* f = ((FLString*)fmt.obj)->data;
+    FLVector* vec = (args.tag == FL_VECTOR) ? (FLVector*)args.obj : NULL;
+    int argc = vec ? (int)vec->len : (args.tag == FL_NIL ? 0 : 1);
+    int ai = 0;
+    char out[4096]; int op = 0;
+    for (int i = 0; f[i] && op < (int)sizeof(out) - 64; i++) {
+        if (f[i] != '%' || !f[i+1]) { out[op++] = f[i]; continue; }
+        i++;
+        FLValue arg = fl_nil();
+        if (ai < argc) { arg = vec ? vec->data[ai] : args; ai++; }
+        char tmp[256];
+        switch (f[i]) {
+            case 's': {
+                const char* s = (arg.tag == FL_STRING)
+                    ? ((FLString*)arg.obj)->data : fl_to_str(arg, tmp, sizeof(tmp));
+                int sl = (int)strlen(s);
+                if (op + sl < (int)sizeof(out) - 2) { memcpy(out+op, s, (size_t)sl); op += sl; }
+                break;
+            }
+            case 'd': {
+                long long v = (arg.tag == FL_INT) ? arg.i : (long long)arg.f;
+                op += snprintf(out+op, sizeof(out)-(size_t)op, "%lld", v);
+                break;
+            }
+            case 'f': {
+                double v = (arg.tag == FL_FLOAT) ? arg.f : (double)arg.i;
+                op += snprintf(out+op, sizeof(out)-(size_t)op, "%f", v);
+                break;
+            }
+            case 'g': {
+                double v = (arg.tag == FL_FLOAT) ? arg.f : (double)arg.i;
+                op += snprintf(out+op, sizeof(out)-(size_t)op, "%g", v);
+                break;
+            }
+            case '%': out[op++] = '%'; break;
+            default:  out[op++] = '%'; out[op++] = f[i]; break;
+        }
+    }
+    out[op] = '\0';
+    return fl_str_val(out);
+}
+
+/* ── re-test ── */
+FLValue fl_re_test(FLValue pattern, FLValue str) {
+    if (pattern.tag != FL_STRING || str.tag != FL_STRING) return fl_bool(false);
+    const char* p = ((FLString*)pattern.obj)->data;
+    const char* s = ((FLString*)str.obj)->data;
+    regex_t re;
+    if (regcomp(&re, p, REG_EXTENDED | REG_NOSUB) != 0) return fl_bool(false);
+    int result = regexec(&re, s, 0, NULL, 0);
+    regfree(&re);
+    return fl_bool(result == 0);
 }
 
 /* ── stdlib aliases — self/all.fl compatibility ── */

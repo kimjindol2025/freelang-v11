@@ -206,6 +206,8 @@ FLValue fl_get_in(FLValue m, FLValue keys);
 FLValue fl_map_vals_fn(FLValue fn, FLValue map);
 FLValue fl_sort_by(FLValue fn, FLValue vec);
 FLValue fl_obj_omit(FLValue map, FLValue keys);
+FLValue fl_str_format(FLValue fmt, FLValue args);
+FLValue fl_re_test(FLValue pattern, FLValue str);
 FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
 FLValue fl_vec_last(FLValue vec);
 FLValue fl_vec_first(FLValue vec);
