@@ -1,2 +1,0 @@
-(load "/root/freelang-v11/lib/validate.fl")
-(println "validate loaded OK")

@@ -1,0 +1,17 @@
+;; 간단한 HTTP 에코 서버 데모 (v11)
+;; 실행: node bootstrap.js run src/echo-server-demo.fl
+
+(load "src/express.fl")
+
+(defn handle-echo [$req]
+  (res-json {:echo   "Hello from FreeLang!"
+             :method (req-method $req)
+             :path   (req-path $req)}))
+
+(defn handle-health [$req]
+  (res-json {:status "healthy"}))
+
+(do
+  (app-get "/"       "handle-echo")
+  (app-get "/health" "handle-health")
+  (app-listen 3000))

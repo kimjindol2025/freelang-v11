@@ -1038,8 +1038,9 @@
                     [(= $op "+")    (str "fl_add(" $deref ", " $ec ")")]
                     [(= $op "-")    (str "fl_sub(" $deref ", " $ec ")")]
                     [(= $op "*")    (str "fl_mul(" $deref ", " $ec ")")]
-                    [(= $op "push") (str "fl_vec_push(" $deref ", " $ec ")")]
-                    [true           (str (c-name $op) "(" $deref
+                    [(= $op "push")   (str "fl_vec_push(" $deref ", " $ec ")")]
+                    [(= $op "append") (str "fl_vec_push(" $deref ", " $ec ")")]
+                    [true             (str (c-name $op) "(" $deref
                                       (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
                   )]]
         (str "fl_atom_reset(" $atom-c ", " $rhs ")")))))

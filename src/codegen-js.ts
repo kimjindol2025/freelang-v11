@@ -1,0 +1,848 @@
+// FreeLang v9: Phase 85 — FL AST → JavaScript 코드 생성기
+// FL AST를 JavaScript 코드로 변환해 Node.js나 브라우저에서 실행 가능한 파일 생성
+
+import { ASTNode, Block, Literal, TemplateString, Variable, SExpr, Keyword } from "./ast";
+import { generateRuntimePreamble } from "./runtime-helpers";
+
+export interface CodegenOptions {
+  module: "commonjs" | "esm"; // 기본 "commonjs"
+  runtime: boolean;           // fl-runtime 인라인 포함 여부
+  minify: boolean;            // 기본 false
+  target: "node" | "browser"; // 기본 "node"
+}
+
+const DEFAULT_OPTIONS: CodegenOptions = {
+  module: "commonjs",
+  runtime: false,
+  minify: false,
+  target: "node",
+};
+
+// FL Runtime 최소 헬퍼 함수 셋
+const FL_RUNTIME = `
+function _fl_map(arr, fn) { return (arr || []).map(fn); }
+function _fl_filter(arr, fn) { return (arr || []).filter(fn); }
+function _fl_reduce(arr, fn, init) { return (arr || []).reduce(fn, init); }
+function _fl_print(v) { console.log(v); return v; }
+`.trim();
+
+// 이항 연산자 매핑
+const BINARY_OPS: Record<string, string> = {
+  "+": "+",
+  "-": "-",
+  "*": "*",
+  "/": "/",
+  "%": "%",
+  "=": "===",
+  "==": "===",
+  "!=": "!==",
+  "<": "<",
+  ">": ">",
+  "<=": "<=",
+  ">=": ">=",
+  "and": "&&",
+  "or": "||",
+};
+
+// FL 내장 함수 → JS 네이티브 바인딩 매핑 (semantic codegen)
+const BUILTIN_MAP: Record<string, string> = {
+  // 타입 체크
+  "null?": "_fl_null_q",
+  "nil?": "_fl_null_q",
+  "cli-args": "_fl_get_argv",
+  "file_read": "_fl_file_read",
+  "file-read": "_fl_file_read",
+  "file_write": "_fl_file_write",
+  "file-write": "_fl_file_write",
+  "file-exists": "_fl_file_exists",
+  "file_exists": "_fl_file_exists",
+  "readline": "_fl_readline",
+  "read-line": "_fl_readline",
+  "char_at": "_fl_char_at",
+  "char-at": "_fl_char_at",
+  "substring": "_fl_substring",
+  "str-slice": "_fl_substring",
+  "true?": "_fl_true_q",
+  "false?": "_fl_false_q",
+  "string?": "_fl_string_q",
+  "number?": "_fl_number_q",
+  "list?": "_fl_list_q",
+  "array?": "_fl_array_q",
+  "map?": "_fl_map_q",
+  "fn?": "_fl_fn_q",
+  "boolean?": "_fl_boolean_q",
+  "type-of": "_fl_type_of",
+  "empty?": "_fl_empty_q",
+
+  // 문자 검증 (lexer 헬퍼)
+  "is-digit?": "_fl_is_digit_q",
+  "is-alpha?": "_fl_is_alpha_q",
+  "is-alnum?": "_fl_is_alnum_q",
+  "is-space?": "_fl_is_space_q",
+  "is-symbol-char?": "_fl_is_symbol_char_q",
+
+  // 기본 연산
+  "map": "_fl_map",
+  "filter": "_fl_filter",
+  "reduce": "_fl_reduce",
+  "first": "_fl_first",
+  "last": "_fl_last",
+  "rest": "_fl_rest",
+  "append": "_fl_append", "concat": "_fl_concat", "slice": "_fl_slice",
+  "take": "_fl_take", "drop": "_fl_drop",
+  "zip": "_fl_zip", "flatten": "_fl_flatten",
+  "reverse": "_fl_reverse", "sort": "_fl_sort",
+  "length": "_fl_length",
+  "range": "_fl_range",
+
+  // 문자열
+  "str": "_fl_str",
+  "contains?": "_fl_contains_q",
+  "str-contains": "_fl_contains_q",
+  "str-includes": "_fl_contains_q",
+  "str-to-num": "_fl_str_to_num",
+  "parse-num": "_fl_str_to_num",
+  "assoc": "_fl_map_set",
+  "upper": "_fl_upper",
+  "str-upper": "_fl_upper",
+  "lower": "_fl_lower",
+  "str-lower": "_fl_lower",
+  "trim": "_fl_trim",
+  "replace": "_fl_replace",
+  "str-replace": "_fl_replace",
+  "str-index-of": "_fl_str_index_of",
+  "str_index_of": "_fl_str_index_of",
+  "join": "_fl_join",
+  "str-join": "_fl_join",
+  "split": "_fl_split",
+  "str-split": "_fl_split",
+  "repeat": "_fl_repeat",
+  "str-repeat": "_fl_repeat",
+
+  // 맵/객체
+  "get": "_fl_get",
+  "json-parse": "JSON.parse",
+  "json-stringify": "JSON.stringify",
+  "json_parse": "JSON.parse",
+  "json_stringify": "JSON.stringify",
+  "keys": "_fl_keys",
+  "json_keys": "_fl_keys",
+  "values": "_fl_values",
+  "map-keys": "_fl_keys",
+  "map-values": "_fl_values",
+  "map-set": "_fl_map_set", "json-set": "_fl_map_set", "json_set": "_fl_map_set",
+  "has-key?": "_fl_has_key_q",
+};
+
+// JavaScript 예약어 목록
+const JS_RESERVED = new Set([
+  "abstract", "arguments", "await", "boolean", "break", "byte", "case", "catch",
+  "char", "class", "const", "continue", "debugger", "default", "delete", "do",
+  "double", "else", "enum", "eval", "export", "extends", "false", "final",
+  "finally", "float", "for", "function", "goto", "if", "implements", "import",
+  "in", "instanceof", "int", "interface", "let", "long", "native", "new",
+  "null", "package", "private", "protected", "public", "return", "short", "static",
+  "super", "switch", "synchronized", "this", "throw", "throws", "transient",
+  "true", "try", "typeof", "var", "void", "volatile", "while", "with", "yield"
+]);
+
+// FL 심볼을 JS 유효 식별자로 인코딩
+function flNameToJs(name: string): string {
+  // BUILTIN_MAP에 있으면 직접 매핑
+  if (BUILTIN_MAP[name]) {
+    return BUILTIN_MAP[name];
+  }
+
+  // $ 접두사 제거 (FL 변수 관습)
+  const cleanName = name.replace(/^\$/, "");
+
+  // 일반 심볼 인코딩: 특수문자 → 안전한 이름
+  const encoded = cleanName
+    .replace(/\?$/g, "_q")      // 끝의 ? → _q
+    .replace(/!/g, "_bang")     // ! → _bang
+    .replace(/>/g, "_gt")       // > → _gt
+    .replace(/</g, "_lt")       // < → _lt
+    .replace(/=/g, "_eq")       // = → _eq
+    .replace(/\+/g, "_plus")    // + → _plus
+    .replace(/\*/g, "_star")    // * → _star
+    .replace(/\//g, "_slash")   // / → _slash
+    .replace(/-/g, "_");        // - → _ (마지막에 처리)
+
+  // JavaScript 예약어 체크
+  if (JS_RESERVED.has(encoded)) {
+    return `_${encoded}`;
+  }
+
+  return encoded;
+}
+
+export class JSCodegen {
+  private opts: CodegenOptions;
+  private exportedNames: string[] = [];
+
+  constructor() {
+    this.opts = { ...DEFAULT_OPTIONS };
+  }
+
+  generate(nodes: ASTNode[], opts?: Partial<CodegenOptions>): string {
+    this.opts = { ...DEFAULT_OPTIONS, ...opts };
+    this.exportedNames = [];
+
+    const parts: string[] = [];
+
+    // 런타임 헬퍼 함수 프리앰블 (항상 포함 - self-hosting 지원)
+    parts.push(generateRuntimePreamble());
+    parts.push("");
+
+    // 추가 런타임 인라인 포함 (레거시)
+    if (this.opts.runtime) {
+      parts.push(FL_RUNTIME);
+      parts.push("");
+    }
+
+    // 노드 코드 생성
+    const bodyParts: string[] = [];
+    for (const node of nodes) {
+      const code = this.genNode(node);
+      if (code !== "") {
+        // JS ASI 함정 방지: 최상위 문장 뒤 세미콜론 강제 삽입
+        // `(` 또는 `[` 로 시작하는 다음 줄이 앞 줄의 함수 호출로 파싱되는 것을 막음
+        bodyParts.push(code.endsWith(";") ? code : code + ";");
+      }
+    }
+    parts.push(...bodyParts);
+
+    // 모듈 export 처리
+    if (this.exportedNames.length > 0) {
+      if (this.opts.module === "commonjs") {
+        const exports = this.exportedNames
+          .map((n) => `  ${n}: ${n}`)
+          .join(",\n");
+        parts.push(`module.exports = {\n${exports}\n};`);
+      } else if (this.opts.module === "esm") {
+        const exports = this.exportedNames.join(", ");
+        parts.push(`export { ${exports} };`);
+      }
+    } else {
+      // export 없어도 모듈 형식 표시 (빈 exports)
+      if (this.opts.module === "commonjs") {
+        // 기본적으로 module.exports 세팅만
+        if (bodyParts.some((p) => p.startsWith("function "))) {
+          // 함수가 있으면 자동으로 exports 추가
+          const funcNames = bodyParts
+            .filter((p) => p.startsWith("function "))
+            .map((p) => {
+              const m = p.match(/^function\s+(\w+)/);
+              return m ? m[1] : null;
+            })
+            .filter(Boolean) as string[];
+          if (funcNames.length > 0) {
+            const exportsStr = funcNames.map((n) => `  ${n}: ${n}`).join(",\n");
+            parts.push(`module.exports = {\n${exportsStr}\n};`);
+          }
+        }
+      }
+    }
+
+    const result = parts.join("\n");
+    return this.opts.minify ? this.minify(result) : result;
+  }
+
+  genNode(node: ASTNode): string {
+    switch (node.kind) {
+      case "literal":
+        return this.genLiteral(node);
+      case "template-string":
+        return this.genTemplateString(node);
+      case "variable":
+        return this.genVariable(node);
+      case "sexpr":
+        return this.genSExpr(node);
+      case "block":
+        return this.genBlock(node);
+      case "keyword":
+        return this.genKeyword(node as Keyword);
+      case "try-block":
+        return this.genTryBlock(node as any);
+      default:
+        return `/* unsupported: ${(node as any).kind} */`;
+    }
+  }
+
+  genLiteral(node: Literal): string {
+    if (node.type === "string") {
+      return JSON.stringify(node.value);
+    } else if (node.type === "boolean") {
+      return node.value ? "true" : "false";
+    } else if (node.type === "null") {
+      return "null";
+    } else if (node.type === "symbol") {
+      if (node.value === "nil" || node.value === "null") {
+        return "null";
+      }
+      const cleanName = String(node.value).replace(/^\$/, "");
+      return flNameToJs(cleanName);
+    } else {
+      return String(node.value);
+    }
+  }
+
+  private genTemplateString(node: any): string {
+    const value = node.value;
+    let jsCode = "`";
+    let i = 0;
+    while (i < value.length) {
+      if (value[i] === "$" && value[i + 1] === "{") {
+        const start = i + 2;
+        const end = value.indexOf("}", start);
+        if (end > start) {
+          const expr = value.slice(start, end).trim();
+          const jsExpr = this.genNode({ kind: "variable", name: expr } as any);
+          jsCode += "${" + jsExpr + "}";
+          i = end + 1;
+          continue;
+        }
+      }
+      if (value[i] === "`") {
+        jsCode += "\\`";
+      } else if (value[i] === "\\") {
+        jsCode += "\\\\";
+      } else {
+        jsCode += value[i];
+      }
+      i++;
+    }
+    jsCode += "`";
+    return jsCode;
+  }
+
+  private genVariable(node: Variable): string {
+    const cleanName = node.name.replace(/^\$/, "");
+    return flNameToJs(cleanName);
+  }
+
+  private genKeyword(node: Keyword): string {
+    return JSON.stringify(node.name);
+  }
+
+  genSExpr(node: SExpr): string {
+    const { op, args } = node;
+
+    if (op === "and") {
+      if (args.length === 0) return "true";
+      return "(" + args.map(a => this.genNode(a)).join(" && ") + ")";
+    }
+    if (op === "or") {
+      if (args.length === 0) return "false";
+      return "(" + args.map(a => this.genNode(a)).join(" || ") + ")";
+    }
+    if (op === "cond") return this.genCond(args);
+    if (op === "while") return this.genWhile(args);
+
+    // -> (thread-first): (-> x (f a b) (g c)) → (g (f x a b) c)
+    if (op === "->") {
+      if (args.length === 0) return "null";
+      let acc = this.genNode(args[0]);
+      for (let i = 1; i < args.length; i++) {
+        const step = args[i];
+        if (step.kind === "sexpr") {
+          const { op: fn, args: fnArgs } = step as SExpr;
+          const fnJs = flNameToJs(fn);
+          const rest = fnArgs.map(a => this.genNode(a));
+          acc = `${fnJs}(${[acc, ...rest].join(", ")})`;
+        } else {
+          // 단순 함수명: (-> x f) → f(x)
+          acc = `${this.genNode(step)}(${acc})`;
+        }
+      }
+      return acc;
+    }
+
+    // ->> (thread-last): (-> x (f a b) (g c)) → (g c (f a b x))
+    if (op === "->>") {
+      if (args.length === 0) return "null";
+      let acc = this.genNode(args[0]);
+      for (let i = 1; i < args.length; i++) {
+        const step = args[i];
+        if (step.kind === "sexpr") {
+          const { op: fn, args: fnArgs } = step as SExpr;
+          const fnJs = flNameToJs(fn);
+          const rest = fnArgs.map(a => this.genNode(a));
+          acc = `${fnJs}(${[...rest, acc].join(", ")})`;
+        } else {
+          acc = `${this.genNode(step)}(${acc})`;
+        }
+      }
+      return acc;
+    }
+    if (op === "recur") {
+      const argStrs = args.map(a => this.genNode(a));
+      return `{ __recur: true, a: [${argStrs.join(", ")}] }`;
+    }
+
+    if (op === "loop") {
+      const bindingsArg = args[0];
+      const bodyExprs = args.slice(1);
+      let items: ASTNode[] = [];
+      if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
+        items = (bindingsArg as Block).fields.get("items") as any || [];
+      }
+
+      const inits: string[] = [];
+      const names: string[] = [];
+      for (let i = 0; i < items.length; i += 2) {
+        const nameNode = items[i];
+        const valNode = items[i+1];
+        if (!nameNode) continue;
+        const name = this.extractVarName(nameNode);
+        const val = valNode ? this.genNode(valNode) : "null";
+        const tmpName = `__fl_loop_${i}`;
+        inits.push(`let ${tmpName} = ${val}; let ${name} = ${tmpName};`);
+        names.push(name);
+      }
+
+      const bodyParts = bodyExprs.map(e => this.genNode(e).trim()).filter(s => s !== "");
+      let bodyCode = "";
+      if (bodyParts.length === 0) {
+        bodyCode = "return null;";
+      } else if (bodyParts.length === 1) {
+        bodyCode = `return ${bodyParts[0]};`;
+      } else {
+        const stmts = bodyParts.slice(0, -1).map(s => s.endsWith(";") ? s : s + ";");
+        bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+      }
+
+      return `((() => { ${inits.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } })())`;
+    }
+
+    if (op === "let") {
+      if (args.length >= 2) {
+        const bindingsArg = args[0];
+        let bindings: ASTNode[] = [];
+        if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
+          bindings = (bindingsArg as Block).fields.get("items") as any || [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = (bindingsArg as SExpr).args;
+        }
+
+        const bindingStmts: string[] = [];
+        // Detect nested vs flat: [[x 1] [y 2]] vs [x 1 y 2]
+        const isNested = bindings.length > 0 && bindings[0].kind === "block" && (bindings[0] as Block).type === "Array";
+        
+        if (isNested) {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && (binding as Block).type === "Array") {
+              const pairItems = (binding as Block).fields.get("items") as any || [];
+              if (pairItems.length >= 2) {
+                const varName = this.extractVarName(pairItems[0]);
+                const value = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName} = ${value};`);
+              }
+            }
+          }
+        } else {
+          for (let i = 0; i < bindings.length; i += 2) {
+            if (!bindings[i]) continue;
+            const varName = this.extractVarName(bindings[i]);
+            const value = bindings[i+1] ? this.genNode(bindings[i+1]) : "null";
+            bindingStmts.push(`let ${varName} = ${value};`);
+          }
+        }
+
+        const bodyParts = args.slice(1).map((a) => this.genNode(a).trim()).filter(s => s !== "");
+        let bodyCode = "";
+        if (bodyParts.length === 0) {
+          bodyCode = "return null;";
+        } else if (bodyParts.length === 1) {
+          bodyCode = `return ${bodyParts[0]};`;
+        } else {
+          const stmts = bodyParts.slice(0, -1).map(s => s.endsWith(";") ? s : s + ";");
+          bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
+        }
+        return `((() => { ${bindingStmts.join(" ")} ${bodyCode} })())`;
+      }
+      return "(() => null)()";
+    }
+
+    if (op === "do") return this.genDo(args);
+
+    const BINARY_OPS: Record<string, string> = {
+      "+": "+", "-": "-", "*": "*", "/": "/", "%": "%",
+      "<": "<", ">": ">", "<=": "<=", ">=": ">=", "==": "===", "!=": "!==",
+      "=": "==="
+    };
+
+    if (op in BINARY_OPS && args.length === 2) {
+      const left = this.genNode(args[0]);
+      const right = this.genNode(args[1]);
+      return `(${left} ${BINARY_OPS[op]} ${right})`;
+    }
+
+    if (op === "-" && args.length === 1) {
+      return `(-${this.genNode(args[0])})`;
+    }
+
+    if (op === "not" && args.length === 1) {
+      return `(!${this.genNode(args[0])})`;
+    }
+
+    if (op === "if") {
+      const cond = this.genNode(args[0]);
+      const thenExpr = this.genNode(args[1]);
+      const elseExpr = args[2] ? this.genNode(args[2]) : "undefined";
+      return `(${cond} ? ${thenExpr} : ${elseExpr})`;
+    }
+
+    if (op === "define") {
+      const varName = this.extractVarName(args[0]);
+      const value = this.genNode(args[1]);
+      return `const ${varName} = ${value};`;
+    }
+
+    if (op === "set!") {
+      const varName = this.extractVarName(args[0]);
+      const value = this.genNode(args[1]);
+      return `(${varName} = ${value})`;
+    }
+
+    if (op === "defn" || op === "defun") {
+      const name = this.extractVarName(args[0]);
+      const { params, preamble } = this.extractParamListWithDestructuring(args[1]);
+      const bodyNode = args[2];
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+      return `const ${name} = (${params.join(", ")}) => ${finalBody}`;
+    }
+
+    if (op === "fn") return this.genFn(args);
+
+    if (op === "list") {
+      const elements = args.map((a) => this.genNode(a));
+      return `[${elements.join(", ")}]`;
+    }
+
+    if (op === "str-concat") {
+      const parts = args.map((a) => this.genNode(a));
+      return `('' + ${parts.join(" + ")})`;
+    }
+
+    if (op === "print" || op === "println") {
+      const arg = args.length > 0 ? this.genNode(args[0]) : '""';
+      return `_fl_print(${arg})`;
+    }
+
+    if (op === "map") return `_fl_map(${this.genNode(args[1])}, ${this.genNode(args[0])})`;
+    if (op === "filter") return `_fl_filter(${this.genNode(args[1])}, ${this.genNode(args[0])})`;
+    if (op === "reduce") return `_fl_reduce(${this.genNode(args[2])}, ${this.genNode(args[0])}, ${this.genNode(args[1])})`;
+
+    if (op === "export") {
+      for (const arg of args) {
+        if (arg.kind === "variable") {
+          this.exportedNames.push(arg.name);
+        } else if (arg.kind === "literal" && typeof arg.value === "string") {
+          this.exportedNames.push(arg.value);
+        }
+      }
+      return "";
+    }
+
+    if (op === "let") {
+      if (args.length >= 2) {
+        const bindingsArg = args[0];
+        let bindings: ASTNode[] = [];
+        if (bindingsArg.kind === "block" && (bindingsArg as Block).type === "Array") {
+          bindings = (bindingsArg as Block).fields.get("items") as any || [];
+        } else if (bindingsArg.kind === "sexpr") {
+          bindings = (bindingsArg as SExpr).args;
+        }
+
+        const bindingStmts: string[] = [];
+        // flat binding: [x 1 y 2] — bindings의 첫 요소가 Array 블록이 아닌 경우
+        const isFlat = bindings.length > 0 && !(bindings[0].kind === "block" && (bindings[0] as Block).type === "Array");
+        if (isFlat) {
+          for (let i = 0; i < bindings.length - 1; i += 2) {
+            const varName = this.extractVarName(bindings[i]);
+            const value = this.genNode(bindings[i + 1]);
+            bindingStmts.push(`let ${varName} = ${value};`);
+          }
+        } else {
+          for (const binding of bindings) {
+            if (binding.kind === "block" && (binding as Block).type === "Array") {
+              const pairItems = (binding as Block).fields.get("items") as any || [];
+              if (pairItems.length >= 2) {
+                const varName = this.extractVarName(pairItems[0]);
+                const value = this.genNode(pairItems[1]);
+                bindingStmts.push(`let ${varName} = ${value};`);
+              }
+            }
+          }
+        }
+
+        const bodyStmts = args.slice(1).map((a) => this.genNode(a)).join("; ");
+        return `(() => { ${bindingStmts.join(" ")} return ${bodyStmts}; })()`;
+      }
+      const varName = this.extractVarName(args[0]);
+      const value = args[1] ? this.genNode(args[1]) : "undefined";
+      return `(() => { let ${varName} = ${value}; return ${varName}; })()`;
+    }
+
+    return this.genFuncCall(op, args);
+  }
+
+  genDo(args: ASTNode[]): string {
+    if (args.length === 0) return "(() => undefined)()";
+    if (args.length === 1) return `(() => ${this.genNode(args[0])})()`;
+    const stmts = args.slice(0, -1).map((a) => {
+      const c = this.genNode(a).trim();
+      return (c === "" || c.endsWith(";")) ? c : c + ";";
+    }).filter(s => s !== "");
+    const last = this.genNode(args[args.length - 1]);
+    return `(() => { ${stmts.join(" ")} return ${last}; })()`;
+  }
+
+  private genCond(args: any[]): string {
+    if (args.length === 0) return "null";
+    
+    // Detect nested vs flat: [[test result] ...] vs [test result test result ...]
+    let isNested = false;
+    if (args[0].kind === "block" && args[0].type === "Array") {
+      const items = args[0].fields.get("items");
+      if (Array.isArray(items) && items.length >= 1) {
+        isNested = true;
+      }
+    }
+
+    let pairs: [any, any][];
+    if (isNested) {
+      pairs = args.map(arg => {
+        if (arg.kind === "block" && arg.type === "Array") {
+          const items = arg.fields.get("items") || [];
+          return [items[0], items[1]] as [any, any];
+        }
+        return [arg, null];
+      });
+    } else {
+      // flat: test1 result1 test2 result2 ...
+      pairs = [];
+      for (let i = 0; i < args.length - 1; i += 2) {
+        pairs.push([args[i], args[i + 1]]);
+      }
+      // Odd number of arguments: last one is default result
+      if (args.length % 2 === 1) {
+        // use true as test for default case
+        pairs.push([{ kind: "literal", type: "boolean", value: true }, args[args.length - 1]]);
+      }
+    }
+
+    let res = "null";
+    for (let i = pairs.length - 1; i >= 0; i--) {
+      const [testNode, bodyNode] = pairs[i];
+      if (!testNode) continue;
+      const test = this.genNode(testNode);
+      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      res = "(" + test + " ? " + body + " : " + res + ")";
+    }
+    return res;
+  }
+
+  private genWhile(args: any[]): string {
+    const cond = this.genNode(args[0]);
+    const bodyParts = args.slice(1).map(a => this.genNode(a).trim()).filter(s => s !== "");
+    const bodyCode = bodyParts.map(s => s.endsWith(";") ? s : s + ";").join(" ");
+    return "(() => { while(" + cond + ") { " + bodyCode + " } })()";
+  }
+
+  private genFn(args: ASTNode[]): string {
+    const { params, preamble } = this.extractParamListWithDestructuring(args[0]);
+    let body: string;
+    if (args.length <= 1) {
+      body = "undefined";
+    } else if (args.length === 2) {
+      body = this.genNode(args[1]);
+    } else {
+      // 여러 body 표현식 → IIFE로 감싸고 마지막 값 반환
+      const bodyNodes = args.slice(1);
+      const stmts = bodyNodes.slice(0, -1).map(n => this.genNode(n) + ";").join(" ");
+      const last = this.genNode(bodyNodes[bodyNodes.length - 1]);
+      body = `((() => { ${stmts} return ${last}; })())`;
+    }
+    const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
+    return `((${params.join(", ")}) => ${finalBody})`;
+  }
+
+  private extractParamListWithDestructuring(node: ASTNode): { params: string[], preamble: string } {
+    if (!node) return { params: [], preamble: "" };
+    let pNodes = (node as any).kind === "block" && (node as any).type === "Array" ? (node as any).fields.get("items") : (node.kind === "sexpr" ? node.args : [node]);
+
+    const params: string[] = [];
+    const bindingStmts: string[] = [];
+    let tmpCount = 0;
+
+    for (const p of (pNodes || [])) {
+      if (p.kind === "variable") {
+        params.push(flNameToJs(p.name.replace(/^\$/, "")));
+      } else if (p.kind === "literal" && (p.type === "symbol" || typeof p.value === "string")) {
+        params.push(flNameToJs(String(p.value).replace(/^\$/, "")));
+      } else if (p.kind === "block" && p.type === "Array") {
+        const tmpName = `_arg${tmpCount++}`;
+        params.push(tmpName);
+        const subItems = p.fields.get("items") || [];
+        for (let i = 0; i < subItems.length; i++) {
+          const sub = subItems[i];
+          if (sub.kind === "variable") {
+            const varName = flNameToJs(sub.name.replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          } else if (sub.kind === "literal" && (sub.type === "symbol" || typeof sub.value === "string")) {
+            const varName = flNameToJs(String(sub.value).replace(/^\$/, ""));
+            bindingStmts.push(`let ${varName} = ${tmpName}[${i}];`);
+          }
+        }
+      } else {
+        params.push("p");
+      }
+    }
+
+    return { params, preamble: bindingStmts.join(" ") };
+  }
+
+  private extractVarName(node: ASTNode): string {
+    if (node.kind === "variable") return flNameToJs(node.name.replace(/^\$/, ""));
+    if (node.kind === "literal" && typeof node.value === "string") return flNameToJs(node.value);
+    return "unknown";
+  }
+
+  private extractParamList(node: ASTNode): string[] {
+    if (!node) return [];
+    let pNodes = (node as any).kind === "block" && (node as any).type === "Array" ? (node as any).fields.get("items") : (node.kind === "sexpr" ? node.args : [node]);
+    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
+  }
+
+  private extractBlockParams(node: Block): string[] {
+    const params = node.fields.get("params");
+    if (!params) return [];
+    let pNodes = Array.isArray(params) ? params : ((params as any).kind === "block" && (params as any).type === "Array" ? (params as any).fields.get("items") : [params]);
+    return (pNodes || []).map((p: any) => (p.name || String(p.value || "p")).replace(/^\\$/, "")).map(n => flNameToJs(n));
+  }
+
+  private genFuncCall(op: string, args: ASTNode[]): string {
+    const argStrs = args.map((a) => this.genNode(a));
+    const jsOp = flNameToJs(op);
+    return `${jsOp}(${argStrs.join(", ")})`;
+  }
+
+  genBlock(node: Block): string {
+    switch (node.type) {
+      case "FUNC": return this.genFuncBlock(node);
+      case "MODULE": return this.genModuleBlock(node);
+      case "SERVICE": return this.genServiceBlock(node);
+      case "MODEL": return this.genModelBlock(node);
+      case "CONTROLLER": return this.genControllerBlock(node);
+      case "MAP": case "Map": return this.genMapBlock(node);
+      case "ARRAY": case "Array": return this.genArrayBlock(node);
+      default: return `/* unsupported block: ${node.type} */`;
+    }
+  }
+
+  private genMapBlock(node: Block): string {
+    const pairs: string[] = [];
+    node.fields.forEach((val, key) => {
+      const jsKey = key.match(/^[a-zA-Z_$][a-zA-Z0-9_$]*$/) ? key : JSON.stringify(key);
+      pairs.push(jsKey + ": " + this.genNode(val as any));
+    });
+    return "({ " + pairs.join(", ") + " })";
+  }
+
+  private genArrayBlock(node: Block): string {
+    const items = node.fields.get("items");
+    let pNodes = Array.isArray(items) ? items : ((items as any) && (items as any).kind === "block" ? (items as any).fields.get("items") : []);
+    const elements = (pNodes || []).map((a: any) => this.genNode(a));
+    return "[" + elements.join(", ") + "]";
+  }
+
+  private genFuncBlock(node: Block): string {
+    const params = this.extractBlockParams(node);
+    const body = node.fields.get("body");
+    const bodyCode = body ? this.genNode(body as ASTNode) : "undefined";
+    const jsName = this.flNameToJs(node.name);
+    return `function ${jsName}(${params.join(", ")}) { return ${bodyCode}; }`;
+  }
+
+  private flNameToJs(name: string): string {
+    return flNameToJs(name);
+  }
+
+  private genModuleBlock(node: Block): string {
+    const body = node.fields.get("body");
+    if (!body) return "";
+    if (Array.isArray(body)) return body.map((n) => this.genNode(n)).join("\n");
+    return this.genNode(body as ASTNode);
+  }
+
+  private genServiceBlock(node: Block): string {
+    const name = node.name;
+    const methods = node.fields.get("methods");
+    const inject = node.fields.get("inject");
+    const injectParams = inject ? (Array.isArray(inject) ? (inject as any[]).map((dep: any) => `private ${dep.name || dep}: ${dep.name || dep}`).join(", ") : "") : "";
+    let methodsCode = "";
+    if (methods && methods.kind === "sexpr") {
+      methodsCode = (methods as SExpr).args.map((arg) => {
+        if (arg.kind === "sexpr" && arg.op === "fn") {
+          const fnExpr = arg as SExpr;
+          const fnName = (fnExpr.args[0] as any).name || (fnExpr.args[0] as any).value || "method";
+          const fnParams = this.extractParamList(fnExpr.args[1]).map((p) => p.replace(/^\$/, "")).join(", ");
+          const fnBody = fnExpr.args[2] ? this.genNode(fnExpr.args[2]) : "undefined";
+          return `  ${fnName}(${fnParams}) { return ${fnBody}; }`;
+        }
+        return "";
+      }).filter(Boolean).join("\n");
+    }
+    return [`export class ${name} {`, injectParams ? `  constructor(${injectParams}) {}` : `  constructor() {}`, methodsCode, `}`].join("\n");
+  }
+
+  private genModelBlock(node: Block): string {
+    const name = node.name;
+    const table = node.fields.get("table") || name.toLowerCase() + "s";
+    const fields = node.fields.get("fields");
+    let sqlColumns = "  id SERIAL PRIMARY KEY";
+    if (fields && fields.kind === "sexpr") {
+      for (const arg of (fields as SExpr).args) {
+        if (arg.kind === "sexpr") {
+          const fName = (arg as SExpr).op.replace(/^[\$:]/, "").replace(/-/g, "_");
+          sqlColumns += `,\n  ${fName} VARCHAR(255)`;
+        }
+      }
+    }
+    return [`CREATE TABLE IF NOT EXISTS ${table} (`, sqlColumns, `,\n  created_at TIMESTAMP DEFAULT NOW(),\n  updated_at TIMESTAMP DEFAULT NOW()\n);`].join("\n");
+  }
+
+  private genControllerBlock(node: Block): string {
+    const prefix = node.fields.get("prefix") || "/";
+    const routes = node.fields.get("routes");
+    let routeCode = "";
+    if (routes && routes.kind === "sexpr") {
+      const sExpr = routes as SExpr;
+      for (let i = 0; i < sExpr.args.length; i += 3) {
+        const method = String((sExpr.args[i] as any).value || "GET").toLowerCase();
+        const route = String((sExpr.args[i+1] as any).value || "/");
+        routeCode += `router.${method}("${prefix === "/" ? route : prefix + route}", async (req, res) => { res.json({ status: 200 }); });\n`;
+      }
+    }
+    return [`import { Router } from "express";`, `export const router = Router();`, routeCode].join("\n");
+  }
+
+  private genTryBlock(node: any): string {
+    const body = this.genNode(node.body);
+    const parts: string[] = [`(()=>{try{return ${body};}`];
+    if (node.catchClauses) {
+      for (const cc of node.catchClauses) {
+        parts.push(`catch(${cc.variable || "err"}){return ${this.genNode(cc.handler)};}`);
+      }
+    }
+    if (node.finallyBlock) parts.push(`finally{${this.genNode(node.finallyBlock)};}`);
+    return parts.join("") + "})()";
+  }
+
+  private minify(code: string): string {
+    return code.replace(/\/\/[^\n]*/g, "").replace(/\s+/g, " ").trim();
+  }
+}

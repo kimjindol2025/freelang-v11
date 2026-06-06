@@ -112,9 +112,6 @@ FLValue fl_vec_get(FLValue vec, FLValue idx);
 FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val);
 FLValue fl_vec_push(FLValue vec, FLValue val);
 FLValue fl_vec_len(FLValue vec);
-FLValue fl_vec_first(FLValue vec);
-FLValue fl_vec_rest(FLValue vec);
-FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
 
 /* ── Map ── */
 FLValue fl_map_new(void);
@@ -160,7 +157,6 @@ FLValue fl_floor(FLValue x);
 FLValue fl_ceil(FLValue x);
 FLValue fl_abs(FLValue x);
 FLValue fl_math_sqrt(FLValue x);
-FLValue fl_sleep_ms(FLValue ms);
 FLValue fl_now(void);
 FLValue fl_now_ms(void);
 FLValue string_p(FLValue v);
@@ -187,31 +183,9 @@ FLValue fl_atom_reset(FLValue atom, FLValue val);
 /* ── S26: stdlib bridge ── */
 FLValue fl_includes_item(FLValue vec, FLValue item);
 FLValue fl_str_includes(FLValue s, FLValue sub);
-FLValue fl_str_starts_with(FLValue s, FLValue prefix);
-FLValue fl_str_ends_with(FLValue s, FLValue suffix);
 FLValue fl_string_p(FLValue v);
-FLValue fl_number_p(FLValue v);
-FLValue fl_boolean_p(FLValue v);
-FLValue fl_integer_p(FLValue v);
-FLValue fl_float_p(FLValue v);
-FLValue fl_array_p(FLValue v);
-FLValue fl_map_p(FLValue v);
-FLValue fl_fn_p(FLValue v);
-FLValue fl_empty_p(FLValue v);
-FLValue fl_not_empty_p(FLValue v);
-FLValue fl_nil_or_empty_p(FLValue v);
-FLValue fl_str_to_num(FLValue s);
-FLValue fl_html_escape(FLValue s);
-FLValue fl_get_in(FLValue m, FLValue keys);
-FLValue fl_map_vals_fn(FLValue fn, FLValue map);
-FLValue fl_sort_by(FLValue fn, FLValue vec);
-FLValue fl_obj_omit(FLValue map, FLValue keys);
-FLValue fl_str_format(FLValue fmt, FLValue args);
-FLValue fl_re_test(FLValue pattern, FLValue str);
 FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end);
 FLValue fl_vec_last(FLValue vec);
-FLValue fl_vec_first(FLValue vec);
-FLValue fl_vec_rest(FLValue vec);
 FLValue fl_map_del(FLValue map, FLValue key);
 FLValue fl_map_merge(FLValue a, FLValue b);
 FLValue fl_concat(FLValue a, FLValue b);
@@ -262,67 +236,6 @@ FLValue _fl_env_get(FLValue key);
 FLValue _fl_env_set(FLValue key, FLValue val);
 FLValue _fl_env_all(void);
 FLValue str_join(FLValue sep, FLValue vec);
-
-/* ── N-08: 컬렉션 함수 ── */
-FLValue sort(FLValue vec);
-FLValue reverse(FLValue vec);
-FLValue flatten(FLValue vec);
-FLValue distinct(FLValue vec);
-FLValue take(FLValue n, FLValue vec);
-FLValue drop(FLValue n, FLValue vec);
-FLValue zip(FLValue a, FLValue b);
-FLValue partition(FLValue n, FLValue vec);
-FLValue interpose(FLValue sep, FLValue vec);
-FLValue group_by(FLValue fn, FLValue vec);
-FLValue frequencies(FLValue vec);
-FLValue keys(FLValue map);
-FLValue vals(FLValue map);
-FLValue entries(FLValue map);
-FLValue dissoc(FLValue map, FLValue key);
-FLValue select_keys(FLValue map, FLValue ks);
-FLValue fl_min2(FLValue a, FLValue b);
-FLValue fl_max2(FLValue a, FLValue b);
-
-/* ── N-07: 문자열 함수 ── */
-FLValue str_split(FLValue s, FLValue sep);
-FLValue str_to_upper(FLValue s);
-FLValue str_to_lower(FLValue s);
-FLValue str_trim(FLValue s);
-FLValue str_pad_left(FLValue s, FLValue width, FLValue ch);
-FLValue str_pad_right(FLValue s, FLValue width, FLValue ch);
-FLValue str_repeat(FLValue s, FLValue n);
-FLValue uuid(void);
-
-/* ── 암호화 (crypto.c) ── */
-FLValue fl_jwt_sign(FLValue payload_map, FLValue secret, FLValue exp_sec);
-FLValue fl_jwt_verify(FLValue token, FLValue secret);
-FLValue fl_jwt_expired(FLValue token);
-FLValue fl_hash_password(FLValue pw);
-FLValue fl_verify_password(FLValue pw, FLValue hash);
-
-/* ── N-06: SQLite3 DB ── */
-FLValue fl_db_open(FLValue path);
-FLValue fl_db_close(FLValue handle);
-FLValue fl_db_query(FLValue handle, FLValue sql, FLValue params);
-FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params);
-
-/* ── N-05: HTTP 서버 (POSIX socket) ── */
-FLValue fl_http_route(FLValue method, FLValue pattern, FLValue handler);
-FLValue fl_http_start(FLValue port);
-FLValue fl_http_stop(void);
-FLValue fl_resp_html(FLValue body);
-FLValue fl_resp_json(FLValue val);
-FLValue fl_resp_status(FLValue code, FLValue msg);
-FLValue fl_resp_redirect(FLValue url);
-FLValue fl_resp_html_cookie(FLValue body, FLValue cookie);
-FLValue fl_resp_set_cookie(FLValue name, FLValue value, FLValue opts);
-
-/* ── HTTP 클라이언트 (libcurl) ── */
-/* 반환값: {:status 200 :body "..." :headers {...}} */
-FLValue fl_http_get(FLValue url);
-FLValue fl_http_post(FLValue url, FLValue body, FLValue content_type);
-FLValue fl_http_get_headers(FLValue url, FLValue headers);
-FLValue fl_http_post_headers(FLValue url, FLValue body, FLValue headers);
 
 /* ── try/catch 인프라 ── */
 #define FL_TRY_MAX 64

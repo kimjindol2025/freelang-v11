@@ -354,7 +354,7 @@ FLValue fl_file_write(FLValue path, FLValue content) {
     if (path.tag != FL_STRING) return fl_nil();
     const char* p = ((FLString*)path.obj)->data;
     char buf[64];
-    const char* s = fl_to_str(content, buf, sizeof(buf));
+    const char* s = fl_display(content, buf, sizeof(buf));
     FILE* f = fopen(p, "wb");
     if (!f) return fl_nil();
     fwrite(s, 1, strlen(s), f);

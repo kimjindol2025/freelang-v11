@@ -465,11 +465,11 @@
   (if (= (length $args) 0)
     (r-pair (parse-consume-rparen $p2) (make-sexpr "" (list) $line))
     (let [[$op-node (get $args 0)]
-          [$op (cond
-                 [(= (get $op-node :kind) "literal") (get $op-node :value)]
-                 [(= (get $op-node :kind) "variable") (str "$" (get $op-node :name))]
-                 [(= (get $op-node :kind) "sexpr") nil]  ;; dynamic call (fn literal + args)
-                 [true "unknown"])]
+          [$op (if (= (get $op-node :kind) "literal")
+                 (get $op-node :value)
+                 (if (= (get $op-node :kind) "variable")
+                   (str "$" (get $op-node :name))
+                   "unknown"))]
           [$rest (slice $args 1 (length $args))]]
       (cond
         [(= $op "try")
@@ -501,7 +501,7 @@
                                    $line))))))]
         [true
          (r-pair (parse-consume-rparen $p2)
-                 (make-sexpr $op (if (null? $op) $args $rest) $line))])))))
+                 (make-sexpr $op $rest $line))])))))
 
 (defn parse-consume-rparen [$p]
   (let [[$t (p-peek $p)]]

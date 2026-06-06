@@ -398,20 +398,20 @@ function createHttpServerModule(callFn, callFunctionValue) {
       }
       return null;
     },
-    // server_json obj -> response object (body, status=200)
-    "server_json": (body, status = 200) => {
+    // server_json obj -> response object
+    "server_json": (body) => {
       return {
         __fl_response: true,
-        status: status,
+        status: 200,
         contentType: "application/json",
         body
       };
     },
-    // server_text text -> response object (body, status=200)
-    "server_text": (body, status = 200) => {
+    // server_text text -> response object
+    "server_text": (body) => {
       return {
         __fl_response: true,
-        status: status,
+        status: 200,
         contentType: "text/plain",
         body
       };
@@ -428,7 +428,7 @@ function createHttpServerModule(callFn, callFunctionValue) {
     // server_html body -> response object (text/html)
     // In dev mode (FL_DEV=1), injects hot-reload script before </body>
     // so browsers auto-refresh when the FreeLang source file changes.
-    "server_html": (body, status = 200) => {
+    "server_html": (body) => {
       let finalBody = body;
       if (process.env.FL_DEV === "1" && typeof finalBody === "string") {
         const script = `<script>(function(){let w=false;function c(){const e=new EventSource('/__hot');e.onopen=function(){if(w)location.reload();w=true;};e.onerror=function(){e.close();setTimeout(c,400);};}c();})();</script>`;
@@ -440,7 +440,7 @@ function createHttpServerModule(callFn, callFunctionValue) {
       }
       return {
         __fl_response: true,
-        status: status,
+        status: 200,
         contentType: "text/html; charset=utf-8",
         body: finalBody
       };

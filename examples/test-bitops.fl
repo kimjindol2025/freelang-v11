@@ -1,6 +1,0 @@
-(println (str "bit-and: " (bit-and 12 10)))
-(println (str "bit-or:  " (bit-or  12 10)))
-(println (str "bit-xor: " (bit-xor 12 10)))
-(println (str "bit-shl: " (bit-shl 1 4)))
-(println (str "bit-shr: " (bit-shr 32 2)))
-(println "ALL BITOPS PASS")

@@ -362,10 +362,7 @@ export function lex(source: string): Token[] {
       continue;
     }
 
-    const unicodeHint = ch.charCodeAt(0) > 127
-      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — 문자열 안에서는 HTML 엔티티 사용 권장, e.g. &amp;middot; &amp;rarr; &amp;check;)`
-      : '';
-    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}${unicodeHint}`);
+    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}`);
   }
 
   tokens.push({ type: T.EOF, value: "", line, col });

@@ -173,25 +173,15 @@ static void collect_let_bindings(N* n, SymSet* bound) {
         && !strcmp(n->c[0]->v, "let")) {
         N* bindings = n->c[1];
         if (bindings) {
-            /* 단일 괄호 [var1 e1 var2 e2]: 첫 아이템이 NA → 짝수 인덱스가 변수명 */
-            int is_flat = (bindings->nc > 0 && bindings->c[0] && bindings->c[0]->k == NA);
-            if (is_flat) {
-                for (int i = 0; i < bindings->nc; i += 2) {
-                    N* var = bindings->c[i];
-                    if (var && var->k == NA) sym_add(bound, var->v);
-                    if (i+1 < bindings->nc) collect_let_bindings(bindings->c[i+1], bound);
-                }
-            } else {
-                /* 이중 괄호 [[var1 e1] [var2 e2]] */
-                for (int i = 0; i < bindings->nc; i++) {
-                    N* item = bindings->c[i];
-                    if (item && (item->k == NV || item->k == NL)
-                        && item->nc >= 1 && item->c[0] && item->c[0]->k == NA) {
-                        sym_add(bound, item->c[0]->v);
-                        if (item->nc >= 2) collect_let_bindings(item->c[1], bound);
-                    } else {
-                        collect_let_bindings(item, bound);
-                    }
+            for (int i = 0; i < bindings->nc; i++) {
+                N* item = bindings->c[i];
+                /* double-bracket: [[$k expr] [$j expr]] — item is NV [$k expr] */
+                if (item && (item->k == NV || item->k == NL)
+                    && item->nc >= 1 && item->c[0] && item->c[0]->k == NA) {
+                    sym_add(bound, item->c[0]->v);
+                    if (item->nc >= 2) collect_let_bindings(item->c[1], bound);
+                } else {
+                    collect_let_bindings(item, bound);
                 }
             }
         }
@@ -298,11 +288,6 @@ static void emit_node(N* n) {
         if (!strcmp(n->v,"nil") || !strcmp(n->v,"null")) { E("fl_nil()"); return; }
         /* :keyword → string literal */
         if (n->v[0] == ':') { E("fl_str_val(\""); cesc(n->v+1); E("\")"); return; }
-        /* @var → fl_atom_deref(var) */
-        if (n->v[0] == '@' && n->v[1]) {
-            char b[512]; cname(n->v + 1, b, sizeof(b));
-            E("fl_atom_deref(%s)", b); return;
-        }
         char b[512]; cname(n->v, b, sizeof(b));
         /* defn name used as value → wrap as FLValue fn */
         if (is_defn_name(n->v)) { E("fl_fn_new(_wrap_%s, 0, NULL)", b); return; }
@@ -569,139 +554,8 @@ static void emit_node(N* n) {
         { E("fl_math_sqrt("); emit_node(a[0]); E(")"); return; }
     if (sym(op,"str-join") || sym(op,"str_join"))
         { E("str_join("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"str-to-num") || sym(op,"str_to_num"))
-        { E("fl_str_to_num("); emit_node(a[0]); E(")"); return; }
-    /* D: atom */
-    if (sym(op,"atom"))
-        { E("fl_atom_new("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"deref"))
-        { E("fl_atom_deref("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"reset!") || sym(op,"reset_e"))
-        { E("fl_atom_reset("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"swap!") || sym(op,"swap_e")) {
-        /* (swap! atom fn args...) → fl_atom_reset(atom, (fn (deref atom) args...)) */
-        E("fl_atom_reset("); emit_node(a[0]); E(", ");
-        N* items[64]; items[0] = a[1];
-        N* da[2]; da[0] = mkn(NA,"deref"); da[1] = a[0];
-        items[1] = mkn2(NL, da, 2);
-        for (int i = 2; i < na; i++) items[i] = a[i];
-        emit_node(mkn2(NL, items, na));
-        E(")"); return; }
-    /* A: fl_fn_call 오류 → 직접 매핑 */
-    if (sym(op,"html-escape") || sym(op,"html_escape"))
-        { E("fl_html_escape("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"sleep"))
-        { E("fl_sleep_ms("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"min")) {
-        for (int i = 0; i < na - 1; i++) E("fl_min2(");
-        emit_node(a[0]);
-        for (int i = 1; i < na; i++) { E(", "); emit_node(a[i]); E(")"); }
-        return; }
-    if (sym(op,"max")) {
-        for (int i = 0; i < na - 1; i++) E("fl_max2(");
-        emit_node(a[0]);
-        for (int i = 1; i < na; i++) { E(", "); emit_node(a[i]); E(")"); }
-        return; }
-    /* B: cname 미스매치 수정 */
-    if (sym(op,"str-starts-with") || sym(op,"str_starts_with"))
-        { E("fl_str_starts_with("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"str-ends-with") || sym(op,"str_ends_with"))
-        { E("fl_str_ends_with("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    /* C: 술어 */
-    if (sym(op,"nil?") || sym(op,"nil_p"))
-        { E("null_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"empty?") || sym(op,"empty_p"))
-        { E("fl_empty_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"not-empty?") || sym(op,"not_empty_p"))
-        { E("fl_not_empty_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"nil-or-empty?") || sym(op,"nil_or_empty_p"))
-        { E("fl_nil_or_empty_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"number?") || sym(op,"number_p"))
-        { E("fl_number_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"boolean?") || sym(op,"boolean_p"))
-        { E("fl_boolean_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"array?") || sym(op,"array_p"))
-        { E("fl_array_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"map?") || sym(op,"map_p"))
-        { E("fl_map_p("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"fn?") || sym(op,"fn_p"))
-        { E("fl_fn_p("); emit_node(a[0]); E(")"); return; }
-    /* C: 컬렉션/맵 */
-    if (sym(op,"get-in") || sym(op,"get_in"))
-        { E("fl_get_in("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"includes-item") || sym(op,"includes_item"))
-        { E("fl_includes_item("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"sort-by") || sym(op,"sort_by"))
-        { E("fl_sort_by("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"obj-omit") || sym(op,"obj_omit"))
-        { E("fl_obj_omit("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     if (sym(op,"cli-args") || sym(op,"cli_args"))
         { E("fl_get_argv()"); return; }
-    /* E: HTTP 서버 라우팅 */
-    if (sym(op,"server-start") || sym(op,"server_start"))
-        { E("fl_http_start("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"server-get") || sym(op,"server_get"))
-        { E("fl_http_route(fl_str_val(\"GET\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"server-post") || sym(op,"server_post"))
-        { E("fl_http_route(fl_str_val(\"POST\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"server-put") || sym(op,"server_put"))
-        { E("fl_http_route(fl_str_val(\"PUT\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"server-delete") || sym(op,"server_delete"))
-        { E("fl_http_route(fl_str_val(\"DELETE\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"server-patch") || sym(op,"server_patch"))
-        { E("fl_http_route(fl_str_val(\"PATCH\"), "); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    /* E: HTTP 응답 빌더 */
-    if (sym(op,"server-html") || sym(op,"server_html"))
-        { E("fl_resp_html("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"server-json") || sym(op,"server_json"))
-        { E("fl_resp_json("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"server-status") || sym(op,"server_status"))
-        { E("fl_resp_status("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"server-redirect") || sym(op,"server_redirect"))
-        { E("fl_resp_redirect("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"server-html-cookie") || sym(op,"server_html_cookie"))
-        { E("fl_resp_html_cookie("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"server-set-cookie") || sym(op,"server_set_cookie"))
-        { E("fl_resp_set_cookie("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(na > 2 ? a[2] : NULL); E(")"); return; }
-    /* E: HTTP 클라이언트 */
-    if (sym(op,"http-get") || sym(op,"http_get"))
-        { E("fl_http_get("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"http-post") || sym(op,"http_post"))
-        { E("fl_http_post("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(na > 2 ? a[2] : NULL); E(")"); return; }
-    if (sym(op,"http-get-headers") || sym(op,"http_get_headers"))
-        { E("fl_http_get_headers("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"http-post-headers") || sym(op,"http_post_headers"))
-        { E("fl_http_post_headers("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
-    /* F: DB (SQLite) */
-    if (sym(op,"db-open") || sym(op,"db_open"))
-        { E("fl_db_open("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"db-close") || sym(op,"db_close"))
-        { E("fl_db_close("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"db-query") || sym(op,"db_query"))
-        { E("fl_db_query("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
-    if (sym(op,"db-exec") || sym(op,"db_exec"))
-        { E("fl_db_exec("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
-    /* G: JWT + auth */
-    if (sym(op,"auth-jwt-sign") || sym(op,"auth_jwt_sign"))
-        { E("fl_jwt_sign("); emit_node(a[0]); E(", "); emit_node(a[1]); E(", "); emit_node(a[2]); E(")"); return; }
-    if (sym(op,"auth-jwt-verify") || sym(op,"auth_jwt_verify"))
-        { E("fl_jwt_verify("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    if (sym(op,"auth-jwt-expired") || sym(op,"auth_jwt_expired"))
-        { E("fl_jwt_expired("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"auth-hash-password") || sym(op,"auth_hash_password"))
-        { E("fl_hash_password("); emit_node(a[0]); E(")"); return; }
-    if (sym(op,"auth-verify-password") || sym(op,"auth_verify_password"))
-        { E("fl_verify_password("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
-    /* H: str-format / uuid / re-test */
-    if (sym(op,"str-format") || sym(op,"str_format")) {
-        E("fl_str_format("); emit_node(a[0]); E(", ");
-        if (na == 2) { emit_node(a[1]); }
-        else { E("fl_vec_from((FLValue[]){"); emit_args(a+1, na-1); E("}, %d)", na-1); }
-        E(")"); return; }
-    if (sym(op,"uuid"))
-        { E("uuid()"); return; }
-    if (sym(op,"re-test") || sym(op,"re_test"))
-        { E("fl_re_test("); emit_node(a[0]); E(", "); emit_node(a[1]); E(")"); return; }
     /* fn literal */
     if (sym(op,"fn")) {
         SymSet fv = {0};
@@ -971,23 +825,17 @@ static char* read_file(const char* path) {
 }
 
 int main(int argc, char** argv) {
-    if (argc < 2) { fputs("usage: freelang <input.fl> [output.c]\n", stderr); return 1; }
+    if (argc < 2) { fputs("usage: freelang <input.fl>\n", stderr); return 1; }
     const char* input = argv[1];
-    const char* output_c = (argc >= 3) ? argv[2] : NULL;
 
     /* runtime directory: same dir as freelang binary */
     char self_path[512]; strncpy(self_path, argv[0], 511);
     char* dir = dirname(self_path);
     char runtime_dir[512]; snprintf(runtime_dir, sizeof(runtime_dir), "%s/runtime", dir);
 
-    /* temp or explicit C output path */
-    char cfile[512];
-    if (output_c) {
-        strncpy(cfile, output_c, 511);
-    } else {
-        snprintf(cfile, sizeof(cfile), "/tmp/fl_out_%d.c", (int)getpid());
-    }
-    char binf[512]; snprintf(binf, sizeof(binf), "/tmp/fl_out_%d", (int)getpid());
+    /* temp paths */
+    char cfile[512]; snprintf(cfile, sizeof(cfile), "/tmp/fl_out_%d.c", (int)getpid());
+    char binf[512];  snprintf(binf,  sizeof(binf),  "/tmp/fl_out_%d",   (int)getpid());
 
     /* lex + parse */
     char* src = read_file(input);
@@ -1003,9 +851,6 @@ int main(int argc, char** argv) {
     if (!out) { fputs("error: cannot write temp file\n", stderr); return 1; }
     emit_program();
     fclose(out);
-
-    /* compile-only mode: output.c 지정 시 C 생성 후 종료 */
-    if (output_c) { free(src); return 0; }
 
     /* compile */
     char cmd[8192];

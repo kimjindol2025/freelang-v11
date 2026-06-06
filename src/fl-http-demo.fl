@@ -1,0 +1,19 @@
+; FreeLang v9 — fl-http-demo.fl
+; Phase 55: FL HTTP 클라이언트 — TODO 서버(포트 30116)와 통신
+
+(define BASE "http://localhost:30116")
+
+; GET /todos — 초기 목록
+(define todos-raw (http_json (str BASE "/todos")))
+(println (str "초기 todos 수: " (length todos-raw)))
+
+; POST /todos — 새 항목 추가
+(define post-body "{\"title\":\"FL에서 추가!\"}")
+(define new-todo-raw (http_post (str BASE "/todos") post-body))
+(println (str "추가 응답: " new-todo-raw))
+
+; GET /todos — 추가 후 목록
+(define todos2-raw (http_json (str BASE "/todos")))
+(println (str "추가 후 todos 수: " (length todos2-raw)))
+
+(println "=== Phase 55 완료 ===")

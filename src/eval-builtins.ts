@@ -1518,7 +1518,7 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
 
     // (capability-list) → ["tcp" "file" "http" "db" "process" ...]
     case "capability-list": {
-      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = { tcp:{enabled:true,builtins:["tcp-server-start","tcp-server-stop","tcp-send","tcp-server-running?","fl-event-tick","fl-event-drain","fl-event-queue-size","fl-error-drain","fl-error-queue-size","fl-run-loop","fl-run-loop-stop"]},file:{enabled:true,builtins:["file-read","file-write","file-append","file-append-line","file-exists?","file-delete","file-mkdir","dir-list","dir-exists?"]},http:{enabled:true,builtins:["http-get","server-start","server-html","server-json","server-status","server-redirect","server-file","server-html-cookie","server-set-cookie"]},db:{enabled:true,builtins:["db-query","db-exec","db-transaction"]},process:{enabled:true,builtins:["fl-env-get","sleep","now-ms","uuid"]} };
+      if (!(globalThis as any).__flCapRegistry) (globalThis as any).__flCapRegistry = { tcp:{enabled:true,builtins:["tcp-server-start","tcp-server-stop","tcp-send","tcp-server-running?","fl-event-tick","fl-event-drain","fl-event-queue-size","fl-error-drain","fl-error-queue-size"]},file:{enabled:true,builtins:["file-read","file-write","file-append","file-append-line","file-exists?","file-delete","file-mkdir","dir-list","dir-exists?"]},http:{enabled:true,builtins:["http-get","server-start","server-html","server-json","server-status","server-redirect","server-file","server-html-cookie","server-set-cookie"]},db:{enabled:true,builtins:["db-query","db-exec","db-transaction"]},process:{enabled:true,builtins:["fl-env-get","sleep","now-ms","uuid"]} };
       return Object.keys((globalThis as any).__flCapRegistry);
     }
 
@@ -3746,9 +3746,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return Object.values(args[0]);
     }
     case "obj-entries": case "obj_entries": {
-      if (!args[0]) return [];
-      if (args[0] instanceof Map) return Array.from(args[0].entries());
-      if (typeof args[0] !== "object" || Array.isArray(args[0])) return [];
+      if (!args[0] || typeof args[0] !== "object" || Array.isArray(args[0])) return [];
       return Object.entries(args[0]);
     }
     case "obj-merge": case "obj_merge": case "merge": {

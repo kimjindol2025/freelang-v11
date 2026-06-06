@@ -1,0 +1,142 @@
+// FreeLang v9: ScopeStack — 렉시컬 스코프 구현
+// Phase A: Map<string,any> 단일 전역 맵 → 스코프 스택으로 교체
+// Phase Y-1: 메타정보 (file/line/col/type) 추가
+
+/** Phase Y-1: 변수 메타정보 */
+export interface ScopeVarMeta {
+  file?: string;                    // 변수 정의 파일
+  line?: number;                    // 변수 정의 줄
+  col?: number;                     // 변수 정의 컬럼
+  type?: { kind: "type"; name: string };  // 타입 정보 (예: {kind:"type", name:"string"})
+  scope?: "local" | "closure" | "global";  // 스코프 레벨
+}
+
+export class ScopeStack {
+  private stack: Map<string, any>[] = [new Map()];
+  /** Phase Y-1: 메타정보 저장소 — 키: "depth:name", 값: ScopeVarMeta */
+  private meta: Map<string, ScopeVarMeta> = new Map();
+
+  /** 스코프 체인 역방향 탐색 — 가장 안쪽 스코프 우선 */
+  get(name: string): any {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) return this.stack[i].get(name);
+    }
+    return undefined;
+  }
+
+  has(name: string): boolean {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) return true;
+    }
+    return false;
+  }
+
+  /** 현재 스코프에 새 바인딩 생성 */
+  set(name: string, val: any, meta?: Partial<ScopeVarMeta>): void {
+    this.stack[this.stack.length - 1].set(name, val);
+    if (meta) {
+      const depth = this.stack.length - 1;
+      this.meta.set(`${depth}:${name}`, {
+        scope: "local",
+        ...meta,
+      });
+    }
+  }
+
+  /** 전역(최상위) 스코프에 직접 저장 — 최상위 define용 */
+  setGlobal(name: string, val: any, meta?: Partial<ScopeVarMeta>): void {
+    this.stack[0].set(name, val);
+    if (meta) {
+      this.meta.set(`0:${name}`, {
+        scope: "global",
+        ...meta,
+      });
+    }
+  }
+
+  /** 변수의 메타정보 조회 */
+  getMeta(name: string): ScopeVarMeta | undefined {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        return this.meta.get(`${i}:${name}`);
+      }
+    }
+    return undefined;
+  }
+
+  /** 현재 스코프의 모든 변수명 반환 (에러 메시지용) */
+  getCurrentScopeVars(): string[] {
+    if (this.stack.length === 0) return [];
+    return Array.from(this.stack[this.stack.length - 1].keys());
+  }
+
+  /** 현재 스코프 체인에서 정의된 모든 변수명 반환 */
+  getAllVars(): string[] {
+    const vars = new Set<string>();
+    for (const scope of this.stack) {
+      for (const name of scope.keys()) {
+        vars.add(name);
+      }
+    }
+    return Array.from(vars);
+  }
+
+  /** set!용: 스코프 체인에서 기존 바인딩을 찾아 수정, 없으면 false 반환 */
+  mutate(name: string, val: any): boolean {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        this.stack[i].set(name, val);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 새 함수 스코프 시작 */
+  push(): void {
+    this.stack.push(new Map());
+  }
+
+  /** 함수 스코프 종료 */
+  pop(): void {
+    if (this.stack.length > 1) this.stack.pop();
+  }
+
+  /** 클로저 캡처용: 현재 스코프 체인 전체를 단일 Map으로 병합 (메타정보 포함) */
+  snapshot(): Map<string, any> {
+    const merged = new Map<string, any>();
+    for (const scope of this.stack) {
+      for (const [k, v] of scope) merged.set(k, v);
+    }
+    return merged;
+  }
+
+  /** 스냅샷 Map으로 스택을 새로 초기화 (callFunctionValue용) */
+  fromSnapshot(snap: Map<string, any>): void {
+    this.stack = [new Map(snap)];
+    // 메타정보는 초기화 (함수 호출 시에는 새 스코프에서 변수 정의)
+    this.meta = new Map();
+  }
+
+  /** 전체 스택 저장 (callFunctionValue 복원용).
+   *  stack[0](전역)은 참조로 보존 — fl-reload 등 전역 수정이 함수 반환 후에도 유지됨.
+   *  클로저 스코프(stack[1+])는 격리를 위해 복사. */
+  saveStack(): Map<string, any>[] {
+    return [this.stack[0], ...this.stack.slice(1).map((s) => new Map(s))];
+  }
+
+  /** 저장된 스택으로 복원 */
+  restoreStack(saved: Map<string, any>[]): void {
+    this.stack = saved;
+  }
+
+  /** 가장 안쪽 스코프에서 이름 삭제 */
+  delete(name: string): void {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        this.stack[i].delete(name);
+        return;
+      }
+    }
+  }
+}

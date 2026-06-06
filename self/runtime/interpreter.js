@@ -46,7 +46,6 @@ function getKeywordTokenType(text) {
 function lex(source) {
   const tokens = [];
   let i = 0, line = 1, col = 1;
-  let lastStringStart = null;
   while (i < source.length) {
     const ch = source[i];
     if (/\s/.test(ch)) {
@@ -63,25 +62,9 @@ function lex(source) {
       while (i < source.length && source[i] !== "\n") i++;
       continue;
     }
-    if (ch === '"' && source[i+1] === '"' && source[i+2] === '"') {
-      const startLine = line, startCol = col;
-      lastStringStart = { line, col };
-      i += 3; col += 3;
-      let value = '';
-      while (i < source.length) {
-        if (source[i] === '"' && source[i+1] === '"' && source[i+2] === '"') {
-          i += 3; col += 3; break;
-        }
-        if (source[i] === '\n') { line++; col = 1; } else { col++; }
-        value += source[i]; i++;
-      }
-      tokens.push({ type: "String" /* String */, value, line: startLine, col: startCol });
-      continue;
-    }
     if (ch === '"') {
       const start = i;
       const startCol = col;
-      lastStringStart = { line, col };
       i++;
       col++;
       let value = "";
@@ -227,13 +210,7 @@ function lex(source) {
       tokens.push({ type: tokenType, value, line, col: startCol });
       continue;
     }
-    const unicodeHint = ch.charCodeAt(0) > 127
-      ? ` (U+${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} — 유니코드는 """...""" 안에서만 자유롭게 사용 가능)`
-      : '';
-    const strHint = lastStringStart
-      ? ` → 마지막으로 열린 문자열: ${lastStringStart.line}번줄 ${lastStringStart.col}열 — 그 근처에서 닫히지 않은 " 또는 """ 확인`
-      : '';
-    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}${unicodeHint}${strHint}`);
+    throw new Error(`Unexpected character '${ch}' at line ${line}, col ${col}`);
   }
   tokens.push({ type: "EOF" /* EOF */, value: "", line, col });
   return tokens;
@@ -10563,10 +10540,6 @@ function flExecOpNative(op, vals) {
       return fenv;
     }
     case "fl-env-get":
-      if (typeof v0 === "string") {
-        const envVal = process.env[v0];
-        return envVal !== void 0 ? envVal : (v1 !== null && v1 !== void 0 ? v1 : null);
-      }
       return flEnvGet(v0, String(v1 ?? ""));
     case "fl-exec-op":
       return flExecOpNative(String(v0 ?? ""), Array.isArray(v1) ? v1 : []);
@@ -11445,10 +11418,6 @@ sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
       if (Array.isArray(args[0])) return args[0];
       return [];
     case "fl-env-get": {
-      if (typeof args[0] === "string") {
-        const envVal = process.env[args[0]];
-        return envVal !== void 0 ? envVal : (args[1] !== null && args[1] !== void 0 ? args[1] : null);
-      }
       let flenv = args[0];
       const fname = String(args[1]);
       while (flenv !== null && flenv !== void 0) {
@@ -30198,7 +30167,7 @@ var Interpreter = class _Interpreter {
     if (!node) return null;
     if (node.kind === "literal") {
       const lit = node;
-      if (lit.type === "string" && typeof lit.value === "string" && lit.value.includes("${")) {
+      if (lit.type === "string" && typeof lit.value === "string" && (lit.value.includes("{$") || lit.value.includes("{("))) {
         return this.interpolateString(lit.value);
       }
       if (lit.type === "symbol" && typeof lit.value === "string") {
@@ -30562,36 +30531,54 @@ var Interpreter = class _Interpreter {
     let result = "";
     let i = 0;
     while (i < template.length) {
-      if (template[i] === "$" && i + 1 < template.length && template[i + 1] === "{") {
-        const start = i + 2;
-        const end = template.indexOf("}", start);
-        if (end > start) {
-          const content = template.slice(start, end).trim();
-          let val;
-          if (content.includes("(")) {
-            try {
-              const tokens = lex("(" + content + ")");
-              const ast = parse(tokens);
-              val = ast.length > 0 ? this.eval(ast[0]) : null;
-            } catch {
-              val = null;
-            }
-          } else if (content.includes(".")) {
-            const parts = content.split(".");
-            val = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
-            for (let p = 1; p < parts.length; p++) {
-              if (val === null || val === void 0) {
-                val = null;
-                break;
+      if (template[i] === "{" && i + 1 < template.length) {
+        const next = template[i + 1];
+        if (next === "$") {
+          const end = template.indexOf("}", i);
+          if (end > i) {
+            const varName = template.slice(i + 2, end);
+            let val;
+            if (varName.includes(".")) {
+              const parts = varName.split(".");
+              val = this.context.variables.has("$" + parts[0]) ? this.context.variables.get("$" + parts[0]) : this.context.variables.get(parts[0]);
+              for (let p = 1; p < parts.length; p++) {
+                if (val === null || val === void 0) {
+                  val = null;
+                  break;
+                }
+                val = typeof val === "object" ? val[parts[p]] : null;
               }
-              val = typeof val === "object" ? val[parts[p]] : null;
+            } else {
+              val = this.context.variables.has("$" + varName) ? this.context.variables.get("$" + varName) : this.context.variables.get(varName);
             }
-          } else {
-            val = this.context.variables.has("$" + content) ? this.context.variables.get("$" + content) : this.context.variables.get(content);
+            result += val === null || val === void 0 ? "" : String(val);
+            i = end + 1;
+            continue;
           }
-          result += val === null || val === void 0 ? "" : String(val);
-          i = end + 1;
-          continue;
+        } else if (next === "(") {
+          let depth = 0;
+          let j = i + 1;
+          while (j < template.length) {
+            if (template[j] === "(") depth++;
+            else if (template[j] === ")") {
+              depth--;
+              if (depth === 0) break;
+            }
+            j++;
+          }
+          if (j < template.length && j + 1 < template.length && template[j + 1] === "}") {
+            const exprStr = template.slice(i + 1, j + 1);
+            try {
+              const tokens = lex(exprStr);
+              const ast = parse(tokens);
+              const val = ast.length > 0 ? this.eval(ast[0]) : null;
+              result += val === null || val === void 0 ? "" : String(val);
+            } catch {
+              result += template.slice(i, j + 2);
+            }
+            i = j + 2;
+            continue;
+          }
         }
       }
       result += template[i];

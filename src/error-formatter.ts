@@ -1,0 +1,368 @@
+// FreeLang v9: Error Formatter
+// Phase 59: 위치 정보 + 소스 강조 + 유사 함수 힌트
+// Phase A (2026-04-25): ErrorCode + context + 자동 복구 힌트
+// Phase Y-1: VariableNotFoundError 특별 포매팅
+
+import { RECOVERY_HINTS, VariableNotFoundError } from "./errors";
+
+export interface FreeLangError {
+  message: string;
+  file?: string;
+  line?: number;
+  col?: number;
+  source?: string;   // 전체 소스 코드 (줄 강조용)
+  hint?: string;     // 수정 제안
+  code?: string;     // Phase A: ErrorCode (예: "E_TYPE_NIL")
+  context?: Record<string, any>;  // Phase A: throw 시점 컨텍스트
+  stack?: Array<{ fn: string; line: number }>;  // Phase B: 호출 스택 트레이스
+}
+
+/**
+ * 레벤슈타인 거리 계산 (간단 구현, npm 패키지 불필요)
+ */
+export function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * 유사 이름 추천
+ * - 짧은 이름(≤4자): 거리 ≤ 2
+ * - 긴 이름(>4자): 거리 ≤ 3 (예: compute-tax vs compute-rate = 3)
+ * @param name 찾지 못한 이름
+ * @param candidates 후보 목록
+ * @returns 가장 가까운 후보 또는 null
+ */
+// AI-First #4: 알려진 잘못된 이름 → 정답 + 사용법 매핑
+export const KNOWN_ALIASES: Record<string, { correct: string; usage: string }> = {
+  // 환경변수
+  "env":              { correct: "shell_env",    usage: '(shell_env "KEY")' },
+  "get_env":          { correct: "shell_env",    usage: '(shell_env "KEY")' },
+  "get-env":          { correct: "shell_env",    usage: '(shell_env "KEY")' },
+  "get_env_or":       { correct: "shell_env",    usage: '(or (shell_env "KEY") "default")' },
+  // 맵 조작
+  "obj_merge":        { correct: "assoc",        usage: '(assoc map "key" value)' },
+  "obj-merge":        { correct: "assoc",        usage: '(assoc map "key" value)' },
+  "merge":            { correct: "assoc",        usage: '(assoc map "key" value)' },
+  "obj_omit":         { correct: "dissoc",       usage: '(dissoc map "key")' },
+  "obj-omit":         { correct: "dissoc",       usage: '(dissoc map "key")' },
+  "obj_pick":         { correct: "get",          usage: '(get map "key")' },
+  "dict":             { correct: "map-set",      usage: '(map-set {} "key" value)' },
+  // 문자열
+  "str_length":       { correct: "length",       usage: '(length "hello")' },
+  "string_length":    { correct: "length",       usage: '(length "hello")' },
+  "str_concat":       { correct: "str",          usage: '(str "a" "b" "c")' },
+  "str_to_int":       { correct: "str_to_num",   usage: '(str_to_num "42")' },
+  "parse_int":        { correct: "str_to_num",   usage: '(str_to_num "42")' },
+  "int_to_str":       { correct: "num_to_str",   usage: '(num_to_str 42)' },
+  "to_string":        { correct: "str",          usage: '(str value)' },
+  "to_str":           { correct: "str",          usage: '(str value)' },
+  // 타입 체크
+  "is_null":          { correct: "nil?",         usage: '(nil? value)' },
+  "is_nil":           { correct: "nil?",         usage: '(nil? value)' },
+  "null?":            { correct: "nil?",         usage: '(nil? value)' },
+  "is_array":         { correct: "array?",       usage: '(array? value)' },
+  "is_string":        { correct: "string?",      usage: '(string? value)' },
+  "is_number":        { correct: "number?",      usage: '(number? value)' },
+  // 배열
+  "push":             { correct: "append",       usage: '(append arr item)' },
+  "list_append":      { correct: "append",       usage: '(append arr item)' },
+  "array_push":       { correct: "append",       usage: '(append arr item)' },
+  "array_length":     { correct: "length",       usage: '(length arr)' },
+  "first":            { correct: "get",          usage: '(get arr 0)' },
+  "head":             { correct: "get",          usage: '(get arr 0)' },
+  // 출력
+  "console_log":      { correct: "println",      usage: '(println value)' },
+  "console.log":      { correct: "println",      usage: '(println value)' },
+  "print":            { correct: "println",      usage: '(println value)' },
+  "log":              { correct: "println",      usage: '(println value)' },
+  // DB
+  "mariadb_all":      { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+  "db_query":         { correct: "mariadb_query", usage: '(mariadb_query db "SELECT ..." [params])' },
+  // mariadb-* kebab-case — (load "stdlib/db.fl") 또는 DB 맵 정의 필요
+  "mariadb-query":    { correct: "mariadb_query", usage: '먼저 DB 맵 정의: (define DB {:host "localhost" :user "u" :password "p" :database "d"})\n  그 후: (mariadb_query DB "SELECT ..." [params])' },
+  "mariadb-exec":     { correct: "mariadb_exec",  usage: '(mariadb_exec DB "INSERT INTO ..." [params])' },
+  "mariadb-one":      { correct: "mariadb_one",   usage: '(mariadb_one DB "SELECT ... LIMIT 1" [params])  ;; → 단일 row 반환' },
+  // db-query / db-exec 는 universal wrapper로 구현됨 — 힌트 제거
+  // HTTP
+  "http_post":        { correct: "http_get",     usage: '(http_get url {:method "POST" :body data})' },
+  "fetch":            { correct: "http_get",     usage: '(http_get url)' },
+  // 서버
+  "server_listen":    { correct: "server_start", usage: '(server_start 40000)' },
+  "listen":           { correct: "server_start", usage: '(server_start 40000)' },
+  // 에러
+  "raise":            { correct: "error",        usage: '(error "메시지")' },
+  "panic":            { correct: "error",        usage: '(error "메시지")' },
+  // 문자열 변환 (#str-to-int 오용)
+  "str-to-int":       { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  "str_to_int":       { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  "parse-int":        { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  "parseInt":         { correct: "str-to-num",   usage: '(str-to-num "42")' },
+  // 맵 키 목록
+  "json_keys":        { correct: "keys",         usage: '(keys map)' },
+  "json-keys":        { correct: "keys",         usage: '(keys map)' },
+  "map-keys":         { correct: "keys",         usage: '(keys map)' },
+  "object-keys":      { correct: "keys",         usage: '(keys map)' },
+  // HTTP 데이터 추출 (#11/#12/#13)
+  "http-simple-get":  { correct: "http-get-data", usage: '(http-get-data url)' },
+  "http-fetch":       { correct: "http-get-data", usage: '(http-get-data url)' },
+  // 맵 병합 (#39)
+  "obj-merge":        { correct: "merge",        usage: '(merge map1 map2)' },
+  "obj_merge":        { correct: "merge",        usage: '(merge map1 map2)' },
+  // 배열 길이 (#42)
+  "size":             { correct: "length",        usage: '(length arr)' },
+  // 문자열 분리 (#43)
+  "split":            { correct: "str-split",     usage: '(str-split "a,b" ",")' },
+  "str_split":        { correct: "str-split",     usage: '(str-split "a,b" ",")' },
+  // JSON 파싱 (#44)
+  "JSON.parse":       { correct: "json-parse",    usage: '(json-parse "{}")' },
+  "parseJSON":        { correct: "json-parse",    usage: '(json-parse "{}")' },
+  "parse_json":       { correct: "json-parse",    usage: '(json-parse "{}")' },
+  // JSON 직렬화 (#45)
+  "JSON.stringify":   { correct: "json-stringify", usage: '(json-stringify {})' },
+  "toJSON":           { correct: "json-stringify", usage: '(json-stringify {})' },
+  "stringify":        { correct: "json-stringify", usage: '(json-stringify {})' },
+  // 숫자→문자열 (#57)
+  "num-to-str":       { correct: "num_to_str",    usage: '(num_to_str 42)' },
+  "numToStr":         { correct: "num_to_str",    usage: '(num_to_str 42)' },
+  "number_to_str":    { correct: "num_to_str",    usage: '(num_to_str 42)' },
+  // 문자열 공백 제거 (#78)
+  "trim":             { correct: "str-trim",      usage: '(str-trim "  hello  ")' },
+  "str_trim":         { correct: "str-trim",      usage: '(str-trim "  hello  ")' },
+  // 문자열 시작 여부 (#79)
+  "starts-with?":     { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+  "startsWith":       { correct: "str-starts-with", usage: '(str-starts-with "hello" "he")' },
+  // 문자열 포함 여부 (#80)
+  "includes":         { correct: "str-contains",  usage: '(str-contains "hello" "ell")' },
+  "str_includes":     { correct: "str-contains",  usage: '(str-contains "hello" "ell")' },
+  // 대문자 변환 (#81)
+  "to-upper":         { correct: "str-to-upper",  usage: '(str-to-upper "hello")' },
+  "toUpperCase":      { correct: "str-to-upper",  usage: '(str-to-upper "hello")' },
+  "to_upper":         { correct: "str-to-upper",  usage: '(str-to-upper "hello")' },
+  // 문자열 변환 (#82)
+  "toString":         { correct: "str",           usage: '(str value)' },
+  // 시간 (#37)
+  "Date.now":         { correct: "now-ms",        usage: '(now-ms)' },
+  "Date.now()":       { correct: "now-ms",        usage: '(now-ms)' },
+  "now_ms":           { correct: "now-ms",        usage: '(now-ms)' },
+  "currentTimeMs":    { correct: "now-ms",        usage: '(now-ms)' },
+  // 수학 (#90) — num-round 등 잘못된 함수명
+  "num-round":        { correct: "round",         usage: '(round 3.7)  ;; → 4 | 소수점 이하 제거는 (int 3.7) → 3' },
+  "num_round":        { correct: "round",         usage: '(round 3.7)' },
+  "Math.round":       { correct: "round",         usage: '(round 3.7)' },
+  "Math.floor":       { correct: "floor",         usage: '(floor 3.7)  ;; → 3' },
+  "Math.ceil":        { correct: "ceil",          usage: '(ceil 3.2)   ;; → 4' },
+  "Math.abs":         { correct: "abs",           usage: '(abs -5)     ;; → 5' },
+  "Math.max":         { correct: "max",           usage: '(max 3 7)    ;; → 7' },
+  "Math.min":         { correct: "min",           usage: '(min 3 7)    ;; → 3' },
+  "Math.pow":         { correct: "pow",           usage: '(pow 2 10)   ;; → 1024' },
+  "Math.sqrt":        { correct: "sqrt",          usage: '(sqrt 16)    ;; → 4' },
+  "truncate":         { correct: "int",           usage: '(int 3.9)    ;; → 3 (소수점 버림)' },
+  "trunc":            { correct: "int",           usage: '(int 3.9)    ;; → 3' },
+  "num-abs":          { correct: "abs",           usage: '(abs -5)' },
+  "num-floor":        { correct: "floor",         usage: '(floor 3.7)' },
+  "num-ceil":         { correct: "ceil",          usage: '(ceil 3.2)' },
+  // 정규식 — regex-test 12회 오용 (fl errors TOP 1)
+  "regex-test":       { correct: "re-test",       usage: '(re-test "^hello" "hello world")  ;; → true' },
+  "regex_test":       { correct: "re-test",       usage: '(re-test "패턴" 문자열)' },
+  "regexp-test":      { correct: "re-test",       usage: '(re-test "패턴" 문자열)' },
+  "re-match":         { correct: "re-test",       usage: '(re-test "패턴" 문자열)  ;; boolean 반환' },
+  // #47: req["params"]["id"] 대신 server_req_param 사용
+  "req_param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
+  "req-param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
+  "req_query":        { correct: "server_req_query", usage: '(server_req_query req "key")' },
+  "req-query":        { correct: "server_req_query", usage: '(server_req_query req "key")' },
+  "req_body":         { correct: "server_req_body",  usage: '(server_req_body req)' },
+  "req-body":         { correct: "server_req_body",  usage: '(server_req_body req)' },
+  // #67: mariadb_connect positional args
+  "mariadb_connect":  { correct: "mariadb_connect",  usage: '(mariadb_connect {:host "h" :user "u" :password "p" :database "d"}) 또는 (mariadb_connect "host" "user" "pass" "db")' },
+  // 추가 HTTP 힌트
+  "http-post-json":   { correct: "http_post",        usage: '(http_post url (json-stringify body))' },
+  // #47: req params 접근 힌트
+  "req-params":       { correct: "server_req_param", usage: '(server_req_param req "id") — URL :id 파라미터 접근' },
+  "req-param":        { correct: "server_req_param", usage: '(server_req_param req "id")' },
+  // #51: (get req "params") → server_req_param 안내
+  "params":           { correct: "server_req_param", usage: '(server_req_param req "id") — URL :id 파라미터. (get (get req "params") "id") 대신 사용' },
+  // #48: body 자동 파싱 — server_req_body 또는 get req "body" 사용 안내
+  "req_body_raw":     { correct: "server_req_body",  usage: '(server_req_body req) — body 문자열 반환. JSON이면 (json-parse (server_req_body req)) 사용' },
+  "body_parse":       { correct: "get",              usage: '(get req "body") — Content-Type: application/json 요청은 자동 파싱. 그 외는 (json-parse (server_req_body req)) 필요' },
+  // #52: express.fl + server_* 혼용 금지
+  "app-get":          { correct: "server-get",       usage: '(load "src/express.fl") 없이 server-get 사용. express.fl 로드 후에는 app-* 계열만 사용하세요.' },
+  "app-post":         { correct: "server-post",      usage: '(load "src/express.fl") 없이 server-post 사용. 혼용 금지: 한 프로젝트에서 server_* / app-* 중 하나만 선택.' },
+  "app-listen":       { correct: "server-start",     usage: '(load "src/express.fl") 없이 app-listen 사용. express.fl 로드 후에만 app-listen 사용 가능.' },
+  "res-json":         { correct: "server-json",      usage: '(load "src/express.fl") 없이 res-json 사용. express.fl 로드 후에만 res-* 계열 사용 가능.' },
+  "res-status":       { correct: "server-status",    usage: '(load "src/express.fl") 없이 res-status 사용. 혼용 금지.' },
+  // #53/#54: WebSocket 힌트
+  "ws_handler":       { correct: "ws-handler",       usage: '(ws-handler (fn [conn msg] ...)) — conn: 연결 객체, msg: 수신 메시지' },
+  "on-close":         { correct: "ws-on-close",      usage: '(ws-on-close conn (fn [] ...)) — 연결 종료 핸들러' },
+  // #99: server_start 블로킹 힌트
+  "server_listen":    { correct: "server_start",     usage: '(server_start port) — 이후 코드는 실행되지 않습니다. 초기화는 server_start 호출 전에 완료하세요.' },
+  "server-listen":    { correct: "server_start",     usage: '(server_start port)' },
+};
+
+export function suggestSimilar(name: string, candidates: string[]): string | null {
+  let best: string | null = null;
+  let bestDist = Infinity;
+
+  // 이름 길이에 따라 임계값 조정
+  const threshold = name.length > 4 ? 3 : 2;
+
+  for (const candidate of candidates) {
+    const dist = levenshtein(name.toLowerCase(), candidate.toLowerCase());
+    if (dist <= threshold && dist < bestDist) {
+      bestDist = dist;
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * 에러 포매팅 — 파일:줄:컬럼 헤더 + 소스 강조 (±2줄) + 힌트
+ */
+/**
+ * Phase Y-1: VariableNotFoundError 전용 포매팅
+ */
+export function formatVariableNotFoundError(err: VariableNotFoundError): string {
+  const lines: string[] = [];
+
+  // 1) 헤더
+  let header = `변수 미정의 오류`;
+  if (err.file) {
+    header += `  ${err.file}`;
+    if (err.line != null) header += `:${err.line}`;
+  }
+  lines.push(header);
+  lines.push("");
+
+  // 2) 에러 메시지
+  lines.push(`✖ ${err.message}`);
+  lines.push("");
+
+  // 3) 현재 스코프의 정의된 변수 (에러 컨텍스트에서 얻기)
+  if (err.context?.scope && Array.isArray(err.context.scope)) {
+    lines.push(`현재 스코프의 변수들:`);
+    const scopeVars = (err.context.scope as string[]).slice(0, 5);
+    scopeVars.forEach(v => {
+      lines.push(`  • ${v}`);
+    });
+    if ((err.context.scope as string[]).length > 5) {
+      lines.push(`  ... 외 ${(err.context.scope as string[]).length - 5}개`);
+    }
+    lines.push("");
+  }
+
+  // 4) 유사 이름 제안
+  if (err.context?.suggestions && Array.isArray(err.context.suggestions) && err.context.suggestions.length > 0) {
+    lines.push(`유사한 변수명:`);
+    (err.context.suggestions as string[]).slice(0, 3).forEach(v => {
+      lines.push(`  • ${v}`);
+    });
+    lines.push("");
+  }
+
+  // 5) 힌트
+  if (err.hint) {
+    lines.push(`💡 힌트:`);
+    lines.push(`  ${err.hint}`);
+  }
+
+  return lines.join("\n");
+}
+
+export function formatError(err: FreeLangError): string {
+  // Phase Y-1: VariableNotFoundError 특별 처리
+  if (err instanceof VariableNotFoundError) {
+    return formatVariableNotFoundError(err);
+  }
+
+  const lines: string[] = [];
+
+  // 1) 헤더 줄
+  let header = `FreeLang 실행 오류`;
+  if (err.file) {
+    header += `  ${err.file}`;
+    if (err.line != null) {
+      header += `:${err.line}`;
+      if (err.col != null) {
+        header += `:${err.col}`;
+      }
+    }
+  }
+  lines.push(header);
+
+  // 2) 소스 강조 (±2줄)
+  if (err.source && err.line != null) {
+    const srcLines = err.source.split("\n");
+    const targetLine = err.line; // 1-based
+    const startLine = Math.max(1, targetLine - 2);
+    const endLine = Math.min(srcLines.length, targetLine + 2);
+
+    for (let i = startLine; i <= endLine; i++) {
+      const lineNum = String(i).padStart(3, " ");
+      const srcLine = srcLines[i - 1] ?? "";
+      lines.push(`  ${lineNum} │ ${srcLine}`);
+
+      // 오류 줄 아래에 캐럿(^^^) 표시
+      if (i === targetLine) {
+        const col = err.col != null ? err.col : 1;
+        const prefix = " ".repeat(7 + (col - 1)); // "  NNN │ " = 7자
+        let caretLen = 1;
+        // 오류 토큰 길이: message에서 따옴표 안 이름 추출 시도
+        const tokenMatch = err.message.match(/['"`]([^'"`]+)['"`]/);
+        if (tokenMatch) caretLen = tokenMatch[1].length;
+        lines.push(prefix + "^".repeat(caretLen));
+      }
+    }
+  }
+
+  // 3) 에러 메시지
+  lines.push(`오류: ${err.message}`);
+
+  // 3.5) Phase A: 컨텍스트 (fn, arg, expected, got 등)
+  if (err.context && Object.keys(err.context).length > 0) {
+    const ctxParts: string[] = [];
+    if (err.context.fn) ctxParts.push(`fn=${err.context.fn}`);
+    if (err.context.arg != null) ctxParts.push(`arg=${err.context.arg}`);
+    if (err.context.expected) ctxParts.push(`expected=${err.context.expected}`);
+    if (err.context.got) ctxParts.push(`got=${err.context.got}`);
+    if (err.context.varName) ctxParts.push(`var=${err.context.varName}`);
+    if (ctxParts.length > 0) {
+      lines.push(`컨텍스트: ${ctxParts.join("  ")}`);
+    }
+  }
+
+  // 4) 힌트 — 명시적 hint 우선, 없으면 ErrorCode 기반 자동 복구 힌트
+  const autoHint = err.code && !err.hint ? RECOVERY_HINTS[err.code] : null;
+  if (err.hint) {
+    lines.push(`힌트: ${err.hint}`);
+  } else if (autoHint) {
+    lines.push(`힌트: ${autoHint}`);
+  }
+
+  // 5) 스택 트레이스 — Phase B: 함수 호출 체인
+  if (err.stack && err.stack.length > 0) {
+    lines.push(`호출 스택:`);
+    for (let i = 0; i < err.stack.length; i++) {
+      const frame = err.stack[i];
+      const indent = "  ".repeat(i + 1);
+      lines.push(`${indent}→ ${frame.fn} (line ${frame.line})`);
+    }
+  }
+
+  return lines.join("\n");
+}

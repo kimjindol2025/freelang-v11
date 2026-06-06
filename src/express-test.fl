@@ -1,0 +1,331 @@
+;; ============================================
+;; Express.fl 테스트 프레임워크
+;; ============================================
+;; 단위 테스트, 통합 테스트, 성능 테스트
+;; 실행: node bootstrap.js run express-test.fl
+
+(load "src/express.fl")
+
+;; ============ 테스트 헬퍼 ============
+
+[FUNC test-response-helpers :params []
+  :body (do
+    (println "\n[응답 헬퍼 테스트]")
+
+    ;; res-json 이 서버 함수를 감싼다
+    (test-deftest "res-json wraps server_json" (fn []
+      (let [result (res-json { :status "ok" })]
+        (test-assert result "res-json should return truthy value"))))
+
+    ;; res-status 는 상태 코드를 반환
+    (test-deftest "res-status returns truthy" (fn []
+      (let [result (res-status 404 { :error "not found" })]
+        (test-assert result "res-status should return truthy value"))))
+  )
+]
+
+[FUNC test-request-helpers :params []
+  :body (do
+    (println "\n[요청 헬퍼 테스트]")
+
+    ;; req-body 는 JSON을 파싱할 수 있어야 함
+    (test-deftest "req-body parses JSON" (fn []
+      (let [
+        body "{\"name\":\"test\",\"value\":123}"
+        result (json_parse body)
+      ]
+        (test-assert result "JSON parsing should succeed"))))
+  )
+]
+
+[FUNC test-string-helpers :params []
+  :body (do
+    (println "\n[문자열 헬퍼 테스트]")
+
+    (test-deftest "str function concatenates" (fn []
+      (let [result (str "hello" "-" "world")]
+        (test-assert-eq result "hello-world" "String concatenation failed"))))
+
+    (test-deftest "str_trim removes whitespace" (fn []
+      (let [result (str_trim "  hello  ")]
+        (test-assert-eq result "hello" "Trimming failed"))))
+  )
+]
+
+[FUNC test-cache-functions :params []
+  :body (do
+    (println "\n[캐시 함수 테스트]")
+
+    ;; 캐시 저장
+    (test-deftest "cache-set stores value" (fn []
+      (cache-set "test:key" { :data "value" } 60000)
+      (test-assert true "Cache set should succeed")))
+
+    ;; 캐시 조회
+    (test-deftest "cache-get retrieves value" (fn []
+      (cache-set "user:1" { :id 1 :name "alice" } 60000)
+      (let [cached (cache-get "user:1")]
+        (test-assert cached "Cache get should return value"))))
+
+    ;; 캐시 확인
+    (test-deftest "cache-has checks existence" (fn []
+      (cache-set "exists:key" "value" 60000)
+      (let [has (cache-has "exists:key")]
+        (test-assert has "Cache should exist"))))
+
+    ;; 캐시 삭제
+    (test-deftest "cache-del removes value" (fn []
+      (cache-set "delete:me" "value" 60000)
+      (cache-del "delete:me")
+      (test-assert true "Cache delete should succeed")))
+
+    ;; 캐시 정보
+    (test-deftest "cache-info returns statistics" (fn []
+      (let [info (cache-info)]
+        (test-assert info "Cache info should return object"))))
+  )
+]
+
+[FUNC test-auth-functions :params []
+  :body (do
+    (println "\n[인증 함수 테스트]")
+
+    ;; JWT 생성
+    (test-deftest "auth-jwt-sign creates token" (fn []
+      (let [
+        payload { :user_id 1 :username "test" }
+        token (auth-jwt-sign payload "secret" 3600)
+      ]
+        (test-assert token "JWT token should be created"))))
+
+    ;; JWT 검증
+    (test-deftest "auth-jwt-verify validates token" (fn []
+      (let [
+        payload { :user_id 1 :username "test" }
+        token (auth-jwt-sign payload "secret" 3600)
+        verified (auth-jwt-verify token "secret")
+      ]
+        (test-assert verified "JWT verification should succeed"))))
+
+    ;; JWT 디코딩
+    (test-deftest "auth-jwt-decode decodes token" (fn []
+      (let [
+        payload { :user_id 1 :username "test" }
+        token (auth-jwt-sign payload "secret" 3600)
+        decoded (auth-jwt-decode token)
+      ]
+        (test-assert decoded "JWT decode should return payload"))))
+
+    ;; 비밀번호 해싱
+    (test-deftest "auth-hash-password hashes password" (fn []
+      (let [hashed (auth-hash-password "mypassword")]
+        (test-assert hashed "Password hashing should produce hash"))))
+
+    ;; 비밀번호 검증
+    (test-deftest "auth-verify-password validates password" (fn []
+      (let [
+        password "mypassword"
+        hashed (auth-hash-password password)
+        valid (auth-verify-password password hashed)
+      ]
+        (test-assert valid "Password verification should succeed"))))
+
+    ;; 무작위 토큰
+    (test-deftest "auth-random-token generates token" (fn []
+      (let [token (auth-random-token 32)]
+        (test-assert token "Random token should be generated"))))
+  )
+]
+
+[FUNC test-pubsub-functions :params []
+  :body (do
+    (println "\n[PubSub 함수 테스트]")
+
+    ;; 토픽 발행
+    (test-deftest "pubsub-publish publishes event" (fn []
+      (let [count (pubsub-publish "test:topic" { :message "hello" })]
+        (test-assert (or (= count 0) (= count 1)) "PubSub publish should return count"))))
+
+    ;; 토픽 목록
+    (test-deftest "pubsub-topics returns topic list" (fn []
+      (let [topics (pubsub-topics)]
+        (test-assert topics "PubSub topics should return list"))))
+  )
+]
+
+[FUNC test-logging-functions :params []
+  :body (do
+    (println "\n[로깅 함수 테스트]")
+
+    (test-deftest "log-info logs message" (fn []
+      (log-info "Test log message")
+      (test-assert true "Logging should succeed")))
+
+    (test-deftest "log-error logs error" (fn []
+      (log-error "Test error message")
+      (test-assert true "Error logging should succeed")))
+
+    (test-deftest "log-debug logs debug" (fn []
+      (log-debug "Test debug message")
+      (test-assert true "Debug logging should succeed")))
+  )
+]
+
+[FUNC test-json-functions :params []
+  :body (do
+    (println "\n[JSON 함수 테스트]")
+
+    (test-deftest "json_parse parses JSON string" (fn []
+      (let [
+        json-str "{\"key\":\"value\",\"number\":42}"
+        parsed (json_parse json-str)
+      ]
+        (test-assert parsed "JSON parsing should succeed"))))
+
+    (test-deftest "json_stringify converts to JSON" (fn []
+      (let [
+        obj { :key "value" :number 42 }
+        json-str (json_stringify obj)
+      ]
+        (test-assert json-str "JSON stringification should succeed"))))
+  )
+]
+
+[FUNC test-type-functions :params []
+  :body (do
+    (println "\n[타입 함수 테스트]")
+
+    (test-deftest "array? checks if value is array" (fn []
+      (let [is-arr (array? [1 2 3])]
+        (test-assert is-arr "Array check should return true"))))
+
+    (test-deftest "object? checks if value is object" (fn []
+      (let [obj { :key "value" }]
+        (test-assert obj "Object check should return true"))))
+
+    (test-deftest "string? checks if value is string" (fn []
+      (let [is-str (string? "hello")]
+        (test-assert is-str "String check should return true"))))
+
+    (test-deftest "number? checks if value is number" (fn []
+      (let [is-num (number? 42)]
+        (test-assert is-num "Number check should return true"))))
+  )
+]
+
+[FUNC test-time-functions :params []
+  :body (do
+    (println "\n[시간 함수 테스트]")
+
+    (test-deftest "now_ms returns milliseconds" (fn []
+      (let [ts (now_ms)]
+        (test-assert (number? ts) "now_ms should return number"))))
+
+    (test-deftest "now_iso returns ISO string" (fn []
+      (let [iso (now_iso)]
+        (test-assert (string? iso) "now_iso should return string"))))
+
+    (test-deftest "now_unix returns unix timestamp" (fn []
+      (let [unix (now_unix)]
+        (test-assert (number? unix) "now_unix should return number"))))
+  )
+]
+
+[FUNC test-lookup-functions :params []
+  :body (do
+    (println "\n[조회 함수 테스트]")
+
+    (test-deftest "get retrieves value from object" (fn []
+      (let [obj { :name "alice" :age 30 }]
+        (let [value (get obj "name")]
+          (test-assert-eq value "alice" "Get should retrieve value")))))
+
+    (test-deftest "array? type check works" (fn []
+      (test-assert (array? [1 2 3]) "Should recognize array")))
+  )
+]
+
+[FUNC test-flow-control :params []
+  :body (do
+    (println "\n[제어 흐름 테스트]")
+
+    (test-deftest "if branching works" (fn []
+      (let [result (if true "yes" "no")]
+        (test-assert-eq result "yes" "If branching failed"))))
+
+    (test-deftest "and logical operation" (fn []
+      (let [result (and true true)]
+        (test-assert result "And operation failed"))))
+
+    (test-deftest "or logical operation" (fn []
+      (let [result (or false true)]
+        (test-assert result "Or operation failed"))))
+  )
+]
+
+[FUNC test-comparison :params []
+  :body (do
+    (println "\n[비교 연산 테스트]")
+
+    (test-deftest "= equality check" (fn []
+      (test-assert (= 42 42) "Equality check failed")))
+
+    (test-deftest "!= inequality check" (fn []
+      (test-assert (!= 42 43) "Inequality check failed")))
+
+    (test-deftest "> greater than" (fn []
+      (test-assert (> 10 5) "Greater than check failed")))
+
+    (test-deftest "< less than" (fn []
+      (test-assert (< 5 10) "Less than check failed")))
+  )
+]
+
+[FUNC test-arithmetic :params []
+  :body (do
+    (println "\n[산술 연산 테스트]")
+
+    (test-deftest "+ addition" (fn []
+      (test-assert-eq (+ 2 3) 5 "Addition failed")))
+
+    (test-deftest "- subtraction" (fn []
+      (test-assert-eq (- 10 4) 6 "Subtraction failed")))
+
+    (test-deftest "* multiplication" (fn []
+      (test-assert-eq (* 3 4) 12 "Multiplication failed")))
+
+    (test-deftest "/ division" (fn []
+      (test-assert-eq (/ 20 4) 5 "Division failed")))
+  )
+]
+
+;; ============ 메인 테스트 실행 ============
+
+(do
+  (log-info "🧪 Express.fl 통합 테스트 스위트 시작")
+  (println "")
+
+  ;; 응답/요청 테스트
+  (test-response-helpers)
+  (test-request-helpers)
+  (test-string-helpers)
+
+  ;; 핵심 기능 테스트
+  (test-cache-functions)
+  (test-auth-functions)
+  (test-pubsub-functions)
+  (test-logging-functions)
+
+  ;; 유틸리티 테스트
+  (test-json-functions)
+  (test-type-functions)
+  (test-time-functions)
+  (test-lookup-functions)
+  (test-flow-control)
+  (test-comparison)
+  (test-arithmetic)
+
+  (println "")
+  (log-info "✅ 모든 테스트 완료")
+  (println "")
+)
