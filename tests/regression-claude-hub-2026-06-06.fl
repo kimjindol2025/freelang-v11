@@ -1,0 +1,112 @@
+;; 회귀 테스트 — claude-hub-fl 도그푸딩 (2026-06-06)
+;;
+;; 작성 배경:
+;;   v11.7.11 → v11.9.0 업그레이드 + claude-hub /api/v3/* 9 endpoint 도그푸딩
+;;   (search.dclub.kr/api/v2/* 외부 실서비스 처리) 중 발견된 3 패턴.
+;;   인터프리터 수정으로 풀리면 우회 코드 제거 가능.
+;;
+;; 실행:
+;;   node bootstrap.js run tests/regression-claude-hub-2026-06-06.fl
+;;
+;; 현재 결과 (v11.9.0):
+;;   [1] db row keys 보존 X      — 기대: 보존,   실제: ['score']만
+;;   [2] arr-group-by db-rows X — 기대: site별, 실제: ['__undefined__']
+;;   [3] 람다 sort 객체 비교 X  — 기대: 정렬,   실제: 원본 순서
+;;
+;; 우회 패턴 (현재 hub.fl이 사용):
+;;   [1][2] → (json-parse (json-str row)) round-trip으로 plain map화
+;;   [3]    → (arr-sort-by-desc arr "key") 사용
+
+(println "=== claude-hub-fl 회귀 테스트 (3 케이스) ===")
+(println "")
+
+;; ─────────── 헬퍼 ───────────
+(defn assert-eq [label expect actual]
+  (if (= expect actual)
+    (println "  PASS " label)
+    (println "  FAIL " label " — expect:" expect " actual:" actual)))
+
+(defn assert-keys-include [label expected-keys actual-map]
+  (let [actual-keys (keys actual-map)
+        missing     (filter (fn [k] (not (str-includes (str actual-keys) k))) expected-keys)]
+    (if (= (length missing) 0)
+      (println "  PASS " label)
+      (println "  FAIL " label " — missing:" missing " in:" actual-keys))))
+
+;; ─────────── DB 준비 (메모리 SQLite) ───────────
+(define db {:type "sqlite" :path ":memory:"})
+
+(db-exec db "CREATE TABLE pages (id TEXT, site_id TEXT, title TEXT, score INTEGER)" [])
+(db-exec db "INSERT INTO pages (id, site_id, title, score) VALUES (?, ?, ?, ?)" ["a" "blog" "X" 1])
+(db-exec db "INSERT INTO pages (id, site_id, title, score) VALUES (?, ?, ?, ?)" ["b" "blog" "Y" 9])
+(db-exec db "INSERT INTO pages (id, site_id, title, score) VALUES (?, ?, ?, ?)" ["c" "gogs" "Z" 5])
+
+(define rows (db-query db "SELECT id, site_id, title, score FROM pages" []))
+(println "준비: rows 개수 =" (length rows))
+(println "")
+
+;; ─────────── [1] db row → assoc 키 보존 ───────────
+(println "[1] db-query row + assoc — 키 보존")
+(define r (first rows))
+(println "    원본 keys:" (keys r))
+
+(define r-with-extra (assoc r "extra" 99))
+(println "    assoc 후 keys:" (keys r-with-extra))
+
+(assert-keys-include "r keys 보존 (id, site_id, title)"
+                     ["id" "site_id" "title" "extra"]
+                     r-with-extra)
+
+;; 우회 확인 — round-trip 패턴
+(define r-plain (json-parse (json-str r)))
+(define r-plain-with-extra (assoc r-plain "extra" 99))
+(assert-keys-include "우회: round-trip 후 assoc 키 보존"
+                     ["id" "site_id" "title" "extra"]
+                     r-plain-with-extra)
+(println "")
+
+;; ─────────── [2] arr-group-by + db rows ───────────
+(println "[2] arr-group-by + db rows — site_id별 그룹화")
+(define grouped (arr-group-by rows "site_id"))
+(define group-keys (keys grouped))
+(println "    그룹 keys:" group-keys)
+
+(assert-eq "그룹 keys 2개 (blog, gogs)" 2 (length group-keys))
+(assert-keys-include "그룹 keys = [blog, gogs]" ["blog" "gogs"] grouped)
+
+;; 우회 — round-trip 후 그룹
+(define rows-plain (map (fn [r] (json-parse (json-str r))) rows))
+(define grouped-plain (arr-group-by rows-plain "site_id"))
+(println "    우회 그룹 keys:" (keys grouped-plain))
+(assert-keys-include "우회: round-trip 후 arr-group-by 정상"
+                     ["blog" "gogs"]
+                     grouped-plain)
+(println "")
+
+;; ─────────── [3] 람다 sort 객체 비교 ───────────
+(println "[3] (sort items (fn [a b] ...)) 객체 score 비교")
+
+(define items [{"name" "A" "score" 1}
+               {"name" "B" "score" 9}
+               {"name" "C" "score" 3}])
+
+(define sorted-by-lambda (sort items (fn [a b] (> (get a "score") (get b "score")))))
+(define first-score (get (first sorted-by-lambda) "score"))
+(println "    sort 후 첫 score:" first-score " (기대: 9)")
+
+(assert-eq "람다 sort score desc 정렬" 9 first-score)
+
+;; 우회 — arr-sort-by-desc 키 패턴
+(define sorted-by-key (arr-sort-by-desc items "score"))
+(assert-eq "우회: arr-sort-by-desc 키 패턴 정상" 9 (get (first sorted-by-key) "score"))
+(println "")
+
+;; ─────────── 요약 ───────────
+(println "=== 요약 ===")
+(println "본 PASS = 인터프리터 수정 완료")
+(println "본 FAIL = 우회 PASS = 현 hub.fl 패턴 그대로 (round-trip + arr-sort-by-desc)")
+(println "")
+(println "참조:")
+(println "  - 외부 작동: https://search.dclub.kr/api/v2/* (FL 처리)")
+(println "  - hub.fl: gogs.dclub.kr/kim/auto-pilot/src/branch/master/claude-hub-sidecar/hub.fl")
+(println "  - SPEC: gogs.dclub.kr/kim/airc")
