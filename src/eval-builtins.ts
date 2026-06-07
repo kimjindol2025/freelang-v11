@@ -77,24 +77,17 @@ import { globalCompiler, PromptCompiler } from "./prompt-compiler"; // Phase 109
 import { sdk as flSDK } from "./fl-sdk"; // Phase 110: External AI SDK
 import { globalTester, HypothesisConfig } from "./hypothesis"; // Phase 111: Hypothesis
 import { maybeMap, maybeBind, maybeChain, maybeFilter, maybeCombine, maybeSelect } from "./maybe-chain"; // Phase 112: Maybe Chain
-import { globalDebater, Argument } from "./experiments/debate"; // Phase 113: Debate
-import { globalCheckpoint } from "./experiments/checkpoint"; // Phase 114: Checkpoint
-import { globalMetaReasoner } from "./experiments/meta-reason"; // Phase 115: Meta-Reason
-import { globalBeliefs, BeliefSystem } from "./experiments/belief"; // Phase 116: Belief System
-import { globalAnalogy } from "./experiments/analogy"; // Phase 117: Analogy
-import { globalCritique, defaultFinders, severityWeight } from "./experiments/critique"; // Phase 118: Critique Agent
-import { globalComposer, ReasonStep } from "./experiments/compose-reason"; // Phase 119: Compose-Reason
-import { globalCognition } from "./experiments/cognitive"; // Phase 120: Cognitive Architecture
-import { globalConsensus, AgentVote, ConsensusEngine } from "./experiments/consensus"; // Phase 121: Consensus
-import { globalDelegation, DelegateAgent, DelegateTask } from "./experiments/delegate"; // Phase 122: Delegation
-import { globalNegotiator, NegotiationPosition } from "./experiments/negotiate"; // Phase 124: Negotiate
-import { globalVoting, VotingSystem, Ballot } from "./experiments/vote"; // Phase 123: VOTE
-import { globalSwarm, Swarm } from "./experiments/swarm"; // Phase 125: Swarm Intelligence
-import { globalPeerReview, Reviewer, ReviewComment } from "./experiments/peer-review"; // Phase 127: Peer-Review
-import { globalCompetition, Competition, Competitor } from "./experiments/compete"; // Phase 129: Compete
-import { AgentChain, ChainAgent, ChainResult, ChainLink } from "./experiments/chain-agents"; // Phase 128: Chain-Agents
-import { globalHub, MultiAgentHub } from "./experiments/multi-agent-hub"; // Phase 130: Multi-Agent Hub
-import { globalOrchestrator, Orchestrator, OrchestrateTask } from "./experiments/orchestrate"; // Phase 126: Orchestrate
+// Phase 113-130: Experiments — lazy loaded from stdlib-ext-experiments.js
+// (직접 import 제거 → bootstrap.js 번들에서 분리)
+/* eslint-disable @typescript-eslint/no-var-requires */
+let _expBundle: any = null;
+function _getExp(): any {
+  if (!_expBundle) {
+    const p = require("path").resolve(__dirname, "./stdlib-ext-experiments.js");
+    _expBundle = require(p);
+  }
+  return _expBundle;
+}
 import { EvolutionEngine, EvolutionConfig, evolveNumbers, evolveStrings } from "./experiments/evolve"; // Phase 131: EVOLVE
 import { Mutator, globalMutator, mutateNumbers as _mutateNumbers, mutateString as _mutateString, selectBest, MutationConfig, MutationType } from "./experiments/mutate"; // Phase 132: Mutate
 import { Crossover, globalCrossover, crossoverNumbers as _crossoverNumbers, crossoverStrings as _crossoverStrings } from "./experiments/crossover"; // Phase 133: Crossover
@@ -5339,14 +5332,14 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "debate") {
         // (debate proposition pro-fn con-fn) → winner string
         const [proposition, proFn, conFn] = args;
-        const result = globalDebater.debate({
+        const result = (_getExp().globalDebater).debate({
           proposition: String(proposition),
-          pro: (round: number, conArgs: Argument[]) => {
+          pro: (round: number, conArgs: any[]) => {
             if (typeof proFn === "function") return proFn(round, conArgs);
             if ((proFn as any)?.kind === "function-value") return callFn(proFn, [round, conArgs]);
             return { side: 'pro', point: String(proFn), strength: 0.5 };
           },
-          con: (round: number, proArgs: Argument[]) => {
+          con: (round: number, proArgs: any[]) => {
             if (typeof conFn === "function") return conFn(round, proArgs);
             if ((conFn as any)?.kind === "function-value") return callFn(conFn, [round, proArgs]);
             return { side: 'con', point: String(conFn), strength: 0.5 };
@@ -5357,14 +5350,14 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "debate-score") {
         // (debate-score proposition pro-fn con-fn) → { pro: number; con: number }
         const [proposition, proFn, conFn] = args;
-        const result = globalDebater.debate({
+        const result = (_getExp().globalDebater).debate({
           proposition: String(proposition),
-          pro: (round: number, conArgs: Argument[]) => {
+          pro: (round: number, conArgs: any[]) => {
             if (typeof proFn === "function") return proFn(round, conArgs);
             if ((proFn as any)?.kind === "function-value") return callFn(proFn, [round, conArgs]);
             return { side: 'pro', point: String(proFn), strength: 0.5 };
           },
-          con: (round: number, proArgs: Argument[]) => {
+          con: (round: number, proArgs: any[]) => {
             if (typeof conFn === "function") return conFn(round, proArgs);
             if ((conFn as any)?.kind === "function-value") return callFn(conFn, [round, proArgs]);
             return { side: 'con', point: String(conFn), strength: 0.5 };
@@ -5375,14 +5368,14 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "debate-conclusion") {
         // (debate-conclusion proposition pro-fn con-fn) → conclusion string
         const [proposition, proFn, conFn] = args;
-        const result = globalDebater.debate({
+        const result = (_getExp().globalDebater).debate({
           proposition: String(proposition),
-          pro: (round: number, conArgs: Argument[]) => {
+          pro: (round: number, conArgs: any[]) => {
             if (typeof proFn === "function") return proFn(round, conArgs);
             if ((proFn as any)?.kind === "function-value") return callFn(proFn, [round, conArgs]);
             return { side: 'pro', point: String(proFn), strength: 0.5 };
           },
-          con: (round: number, proArgs: Argument[]) => {
+          con: (round: number, proArgs: any[]) => {
             if (typeof conFn === "function") return conFn(round, proArgs);
             if ((conFn as any)?.kind === "function-value") return callFn(conFn, [round, proArgs]);
             return { side: 'con', point: String(conFn), strength: 0.5 };
@@ -5395,19 +5388,19 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "cp-save") {
         // (cp-save "name" state)
         const [name, state] = args;
-        globalCheckpoint.save(String(name), state);
+        (_getExp().globalCheckpoint).save(String(name), state);
         return null;
       }
       if (op === "cp-restore") {
         // (cp-restore "name") → 최신 state 또는 null
         const [name] = args;
-        return globalCheckpoint.restore(String(name));
+        return (_getExp().globalCheckpoint).restore(String(name));
       }
       if (op === "cp-branch") {
         // (cp-branch "name" state fn) → 성공 시 결과, 실패 시 복원된 state
         // fn: function-value (인라인 fn), string (함수이름), 또는 JS function
         const [name, state, fn] = args;
-        const result = globalCheckpoint.branch(String(name), state, (s: any) => {
+        const result = (_getExp().globalCheckpoint).branch(String(name), state, (s: any) => {
           if (typeof fn === "function") return fn(s);
           if (typeof fn === "string") return callUser(fn, [s]);
           if ((fn as any)?.kind === "function-value" || (fn as any)?.kind === "async-function-value") {
@@ -5423,29 +5416,29 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "cp-drop") {
         // (cp-drop "name") → boolean
         const [name] = args;
-        return globalCheckpoint.drop(String(name));
+        return (_getExp().globalCheckpoint).drop(String(name));
       }
       if (op === "cp-list") {
         // (cp-list) → 이름 목록 (배열)
-        return globalCheckpoint.list();
+        return (_getExp().globalCheckpoint).list();
       }
       if (op === "cp-versions") {
         // (cp-versions "name") → 버전 수 (number)
         const [name] = args;
-        return globalCheckpoint.versions(String(name));
+        return (_getExp().globalCheckpoint).versions(String(name));
       }
 
       // Phase 115: Meta-Reason — AI 추론 방법 자동 선택
       if (op === "meta-reason") {
         // (meta-reason "problem") → 선택된 전략 이름 문자열
         const problem = String(args[0] ?? "");
-        const result = globalMetaReasoner.analyze(problem);
+        const result = (_getExp().globalMetaReasoner).analyze(problem);
         return result.selected;
       }
       if (op === "meta-reason-scores") {
         // (meta-reason-scores "problem") → 전략별 점수 맵 [{strategy, score, reason}]
         const problem = String(args[0] ?? "");
-        const result = globalMetaReasoner.analyze(problem);
+        const result = (_getExp().globalMetaReasoner).analyze(problem);
         // Map으로 변환: { COT: 0.9, TOT: 0.4, ... }
         const scoreMap: Record<string, number> = {};
         for (const s of result.scores) {
@@ -5456,7 +5449,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "meta-reason-rationale") {
         // (meta-reason-rationale "problem") → 선택 이유 문자열
         const problem = String(args[0] ?? "");
-        const result = globalMetaReasoner.analyze(problem);
+        const result = (_getExp().globalMetaReasoner).analyze(problem);
         return result.rationale;
       }
 
@@ -5464,46 +5457,46 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "belief-set") {
         // (belief-set "claim" confidence) → null
         const [claim, confidence] = args;
-        globalBeliefs.set(String(claim), Number(confidence));
+        (_getExp().globalBeliefs).set(String(claim), Number(confidence));
         return null;
       }
       if (op === "belief-get") {
         // (belief-get "claim") → confidence 숫자 또는 null
         const [claim] = args;
-        return globalBeliefs.get(String(claim));
+        return (_getExp().globalBeliefs).get(String(claim));
       }
       if (op === "belief-update") {
         // (belief-update "claim" evidence) → 업데이트된 confidence
         const [claim, evidence] = args;
-        return globalBeliefs.update(String(claim), Number(evidence));
+        return (_getExp().globalBeliefs).update(String(claim), Number(evidence));
       }
       if (op === "belief-negate") {
         // (belief-negate "claim") → 약화된 confidence
         const [claim] = args;
-        return globalBeliefs.negate(String(claim));
+        return (_getExp().globalBeliefs).negate(String(claim));
       }
       if (op === "belief-list") {
         // (belief-list) → 신념 리스트 배열
-        return globalBeliefs.list();
+        return (_getExp().globalBeliefs).list();
       }
       if (op === "belief-certain") {
         // (belief-certain threshold) → 임계값 이상 신념들
         const threshold = args.length > 0 ? Number(args[0]) : 0.8;
-        return globalBeliefs.certain(threshold);
+        return (_getExp().globalBeliefs).certain(threshold);
       }
       if (op === "belief-strongest") {
         // (belief-strongest) → 가장 강한 신념의 claim 문자열 또는 null
-        const b = globalBeliefs.strongest();
+        const b = (_getExp().globalBeliefs).strongest();
         return b ? b.claim : null;
       }
       if (op === "belief-forget") {
         // (belief-forget "claim") → boolean
         const [claim] = args;
-        return globalBeliefs.forget(String(claim));
+        return (_getExp().globalBeliefs).forget(String(claim));
       }
       if (op === "belief-size") {
         // (belief-size) → 신념 개수
-        return globalBeliefs.size();
+        return (_getExp().globalBeliefs).size();
       }
 
       // Phase 117: Analogy — 유사 패턴 추론
@@ -5511,65 +5504,65 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         // (analogy-store "description" solution tags?) → 패턴 저장, id 반환
         const [desc, solution, tagsRaw] = args;
         const tags = Array.isArray(tagsRaw) ? tagsRaw.map(String) : [];
-        const p = globalAnalogy.store(String(desc), solution, tags);
+        const p = (_getExp().globalAnalogy).store(String(desc), solution, tags);
         return p.id;
       }
       if (op === "analogy-find") {
         // (analogy-find "problem" topK?) → 유사 패턴 description 리스트
         const [problem, topK] = args;
-        const results = globalAnalogy.find(String(problem), topK != null ? Number(topK) : 3);
+        const results = (_getExp().globalAnalogy).find(String(problem), topK != null ? Number(topK) : 3);
         return results.map(p => p.description);
       }
       if (op === "analogy-best") {
         // (analogy-best "problem") → 가장 유사한 패턴의 solution, 없으면 null
         const [problem] = args;
-        const p = globalAnalogy.best(String(problem));
+        const p = (_getExp().globalAnalogy).best(String(problem));
         return p ? p.solution : null;
       }
       if (op === "analogy-by-tag") {
         // (analogy-by-tag "tag") → 태그별 패턴 description 리스트
         const [tag] = args;
-        const results = globalAnalogy.byTag(String(tag));
+        const results = (_getExp().globalAnalogy).byTag(String(tag));
         return results.map(p => p.description);
       }
       if (op === "analogy-popular") {
         // (analogy-popular n?) → 자주 쓰인 패턴 description 리스트
         const [n] = args;
-        const results = globalAnalogy.popular(n != null ? Number(n) : 3);
+        const results = (_getExp().globalAnalogy).popular(n != null ? Number(n) : 3);
         return results.map(p => p.description);
       }
       if (op === "analogy-size") {
         // (analogy-size) → 저장된 패턴 수
-        return globalAnalogy.size();
+        return (_getExp().globalAnalogy).size();
       }
       if (op === "analogy-all") {
         // (analogy-all) → 전체 패턴 description 리스트
-        return globalAnalogy.all().map(p => p.description);
+        return (_getExp().globalAnalogy).all().map(p => p.description);
       }
 
       // Phase 118: Critique Agent — 자기 출력 비판
       if (op === "critique") {
-        // (critique output) → approved? boolean (defaultFinders 사용)
+        // (critique output) → approved? boolean (_getExp().defaultFinders 사용)
         const [output] = args;
-        const result = globalCritique.run(output, { finders: defaultFinders });
+        const result = (_getExp().globalCritique).run(output, { finders: _getExp().defaultFinders });
         return result.approved;
       }
       if (op === "critique-points") {
         // (critique-points output) → 문제점 리스트 (descriptions)
         const [output] = args;
-        const result = globalCritique.run(output, { finders: defaultFinders });
+        const result = (_getExp().globalCritique).run(output, { finders: _getExp().defaultFinders });
         return result.points.map(p => p.description);
       }
       if (op === "critique-risk") {
         // (critique-risk output) → 위험도 숫자
         const [output] = args;
-        const result = globalCritique.run(output, { finders: defaultFinders });
+        const result = (_getExp().globalCritique).run(output, { finders: _getExp().defaultFinders });
         return result.overallRisk;
       }
       if (op === "critique-summary") {
         // (critique-summary output) → 요약 문자열
         const [output] = args;
-        const result = globalCritique.run(output, { finders: defaultFinders });
+        const result = (_getExp().globalCritique).run(output, { finders: _getExp().defaultFinders });
         return result.summary;
       }
 
@@ -5579,51 +5572,51 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         // steps-list: [[name fn], ...] 또는 [[name fn condition], ...]
         const [stepsList, input] = args;
         if (!Array.isArray(stepsList)) return input;
-        const steps: ReasonStep[] = stepsList.map((s: any) => {
+        const steps: any[] = stepsList.map((s: any) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x: any) => x };
           const [name, fn, condition] = s;
-          const step: ReasonStep = {
+          const step: any = {
             name: String(name),
             fn: typeof fn === "function" ? fn : (x: any) => x,
           };
           if (typeof condition === "function") step.condition = condition;
           return step;
         });
-        const result = globalComposer.compose(steps, input);
+        const result = (_getExp().globalComposer).compose(steps, input);
         return result.output;
       }
       if (op === "compose-history") {
         // (compose-history steps-list input) → 단계별 이름 리스트
         const [stepsList, input] = args;
         if (!Array.isArray(stepsList)) return [];
-        const steps: ReasonStep[] = stepsList.map((s: any) => {
+        const steps: any[] = stepsList.map((s: any) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x: any) => x };
           const [name, fn, condition] = s;
-          const step: ReasonStep = {
+          const step: any = {
             name: String(name),
             fn: typeof fn === "function" ? fn : (x: any) => x,
           };
           if (typeof condition === "function") step.condition = condition;
           return step;
         });
-        const result = globalComposer.compose(steps, input);
+        const result = (_getExp().globalComposer).compose(steps, input);
         return result.history.map(h => h.name);
       }
       if (op === "compose-steps") {
         // (compose-steps steps-list input) → 실행된 단계 수
         const [stepsList, input] = args;
         if (!Array.isArray(stepsList)) return 0;
-        const steps: ReasonStep[] = stepsList.map((s: any) => {
+        const steps: any[] = stepsList.map((s: any) => {
           if (!Array.isArray(s)) return { name: String(s), fn: (x: any) => x };
           const [name, fn, condition] = s;
-          const step: ReasonStep = {
+          const step: any = {
             name: String(name),
             fn: typeof fn === "function" ? fn : (x: any) => x,
           };
           if (typeof condition === "function") step.condition = condition;
           return step;
         });
-        const result = globalComposer.compose(steps, input);
+        const result = (_getExp().globalComposer).compose(steps, input);
         return result.steps;
       }
 
@@ -5631,7 +5624,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "cognition-solve") {
         // (cognition-solve "problem" solver-fn) → { strategy, output, approved, risk }
         const [problem, solverFn] = args;
-        const result = globalCognition.solve(String(problem), (strategy: string, prob: string) => {
+        const result = (_getExp().globalCognition).solve(String(problem), (strategy: string, prob: string) => {
           if (typeof solverFn === "function") return solverFn(strategy, prob);
           if ((solverFn as any)?.kind === "function-value") return callFn(solverFn, [strategy, prob]);
           return solverFn;
@@ -5645,7 +5638,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       if (op === "cognition-stats") {
         // (cognition-stats) → { beliefs, analogies, checkpoints }
-        const s = globalCognition.stats();
+        const s = (_getExp().globalCognition).stats();
         return new Map([
           ["beliefs", s.beliefs],
           ["analogies", s.analogies],
@@ -5655,64 +5648,64 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "cognition-meta") {
         // (cognition-meta "problem") → 전략 문자열
         const [problem] = args;
-        const result = globalCognition.meta.analyze(String(problem));
+        const result = (_getExp().globalCognition).meta.analyze(String(problem));
         return result.selected;
       }
       if (op === "cognition-believe") {
         // (cognition-believe "claim" confidence) → void
         const [claim, confidence] = args;
-        globalCognition.beliefs.set(String(claim), Number(confidence));
+        (_getExp().globalCognition).beliefs.set(String(claim), Number(confidence));
         return null;
       }
       if (op === "cognition-recall") {
         // (cognition-recall "pattern") → 유사 패턴 solution or null
         const [pattern] = args;
-        const p = globalCognition.analogies.best(String(pattern));
+        const p = (_getExp().globalCognition).analogies.best(String(pattern));
         return p ? p.solution : null;
       }
 
       // Phase 121: Consensus — 여러 에이전트 합의
       // votes-list 형식: [[agentId answer confidence], ...]
       {
-        function parseVotes(raw: any): AgentVote<any>[] {
+        function parseVotes(raw: any): any[] {
           if (!Array.isArray(raw)) return [];
           return raw.map((item: any) => {
             if (Array.isArray(item)) {
               return { agentId: String(item[0]), answer: item[1], confidence: Number(item[2]) };
             }
-            return item as AgentVote<any>;
+            return item as any;
           });
         }
         if (op === "consensus-majority") {
           // (consensus-majority votes-list) → answer
           const votes = parseVotes(args[0]);
-          const result = globalConsensus.majority(votes);
+          const result = (_getExp().globalConsensus).majority(votes);
           return result.answer;
         }
         if (op === "consensus-weighted") {
           // (consensus-weighted votes-list) → 숫자
-          const votes = parseVotes(args[0]) as AgentVote<number>[];
-          const result = globalConsensus.weighted(votes);
+          const votes = parseVotes(args[0]);
+          const result = (_getExp().globalConsensus).weighted(votes);
           return result.answer;
         }
         if (op === "consensus-threshold") {
           // (consensus-threshold votes-list threshold) → answer or null
           const votes = parseVotes(args[0]);
           const threshold = args[1] !== undefined ? Number(args[1]) : 0.7;
-          const result = globalConsensus.threshold(votes, threshold);
+          const result = (_getExp().globalConsensus).threshold(votes, threshold);
           return result ? result.answer : null;
         }
         if (op === "consensus-agreement") {
           // (consensus-agreement votes-list) → agreement 숫자
           const votes = parseVotes(args[0]);
-          return globalConsensus.agreement(votes);
+          return (_getExp().globalConsensus).agreement(votes);
         }
       }
 
       // Phase 123: VOTE — 에이전트 투표 결정
       // ballots 형식: [[voterId [choice1 choice2 ...] {scores}], ...]
       {
-        function parseBallots(raw: any): Ballot[] {
+        function parseBallots(raw: any): any[] {
           if (!Array.isArray(raw)) return [];
           return raw.map((item: any) => {
             if (Array.isArray(item)) {
@@ -5721,7 +5714,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
               const scores = item[2] && typeof item[2] === "object" && !Array.isArray(item[2]) ? item[2] as Record<string, number> : undefined;
               return { voterId, choices, scores };
             }
-            return item as Ballot;
+            return item as any;
           });
         }
         function parseCandidates(raw: any): string[] {
@@ -5731,25 +5724,25 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         if (op === "vote-plurality") {
           const ballots = parseBallots(args[0]);
           const candidates = parseCandidates(args[1]);
-          const result = globalVoting.plurality(ballots, candidates);
+          const result = (_getExp().globalVoting).plurality(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-approval") {
           const ballots = parseBallots(args[0]);
           const candidates = parseCandidates(args[1]);
-          const result = globalVoting.approval(ballots, candidates);
+          const result = (_getExp().globalVoting).approval(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-score") {
           const ballots = parseBallots(args[0]);
           const candidates = parseCandidates(args[1]);
-          const result = globalVoting.score(ballots, candidates);
+          const result = (_getExp().globalVoting).score(ballots, candidates);
           return result.winner;
         }
         if (op === "vote-tally") {
           const ballots = parseBallots(args[0]);
           const candidates = parseCandidates(args[1]);
-          const t = globalVoting.tally(ballots, candidates);
+          const t = (_getExp().globalVoting).tally(ballots, candidates);
           return new Map(Object.entries(t));
         }
       }
@@ -5759,39 +5752,39 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         // (negotiate positions-list) → agreed? boolean
         const [raw] = args;
         if (!Array.isArray(raw)) return false;
-        const positions: NegotiationPosition[] = raw.map((p: any) => {
+        const positions: any[] = raw.map((p: any) => {
           if (Array.isArray(p)) {
             return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
           }
-          return p as NegotiationPosition;
+          return p as any;
         });
-        const result = globalNegotiator.negotiate(positions);
+        const result = (_getExp().globalNegotiator).negotiate(positions);
         return result.agreed;
       }
       if (op === "negotiate-value") {
         // (negotiate-value positions-list) → 합의 값 or null
         const [raw] = args;
         if (!Array.isArray(raw)) return null;
-        const positions: NegotiationPosition[] = raw.map((p: any) => {
+        const positions: any[] = raw.map((p: any) => {
           if (Array.isArray(p)) {
             return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
           }
-          return p as NegotiationPosition;
+          return p as any;
         });
-        const result = globalNegotiator.negotiate(positions);
+        const result = (_getExp().globalNegotiator).negotiate(positions);
         return result.agreed ? (result.value ?? null) : null;
       }
       if (op === "negotiate-rounds") {
         // (negotiate-rounds positions-list) → 라운드 수
         const [raw] = args;
         if (!Array.isArray(raw)) return 0;
-        const positions: NegotiationPosition[] = raw.map((p: any) => {
+        const positions: any[] = raw.map((p: any) => {
           if (Array.isArray(p)) {
             return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
           }
-          return p as NegotiationPosition;
+          return p as any;
         });
-        const result = globalNegotiator.negotiate(positions);
+        const result = (_getExp().globalNegotiator).negotiate(positions);
         return result.rounds.length;
       }
 
@@ -5802,7 +5795,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const objective = typeof fnArg === "function"
           ? fnArg
           : (x: number) => callFnVal(fnArg, [x]);
-        const result = globalSwarm.optimize({
+        const result = (_getExp().globalSwarm).optimize({
           objective,
           particles: nArg !== undefined ? Number(nArg) : 10,
           iterations: iterArg !== undefined ? Number(iterArg) : 50,
@@ -5815,7 +5808,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const objective = typeof fnArg === "function"
           ? fnArg
           : (x: number) => callFnVal(fnArg, [x]);
-        const result = globalSwarm.optimize({
+        const result = (_getExp().globalSwarm).optimize({
           objective,
           particles: nArg !== undefined ? Number(nArg) : 10,
           iterations: iterArg !== undefined ? Number(iterArg) : 50,
@@ -5828,7 +5821,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const objective = typeof fnArg === "function"
           ? fnArg
           : (x: number) => callFnVal(fnArg, [x]);
-        const result = globalSwarm.optimize({ objective });
+        const result = (_getExp().globalSwarm).optimize({ objective });
         return result.converged;
       }
 
@@ -5836,37 +5829,37 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (op === "compete-register") {
         // (compete-register id solve-fn) → void
         const [id, solveFn] = args;
-        const competitor: Competitor = {
+        const competitor: any = {
           id: String(id),
           solve: (problem: any) => callFn(solveFn, [problem]),
         };
-        globalCompetition.register(competitor);
+        (_getExp().globalCompetition).register(competitor);
         return null;
       }
       if (op === "compete") {
         // (compete problem eval-fn) → winner agentId
         const [problem, evalFn] = args;
         const evaluate = (output: any) => Number(callFn(evalFn, [output]));
-        const result = globalCompetition.run(problem, evaluate);
+        const result = (_getExp().globalCompetition).run(problem, evaluate);
         return result.winner?.agentId ?? null;
       }
       if (op === "compete-score") {
         // (compete-score problem eval-fn) → winner score
         const [problem, evalFn] = args;
         const evaluate = (output: any) => Number(callFn(evalFn, [output]));
-        const result = globalCompetition.run(problem, evaluate);
+        const result = (_getExp().globalCompetition).run(problem, evaluate);
         return result.winner?.score ?? null;
       }
       if (op === "compete-all") {
         // (compete-all problem eval-fn) → 전체 순위 리스트 [[agentId score rank] ...]
         const [problem, evalFn] = args;
         const evaluate = (output: any) => Number(callFn(evalFn, [output]));
-        const result = globalCompetition.run(problem, evaluate);
+        const result = (_getExp().globalCompetition).run(problem, evaluate);
         return result.allResults.map(r => [r.agentId, r.score, r.rank]);
       }
       if (op === "compete-list") {
         // (compete-list) → 등록된 경쟁자 목록
-        return globalCompetition.list();
+        return (_getExp().globalCompetition).list();
       }
 
       // Phase 127: PEER-REVIEW — 에이전트 간 피어 리뷰
@@ -5874,7 +5867,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         // (peer-review-add "id" review-fn) → void
         const [idArg, fnArg] = args;
         const reviewerId = String(idArg);
-        const reviewer: Reviewer = {
+        const reviewer: any = {
           id: reviewerId,
           review: (output: any) => {
             const raw = callFnVal(fnArg, [output]);
@@ -5885,35 +5878,35 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
                 score: Number(raw.score ?? 0.5),
                 comment: String(raw.comment ?? ""),
                 suggestion: raw.suggestion !== undefined ? String(raw.suggestion) : undefined,
-              } as ReviewComment;
+              };
             }
             return { reviewerId, aspect: "quality", score: 0.5, comment: String(raw ?? "") };
           },
         };
-        globalPeerReview.addReviewer(reviewer);
+        (_getExp().globalPeerReview).addReviewer(reviewer);
         return null;
       }
       if (op === "peer-review") {
         // (peer-review "targetId" output) → approved? boolean
         const [targetId, output] = args;
-        const result = globalPeerReview.review(String(targetId), output);
+        const result = (_getExp().globalPeerReview).review(String(targetId), output);
         return result.approved;
       }
       if (op === "peer-review-score") {
         // (peer-review-score "targetId" output) → averageScore
         const [targetId, output] = args;
-        const result = globalPeerReview.review(String(targetId), output);
+        const result = (_getExp().globalPeerReview).review(String(targetId), output);
         return result.averageScore;
       }
       if (op === "peer-review-comments") {
         // (peer-review-comments "targetId" output) → comments list
         const [targetId, output] = args;
-        const result = globalPeerReview.review(String(targetId), output);
+        const result = (_getExp().globalPeerReview).review(String(targetId), output);
         return result.comments;
       }
       if (op === "peer-review-list") {
         // (peer-review-list) → reviewer ids
-        return globalPeerReview.list();
+        return (_getExp().globalPeerReview).list();
       }
 
       // Phase 128: Chain-Agents — 에이전트 체인 파이프라인
@@ -5921,19 +5914,19 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         // (chain-agents agents-list input) → finalOutput
         const [rawAgents, input] = args;
         if (!Array.isArray(rawAgents)) return input;
-        const agents: ChainAgent[] = rawAgents.map((a: any) => {
-          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as ChainAgent;
+        const agents: any[] = rawAgents.map((a: any) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as any;
           if (Array.isArray(a)) {
             const [id, tf, vf] = a;
             return {
               id: String(id),
               transform: (inp: any) => callFn(tf, [inp]),
               validate: vf ? (out: any) => Boolean(callFn(vf, [out])) : undefined,
-            } as ChainAgent;
+            } as any;
           }
-          return { id: String(a), transform: (x: any) => x } as ChainAgent;
+          return { id: String(a), transform: (x: any) => x } as any;
         });
-        const chain = AgentChain.from(agents);
+        const chain = (_getExp().AgentChain).from(agents);
         const result = chain.run(input);
         return result.finalOutput;
       }
@@ -5941,39 +5934,39 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         // (chain-links agents-list input) → agentId 리스트 (완료된 것)
         const [rawAgents, input] = args;
         if (!Array.isArray(rawAgents)) return [];
-        const agents: ChainAgent[] = rawAgents.map((a: any) => {
-          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as ChainAgent;
+        const agents: any[] = rawAgents.map((a: any) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as any;
           if (Array.isArray(a)) {
             const [id, tf, vf] = a;
             return {
               id: String(id),
               transform: (inp: any) => callFn(tf, [inp]),
               validate: vf ? (out: any) => Boolean(callFn(vf, [out])) : undefined,
-            } as ChainAgent;
+            } as any;
           }
-          return { id: String(a), transform: (x: any) => x } as ChainAgent;
+          return { id: String(a), transform: (x: any) => x } as any;
         });
-        const chain = AgentChain.from(agents);
+        const chain = (_getExp().AgentChain).from(agents);
         const result = chain.run(input);
-        return result.links.filter((l: ChainLink) => !l.skipped).map((l: ChainLink) => l.agentId);
+        return result.links.filter(l => !l.skipped).map(l => l.agentId);
       }
       if (op === "chain-steps") {
         // (chain-steps agents-list input) → 완료 스텝 수
         const [rawAgents, input] = args;
         if (!Array.isArray(rawAgents)) return 0;
-        const agents: ChainAgent[] = rawAgents.map((a: any) => {
-          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as ChainAgent;
+        const agents: any[] = rawAgents.map((a: any) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a as any;
           if (Array.isArray(a)) {
             const [id, tf, vf] = a;
             return {
               id: String(id),
               transform: (inp: any) => callFn(tf, [inp]),
               validate: vf ? (out: any) => Boolean(callFn(vf, [out])) : undefined,
-            } as ChainAgent;
+            } as any;
           }
-          return { id: String(a), transform: (x: any) => x } as ChainAgent;
+          return { id: String(a), transform: (x: any) => x } as any;
         });
-        const chain = AgentChain.from(agents);
+        const chain = (_getExp().AgentChain).from(agents);
         const result = chain.run(input);
         return result.stepsCompleted;
       }
@@ -5983,72 +5976,72 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         // (orchestrate-run tasks-list) → outputs map
         const [rawTasks] = args;
         if (!Array.isArray(rawTasks)) return {};
-        const tasks: OrchestrateTask[] = rawTasks.map((t: any) => {
+        const tasks: any[] = rawTasks.map((t: any) => {
           if (Array.isArray(t)) {
             return { id: String(t[0]), input: t[1] ?? null, dependsOn: Array.isArray(t[2]) ? t[2].map(String) : undefined };
           }
           return { id: String(t.id ?? 'task'), input: t.input ?? null, dependsOn: t.dependsOn };
         });
-        return globalOrchestrator.run(tasks).outputs;
+        return (_getExp().globalOrchestrator).run(tasks).outputs;
       }
       if (op === "orchestrate-order") {
         // (orchestrate-order tasks-list) → 실행 순서 배열
         const [rawTasks] = args;
         if (!Array.isArray(rawTasks)) return [];
-        const tasks: OrchestrateTask[] = rawTasks.map((t: any) => {
+        const tasks: any[] = rawTasks.map((t: any) => {
           if (Array.isArray(t)) {
             return { id: String(t[0]), input: t[1] ?? null, dependsOn: Array.isArray(t[2]) ? t[2].map(String) : undefined };
           }
           return { id: String(t.id ?? 'task'), input: t.input ?? null, dependsOn: t.dependsOn };
         });
-        return globalOrchestrator.getOrder(tasks);
+        return (_getExp().globalOrchestrator).getOrder(tasks);
       }
 
       // Phase 130: Multi-Agent Hub — 협업 통합 허브
       if (op === "hub-route") {
         // (hub-route "taskType" problem) → result
         const [taskType, problem] = args;
-        const result = globalHub.route(String(taskType), problem, []);
+        const result = (_getExp().globalHub).route(String(taskType), problem, []);
         return result.result;
       }
       if (op === "hub-stats") {
         // (hub-stats) → { systems, ready, phases, tier }
-        return globalHub.stats();
+        return (_getExp().globalHub).stats();
       }
       if (op === "hub-systems") {
         // (hub-systems) → 시스템 이름 배열
-        return globalHub.systems();
+        return (_getExp().globalHub).systems();
       }
       if (op === "hub-task-types") {
         // (hub-task-types) → 태스크 타입 배열
-        return globalHub.taskTypes();
+        return (_getExp().globalHub).taskTypes();
       }
 
       // Phase 122: Delegation — 서브태스크 위임
       if (op === "delegate-register") {
         const [id, caps, fn] = args;
         const capabilities: string[] = Array.isArray(caps) ? caps.map(String) : [];
-        const agent: DelegateAgent = {
+        const agent: any = {
           id: String(id),
           capabilities,
-          execute: (task: DelegateTask) => {
+          execute: (task: any) => {
             if (typeof fn === "function") return fn(task);
             if ((fn as any)?.kind === "function-value") return callFn(fn, [task]);
             return fn;
           }
         };
-        globalDelegation.register(agent);
+        (_getExp().globalDelegation).register(agent);
         return String(id);
       }
       if (op === "delegate") {
         const [desc, input, capability] = args;
-        const task: DelegateTask = {
+        const task: any = {
           id: `task-${Date.now()}`,
           description: String(desc),
           input,
           requiredCapability: capability != null ? String(capability) : undefined
         };
-        const result = globalDelegation.delegate(task);
+        const result = (_getExp().globalDelegation).delegate(task);
         return new Map([
           ["taskId", result.taskId],
           ["agentId", result.agentId],
@@ -6059,7 +6052,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       if (op === "delegate-all") {
         const [taskList] = args;
-        const tasks: DelegateTask[] = Array.isArray(taskList)
+        const tasks: any[] = Array.isArray(taskList)
           ? taskList.map((t: any, i: number) => ({
               id: t instanceof Map ? String(t.get("id") ?? `task-${i}`) : `task-${i}`,
               description: t instanceof Map ? String(t.get("description") ?? "") : String(t),
@@ -6069,7 +6062,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
                 : undefined
             }))
           : [];
-        const result = globalDelegation.delegateAll(tasks);
+        const result = (_getExp().globalDelegation).delegateAll(tasks);
         return new Map<string, any>([
           ["results", result.results.map(r => new Map<string, any>([
             ["taskId", r.taskId],
@@ -6084,7 +6077,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         ]);
       }
       if (op === "delegate-list") {
-        return globalDelegation.list();
+        return (_getExp().globalDelegation).list();
       }
 
       // === Phase 133: CROSSOVER ===

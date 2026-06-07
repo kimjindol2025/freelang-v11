@@ -90,6 +90,8 @@ const EXT_BUNDLES = [
   { entryPoints: ["src/ext-async.ts"],    outfile: "stdlib-ext-async.js" },
   // misc는 레거시 하위호환 유지 (내부는 비어 있음)
   { entryPoints: ["src/ext-misc.ts"],     outfile: "stdlib-ext-misc.js" },
+  // Phase 113-130: Experiments (lazy — eval-builtins.ts가 요청 시 로드)
+  { entryPoints: ["src/ext-experiments.ts"], outfile: "stdlib-ext-experiments.js" },
 ];
 
 function bootstrapOpts() {
