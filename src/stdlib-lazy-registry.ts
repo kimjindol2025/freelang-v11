@@ -55,9 +55,10 @@ const BUNDLE_MAP: Record<string, { bundle: string; factory: string; needsInterp?
   "table":       { bundle: "./stdlib-ext-content.js",  factory: "createTableModule" },
   "validation":  { bundle: "./stdlib-ext-content.js",  factory: "createValidationModule" },
   "middleware":  { bundle: "./stdlib-ext-content.js",  factory: "createMiddlewareModule" },
-  // Compile (parser+AST 포함 — ~155KB)
+  // Compile (parser+AST 포함 — ~139KB, 구조적 비용)
   "compile":     { bundle: "./stdlib-ext-compile.js",  factory: "createCompileModule" },
-  "registry":    { bundle: "./stdlib-ext-compile.js",  factory: "createRegistryModule" },
+  // Registry (http만 의존 — 3KB)
+  "registry":    { bundle: "./stdlib-ext-registry.js", factory: "createRegistryModule" },
   // Async / concurrency
   "async":       { bundle: "./stdlib-ext-async.js",    factory: "createAsyncModule", needsInterp: true },
   "channel":     { bundle: "./stdlib-ext-async.js",    factory: "createChannelModule" },

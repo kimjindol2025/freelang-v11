@@ -86,6 +86,7 @@ const EXT_BUNDLES = [
   { entryPoints: ["src/ext-ai.ts"],       outfile: "stdlib-ext-ai.js" },
   { entryPoints: ["src/ext-content.ts"],  outfile: "stdlib-ext-content.js" },
   { entryPoints: ["src/ext-compile.ts"],  outfile: "stdlib-ext-compile.js" },
+  { entryPoints: ["src/ext-registry.ts"], outfile: "stdlib-ext-registry.js" },
   { entryPoints: ["src/ext-async.ts"],    outfile: "stdlib-ext-async.js" },
   // misc는 레거시 하위호환 유지 (내부는 비어 있음)
   { entryPoints: ["src/ext-misc.ts"],     outfile: "stdlib-ext-misc.js" },
