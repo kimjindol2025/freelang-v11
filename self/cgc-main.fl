@@ -493,7 +493,7 @@
          ;; loop: (loop [[$i 0] (< $i 10) (+ $i 1)] body...)
          ;; 형식: (loop [init-binding condition update] body)
          (let [[$loop-array (if (> (length $rest) 0) (get $rest 0) null)]
-               [$body-start (if (> (length $rest) 1) (get $rest 1) null)]]
+               [$_body-start (if (> (length $rest) 1) (get $rest 1) null)]]
            (if (null? $loop-array)
              (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
              (if (not (= (get $loop-array :kind) "array"))
@@ -686,10 +686,18 @@
     [(null? $n) "fl_nil()"]
     [(= (get $n :kind) "literal")   (cgc-literal $n)]
     [(= (get $n :kind) "variable")
-      (let [[$cn (c-name (get $n :name))]]
+      (let [[$name (get $n :name)]
+            [$cn   (c-name $name)]
+            [$line (get $n :line)]]
         (if (includes-item @known-defns-atom $cn)
           (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
-          $cn))]
+          ;; 알려진 함수/변수가 아니면 경고 출력 (컴파일 시점)
+          (if (not (includes-item @known-fncall-targets-atom $cn))
+            (do
+              (println (str "[FL Warn] 정의되지 않은 이름: " $name
+                            (if (null? $line) "" (str " (line " $line ")"))))
+              $cn)
+            $cn)))]
     [(= (get $n :kind) "keyword")   (str "fl_str_val(\"" (c-esc (get $n :name)) "\")")]
     [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
     [(= (get $n :kind) "block")     (cgc-block $n)]
@@ -809,11 +817,65 @@
   [(= $op "deref")         (str "fl_atom_deref(" (cgc (get $args 0)) ")")]
   [(= $op "reset!")        (str "fl_atom_reset(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "swap!")         (cgc-swap! $args)]
-  ;; S26: 누락 stdlib 매핑
-  [(= $op "includes-item") (str "fl_includes_item(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "str-includes")  (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "string?")       (str "fl_string_p(" (cgc (get $args 0)) ")")]
-  [(= $op "obj-entries")   (str "fl_map_entries(" (cgc (get $args 0)) ")")]
+  ;; S26: stdlib 매핑
+  [(= $op "includes-item")  (str "fl_includes_item(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-includes")    (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-starts-with") (str "fl_str_starts_with(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-ends-with")   (str "fl_str_ends_with(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "string?")         (str "fl_string_p(" (cgc (get $args 0)) ")")]
+  [(= $op "obj-entries")     (str "fl_map_entries(" (cgc (get $args 0)) ")")]
+  ;; S28: stdlib 커버리지 확장 (N-시리즈 P2)
+  ;; 컬렉션 기본
+  [(= $op "length")      (str "length(" (cgc (get $args 0)) ")")]
+  [(= $op "count")       (str "length(" (cgc (get $args 0)) ")")]
+  [(= $op "get")         (str "get(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "assoc")       (str "fl_map_set(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "dissoc")      (str "dissoc(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "reverse")     (str "reverse(" (cgc (get $args 0)) ")")]
+  [(= $op "sort")        (str "sort(" (cgc (get $args 0)) ")")]
+  [(= $op "sort-by")     (str "fl_sort_by(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "range")       (str "range(" (cgc (get $args 0)) ")")]
+  [(= $op "take")        (str "take(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "drop")        (str "drop(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "last")        (str "fl_vec_last(" (cgc (get $args 0)) ")")]
+  [(= $op "nth")         (str "get(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "concat")      (str "fl_concat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "uuid")        "uuid()"]
+  ;; 맵 ops
+  [(= $op "obj-merge")   (str "fl_map_merge(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "obj-pick")    (str "select_keys(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "obj-omit")    (str "fl_obj_omit(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "obj-values")  (str "vals(" (cgc (get $args 0)) ")")]
+  [(= $op "vals")        (str "vals(" (cgc (get $args 0)) ")")]
+  [(= $op "entries")     (str "entries(" (cgc (get $args 0)) ")")]
+  [(= $op "get-in")      (str "fl_get_in(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "map-vals")    (str "fl_map_vals_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  ;; 문자열 ops
+  [(= $op "str-split")    (str "str_split(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-slice")    (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-to-upper") (str "str_to_upper(" (cgc (get $args 0)) ")")]
+  [(= $op "str-to-lower") (str "str_to_lower(" (cgc (get $args 0)) ")")]
+  [(= $op "str-trim")     (str "str_trim(" (cgc (get $args 0)) ")")]
+  [(= $op "str-pad-left") (str "str_pad_left(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-pad-right")(str "str_pad_right(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-index-of") (str "str_index_of(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-repeat")   (str "str_repeat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-length")   (str "length(" (cgc (get $args 0)) ")")]
+  [(= $op "str-to-num")   (str "fl_str_to_num(" (cgc (get $args 0)) ")")]
+  [(= $op "html-escape")  (str "fl_html_escape(" (cgc (get $args 0)) ")")]
+  ;; 타입 술어
+  [(= $op "number?")      (str "fl_number_p(" (cgc (get $args 0)) ")")]
+  [(= $op "boolean?")     (str "fl_boolean_p(" (cgc (get $args 0)) ")")]
+  [(= $op "integer?")     (str "fl_integer_p(" (cgc (get $args 0)) ")")]
+  [(= $op "float?")       (str "fl_float_p(" (cgc (get $args 0)) ")")]
+  [(= $op "array?")       (str "fl_array_p(" (cgc (get $args 0)) ")")]
+  [(= $op "vector?")      (str "fl_array_p(" (cgc (get $args 0)) ")")]
+  [(= $op "map?")         (str "fl_map_p(" (cgc (get $args 0)) ")")]
+  [(= $op "fn?")          (str "fl_fn_p(" (cgc (get $args 0)) ")")]
+  [(= $op "type-of")      (str "type_of(" (cgc (get $args 0)) ")")]
+  [(= $op "empty?")       (str "fl_empty_p(" (cgc (get $args 0)) ")")]
+  [(= $op "not-empty?")   (str "fl_not_empty_p(" (cgc (get $args 0)) ")")]
+  [(= $op "nil-or-empty?") (str "fl_nil_or_empty_p(" (cgc (get $args 0)) ")")]
   [(= $op "loop")   (cgc-loop $args)]
   [(= $op "recur")  "/* orphan recur */ fl_nil()"]
   ;; S15: collection ops → 기존 fl_* 직접 매핑
@@ -822,11 +884,35 @@
   [(= $op "reduce")      (str "fl_reduce_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "append")      (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "push")        (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  ;; task-native-stdlib-gap P1: 기존 C 구현 dispatch 연결
+  [(= $op "flatten")     (str "flatten(" (cgc (get $args 0)) ")")]
+  [(= $op "flatten-1")   (str "flatten(" (cgc (get $args 0)) ")")]
+  [(= $op "distinct")    (str "distinct(" (cgc (get $args 0)) ")")]
+  [(= $op "zip")         (str "zip(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "zip-with")    (str "zip(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "group-by")    (str "group_by(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "frequencies") (str "frequencies(" (cgc (get $args 0)) ")")]
+  ;; P1: 신규 C 구현 함수
+  [(= $op "every?")      (str "fl_every_p(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "any?")        (str "fl_any_p(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "none?")       (str "fl_none_p(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "find-first")  (str "fl_find_first(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "count-if")    (str "fl_count_if(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "repeat")      (str "fl_repeat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "map-indexed") (str "fl_map_indexed(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "mapcat")      (str "fl_mapcat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "keep")        (str "fl_keep(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "comp")        (str "fl_comp(" (cgc-args $args) ", " (length $args) ")")]
+  [(= $op "conj")        (str "fl_conj(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "into")        (str "fl_into(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "keys")        (str "fl_map_keys(" (cgc (get $args 0)) ")")]
   [(= $op "obj-keys")    (str "fl_map_keys(" (cgc (get $args 0)) ")")]
   [(= $op "map-entries") (str "fl_map_entries(" (cgc (get $args 0)) ")")]
-  [(= $op "null?")       (str "null_p(" (cgc (get $args 0)) ")")]
-  [(= $op "nil?")        (str "null_p(" (cgc (get $args 0)) ")")]
+  [(= $op "null?")        (str "null_p(" (cgc (get $args 0)) ")")]
+  [(= $op "nil?")         (str "null_p(" (cgc (get $args 0)) ")")]
+  ;; N-12: 미커버리지 완전 해소
+  [(= $op "char-at")      (str "char_at(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "char-code-at") (str "char_code_at(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S15: math/time — C stdlib 충돌 방지용 fl_ 접두사
   [(= $op "floor")       (str "fl_floor(" (cgc (get $args 0)) ")")]
   [(= $op "ceil")        (str "fl_ceil(" (cgc (get $args 0)) ")")]
@@ -847,46 +933,98 @@
   [(= $op "_fl_file_write")   (str "fl_file_write(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "file-read")        (str "fl_file_read(" (cgc (get $args 0)) ")")]
   [(= $op "file-write")       (str "fl_file_write(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "file-exists")      (str "fl_bool(fl_file_read(" (cgc (get $args 0)) ").tag != FL_NIL)")]
-  [(= $op "file_exists")      (str "fl_bool(fl_file_read(" (cgc (get $args 0)) ").tag != FL_NIL)")]
-  [(= $op "_fl_file_append")  "fl_nil()"]
-  [(= $op "_fl_file_copy")    "fl_nil()"]
-  [(= $op "_fl_file_delete")  "fl_nil()"]
-  [(= $op "_fl_file_mkdir")   "fl_nil()"]
-  [(= $op "_fl_file_rmdir")   "fl_nil()"]
-  [(= $op "_fl_file_list")    "fl_vec_new()"]
-  [(= $op "_fl_file_size")    "fl_int(0)"]
-  [(= $op "_fl_file_modified")"fl_int(0)"]
-  [(= $op "_fl_file_rename")  "fl_nil()"]
-  [(= $op "_fl_file_is_file") "fl_bool(false)"]
-  [(= $op "_fl_file_is_dir")  "fl_bool(false)"]
-  ;; S17: env / process / misc — stub
-  [(= $op "_fl_env_get")           "fl_nil()"]
-  [(= $op "_fl_env_set")           "fl_nil()"]
-  [(= $op "_fl_env_all")           "fl_map_new()"]
-  [(= $op "_fl_process_run")       "fl_str_val(\"\")"]
-  [(= $op "_fl_process_run_args")  "fl_str_val(\"\")"]
-  [(= $op "_fl_process_exec")      "fl_str_val(\"\")"]
-  [(= $op "_fl_process_exec_args") "fl_str_val(\"\")"]
-  [(= $op "_fl_process_spawn")     "fl_str_val(\"\")"]
-  [(= $op "_fl_process_kill")      "fl_nil()"]
-  [(= $op "_fl_process_wait")      "fl_nil()"]
-  [(= $op "_fl_process_exists")    "fl_bool(false)"]
-  [(= $op "_fl_process_getcwd")    "fl_str_val(\"/\")"]
-  [(= $op "_fl_process_chdir")     "fl_nil()"]
-  [(= $op "_fl_process_pid")       "fl_int(0)"]
-  [(= $op "_fl_process_ppid")      "fl_nil()"]
-  [(= $op "_fl_run_inherit")       "fl_nil()"]
+  [(= $op "file-exists")      (str "file_exists(" (cgc (get $args 0)) ")")]
+  [(= $op "file_exists")      (str "file_exists(" (cgc (get $args 0)) ")")]
+  ;; N-11: 파일 ops — stub → 실제 구현
+  [(= $op "_fl_file_append")  (str "_fl_file_append(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "file-append")      (str "_fl_file_append(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_file_copy")    (str "_fl_file_copy(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_file_delete")  (str "_fl_file_delete(" (cgc (get $args 0)) ")")]
+  [(= $op "file-delete")      (str "_fl_file_delete(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_file_mkdir")   (str "_fl_file_mkdir(" (cgc (get $args 0)) ")")]
+  [(= $op "file-mkdir")       (str "_fl_file_mkdir(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_file_rmdir")   (str "_fl_file_rmdir(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_file_list")    (str "_fl_file_list(" (cgc (get $args 0)) ")")]
+  [(= $op "file-list")        (str "_fl_file_list(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_file_size")    (str "_fl_file_size(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_file_modified")(str "_fl_file_modified(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_file_rename")  (str "_fl_file_rename(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_file_is_file") (str "_fl_file_is_file(" (cgc (get $args 0)) ")")]
+  [(= $op "file-is-file?")    (str "_fl_file_is_file(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_file_is_dir")  (str "_fl_file_is_dir(" (cgc (get $args 0)) ")")]
+  [(= $op "file-is-dir?")     (str "_fl_file_is_dir(" (cgc (get $args 0)) ")")]
+  ;; N-11: env / process — stub → 실제 구현
+  [(= $op "_fl_env_get")           (str "_fl_env_get(" (cgc (get $args 0)) ")")]
+  [(= $op "env-get")               (str "_fl_env_get(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_env_set")           (str "_fl_env_set(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_env_all")           "_fl_env_all()"]
+  [(= $op "_fl_process_run")       (str "_fl_process_run(" (cgc (get $args 0)) ")")]
+  [(= $op "process-run")           (str "_fl_process_run(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_process_run_args")  (str "_fl_process_run_args(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_process_exec")      (str "_fl_process_exec(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_process_exec_args") (str "_fl_process_exec_args(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_process_spawn")     (str "_fl_process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_process_kill")      (str "_fl_process_kill(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_process_wait")      (str "_fl_process_wait(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_process_exists")    (str "_fl_process_exists(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_process_getcwd")    "_fl_process_getcwd()"]
+  [(= $op "process-cwd")           "_fl_process_getcwd()"]
+  [(= $op "_fl_process_chdir")     (str "_fl_process_chdir(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_process_pid")       "_fl_process_pid()"]
+  [(= $op "process-pid")           "_fl_process_pid()"]
+  [(= $op "_fl_process_ppid")      "_fl_process_ppid()"]
+  [(= $op "_fl_run_inherit")       (str "_fl_run_inherit(" (cgc (get $args 0)) ")")]
+  [(= $op "run-inherit")           (str "_fl_run_inherit(" (cgc (get $args 0)) ")")]
   [(= $op "cli-args")              "fl_get_argv()"]
-  [(= $op "bit-xor")               (str "fl_int(" (cgc (get $args 0)) ".i ^ " (cgc (get $args 1)) ".i)")]
+  [(= $op "bit-xor") (str "fl_bit_xor(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-and") (str "fl_bit_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-or")  (str "fl_bit_or("  (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-shl") (str "fl_bit_shl(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "bit-shr") (str "fl_bit_shr(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
-  [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
-  [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
+  [(= $op "json-parse")      (str "fl_json_parse(" (cgc (get $args 0)) ")")]
+  [(= $op "json-stringify")  (str "fl_json_stringify(" (cgc (get $args 0)) ")")]
+  ;; 병렬 실행
+  [(= $op "run-parallel")      (str "fl_run_parallel(" (cgc (get $args 0)) ", " (if (>= (length $args) 2) (cgc (get $args 1)) "fl_int(0)") ")")]
+  ;; HTTP 클라이언트 (libcurl) — {:status N :body "..." :headers {}}
+  [(= $op "http-get")          (str "fl_http_get(" (cgc (get $args 0)) ")")]
+  [(= $op "http-post")         (str "fl_http_post(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "http-get-headers")  (str "fl_http_get_headers(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "http-post-headers") (str "fl_http_post_headers(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "http-post-stream")     (str "fl_http_post_stream(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ", " (cgc (get $args 3)) ")")]
+  [(= $op "http-stream-collect") (str "fl_http_stream_collect(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  ;; 유틸 — sleep/now
+  [(= $op "sleep")   (str "fl_sleep_ms(" (cgc (get $args 0)) ")")]
+  [(= $op "now-ms")  "fl_now_ms()"]
+  ;; N-05: HTTP 서버
+  [(= $op "server-start")       (str "fl_http_start(" (cgc (get $args 0)) ")")]
+  [(= $op "server-stop")        "fl_http_stop()"]
+  [(= $op "server-html")        (str "fl_resp_html(" (cgc (get $args 0)) ")")]
+  [(= $op "server-json")        (str "fl_resp_json(" (cgc (get $args 0)) ")")]
+  [(= $op "server-status")      (str "fl_resp_status(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-redirect")    (str "fl_resp_redirect(" (cgc (get $args 0)) ")")]
+  [(= $op "server-html-cookie") (str "fl_resp_html_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-set-cookie")  (str "fl_resp_set_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "server-route")       (str "fl_http_route(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "server-get")         (str "fl_http_route(fl_str_val(\"GET\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-post")        (str "fl_http_route(fl_str_val(\"POST\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  ;; N-06: SQLite3 DB
+  [(= $op "db-open")   (str "fl_db_open(" (cgc (get $args 0)) ")")]
+  [(= $op "db-close")  (str "fl_db_close(" (cgc (get $args 0)) ")")]
+  [(= $op "db-query")  (str "fl_db_query(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "db-exec")   (str "fl_db_exec("  (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   ;; S19: fn lambda → static FLClosure 추출
   [(= $op "fn")      (cgc-fn $args)]
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
+  ;; N-09: 암호화 / JWT / 비밀번호
+  [(= $op "auth-jwt-sign")       (str "fl_jwt_sign(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "auth-jwt-verify")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "auth-jwt-expired")    (str "fl_jwt_expired(" (cgc (get $args 0)) ")")]
+  [(= $op "auth-jwt-decode")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", fl_str_val(\"\"))")]
+  [(= $op "auth-hash-password")  (str "fl_hash_password(" (cgc (get $args 0)) ")")]
+  [(= $op "auth-verify-password")(str "fl_verify_password(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [true             (cgc-dispatch-fallback $op $args)]))
 
 (defn cgc-swap! [$args]
@@ -900,17 +1038,22 @@
                     [(= $op "+")    (str "fl_add(" $deref ", " $ec ")")]
                     [(= $op "-")    (str "fl_sub(" $deref ", " $ec ")")]
                     [(= $op "*")    (str "fl_mul(" $deref ", " $ec ")")]
-                    [(= $op "push") (str "fl_vec_push(" $deref ", " $ec ")")]
-                    [true           (str (c-name $op) "(" $deref
+                    [(= $op "push")   (str "fl_vec_push(" $deref ", " $ec ")")]
+                    [(= $op "append") (str "fl_vec_push(" $deref ", " $ec ")")]
+                    [true             (str (c-name $op) "(" $deref
                                       (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
                   )]]
         (str "fl_atom_reset(" $atom-c ", " $rhs ")")))))
 
 (defn cgc-dispatch-fallback [$op $args]
-  (let [[$cn (c-name $op)]]
-    (if (includes-item @known-fncall-targets-atom $cn)
-      (cgc-fncall $cn $args)
-      (str $cn "(" (cgc-args $args) ")"))))
+  (cond
+    [(= $op "first")  (str "fl_vec_first(" (cgc (get $args 0)) ")")]
+    [(= $op "rest")   (str "fl_vec_rest(" (cgc (get $args 0)) ")")]
+    [true
+     (let [[$cn (c-name $op)]]
+       (if (includes-item @known-fncall-targets-atom $cn)
+         (cgc-fncall $cn $args)
+         (str $cn "(" (cgc-args $args) ")")))]))
 
 ;; ── S19/S20: fn lambda → static FLClosure 추출 (capture 지원) ──
 
@@ -919,7 +1062,7 @@
   (if (>= $i (length $items)) $acc
   (let [[$name (c-name (cgc-extract-name (get $items $i)))]]
     (cgc-fn-argv-decls $items (+ $i 1)
-      (str $acc "    FLValue " $name " = argv[" $i "];\n")))))
+      (str $acc "    FLValue " $name " __attribute__((unused)) = argv[" $i "];\n")))))
 
 ;; 파라미터 이름 목록 수집
 (defn cgc-fn-param-names [$items $i $acc]
@@ -988,7 +1131,7 @@
         [$decls (cgc-fn-argv-decls $param-items 0 "")]
         [$fn-name (str "__fl_anon_" $id)]]
     (swap! lambda-id-atom + 1)
-    (swap! lambda-defs-atom push
+    (swap! lambda-defs-atom append
       (str "static FLValue " $fn-name
            "(FLClosure* _self, int _argc, FLValue* argv) {\n"
            "    (void)_self; (void)_argc;\n"
@@ -1072,19 +1215,21 @@
 (defn cgc-let-1d [$it $i $acc]
   (if (>= $i (length $it)) $acc
   (let [[$n (cgc-extract-name (get $it $i))]
-        [$v (cgc (get $it (+ $i 1)))]]
-    (swap! known-fncall-targets-atom push $n)
-    (swap! outer-params-atom push $n)
-    (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n " = " $v ";\n")))))
+        [$v (cgc (get $it (+ $i 1)))]
+        [$attr (if (str-starts-with $n "_") " __attribute__((unused))" "")]]
+    (swap! known-fncall-targets-atom append $n)
+    (swap! outer-params-atom append $n)
+    (cgc-let-1d $it (+ $i 2) (str $acc "    FLValue " $n $attr " = " $v ";\n")))))
 
 (defn cgc-let-2d [$it $i $acc]
   (if (>= $i (length $it)) $acc
-  (let [[$p (get-block-items (get $it $i))]
-        [$n (cgc-extract-name (get $p 0))]
-        [$v (cgc (get $p 1))]]
-    (swap! known-fncall-targets-atom push $n)
-    (swap! outer-params-atom push $n)
-    (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n " = " $v ";\n")))))
+  (let [[$p    (get-block-items (get $it $i))]
+        [$n    (cgc-extract-name (get $p 0))]
+        [$v    (cgc (get $p 1))]
+        [$attr (if (str-starts-with $n "_") " __attribute__((unused))" "")]]
+    (swap! known-fncall-targets-atom append $n)
+    (swap! outer-params-atom append $n)
+    (cgc-let-2d $it (+ $i 1) (str $acc "    FLValue " $n $attr " = " $v ";\n")))))
 
 (defn cgc-body [$args $i $acc]
   (if (>= $i (length $args)) $acc
@@ -1101,7 +1246,7 @@
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
     (reset! outer-params-atom $pnames)
     (let [[$call-args (cgc-wrapper-call-args $param-items 0 "")]]
-      (swap! wrapper-defs-atom push
+      (swap! wrapper-defs-atom append
         (str "static FLValue __fl_wrap_" $name
              "(FLClosure* _s, int _ac, FLValue* argv) {\n"
              "    (void)_s; (void)_ac;\n"
@@ -1114,8 +1259,8 @@
 (defn cgc-define [$args]
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$val (cgc (get $args 1))]]
-    (swap! known-fncall-targets-atom push $name)
-    (swap! global-decls-atom push (str "static FLValue " $name ";"))
+    (swap! known-fncall-targets-atom append $name)
+    (swap! global-decls-atom append (str "static FLValue " $name ";"))
     (str $name " = " $val ";")))
 
 ;; ── 이진 연산 연쇄 (fl_add(fl_add(a,b),c)) ──
@@ -1182,7 +1327,7 @@
       (if (and (= (get $n :kind) "sexpr") (= (get $n :op) "defn"))
         (let [[$name (c-name (cgc-extract-name (get (get $n :args) 0)))]
               [$ps (cgc-params (get-block-items (get (get $n :args) 1)))]]
-          (swap! known-defns-atom push $name)
+          (swap! known-defns-atom append $name)
           (str $acc
                "FLValue " $name "(" $ps ");\n"
                "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n"))
@@ -1513,15 +1658,58 @@
           (recur (+ $i 1)))))))
 
 ;; ── S27 entry point ──────────────────────────────────────────────────────────
+;; 경로에서 디렉토리 부분 추출 ("a/b/c.fl" → "a/b/")
+(defn path-dir [$path]
+  (let [[$len (length $path)]
+        [$last (loop [$i (- $len 1) $r -1]
+                 (if (< $i 0) $r
+                   (if (= (char-at $path $i) "/")
+                     $i
+                     (recur (- $i 1) $r))))]]
+    (if (< $last 0) "" (substring $path 0 (+ $last 1)))))
+
+;; 노드 목록에 서브목록 모두 추가
+(defn append-all [$acc $items]
+  (loop [$i 0 $a $acc]
+    (if (>= $i (length $items)) $a
+      (recur (+ $i 1) (push $a (get $items $i))))))
+
+;; (load "file.fl") 를 컴파일 타임에 인라인 — 재귀적으로 처리
+(defn expand-loads [$nodes $base-dir]
+  (loop [$i 0 $acc []]
+    (if (>= $i (length $nodes))
+      $acc
+      (let [[$node (get $nodes $i)]]
+        (if (and (= (get $node :kind) "sexpr") (= (get $node :op) "load"))
+          (let [[$path-node (get (get $node :args) 0)]
+                [$rel-path  (get $path-node :value)]
+                ;; 절대 경로면 그대로, 상대 경로면 base-dir 우선, 없으면 CWD 기준
+                [$try1 (if (str-starts-with $rel-path "/")
+                          $rel-path
+                          (str $base-dir $rel-path))]
+                [$src1 (file-read $try1)]
+                [$abs-path (if (null? $src1) $rel-path $try1)]
+                [$src  (if (null? $src1) (file-read $rel-path) $src1)]]
+            (if (null? $src)
+              (do (println (str "[load] 파일 없음: " $rel-path))
+                  (recur (+ $i 1) $acc))
+              (let [[$sub-dir  (path-dir $abs-path)]
+                    [$sub-raw  (parse (lex $src))]
+                    [$expanded (expand-loads $sub-raw $sub-dir)]]
+                (recur (+ $i 1) (append-all $acc $expanded)))))
+          (recur (+ $i 1) (push $acc $node)))))))
+
 (defn cgc-run [$argv]
   (let [[$input  (get $argv 0)]
         [$output (get $argv 1)]]
   (if (or (null? $input) (null? $output))
     (println "usage: cgc-bin <input.fl> <output.c>")
-    (let [[$src    (file-read $input)]
-          [$nodes  (parse (lex $src))]
-          [$_v    (ir-validate $nodes)]
-          [$c-code (generate-c $nodes)]]
+    (let [[$src      (file-read $input)]
+          [$base-dir (path-dir $input)]
+          [$raw      (parse (lex $src))]
+          [$nodes    (expand-loads $raw $base-dir)]
+          [$_v      (ir-validate $nodes)]
+          [$c-code   (generate-c $nodes)]]
       (file-write $output $c-code)
       (println (str "Compiled " $input " -> " $output))))))
 
