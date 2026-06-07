@@ -10,6 +10,26 @@
 
 ---
 
+## Architecture (5-Layer)
+
+```
+Layer 5: Experiments  ← 불안정, 자주 변경 (wisdom, predict, evolve)
+Layer 4: Core         ← 언어 의미론만 (parser, interpreter, match, type-check)
+Layer 3: Extensions   ← 도메인 기능 (web, db, http, agent, workflow)
+Layer 2: StdLib       ← 범용 유틸 (string, list, map, file, json)
+Layer 1: Temporary    ← 임시/호환성 (compat, temp, scratch - 막힌 것 먼저)
+```
+
+**쌓는 순서**: 막힌 것 → Temporary → StdLib → Extensions → Core 안정화
+
+**Core 원칙**: 언어 의미론에 필수적인 것만
+- 문법 파싱 & 타입 체크
+- 함수 정의 & 호출
+- 이름 해석 & 스코프
+- 패턴 매칭 & 제어문
+
+---
+
 ## What Currently Works
 
 ✅ **Runtime & Execution**
