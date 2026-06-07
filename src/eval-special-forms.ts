@@ -23,13 +23,9 @@ function checkBudgetInLoop(): void {
 }
 import { ok, err, isOk, isErr, fromThrown, ErrorCategory } from "./result-type"; // Phase 96
 import { ReturnSignal } from "./return-signal";
-import { BytecodeCompiler } from "./compiler"; // Phase 3-E: VM defn 컴파일
-import { registerVMFunction } from "./vm-eligible"; // Phase 3-E: VM 함수 등록
 import { FLRuntimeError, ErrorCodes } from "./errors"; // Phase A: 통일 에러
 import { propRegistry, PropDef } from "./stdlib-property"; // AI-Native Phase 4
 import { ScopeVarMeta } from "./interpreter-scope"; // Phase Y-1: 변수 메타정보
-
-const _vmCompiler = new BytecodeCompiler(); // Phase 3-E
 
 // ── AI-Native Phase 1: 함수 메타 레지스트리 ────────────────────────
 export interface FnMeta {

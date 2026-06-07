@@ -3864,310 +3864,6 @@ var init_return_signal = __esm({
   }
 });
 
-// src/bytecode.ts
-var init_bytecode = __esm({
-  "src/bytecode.ts"() {
-  }
-});
-
-// src/compiler.ts
-var BytecodeCompiler;
-var init_compiler = __esm({
-  "src/compiler.ts"() {
-    init_bytecode();
-    BytecodeCompiler = class {
-      compile(node) {
-        const chunk = {
-          instructions: [],
-          constants: [],
-          name: "main"
-        };
-        this.compileExpr(node, chunk);
-        this.emit(chunk, 25 /* HALT */);
-        return chunk;
-      }
-      compileExpr(node, chunk) {
-        switch (node.kind) {
-          case "literal":
-            this.compileLiteral(node, chunk);
-            break;
-          case "variable":
-            this.compileVariable(node, chunk);
-            break;
-          case "sexpr":
-            this.compileSExpr(node, chunk);
-            break;
-          case "block":
-            this.compileBlock(node, chunk);
-            break;
-          default:
-            this.emit(chunk, 25 /* HALT */);
-            break;
-        }
-      }
-      compileLiteral(node, chunk) {
-        if (node.type === "symbol" && typeof node.value === "string") {
-          const bareName = node.value;
-          if (bareName !== "true" && bareName !== "false" && bareName !== "null") {
-            this.emit(chunk, 1 /* PUSH_VAR */, "$" + bareName);
-            return;
-          }
-        }
-        const idx = this.addConst(chunk, node.value);
-        this.emit(chunk, 0 /* PUSH_CONST */, idx);
-      }
-      compileVariable(node, chunk) {
-        this.emit(chunk, 1 /* PUSH_VAR */, node.name);
-      }
-      compileSExpr(node, chunk) {
-        const op = node.op;
-        switch (op) {
-          case "if":
-            this.compileIf(node, chunk);
-            return;
-          case "define":
-            this.compileDefine(node, chunk);
-            return;
-          case "do":
-            this.compileDo(node, chunk);
-            return;
-          case "list":
-            this.compileList(node, chunk);
-            return;
-          case "not":
-            if (node.args.length >= 1) {
-              this.compileExpr(node.args[0], chunk);
-              this.emit(chunk, 22 /* NOT */);
-            }
-            return;
-          case "and":
-            this.compileAnd(node, chunk);
-            return;
-          case "or":
-            this.compileOr(node, chunk);
-            return;
-          case "get":
-          case ".":
-            if (node.args.length >= 2) {
-              this.compileExpr(node.args[0], chunk);
-              const field = node.args[1];
-              if (field.kind === "literal") {
-                this.emit(chunk, 24 /* GET_FIELD */, String(field.value));
-              } else {
-                this.emit(chunk, 25 /* HALT */);
-              }
-            }
-            return;
-        }
-        const binaryOps = {
-          "+": 9 /* ADD */,
-          "-": 10 /* SUB */,
-          "*": 11 /* MUL */,
-          "/": 12 /* DIV */,
-          "%": 13 /* MOD */,
-          "mod": 13 /* MOD */,
-          "==": 14 /* EQ */,
-          "=": 14 /* EQ */,
-          "!=": 19 /* NEQ */,
-          "<": 15 /* LT */,
-          ">": 16 /* GT */,
-          "<=": 17 /* LE */,
-          ">=": 18 /* GE */
-        };
-        if (binaryOps[op] !== void 0) {
-          if (node.args.length >= 2) {
-            this.compileExpr(node.args[0], chunk);
-            this.compileExpr(node.args[1], chunk);
-            this.emit(chunk, binaryOps[op]);
-          } else if (node.args.length === 1) {
-            if (op === "-") {
-              const zeroIdx = this.addConst(chunk, 0);
-              this.emit(chunk, 0 /* PUSH_CONST */, zeroIdx);
-              this.compileExpr(node.args[0], chunk);
-              this.emit(chunk, 10 /* SUB */);
-            } else {
-              this.compileExpr(node.args[0], chunk);
-            }
-          }
-          return;
-        }
-        this.emit(chunk, 25 /* HALT */);
-      }
-      compileIf(node, chunk) {
-        if (node.args.length < 2) {
-          this.emit(chunk, 25 /* HALT */);
-          return;
-        }
-        this.compileExpr(node.args[0], chunk);
-        const jumpIfFalseIdx = chunk.instructions.length;
-        this.emit(chunk, 6 /* JUMP_IF_FALSE */, 0);
-        this.compileExpr(node.args[1], chunk);
-        const jumpIdx = chunk.instructions.length;
-        this.emit(chunk, 5 /* JUMP */, 0);
-        const elseStart = chunk.instructions.length;
-        chunk.instructions[jumpIfFalseIdx].arg = elseStart;
-        if (node.args.length >= 3) {
-          this.compileExpr(node.args[2], chunk);
-        } else {
-          const nullIdx = this.addConst(chunk, null);
-          this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-        }
-        const end = chunk.instructions.length;
-        chunk.instructions[jumpIdx].arg = end;
-      }
-      compileDefine(node, chunk) {
-        if (node.args.length < 2) {
-          this.emit(chunk, 25 /* HALT */);
-          return;
-        }
-        const varNode = node.args[0];
-        const valNode = node.args[1];
-        this.compileExpr(valNode, chunk);
-        const name = varNode.kind === "variable" ? varNode.name : varNode.kind === "literal" ? String(varNode.value) : "unknown";
-        this.emit(chunk, 2 /* SET_VAR */, name);
-        const nullIdx = this.addConst(chunk, null);
-        this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-      }
-      compileDo(node, chunk) {
-        if (node.args.length === 0) {
-          const nullIdx = this.addConst(chunk, null);
-          this.emit(chunk, 0 /* PUSH_CONST */, nullIdx);
-          return;
-        }
-        for (let i = 0; i < node.args.length; i++) {
-          this.compileExpr(node.args[i], chunk);
-          if (i < node.args.length - 1) {
-            this.emit(chunk, 7 /* POP */);
-          }
-        }
-      }
-      compileList(node, chunk) {
-        for (const arg of node.args) {
-          this.compileExpr(arg, chunk);
-        }
-        this.emit(chunk, 23 /* MAKE_LIST */, node.args.length);
-      }
-      compileAnd(node, chunk) {
-        if (node.args.length === 0) {
-          const idx = this.addConst(chunk, true);
-          this.emit(chunk, 0 /* PUSH_CONST */, idx);
-          return;
-        }
-        if (node.args.length === 1) {
-          this.compileExpr(node.args[0], chunk);
-          return;
-        }
-        this.compileExpr(node.args[0], chunk);
-        this.compileExpr(node.args[1], chunk);
-        this.emit(chunk, 20 /* AND */);
-      }
-      compileOr(node, chunk) {
-        if (node.args.length === 0) {
-          const idx = this.addConst(chunk, false);
-          this.emit(chunk, 0 /* PUSH_CONST */, idx);
-          return;
-        }
-        if (node.args.length === 1) {
-          this.compileExpr(node.args[0], chunk);
-          return;
-        }
-        this.compileExpr(node.args[0], chunk);
-        this.compileExpr(node.args[1], chunk);
-        this.emit(chunk, 21 /* OR */);
-      }
-      compileBlock(node, chunk) {
-        this.emit(chunk, 25 /* HALT */);
-      }
-      addConst(chunk, value) {
-        chunk.constants.push(value);
-        return chunk.constants.length - 1;
-      }
-      emit(chunk, op, arg) {
-        const instr = { op };
-        if (arg !== void 0) instr.arg = arg;
-        chunk.instructions.push(instr);
-      }
-    };
-  }
-});
-
-// src/vm-eligible.ts
-function registerVMFunction(name, vmFunc) {
-  if (vmFunc) {
-    vmFunctionRegistry.set(name, vmFunc);
-  }
-}
-function isVMEligible(node) {
-  if (!node || typeof node !== "object") {
-    return false;
-  }
-  const kind = node.kind;
-  switch (kind) {
-    case "literal":
-      return true;
-    case "variable":
-      return true;
-    case "sexpr": {
-      const sexpr = node;
-      if (!sexpr || !sexpr.op) {
-        return false;
-      }
-      if (!VM_SUPPORTED_OPS.has(sexpr.op)) {
-        return false;
-      }
-      if (!sexpr.args || !Array.isArray(sexpr.args)) {
-        return false;
-      }
-      return sexpr.args.every((arg) => isVMEligible(arg));
-    }
-    case "keyword":
-      return false;
-    case "block":
-      return false;
-    case "pattern-match":
-    case "try-block":
-    case "throw":
-    default:
-      return false;
-  }
-}
-var vmFunctionRegistry, VM_SUPPORTED_OPS;
-var init_vm_eligible = __esm({
-  "src/vm-eligible.ts"() {
-    vmFunctionRegistry = /* @__PURE__ */ new Map();
-    VM_SUPPORTED_OPS = /* @__PURE__ */ new Set([
-      // 산술
-      "+",
-      "-",
-      "*",
-      "/",
-      "%",
-      "mod",
-      // 비교
-      "=",
-      "==",
-      "!=",
-      "<",
-      ">",
-      "<=",
-      ">=",
-      // 논리
-      "and",
-      "or",
-      "not",
-      // 제어
-      "if",
-      "do",
-      // 데이터
-      "list",
-      "get",
-      ".",
-      // 정의
-      "define"
-    ]);
-  }
-});
-
 // src/stdlib-property.ts
 function genValue(type) {
   const t = type.replace(/^:/, "").toLowerCase();
@@ -6127,7 +5823,7 @@ function evalCond(interp2, args3) {
   }
   return null;
 }
-var _vmCompiler, fnMetaRegistry, META_KEYS, EFFECT_CATALOG;
+var fnMetaRegistry, META_KEYS, EFFECT_CATALOG;
 var init_eval_special_forms = __esm({
   "src/eval-special-forms.ts"() {
     init_ast();
@@ -6138,11 +5834,8 @@ var init_eval_special_forms = __esm({
     init_runtime_context();
     init_result_type();
     init_return_signal();
-    init_compiler();
-    init_vm_eligible();
     init_errors();
     init_stdlib_property();
-    _vmCompiler = new BytecodeCompiler();
     fnMetaRegistry = /* @__PURE__ */ new Map();
     META_KEYS = /* @__PURE__ */ new Set(["doc", "returns", "context", "effects", "examples", "property"]);
     EFFECT_CATALOG = /* @__PURE__ */ new Map([
@@ -13155,223 +12848,6 @@ var init_predict = __esm({
 });
 
 // src/eval-builtins-ai.ts
-function evalRefactorSelf(op, args3) {
-  if (op === "refactor-analyze") {
-    const code = String(args3[0] ?? "");
-    const result = globalRefactorer.refactor(code, true);
-    return /* @__PURE__ */ new Map([
-      ["suggestions", result.suggestions.map((s) => /* @__PURE__ */ new Map([
-        ["pattern", s.pattern],
-        ["location", s.location],
-        ["original", s.original],
-        ["suggested", s.suggested],
-        ["reason", s.reason],
-        ["impact", s.impact]
-      ]))],
-      ["applied", result.applied],
-      ["skipped", result.skipped],
-      ["score", /* @__PURE__ */ new Map([
-        ["before", result.score.before],
-        ["after", result.score.after],
-        ["improvement", result.score.improvement]
-      ])]
-    ]);
-  }
-  if (op === "refactor-suggest") {
-    const code = String(args3[0] ?? "");
-    return globalRefactorer.suggest(code).map((s) => /* @__PURE__ */ new Map([
-      ["pattern", s.pattern],
-      ["location", s.location],
-      ["original", s.original],
-      ["suggested", s.suggested],
-      ["reason", s.reason],
-      ["impact", s.impact]
-    ]));
-  }
-  if (op === "refactor-apply") {
-    const code = String(args3[0] ?? "");
-    const rawSuggestions = Array.isArray(args3[1]) ? args3[1] : [];
-    const suggestions = rawSuggestions.map((s) => {
-      if (s instanceof Map) return {
-        pattern: s.get("pattern") ?? "extract-duplicate",
-        location: s.get("location") ?? "",
-        original: s.get("original") ?? "",
-        suggested: s.get("suggested") ?? "",
-        reason: s.get("reason") ?? "",
-        impact: s.get("impact") ?? "low"
-      };
-      return s;
-    });
-    const applyResult = globalRefactorer.apply(code, suggestions);
-    return /* @__PURE__ */ new Map([
-      ["code", applyResult.code],
-      ["applied", applyResult.applied.map((s) => /* @__PURE__ */ new Map([
-        ["pattern", s.pattern],
-        ["location", s.location],
-        ["impact", s.impact]
-      ]))]
-    ]);
-  }
-  if (op === "refactor-complexity") {
-    const code = String(args3[0] ?? "");
-    const c = globalRefactorer.analyzeComplexity(code);
-    return /* @__PURE__ */ new Map([["lines", c.lines], ["depth", c.depth], ["conditions", c.conditions], ["score", c.score]]);
-  }
-  if (op === "refactor-quality") {
-    const code = String(args3[0] ?? "");
-    return globalRefactorer.qualityScore(code);
-  }
-  if (op === "refactor-naming") {
-    const code = String(args3[0] ?? "");
-    const n = globalRefactorer.analyzeNaming(code);
-    return /* @__PURE__ */ new Map([
-      ["issues", n.issues.map((i) => /* @__PURE__ */ new Map([
-        ["name", i.name],
-        ["suggestion", i.suggestion],
-        ["reason", i.reason]
-      ]))],
-      ["score", n.score]
-    ]);
-  }
-  if (op === "refactor-duplicates") {
-    const code = String(args3[0] ?? "");
-    return globalRefactorer.findDuplicates(code).map((s) => /* @__PURE__ */ new Map([
-      ["pattern", s.pattern],
-      ["location", s.location],
-      ["original", s.original],
-      ["suggested", s.suggested],
-      ["reason", s.reason],
-      ["impact", s.impact]
-    ]));
-  }
-  if (op === "refactor-score") {
-    const r = args3[0];
-    if (r instanceof Map) {
-      const score = r.get("score");
-      if (score instanceof Map) return /* @__PURE__ */ new Map([
-        ["before", score.get("before") ?? 0],
-        ["after", score.get("after") ?? 0],
-        ["improvement", score.get("improvement") ?? 0]
-      ]);
-    }
-    return /* @__PURE__ */ new Map([["before", 0], ["after", 0], ["improvement", 0]]);
-  }
-  if (op === "causal-add-node") {
-    const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kw[key] = args3[i + 1];
-    }
-    const node = {
-      id: String(kw["id"] ?? ""),
-      name: String(kw["name"] ?? kw["id"] ?? ""),
-      description: String(kw["desc"] ?? kw["description"] ?? ""),
-      value: kw["value"] !== void 0 ? Number(kw["value"]) : void 0
-    };
-    globalCausal.addNode(node);
-    return /* @__PURE__ */ new Map([["id", node.id], ["name", node.name], ["description", node.description]]);
-  }
-  if (op === "causal-add-edge") {
-    const kw = {};
-    for (let i = 0; i < args3.length - 1; i += 2) {
-      const key = String(args3[i]).replace(/^:/, "");
-      kw[key] = args3[i + 1];
-    }
-    const edge = {
-      from: String(kw["from"] ?? ""),
-      to: String(kw["to"] ?? ""),
-      strength: Number(kw["strength"] ?? 1),
-      confidence: Number(kw["confidence"] ?? 1),
-      delay: kw["delay"] !== void 0 ? Number(kw["delay"]) : void 0,
-      mechanism: kw["mechanism"] !== void 0 ? String(kw["mechanism"]) : void 0
-    };
-    globalCausal.addEdge(edge);
-    return /* @__PURE__ */ new Map([["from", edge.from], ["to", edge.to], ["strength", edge.strength], ["confidence", edge.confidence]]);
-  }
-  if (op === "causal-explain") {
-    const effectId = String(args3[0] ?? "");
-    const expl = globalCausal.explain(effectId);
-    return /* @__PURE__ */ new Map([
-      ["effect", expl.effect],
-      ["primaryCause", expl.primaryCause],
-      ["explanation", expl.explanation],
-      ["confidence", expl.confidence],
-      ["causes", expl.causes.map((c) => /* @__PURE__ */ new Map([
-        ["cause", c.cause],
-        ["contribution", c.contribution],
-        ["chain", /* @__PURE__ */ new Map([
-          ["path", c.chain.path],
-          ["totalStrength", c.chain.totalStrength],
-          ["explanation", c.chain.explanation],
-          ["confidence", c.chain.confidence]
-        ])]
-      ]))]
-    ]);
-  }
-  if (op === "causal-chains") {
-    const causeId = String(args3[0] ?? "");
-    const effectId = String(args3[1] ?? "");
-    const chains = globalCausal.findCausalChains(causeId, effectId);
-    return chains.map((c) => /* @__PURE__ */ new Map([
-      ["path", c.path],
-      ["totalStrength", c.totalStrength],
-      ["explanation", c.explanation],
-      ["confidence", c.confidence]
-    ]));
-  }
-  if (op === "causal-causes") {
-    const nodeId = String(args3[0] ?? "");
-    const causes = globalCausal.getDirectCauses(nodeId);
-    return causes.map((e) => /* @__PURE__ */ new Map([
-      ["from", e.from],
-      ["to", e.to],
-      ["strength", e.strength],
-      ["confidence", e.confidence]
-    ]));
-  }
-  if (op === "causal-effects") {
-    const nodeId = String(args3[0] ?? "");
-    const effects = globalCausal.getDirectEffects(nodeId);
-    return effects.map((e) => /* @__PURE__ */ new Map([
-      ["from", e.from],
-      ["to", e.to],
-      ["strength", e.strength],
-      ["confidence", e.confidence]
-    ]));
-  }
-  if (op === "causal-roots") {
-    const nodeId = String(args3[0] ?? "");
-    return globalCausal.findRootCauses(nodeId);
-  }
-  if (op === "causal-simulate") {
-    const arg = args3[0];
-    const interventions = {};
-    if (arg instanceof Map) {
-      for (const [k, v] of arg.entries()) {
-        interventions[String(k)] = Number(v);
-      }
-    }
-    const result = globalCausal.simulate(interventions);
-    return new Map(Object.entries(result));
-  }
-  if (op === "causal-why") {
-    const effectId = String(args3[0] ?? "");
-    const causeId = String(args3[1] ?? "");
-    const chain = whyCaused(effectId, causeId);
-    if (chain === null) return null;
-    return /* @__PURE__ */ new Map([
-      ["path", chain.path],
-      ["totalStrength", chain.totalStrength],
-      ["explanation", chain.explanation],
-      ["confidence", chain.confidence]
-    ]);
-  }
-  if (op === "causal-summary") {
-    const nodeId = String(args3[0] ?? "");
-    return globalCausal.summarize(nodeId);
-  }
-  return null;
-}
 function evalAlign(op, args3) {
   if (op === "align-add-goal") {
     const kw = {};
@@ -14614,6 +14090,195 @@ var init_eval_builtins_ai = __esm({
   }
 });
 
+// src/eval-builtins-experiments.ts
+function evalExperimentBuiltin(op, args3, callFn) {
+  if (op.startsWith("world-")) {
+    const r141 = evalWorldModel141(op, args3);
+    if (r141 !== void 0) return r141;
+  }
+  if (op.startsWith("cf-")) {
+    const r143 = evalCounterfactual(op, args3, callFn);
+    if (r143 !== null) return r143;
+  }
+  if (op.startsWith("align-")) {
+    const r146 = evalAlign(op, args3);
+    if (r146 !== null) return r146;
+  }
+  if (op === "causal-add-node") {
+    const kw142 = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw142[key] = args3[i + 1];
+    }
+    const node142 = {
+      id: String(kw142["id"] ?? ""),
+      name: String(kw142["name"] ?? kw142["id"] ?? ""),
+      description: String(kw142["desc"] ?? kw142["description"] ?? ""),
+      value: kw142["value"] !== void 0 ? Number(kw142["value"]) : void 0
+    };
+    globalCausal.addNode(node142);
+    return /* @__PURE__ */ new Map([
+      ["id", node142.id],
+      ["name", node142.name],
+      ["description", node142.description]
+    ]);
+  }
+  if (op === "causal-add-edge") {
+    const kw142e = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw142e[key] = args3[i + 1];
+    }
+    const edge142 = {
+      from: String(kw142e["from"] ?? ""),
+      to: String(kw142e["to"] ?? ""),
+      strength: Number(kw142e["strength"] ?? 1),
+      confidence: Number(kw142e["confidence"] ?? 1),
+      delay: kw142e["delay"] !== void 0 ? Number(kw142e["delay"]) : void 0,
+      mechanism: kw142e["mechanism"] !== void 0 ? String(kw142e["mechanism"]) : void 0
+    };
+    globalCausal.addEdge(edge142);
+    return /* @__PURE__ */ new Map([
+      ["from", edge142.from],
+      ["to", edge142.to],
+      ["strength", edge142.strength],
+      ["confidence", edge142.confidence]
+    ]);
+  }
+  if (op === "causal-explain") {
+    const expl142 = globalCausal.explain(String(args3[0] ?? ""));
+    return /* @__PURE__ */ new Map([
+      ["effect", expl142.effect],
+      ["primaryCause", expl142.primaryCause],
+      ["explanation", expl142.explanation],
+      ["confidence", expl142.confidence],
+      ["causes", expl142.causes.map((c) => /* @__PURE__ */ new Map([
+        ["cause", c.cause],
+        ["contribution", c.contribution],
+        ["chain", /* @__PURE__ */ new Map([
+          ["path", c.chain.path],
+          ["totalStrength", c.chain.totalStrength],
+          ["explanation", c.chain.explanation],
+          ["confidence", c.chain.confidence]
+        ])]
+      ]))]
+    ]);
+  }
+  if (op === "causal-chains") {
+    const ch142 = globalCausal.findCausalChains(String(args3[0] ?? ""), String(args3[1] ?? ""));
+    return ch142.map((c) => /* @__PURE__ */ new Map([
+      ["path", c.path],
+      ["totalStrength", c.totalStrength],
+      ["explanation", c.explanation],
+      ["confidence", c.confidence]
+    ]));
+  }
+  if (op === "causal-causes") {
+    return globalCausal.getDirectCauses(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([
+      ["from", e.from],
+      ["to", e.to],
+      ["strength", e.strength],
+      ["confidence", e.confidence]
+    ]));
+  }
+  if (op === "causal-effects") {
+    return globalCausal.getDirectEffects(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([
+      ["from", e.from],
+      ["to", e.to],
+      ["strength", e.strength],
+      ["confidence", e.confidence]
+    ]));
+  }
+  if (op === "causal-roots") {
+    return globalCausal.findRootCauses(String(args3[0] ?? ""));
+  }
+  if (op === "causal-simulate") {
+    const arg142 = args3[0];
+    const iv142 = {};
+    if (arg142 instanceof Map) {
+      for (const [k, v] of arg142.entries()) {
+        iv142[String(k)] = Number(v);
+      }
+    }
+    return new Map(Object.entries(globalCausal.simulate(iv142)));
+  }
+  if (op === "causal-why") {
+    const chain142 = whyCaused(String(args3[0] ?? ""), String(args3[1] ?? ""));
+    if (chain142 === null) return null;
+    return /* @__PURE__ */ new Map([
+      ["path", chain142.path],
+      ["totalStrength", chain142.totalStrength],
+      ["explanation", chain142.explanation],
+      ["confidence", chain142.confidence]
+    ]);
+  }
+  if (op === "causal-summary") {
+    return globalCausal.summarize(String(args3[0] ?? ""));
+  }
+  if (op.startsWith("predict-")) {
+    const r144 = evalPredict_PHASE144(op, args3);
+    if (r144 !== null) return r144;
+  }
+  if (op.startsWith("curiosity-")) {
+    const r148 = evalCuriosity(op, args3, callFn);
+    if (r148 !== null) return r148;
+  }
+  if (op.startsWith("wisdom-")) {
+    const r149 = evalWisdom(op, args3);
+    if (r149 !== null) return r149;
+  }
+  if (op.startsWith("explain-")) {
+    const r145 = evalExplain_PHASE145(op, args3, callFn);
+    if (r145 !== null) return r145;
+  }
+  if (op === "consensus-create") {
+    const config = typeof args3[0] === "object" ? args3[0] : {};
+    return { engine: globalConsensus, id: `cons-${Date.now()}` };
+  }
+  if (op === "consensus-vote") {
+    const agentId = String(args3[0] ?? "");
+    const position = String(args3[1] ?? "neutral");
+    globalConsensus.vote(agentId, position);
+    return true;
+  }
+  if (op === "consensus-result") {
+    return globalConsensus.getConsensus();
+  }
+  if (op === "delegate-assign") {
+    const taskId = String(args3[0] ?? "");
+    const agentId = String(args3[1] ?? "");
+    globalDelegation.assignTask(taskId, agentId);
+    return true;
+  }
+  if (op === "delegate-status") {
+    const taskId = String(args3[0] ?? "");
+    return globalDelegation.getTaskStatus(taskId);
+  }
+  if (op === "vote-create") {
+    const ballot = { id: `ballot-${Date.now()}`, options: args3 };
+    return ballot;
+  }
+  if (op === "swarm-spawn") {
+    return globalSwarm.spawn(String(args3[0] ?? ""));
+  }
+  if (op === "hub-register") {
+    const agentId = String(args3[0] ?? "");
+    globalHub.register(agentId);
+    return true;
+  }
+  return null;
+}
+var init_eval_builtins_experiments = __esm({
+  "src/eval-builtins-experiments.ts"() {
+    init_causal();
+    init_eval_builtins_ai();
+    init_consensus();
+    init_delegate();
+    init_swarm();
+    init_multi_agent_hub();
+  }
+});
+
 // src/runtime-store.ts
 function newRunId() {
   return `r-${++_runCounter}`;
@@ -14859,7 +14524,8 @@ var require_stdlib_signatures = __commonJS({
 // src/eval-builtins.ts
 var eval_builtins_exports = {};
 __export(eval_builtins_exports, {
-  evalBuiltin: () => evalBuiltin
+  evalBuiltin: () => evalBuiltin,
+  flIsKnownBuiltin: () => flIsKnownBuiltin
 });
 function flDeepEq(a, b) {
   if (a === b) return true;
@@ -15568,6 +15234,25 @@ function __ensureIoWorker() {
   globalThis.__ioWorker = worker;
   globalThis.__ioCtrlBuf = ctrlBuf;
   globalThis.__ioDataBuf = dataBuf2;
+}
+function flIsKnownBuiltin(name) {
+  if (_FL_KNOWN_BUILTIN_OPS === null) {
+    const set = /* @__PURE__ */ new Set();
+    try {
+      const re = /case\s+"([^"]+)"/g;
+      let mm;
+      const src = evalBuiltin.toString();
+      while (mm = re.exec(src)) {
+        set.add(mm[1]);
+        set.add(mm[1].replace(/_/g, "-"));
+        set.add(mm[1].replace(/-/g, "_"));
+      }
+    } catch (e) {
+    }
+    _FL_KNOWN_BUILTIN_OPS = set;
+  }
+  if (typeof name !== "string") return false;
+  return _FL_KNOWN_BUILTIN_OPS.has(name) || _FL_KNOWN_BUILTIN_OPS.has(name.replace(/_/g, "-"));
 }
 function evalBuiltin(interp2, op, args3, expr2) {
   const normalizedOp2 = op.replace(/_/g, "-");
@@ -16672,6 +16357,46 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "%":
       return args3[0] % args3[1];
+    // ── fx 회귀패치 이식 (2026-06-07): flExecOpNative 에만 있고 evalBuiltin
+    //    (메인 인터프리터 경로)에 누락됐던 op 들. INTEGRATION-BASELINE.md 4절.
+    case "mod":
+      return args3[0] % args3[1];
+    case "inc":
+      return typeof args3[0] === "number" ? args3[0] + 1 : args3[0];
+    case "dec":
+      return typeof args3[0] === "number" ? args3[0] - 1 : args3[0];
+    case "true?":
+      return args3[0] === true;
+    case "false?":
+      return args3[0] === false;
+    case "strlen":
+      return typeof args3[0] === "string" ? args3[0].length : 0;
+    case "includes?":
+    case "includes-item":
+      return typeof args3[0] === "string" ? args3[0].includes(String(args3[1])) : Array.isArray(args3[0]) ? args3[0].includes(args3[1]) : false;
+    case "cons":
+      return [args3[0], ...Array.isArray(args3[1]) ? args3[1] : [args3[1]]];
+    case "closure?":
+      return args3[0] !== null && args3[0] !== void 0 && typeof args3[0] === "object" && args3[0].kind === "closure";
+    case "read-file":
+      try {
+        return require("fs").readFileSync(String(args3[0]), "utf-8");
+      } catch {
+        return null;
+      }
+    case "write-file":
+      try {
+        require("fs").writeFileSync(String(args3[0]), String(args3[1] ?? ""));
+        return true;
+      } catch {
+        return false;
+      }
+    case "file-exists?":
+      try {
+        return require("fs").existsSync(String(args3[0]));
+      } catch {
+        return false;
+      }
     // Comparison
     case "=":
       return flDeepEq(args3[0], args3[1]);
@@ -21450,102 +21175,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         if (arg140f instanceof Map) return arg140f.get("bestFitness") ?? 0;
         return 0;
       }
-      if (op.startsWith("world-")) {
-        const r141 = evalWorldModel141(op, args3);
-        if (r141 !== void 0) return r141;
-      }
-      if (op.startsWith("cf-")) {
-        const r143 = evalCounterfactual(op, args3, callFn);
-        if (r143 !== null) return r143;
-      }
-      if (op.startsWith("align-")) {
-        const r146 = evalAlign(op, args3);
-        if (r146 !== null) return r146;
-      }
-      if (op === "causal-add-node") {
-        const kw142 = {};
-        for (let i = 0; i < args3.length - 1; i += 2) {
-          const key = String(args3[i]).replace(/^:/, "");
-          kw142[key] = args3[i + 1];
-        }
-        const node142 = { id: String(kw142["id"] ?? ""), name: String(kw142["name"] ?? kw142["id"] ?? ""), description: String(kw142["desc"] ?? kw142["description"] ?? ""), value: kw142["value"] !== void 0 ? Number(kw142["value"]) : void 0 };
-        globalCausal.addNode(node142);
-        return /* @__PURE__ */ new Map([["id", node142.id], ["name", node142.name], ["description", node142.description]]);
-      }
-      if (op === "causal-add-edge") {
-        const kw142e = {};
-        for (let i = 0; i < args3.length - 1; i += 2) {
-          const key = String(args3[i]).replace(/^:/, "");
-          kw142e[key] = args3[i + 1];
-        }
-        const edge142 = { from: String(kw142e["from"] ?? ""), to: String(kw142e["to"] ?? ""), strength: Number(kw142e["strength"] ?? 1), confidence: Number(kw142e["confidence"] ?? 1), delay: kw142e["delay"] !== void 0 ? Number(kw142e["delay"]) : void 0, mechanism: kw142e["mechanism"] !== void 0 ? String(kw142e["mechanism"]) : void 0 };
-        globalCausal.addEdge(edge142);
-        return /* @__PURE__ */ new Map([["from", edge142.from], ["to", edge142.to], ["strength", edge142.strength], ["confidence", edge142.confidence]]);
-      }
-      if (op === "causal-explain") {
-        const expl142 = globalCausal.explain(String(args3[0] ?? ""));
-        return /* @__PURE__ */ new Map([
-          ["effect", expl142.effect],
-          ["primaryCause", expl142.primaryCause],
-          ["explanation", expl142.explanation],
-          ["confidence", expl142.confidence],
-          ["causes", expl142.causes.map((c) => /* @__PURE__ */ new Map([
-            ["cause", c.cause],
-            ["contribution", c.contribution],
-            ["chain", /* @__PURE__ */ new Map([
-              ["path", c.chain.path],
-              ["totalStrength", c.chain.totalStrength],
-              ["explanation", c.chain.explanation],
-              ["confidence", c.chain.confidence]
-            ])]
-          ]))]
-        ]);
-      }
-      if (op === "causal-chains") {
-        const ch142 = globalCausal.findCausalChains(String(args3[0] ?? ""), String(args3[1] ?? ""));
-        return ch142.map((c) => /* @__PURE__ */ new Map([["path", c.path], ["totalStrength", c.totalStrength], ["explanation", c.explanation], ["confidence", c.confidence]]));
-      }
-      if (op === "causal-causes") {
-        return globalCausal.getDirectCauses(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
-      }
-      if (op === "causal-effects") {
-        return globalCausal.getDirectEffects(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
-      }
-      if (op === "causal-roots") {
-        return globalCausal.findRootCauses(String(args3[0] ?? ""));
-      }
-      if (op === "causal-simulate") {
-        const arg142 = args3[0];
-        const iv142 = {};
-        if (arg142 instanceof Map) {
-          for (const [k, v] of arg142.entries()) iv142[String(k)] = Number(v);
-        }
-        return new Map(Object.entries(globalCausal.simulate(iv142)));
-      }
-      if (op === "causal-why") {
-        const chain142 = whyCaused(String(args3[0] ?? ""), String(args3[1] ?? ""));
-        if (chain142 === null) return null;
-        return /* @__PURE__ */ new Map([["path", chain142.path], ["totalStrength", chain142.totalStrength], ["explanation", chain142.explanation], ["confidence", chain142.confidence]]);
-      }
-      if (op === "causal-summary") {
-        return globalCausal.summarize(String(args3[0] ?? ""));
-      }
-      if (op.startsWith("predict-")) {
-        const r144 = evalPredict_PHASE144(op, args3);
-        if (r144 !== null) return r144;
-      }
-      if (op.startsWith("curiosity-")) {
-        const r148 = evalCuriosity(op, args3, callFn);
-        if (r148 !== null) return r148;
-      }
-      if (op.startsWith("wisdom-")) {
-        const r149 = evalWisdom(op, args3);
-        if (r149 !== null) return r149;
-      }
-      if (op.startsWith("explain-")) {
-        const r145 = evalExplain_PHASE145(op, args3, callFnVal);
-        if (r145 !== null) return r145;
-      }
+      const expResult = evalExperimentBuiltin(op, args3, callFn);
+      if (expResult !== null) return expResult;
       switch (normalizedOp2) {
         case "file-mkdir":
         case "file_mkdir": {
@@ -21633,7 +21264,7 @@ req.end();`;
     }
   }
 }
-var MODULE_CACHE_DISABLED, FL_SPECIAL_FORMS, _globalCache, IO_CTRL_SLOTS, IO_CTRL_SIZE, IO_DATA_SIZE, IO_SLOT_WRITE, IO_SLOT_READ, IO_SLOT_NOTIFY, _ioWorkerCode;
+var MODULE_CACHE_DISABLED, FL_SPECIAL_FORMS, _globalCache, IO_CTRL_SLOTS, IO_CTRL_SIZE, IO_DATA_SIZE, IO_SLOT_WRITE, IO_SLOT_READ, IO_SLOT_NOTIFY, _ioWorkerCode, _FL_KNOWN_BUILTIN_OPS;
 var init_eval_builtins = __esm({
   "src/eval-builtins.ts"() {
     init_async_runtime();
@@ -21683,8 +21314,7 @@ var init_eval_builtins = __esm({
     init_benchmark_self();
     init_version_self();
     init_self_evolution_hub();
-    init_causal();
-    init_eval_builtins_ai();
+    init_eval_builtins_experiments();
     init_lexer();
     init_parser();
     init_runtime_events();
@@ -21803,6 +21433,7 @@ parentPort.on('message', (msg) => {
   }
 });
 `;
+    _FL_KNOWN_BUILTIN_OPS = null;
   }
 });
 
@@ -21922,198 +21553,6 @@ var init_profiler = __esm({
   }
 });
 
-// src/vm.ts
-var VM;
-var init_vm = __esm({
-  "src/vm.ts"() {
-    init_bytecode();
-    VM = class {
-      constructor() {
-        this.stack = [];
-        this.vars = /* @__PURE__ */ new Map();
-        this.ip = 0;
-      }
-      run(chunk) {
-        this.stack = [];
-        this.vars = /* @__PURE__ */ new Map();
-        this.ip = 0;
-        while (this.ip < chunk.instructions.length) {
-          const instr = chunk.instructions[this.ip];
-          this.ip++;
-          switch (instr.op) {
-            case 0 /* PUSH_CONST */: {
-              const idx = instr.arg;
-              this.push(chunk.constants[idx]);
-              break;
-            }
-            case 1 /* PUSH_VAR */: {
-              const name = instr.arg;
-              if (!this.vars.has(name)) {
-                throw new Error(`VM: \uC815\uC758\uB418\uC9C0 \uC54A\uC740 \uBCC0\uC218: ${name}`);
-              }
-              this.push(this.vars.get(name));
-              break;
-            }
-            case 2 /* SET_VAR */: {
-              const name = instr.arg;
-              const val = this.pop();
-              this.vars.set(name, val);
-              break;
-            }
-            case 7 /* POP */: {
-              this.pop();
-              break;
-            }
-            case 8 /* DUP */: {
-              if (this.stack.length === 0) {
-                throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (DUP)");
-              }
-              this.push(this.stack[this.stack.length - 1]);
-              break;
-            }
-            case 9 /* ADD */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a + b);
-              break;
-            }
-            case 10 /* SUB */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a - b);
-              break;
-            }
-            case 11 /* MUL */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a * b);
-              break;
-            }
-            case 12 /* DIV */: {
-              const b = this.pop();
-              const a = this.pop();
-              if (b === 0) throw new Error("VM: 0\uC73C\uB85C \uB098\uB204\uAE30");
-              this.push(a / b);
-              break;
-            }
-            case 13 /* MOD */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a % b);
-              break;
-            }
-            case 14 /* EQ */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a === b);
-              break;
-            }
-            case 19 /* NEQ */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a !== b);
-              break;
-            }
-            case 15 /* LT */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a < b);
-              break;
-            }
-            case 16 /* GT */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a > b);
-              break;
-            }
-            case 17 /* LE */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a <= b);
-              break;
-            }
-            case 18 /* GE */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(a >= b);
-              break;
-            }
-            case 20 /* AND */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(Boolean(a) && Boolean(b));
-              break;
-            }
-            case 21 /* OR */: {
-              const b = this.pop();
-              const a = this.pop();
-              this.push(Boolean(a) || Boolean(b));
-              break;
-            }
-            case 22 /* NOT */: {
-              const a = this.pop();
-              this.push(!Boolean(a));
-              break;
-            }
-            case 5 /* JUMP */: {
-              this.ip = instr.arg;
-              break;
-            }
-            case 6 /* JUMP_IF_FALSE */: {
-              const cond = this.pop();
-              if (!Boolean(cond)) {
-                this.ip = instr.arg;
-              }
-              break;
-            }
-            case 23 /* MAKE_LIST */: {
-              const count = instr.arg;
-              if (this.stack.length < count) {
-                throw new Error(`VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (MAKE_LIST: need ${count}, have ${this.stack.length})`);
-              }
-              const items = this.stack.splice(this.stack.length - count, count);
-              this.push(items);
-              break;
-            }
-            case 24 /* GET_FIELD */: {
-              const obj = this.pop();
-              const field = instr.arg;
-              if (obj !== null && typeof obj === "object") {
-                this.push(obj[field]);
-              } else {
-                throw new Error(`VM: GET_FIELD \uB300\uC0C1\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D8`);
-              }
-              break;
-            }
-            case 3 /* CALL */: {
-              throw new Error("VM: CALL \uBBF8\uAD6C\uD604");
-            }
-            case 4 /* RETURN */: {
-              return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-            }
-            case 25 /* HALT */: {
-              return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-            }
-            default: {
-              throw new Error(`VM: \uC54C \uC218 \uC5C6\uB294 OpCode: ${instr.op}`);
-            }
-          }
-        }
-        return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
-      }
-      push(val) {
-        this.stack.push(val);
-      }
-      pop() {
-        if (this.stack.length === 0) {
-          throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C");
-        }
-        return this.stack.pop();
-      }
-    };
-  }
-});
-
 // src/eval-call-function.ts
 var eval_call_function_exports = {};
 __export(eval_call_function_exports, {
@@ -22205,41 +21644,6 @@ function callUserFunction(interp2, name, args3) {
   }
   const _effBase = name.replace(/\[.*$/, "");
   enforceCall(_effBase);
-  if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
-    const _vmAllowed = resolveFnAllowed(_effBase);
-    pushFrame(_effBase, _vmAllowed);
-    let _vmOk = false;
-    let _vmResult;
-    try {
-      try {
-        const vmFunc = vmFunctionRegistry.get(name);
-        const initialVars = /* @__PURE__ */ new Map();
-        if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
-          for (const [k, v] of vmFunc._closure) {
-            initialVars.set(k, v);
-          }
-        } else {
-          const snapshot = interp2.context.variables.snapshot();
-          for (const [k, v] of snapshot) {
-            initialVars.set(k, v);
-          }
-        }
-        for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
-          initialVars.set("$" + vmName, vmFuncObj);
-          initialVars.set(vmName, vmFuncObj);
-        }
-        for (let i = 0; i < vmFunc._params.length; i++) {
-          initialVars.set(vmFunc._params[i], args3[i] ?? null);
-        }
-        _vmResult = _callVM.run(vmFunc._chunk, initialVars);
-        _vmOk = true;
-      } catch {
-      }
-    } finally {
-      popFrame();
-    }
-    if (_vmOk) return _vmResult;
-  }
   const _interpAllowed = resolveFnAllowed(_effBase);
   pushFrame(_effBase, _interpAllowed);
   try {
@@ -22771,7 +22175,7 @@ function callFunctionValueRaw(interp2, fn, args3) {
     popFrame();
   }
 }
-var _callVM, MAX_CALL_DEPTH;
+var MAX_CALL_DEPTH;
 var init_eval_call_function = __esm({
   "src/eval-call-function.ts"() {
     init_async_runtime();
@@ -22779,12 +22183,9 @@ var init_eval_call_function = __esm({
     init_errors();
     init_tco();
     init_profiler();
-    init_vm_eligible();
-    init_vm();
     init_return_signal();
     init_runtime_budget();
     init_effect_enforcer();
-    _callVM = new VM();
     MAX_CALL_DEPTH = 5e3;
   }
 });
@@ -38368,208 +37769,6 @@ function createAgentBuiltins(interp2) {
 }
 
 // src/interpreter.ts
-init_vm_eligible();
-init_compiler();
-init_vm();
-
-// src/optimizer.ts
-init_bytecode();
-function cloneChunk(chunk) {
-  return {
-    instructions: chunk.instructions.map((i) => ({ ...i })),
-    constants: [...chunk.constants],
-    name: chunk.name
-  };
-}
-var FOLDABLE_BINARY_OPS = /* @__PURE__ */ new Set([
-  9 /* ADD */,
-  10 /* SUB */,
-  11 /* MUL */,
-  12 /* DIV */,
-  13 /* MOD */,
-  14 /* EQ */,
-  19 /* NEQ */,
-  15 /* LT */,
-  16 /* GT */,
-  17 /* LE */,
-  18 /* GE */,
-  20 /* AND */,
-  21 /* OR */
-]);
-function applyBinaryOp(op, a, b) {
-  switch (op) {
-    case 9 /* ADD */:
-      return a + b;
-    case 10 /* SUB */:
-      return a - b;
-    case 11 /* MUL */:
-      return a * b;
-    case 12 /* DIV */:
-      return b === 0 ? null : a / b;
-    case 13 /* MOD */:
-      return a % b;
-    case 14 /* EQ */:
-      return a === b;
-    case 19 /* NEQ */:
-      return a !== b;
-    case 15 /* LT */:
-      return a < b;
-    case 16 /* GT */:
-      return a > b;
-    case 17 /* LE */:
-      return a <= b;
-    case 18 /* GE */:
-      return a >= b;
-    case 20 /* AND */:
-      return Boolean(a) && Boolean(b);
-    case 21 /* OR */:
-      return Boolean(a) || Boolean(b);
-    default:
-      return null;
-  }
-}
-var constantFoldingPass = {
-  name: "constant-folding",
-  run(chunk) {
-    const result = cloneChunk(chunk);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const instrs = result.instructions;
-      for (let i = 0; i + 2 < instrs.length; i++) {
-        const a = instrs[i];
-        const b = instrs[i + 1];
-        const op = instrs[i + 2];
-        if (a.op === 0 /* PUSH_CONST */ && b.op === 0 /* PUSH_CONST */ && FOLDABLE_BINARY_OPS.has(op.op)) {
-          const aVal = result.constants[a.arg];
-          const bVal = result.constants[b.arg];
-          if (op.op === 12 /* DIV */ && bVal === 0) continue;
-          const foldedVal = applyBinaryOp(op.op, aVal, bVal);
-          let newIdx = result.constants.indexOf(foldedVal);
-          if (newIdx === -1) {
-            newIdx = result.constants.length;
-            result.constants.push(foldedVal);
-          }
-          instrs.splice(i, 3, { op: 0 /* PUSH_CONST */, arg: newIdx });
-          for (let j = 0; j < instrs.length; j++) {
-            const instr = instrs[j];
-            if ((instr.op === 5 /* JUMP */ || instr.op === 6 /* JUMP_IF_FALSE */) && typeof instr.arg === "number") {
-              if (instr.arg > i + 2) {
-                instr.arg -= 2;
-              } else if (instr.arg > i) {
-                instr.arg = i;
-              }
-            }
-          }
-          changed = true;
-          break;
-        }
-      }
-    }
-    return result;
-  }
-};
-var deadCodeEliminationPass = {
-  name: "dead-code-elimination",
-  run(chunk) {
-    const result = cloneChunk(chunk);
-    const instrs = result.instructions;
-    const haltIdx = instrs.findIndex((i) => i.op === 25 /* HALT */);
-    if (haltIdx !== -1 && haltIdx < instrs.length - 1) {
-      result.instructions = instrs.slice(0, haltIdx + 1);
-    }
-    return result;
-  }
-};
-var pushPopEliminationPass = {
-  name: "push-pop-elimination",
-  run(chunk) {
-    const result = cloneChunk(chunk);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const instrs = result.instructions;
-      for (let i = 0; i + 1 < instrs.length; i++) {
-        const curr = instrs[i];
-        const next = instrs[i + 1];
-        if (curr.op === 0 /* PUSH_CONST */ && next.op === 7 /* POP */) {
-          instrs.splice(i, 2);
-          for (let j = 0; j < instrs.length; j++) {
-            const instr = instrs[j];
-            if ((instr.op === 5 /* JUMP */ || instr.op === 6 /* JUMP_IF_FALSE */) && typeof instr.arg === "number") {
-              if (instr.arg > i + 1) {
-                instr.arg -= 2;
-              } else if (instr.arg > i) {
-                instr.arg = i;
-              }
-            }
-          }
-          changed = true;
-          break;
-        }
-      }
-    }
-    return result;
-  }
-};
-var jumpOptimizationPass = {
-  name: "jump-optimization",
-  run(chunk) {
-    const result = cloneChunk(chunk);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const instrs = result.instructions;
-      for (let i = 0; i < instrs.length; i++) {
-        const instr = instrs[i];
-        if (instr.op === 5 /* JUMP */ && instr.arg === i + 1) {
-          instrs.splice(i, 1);
-          for (let j = 0; j < instrs.length; j++) {
-            const other = instrs[j];
-            if ((other.op === 5 /* JUMP */ || other.op === 6 /* JUMP_IF_FALSE */) && typeof other.arg === "number") {
-              if (other.arg > i) {
-                other.arg -= 1;
-              }
-            }
-          }
-          changed = true;
-          break;
-        }
-      }
-    }
-    return result;
-  }
-};
-var Optimizer = class {
-  constructor() {
-    this.passes = [];
-    this.stats = [];
-  }
-  addPass(pass) {
-    this.passes.push(pass);
-    return this;
-  }
-  optimize(chunk) {
-    this.stats = [];
-    let current = chunk;
-    for (const pass of this.passes) {
-      const before = current.instructions.length;
-      const after = pass.run(current);
-      const reduced = before - after.instructions.length;
-      this.stats.push({ passName: pass.name, reduced });
-      current = after;
-    }
-    return current;
-  }
-  getStats() {
-    return this.stats;
-  }
-};
-function createDefaultOptimizer() {
-  return new Optimizer().addPass(constantFoldingPass).addPass(deadCodeEliminationPass).addPass(pushPopEliminationPass).addPass(jumpOptimizationPass);
-}
-
-// src/interpreter.ts
 var Interpreter = class _Interpreter {
   constructor(logger, options) {
     // Phase 9b: Learning persistence
@@ -38667,19 +37866,6 @@ var Interpreter = class _Interpreter {
   }
   static {
     // ← 기본값 유지 (TCO 라우팅은 내부용)
-    // Phase 3-E: VM opt-in 최적화
-    this._vmCompiler = new BytecodeCompiler();
-  }
-  static {
-    this._vmOptimizer = createDefaultOptimizer();
-  }
-  static {
-    this._vm = new VM();
-  }
-  static {
-    this._vmEnabled = process.env.FL_VM === "1";
-  }
-  static {
     // DU-1: 성능 최적화 — 어댑터/debug 플래그 캐싱
     this._duAdapter = null;
   }
@@ -39756,6 +38942,9 @@ var Interpreter = class _Interpreter {
       if (this.context.functions.has(varName) || this.context.functions.has("$" + varName)) {
         return { kind: "builtin-fn", name: varName };
       }
+      if (flIsKnownBuiltin(varName)) {
+        return { kind: "builtin-fn", name: varName };
+      }
       const scopeVars = this.context.variables.getAllVars();
       const similar = suggestSimilar(varName, scopeVars);
       const err4 = new VariableNotFoundError(
@@ -40048,16 +39237,6 @@ var Interpreter = class _Interpreter {
     if (op === "map" && expr2.args.length === 3) {
       const mapResult = evalSpecialForm(this, op, expr2);
       if (mapResult !== void 0) return mapResult;
-    }
-    if (_Interpreter._vmEnabled && isVMEligible(expr2)) {
-      try {
-        const chunk = _Interpreter._vmCompiler.compile(expr2);
-        const optimized = _Interpreter._vmOptimizer.optimize(chunk);
-        const initialVars = this.context.variables.snapshot();
-        const vmResult = _Interpreter._vm.run(optimized, initialVars);
-        return vmResult;
-      } catch (_vmErr) {
-      }
     }
     const args3 = expr2.args.map((arg) => this.eval(arg));
     if (args3.length >= 1 && typeof args3[0] === "string") {

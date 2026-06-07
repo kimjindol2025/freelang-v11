@@ -16,7 +16,7 @@ import { FreeLangPromise, resolvedPromise, rejectedPromise } from "./async-runti
 import { ScopeStack } from "./interpreter-scope"; // Phase A: 렉시컬 스코프
 import { WebSearchAdapter } from "./web-search-adapter"; // Phase 9a: WebSearch integration
 import { LearnedFactsStore } from "./learned-facts-store"; // Phase 9b: Learning persistence
-import { evalBuiltin } from "./eval-builtins";                       // Phase 57: Built-in functions
+import { evalBuiltin, flIsKnownBuiltin } from "./eval-builtins";     // Phase 57: Built-in functions
 import { evalAiBlock } from "./eval-ai-blocks";                       // Phase 57: AI blocks
 import { evalInfraBlock } from "./eval-infra-blocks";                 // Phase 58: Infra blocks
 import { evalStyleBlock } from "./eval-style-blocks";                 // Phase 59: Style blocks
@@ -38,12 +38,6 @@ import { evalTotBlock, TreeOfThought } from "./tot"; // Phase 93: Tree-of-Though
 import { evalReflectForm } from "./reflect"; // Phase 94: REFLECT 자기 평가/반성
 import { globalToolRegistry, ToolRegistry, type ToolDefinition } from "./tool-registry"; // Phase 97: Tool DSL
 import { evalAgentBlock, createAgentBuiltins, type AgentState, type AgentAction } from "./agent"; // Phase 98: AGENT 루프
-
-// Phase 3-E: VM opt-in 최적화
-import { isVMEligible } from "./vm-eligible";
-import { BytecodeCompiler } from "./compiler";
-import { VM } from "./vm";
-import { createDefaultOptimizer } from "./optimizer";
 
 // Phase 58: 타입 정의는 interpreter-context.ts로 이동, re-export로 호환성 유지
 export type {
@@ -88,12 +82,6 @@ export class Interpreter {
   public static readonly MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 100만 재귀 처리)
   // Phase 61: TCO 모드 — eval이 꼬리 위치 함수 호출을 TailCall 토큰으로 반환
   public tcoMode = false; // ← 기본값 유지 (TCO 라우팅은 내부용)
-
-  // Phase 3-E: VM opt-in 최적화
-  private static readonly _vmCompiler = new BytecodeCompiler();
-  private static readonly _vmOptimizer = createDefaultOptimizer();
-  private static readonly _vm = new VM();
-  private static readonly _vmEnabled = process.env.FL_VM === "1";
 
   // DU-1: 성능 최적화 — 어댑터/debug 플래그 캐싱
   private static _duAdapter: any = null;
@@ -1549,6 +1537,12 @@ export class Interpreter {
       if (this.context.functions.has(varName) || this.context.functions.has("$" + varName)) {
         return { kind: "builtin-fn", name: varName };
       }
+      // fx 회귀패치 이식 (2026-06-07): context.functions 화이트리스트에 없어도
+      // evalBuiltin 이 아는 op 면 first-class 허용 — (swap! a update), (map mod xs) 등.
+      // 미정의 심볼은 flIsKnownBuiltin=false → 아래 VariableNotFoundError 로 보존.
+      if (flIsKnownBuiltin(varName)) {
+        return { kind: "builtin-fn", name: varName };
+      }
       // Phase Y-1: VariableNotFoundError로 변경
       const scopeVars = this.context.variables.getAllVars();
       const similar = suggestSimilar(varName, scopeVars);
@@ -1913,18 +1907,6 @@ export class Interpreter {
 
     // Phase 3-E: VM opt-in — FL_VM=1 환경 변수로 활성화
     // isVMEligible() 통과 시 VM 경로 실행, 실패 시 기존 evalBuiltin으로 fallback
-    if (Interpreter._vmEnabled && isVMEligible(expr)) {
-      try {
-        const chunk = Interpreter._vmCompiler.compile(expr);
-        const optimized = Interpreter._vmOptimizer.optimize(chunk);
-        const initialVars = this.context.variables.snapshot();
-        const vmResult = Interpreter._vm.run(optimized, initialVars);
-        return vmResult;
-      } catch (_vmErr) {
-        // VM 실패 시 조용히 fallback — 기존 경로로 계속 진행
-      }
-    }
-
     // Evaluate args for builtins
     const args = expr.args.map((arg) => this.eval(arg));
 

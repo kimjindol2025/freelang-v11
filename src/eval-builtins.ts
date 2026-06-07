@@ -105,17 +105,8 @@ import { SelfBenchmark, globalBenchmark, bench as _bench, benchCompare as _bench
 import { SelfRefactorer, globalRefactorer, RefactorSuggestion, RefactorResult } from "./refactor-self"; // Phase 137: REFACTOR-SELF
 import { SelfVersioning, globalVersioning, Snapshot, RollbackResult } from "./version-self"; // Phase 139: VERSION-SELF
 import { SelfEvolutionHub, globalSelfEvolution, EvolutionCycleConfig, EvolutionCycleResult, SelfEvolutionReport } from "./self-evolution-hub"; // Phase 140: SELF-EVOLUTION HUB
-import { AlignmentSystem, globalAlignment, Goal, Value, Action } from "./align"; // Phase 146: ALIGN
-import { globalEthics, EthicsChecker, EthicsViolation, EthicsCheckResult, EthicsPrinciple, EthicsFramework } from "./ethics-check"; // Phase 147: ETHICS-CHECK
-import { CuriosityEngine, globalCuriosity, KnowledgeGap, ExplorationResult, CuriosityState } from "./curiosity"; // Phase 148: CURIOSITY
-import { WisdomEngine, globalWisdom, Experience, Heuristic, WisdomJudgment } from "./wisdom"; // Phase 149: WISDOM
-import { CausalGraph, globalCausal, CausalNode, CausalEdge, CausalChain, CausalExplanation, whyCaused } from "./causal"; // Phase 142: CAUSAL
-import { globalExplainer, DecisionExplanation, FeatureImportance, LocalExplanation } from "./explain"; // Phase 145: EXPLAIN
-import { globalWorldModel } from "./world-model"; // Phase 141: WORLD-MODEL
-import { globalCounterfactual, CounterfactualReasoner, Scenario } from "./counterfactual"; // Phase 143: COUNTERFACTUAL
-import { globalPredictor } from "./predict"; // Phase 144: PREDICT
 import { FreeLangV9, freelangV9, FREELANG_V9_MANIFEST } from "./freelang-v9-complete"; // Phase 150: COMPLETE
-import { evalRefactorSelf, evalAlign, evalPredict_PHASE144, evalCuriosity, evalEthicsCheck, evalCounterfactual, evalWisdom, evalExplain_PHASE145, evalWorldModel141 } from "./eval-builtins-ai";
+import { evalExperimentBuiltin } from "./eval-builtins-experiments"; // Phase 141-149: Lazy Experiments
 
 // ── FL 파서 접근 ─────────────────────────────────────────────────────────
 // fl-parse: FL 소스 문자열 → AST 배열 (셀프 호스팅용)
@@ -896,6 +887,30 @@ function __ensureIoWorker(): void {
 
 // ──────────────────────────────────────────────────────────────────────────────
 
+// fx 회귀패치 이식 (2026-06-07): builtin first-class 일반화.
+// evalBuiltin switch 의 case 라벨을 1회 스캔해 "메인 인터프리터가 아는 op" 집합 구축.
+// interpreter.ts symbol resolve 에서 (swap! a update) 처럼 builtin 을 함수인자로
+// 넘길 때, context.functions.has 화이트리스트에 없어도 이 집합으로 허용.
+// 미정의 심볼은 집합에 없으므로 기존 VariableNotFoundError 동작 보존.
+let _FL_KNOWN_BUILTIN_OPS: Set<string> | null = null;
+export function flIsKnownBuiltin(name: string): boolean {
+  if (_FL_KNOWN_BUILTIN_OPS === null) {
+    const set = new Set<string>();
+    try {
+      const re = /case\s+"([^"]+)"/g;
+      let mm: RegExpExecArray | null;
+      const src = evalBuiltin.toString();
+      while ((mm = re.exec(src))) {
+        set.add(mm[1]);
+        set.add(mm[1].replace(/_/g, "-"));
+        set.add(mm[1].replace(/-/g, "_"));
+      }
+    } catch (e) { /* noop */ }
+    _FL_KNOWN_BUILTIN_OPS = set;
+  }
+  if (typeof name !== "string") return false;
+  return _FL_KNOWN_BUILTIN_OPS.has(name) || _FL_KNOWN_BUILTIN_OPS.has(name.replace(/_/g, "-"));
+}
 export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: SExpr): any {
   // AI-First #3: snake_case ↔ kebab-case 양방향 허용
   // 내부 구현은 kebab-case 기준 — snake_case 입력 시 자동 변환
@@ -2019,6 +2034,34 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     }
     case "%":
       return args[0] % args[1];
+
+    // ── fx 회귀패치 이식 (2026-06-07): flExecOpNative 에만 있고 evalBuiltin
+    //    (메인 인터프리터 경로)에 누락됐던 op 들. INTEGRATION-BASELINE.md 4절.
+    case "mod":
+      return args[0] % args[1];
+    case "inc":
+      return typeof args[0] === "number" ? args[0] + 1 : args[0];
+    case "dec":
+      return typeof args[0] === "number" ? args[0] - 1 : args[0];
+    case "true?":
+      return args[0] === true;
+    case "false?":
+      return args[0] === false;
+    case "strlen":
+      return typeof args[0] === "string" ? args[0].length : 0;
+    case "includes?":
+    case "includes-item":
+      return typeof args[0] === "string" ? args[0].includes(String(args[1])) : Array.isArray(args[0]) ? args[0].includes(args[1]) : false;
+    case "cons":
+      return [args[0], ...(Array.isArray(args[1]) ? args[1] : [args[1]])];
+    case "closure?":
+      return args[0] !== null && args[0] !== undefined && typeof args[0] === "object" && args[0].kind === "closure";
+    case "read-file":
+      try { return require("fs").readFileSync(String(args[0]), "utf-8"); } catch { return null; }
+    case "write-file":
+      try { require("fs").writeFileSync(String(args[0]), String(args[1] ?? "")); return true; } catch { return false; }
+    case "file-exists?":
+      try { return require("fs").existsSync(String(args[0])); } catch { return false; }
 
     // Comparison
     case "=":
@@ -7249,89 +7292,9 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         return 0;
       }
 
-      // === Phase 141: WORLD-MODEL ===
-      if (op.startsWith("world-")) { const r141 = evalWorldModel141(op, args); if (r141 !== undefined) return r141; }
-
-      // === Phase 143: COUNTERFACTUAL ===
-      if (op.startsWith("cf-")) {
-        const r143 = evalCounterfactual(op, args, callFn);
-        if (r143 !== null) return r143;
-      }
-
-      // === Phase 146: ALIGN ===
-      if (op.startsWith("align-")) {
-        const r146 = evalAlign(op, args);
-        if (r146 !== null) return r146;
-      }
-
-
-      // === Phase 142: CAUSAL (inline) ===
-      if (op === 'causal-add-node') {
-        const kw142: Record<string, any> = {};
-        for (let i = 0; i < args.length - 1; i += 2) {
-          const key = String(args[i]).replace(/^:/, '');
-          kw142[key] = args[i + 1];
-        }
-        const node142 = { id: String(kw142['id'] ?? ''), name: String(kw142['name'] ?? kw142['id'] ?? ''), description: String(kw142['desc'] ?? kw142['description'] ?? ''), value: kw142['value'] !== undefined ? Number(kw142['value']) : undefined };
-        globalCausal.addNode(node142);
-        return new Map<string, any>([['id', node142.id], ['name', node142.name], ['description', node142.description]]);
-      }
-      if (op === 'causal-add-edge') {
-        const kw142e: Record<string, any> = {};
-        for (let i = 0; i < args.length - 1; i += 2) {
-          const key = String(args[i]).replace(/^:/, '');
-          kw142e[key] = args[i + 1];
-        }
-        const edge142 = { from: String(kw142e['from'] ?? ''), to: String(kw142e['to'] ?? ''), strength: Number(kw142e['strength'] ?? 1), confidence: Number(kw142e['confidence'] ?? 1), delay: kw142e['delay'] !== undefined ? Number(kw142e['delay']) : undefined, mechanism: kw142e['mechanism'] !== undefined ? String(kw142e['mechanism']) : undefined };
-        globalCausal.addEdge(edge142);
-        return new Map<string, any>([['from', edge142.from], ['to', edge142.to], ['strength', edge142.strength], ['confidence', edge142.confidence]]);
-      }
-      if (op === 'causal-explain') {
-        const expl142 = globalCausal.explain(String(args[0] ?? ''));
-        return new Map<string, any>([
-          ['effect', expl142.effect], ['primaryCause', expl142.primaryCause],
-          ['explanation', expl142.explanation], ['confidence', expl142.confidence],
-          ['causes', expl142.causes.map((c: any) => new Map<string, any>([
-            ['cause', c.cause], ['contribution', c.contribution],
-            ['chain', new Map<string, any>([
-              ['path', c.chain.path], ['totalStrength', c.chain.totalStrength],
-              ['explanation', c.chain.explanation], ['confidence', c.chain.confidence],
-            ])],
-          ]))],
-        ]);
-      }
-      if (op === 'causal-chains') { const ch142 = globalCausal.findCausalChains(String(args[0] ?? ''), String(args[1] ?? '')); return ch142.map((c: any) => new Map<string, any>([['path', c.path], ['totalStrength', c.totalStrength], ['explanation', c.explanation], ['confidence', c.confidence]])); }
-      if (op === 'causal-causes') { return globalCausal.getDirectCauses(String(args[0] ?? '')).map((e: any) => new Map<string, any>([['from', e.from], ['to', e.to], ['strength', e.strength], ['confidence', e.confidence]])); }
-      if (op === 'causal-effects') { return globalCausal.getDirectEffects(String(args[0] ?? '')).map((e: any) => new Map<string, any>([['from', e.from], ['to', e.to], ['strength', e.strength], ['confidence', e.confidence]])); }
-      if (op === 'causal-roots') { return globalCausal.findRootCauses(String(args[0] ?? '')); }
-      if (op === 'causal-simulate') { const arg142 = args[0]; const iv142: Record<string, number> = {}; if (arg142 instanceof Map) { for (const [k, v] of arg142.entries()) iv142[String(k)] = Number(v); } return new Map<string, any>(Object.entries(globalCausal.simulate(iv142))); }
-      if (op === 'causal-why') { const chain142 = whyCaused(String(args[0] ?? ''), String(args[1] ?? '')); if (chain142 === null) return null; return new Map<string, any>([['path', chain142.path], ['totalStrength', chain142.totalStrength], ['explanation', chain142.explanation], ['confidence', chain142.confidence]]); }
-      if (op === 'causal-summary') { return globalCausal.summarize(String(args[0] ?? '')); }
-
-
-      // === Phase 144: PREDICT ===
-      if (op.startsWith("predict-")) {
-        const r144 = evalPredict_PHASE144(op, args);
-        if (r144 !== null) return r144;
-      }
-
-      // === Phase 148: CURIOSITY ===
-      if (op.startsWith("curiosity-")) {
-        const r148 = evalCuriosity(op, args, callFn);
-        if (r148 !== null) return r148;
-      }
-
-      // === Phase 149: WISDOM ===
-      if (op.startsWith("wisdom-")) {
-        const r149 = evalWisdom(op, args);
-        if (r149 !== null) return r149;
-      }
-
-      // === Phase 145: EXPLAIN ===
-      if (op.startsWith("explain-")) {
-        const r145 = evalExplain_PHASE145(op, args, callFnVal);
-        if (r145 !== null) return r145;
-      }
+      // === Experiment Builtins (Phase 141-149, 121-130) ===
+      const expResult = evalExperimentBuiltin(op, args, callFn);
+      if (expResult !== null) return expResult;
 
       // === Phase A-2: File/HTTP builtins ===
       switch (normalizedOp) {
