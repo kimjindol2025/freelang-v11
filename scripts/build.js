@@ -63,63 +63,84 @@ const NODE_EXTERNALS = [
   "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
 ];
 
-// stdlib-extensions.js 빌드 대상: lazy-registry + 모든 extension 모듈
-// bootstrap.js에서 external로 지정 → 번들 분리
-const EXTENSIONS_EXTERNALS = [...NODE_EXTERNALS];
+// Extension 번들 분리:
+//   stdlib-ext-http.js     — http-server
+//   stdlib-ext-db.js       — mariadb, mongodb, db, orm
+//   stdlib-ext-workflow.js — workflow, resource, service
+//   stdlib-ext-ws.js       — ws, wsc
+//   stdlib-ext-misc.js     — 기타 (mail, totp, webauthn, ...)
+//   bootstrap.js + stdlib-lazy-registry → core (stdlib-lazy-registry는 external)
+
+const EXT_COMMON = {
+  bundle: true, platform: "node", target: "node18",
+  loader: { ".json": "json" }, minify: false, format: "cjs",
+  external: NODE_EXTERNALS, logLevel: "warning",
+};
+
+const EXT_BUNDLES = [
+  { entryPoints: ["src/ext-http.ts"],     outfile: "stdlib-ext-http.js" },
+  { entryPoints: ["src/ext-db.ts"],       outfile: "stdlib-ext-db.js" },
+  { entryPoints: ["src/ext-workflow.ts"], outfile: "stdlib-ext-workflow.js" },
+  { entryPoints: ["src/ext-ws.ts"],       outfile: "stdlib-ext-ws.js" },
+  { entryPoints: ["src/ext-misc.ts"],     outfile: "stdlib-ext-misc.js" },
+];
 
 function bootstrapOpts() {
   return {
     absWorkingDir: REPO,
     entryPoints: ["src/cli.ts"],
-    bundle: true,
-    platform: "node",
-    target: "node18",
+    bundle: true, platform: "node", target: "node18",
     outfile: "bootstrap.js",
-    loader: { ".json": "json" },
-    minify: false,
-    // stdlib-lazy-registry를 external로 지정 → 번들에서 제외
-    // 런타임에 require("./stdlib-extensions.js")로 로드됨
+    loader: { ".json": "json" }, minify: false,
+    // stdlib-lazy-registry → external: 런타임에 동적 로드
     external: [...NODE_EXTERNALS, "./stdlib-lazy-registry"],
     logLevel: "info",
   };
 }
 
-function extensionsOpts() {
+// stdlib-lazy-registry 자체 번들 (bootstrap이 require로 로드)
+function lazyRegistryOpts() {
   return {
     absWorkingDir: REPO,
     entryPoints: ["src/stdlib-lazy-registry.ts"],
-    bundle: true,
-    platform: "node",
-    target: "node18",
-    outfile: "stdlib-extensions.js",
-    loader: { ".json": "json" },
-    minify: false,
-    external: NODE_EXTERNALS,
-    // CommonJS 형식으로 출력 (require()로 로드 가능)
-    format: "cjs",
-    logLevel: "info",
+    bundle: true, platform: "node", target: "node18",
+    outfile: "stdlib-extensions.js",   // 하위호환 유지
+    loader: { ".json": "json" }, minify: false, format: "cjs",
+    external: NODE_EXTERNALS, logLevel: "warning",
   };
 }
 
 function buildBootstrap() {
   const esbuild = require("esbuild");
-  // 두 번들 병렬 빌드
-  return Promise.all([
+  const builds = [
+    // bootstrap (core)
     esbuild.build(bootstrapOpts()).then(() => {
       const size = fs.statSync(path.join(REPO, "bootstrap.js")).size;
       console.log(`bootstrap=built size=${Math.round(size / 1024)}KB`);
     }),
-    esbuild.build(extensionsOpts()).then(() => {
+    // lazy-registry dispatcher (하위호환: stdlib-extensions.js)
+    esbuild.build(lazyRegistryOpts()).then(() => {
       const size = fs.statSync(path.join(REPO, "stdlib-extensions.js")).size;
       console.log(`stdlib-extensions=built size=${Math.round(size / 1024)}KB`);
     }),
-  ]);
+    // 기능별 extension 번들
+    ...EXT_BUNDLES.map(b =>
+      esbuild.build({ ...EXT_COMMON, absWorkingDir: REPO, ...b }).then(() => {
+        const size = fs.statSync(path.join(REPO, b.outfile)).size;
+        console.log(`${b.outfile}=built size=${Math.round(size / 1024)}KB`);
+      })
+    ),
+  ];
+  return Promise.all(builds);
 }
 
 function watchBootstrap() {
   const esbuild = require("esbuild");
   return esbuild.context(bootstrapOpts()).then((ctx) => ctx.watch()).then(() => {
-    console.log("bootstrap=watching (Ctrl+C to stop)");
+    console.log("bootstrap=watching (Ctrl+C to stop) — extension bundles built once");
+    // watch 모드에서는 bootstrap만 watch, extensions는 1회 빌드
+    const extBuilds = [lazyRegistryOpts(), ...EXT_BUNDLES.map(b => ({ ...EXT_COMMON, absWorkingDir: REPO, ...b }))];
+    return Promise.all(extBuilds.map(o => esbuild.build(o)));
   });
 }
 
