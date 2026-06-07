@@ -7522,10 +7522,10 @@ var init_maybe_chain = __esm({
   }
 });
 
-// src/debate.ts
+// src/experiments/debate.ts
 var Debater, globalDebater;
 var init_debate = __esm({
-  "src/debate.ts"() {
+  "src/experiments/debate.ts"() {
     Debater = class {
       debate(config) {
         const { proposition, pro, con, rounds = 3 } = config;
@@ -7551,10 +7551,10 @@ var init_debate = __esm({
   }
 });
 
-// src/checkpoint.ts
+// src/experiments/checkpoint.ts
 var CheckpointManager, globalCheckpoint;
 var init_checkpoint = __esm({
-  "src/checkpoint.ts"() {
+  "src/experiments/checkpoint.ts"() {
     CheckpointManager = class {
       constructor() {
         this.checkpoints = /* @__PURE__ */ new Map();
@@ -7632,7 +7632,7 @@ var init_checkpoint = __esm({
   }
 });
 
-// src/meta-reason.ts
+// src/experiments/meta-reason.ts
 function scoreStrategy(problem, strategy) {
   const p = problem.toLowerCase();
   let score = 0.5;
@@ -7668,7 +7668,7 @@ function scoreStrategy(problem, strategy) {
 }
 var ALL_STRATEGIES, MetaReasoner, globalMetaReasoner;
 var init_meta_reason = __esm({
-  "src/meta-reason.ts"() {
+  "src/experiments/meta-reason.ts"() {
     ALL_STRATEGIES = ["COT", "TOT", "HYPOTHESIS", "DEBATE", "REFLECT", "DIRECT"];
     MetaReasoner = class {
       constructor(strategies = [...ALL_STRATEGIES]) {
@@ -7693,10 +7693,10 @@ var init_meta_reason = __esm({
   }
 });
 
-// src/belief.ts
+// src/experiments/belief.ts
 var BeliefSystem, globalBeliefs;
 var init_belief = __esm({
-  "src/belief.ts"() {
+  "src/experiments/belief.ts"() {
     BeliefSystem = class {
       constructor() {
         this.beliefs = /* @__PURE__ */ new Map();
@@ -7767,7 +7767,7 @@ var init_belief = __esm({
   }
 });
 
-// src/analogy.ts
+// src/experiments/analogy.ts
 function similarity(a, b) {
   const tokA = new Set(a.toLowerCase().split(/\s+/));
   const tokB = new Set(b.toLowerCase().split(/\s+/));
@@ -7777,7 +7777,7 @@ function similarity(a, b) {
 }
 var AnalogyStore, globalAnalogy;
 var init_analogy = __esm({
-  "src/analogy.ts"() {
+  "src/experiments/analogy.ts"() {
     AnalogyStore = class {
       constructor() {
         this.patterns = [];
@@ -7829,13 +7829,13 @@ var init_analogy = __esm({
   }
 });
 
-// src/critique.ts
+// src/experiments/critique.ts
 function severityWeight(s) {
   return { critical: 1, major: 0.7, minor: 0.3, suggestion: 0.1 }[s];
 }
 var CritiqueAgent, defaultFinders, globalCritique;
 var init_critique = __esm({
-  "src/critique.ts"() {
+  "src/experiments/critique.ts"() {
     CritiqueAgent = class {
       run(output, config) {
         const { finders, riskThreshold = 0.5 } = config;
@@ -7882,10 +7882,10 @@ var init_critique = __esm({
   }
 });
 
-// src/compose-reason.ts
+// src/experiments/compose-reason.ts
 var ReasonComposer, PipelineBuilder, globalComposer;
 var init_compose_reason = __esm({
-  "src/compose-reason.ts"() {
+  "src/experiments/compose-reason.ts"() {
     ReasonComposer = class {
       compose(steps, input) {
         const startTime = Date.now();
@@ -7969,10 +7969,10 @@ var init_compose_reason = __esm({
   }
 });
 
-// src/cognitive.ts
+// src/experiments/cognitive.ts
 var CognitiveArchitecture, globalCognition;
 var init_cognitive = __esm({
-  "src/cognitive.ts"() {
+  "src/experiments/cognitive.ts"() {
     init_hypothesis();
     init_meta_reason();
     init_belief();
@@ -8025,10 +8025,10 @@ var init_cognitive = __esm({
   }
 });
 
-// src/consensus.ts
+// src/experiments/consensus.ts
 var ConsensusEngine, globalConsensus;
 var init_consensus = __esm({
-  "src/consensus.ts"() {
+  "src/experiments/consensus.ts"() {
     ConsensusEngine = class {
       // 다수결 (가장 많이 나온 답)
       majority(votes) {
@@ -8117,10 +8117,10 @@ var init_consensus = __esm({
   }
 });
 
-// src/delegate.ts
+// src/experiments/delegate.ts
 var DelegationManager, globalDelegation;
 var init_delegate = __esm({
-  "src/delegate.ts"() {
+  "src/experiments/delegate.ts"() {
     DelegationManager = class {
       constructor() {
         this.agents = /* @__PURE__ */ new Map();
@@ -8169,10 +8169,10 @@ var init_delegate = __esm({
   }
 });
 
-// src/negotiate.ts
+// src/experiments/negotiate.ts
 var Negotiator, globalNegotiator;
 var init_negotiate = __esm({
-  "src/negotiate.ts"() {
+  "src/experiments/negotiate.ts"() {
     Negotiator = class {
       negotiate(positions, maxRounds = 5) {
         const rounds = [];
@@ -8202,10 +8202,10 @@ var init_negotiate = __esm({
   }
 });
 
-// src/vote.ts
+// src/experiments/vote.ts
 var VotingSystem, globalVoting;
 var init_vote = __esm({
-  "src/vote.ts"() {
+  "src/experiments/vote.ts"() {
     VotingSystem = class {
       // 단순 다수결 (가장 많은 1순위 표)
       plurality(ballots, candidates) {
@@ -8309,10 +8309,10 @@ var init_vote = __esm({
   }
 });
 
-// src/swarm.ts
+// src/experiments/swarm.ts
 var Swarm, globalSwarm;
 var init_swarm = __esm({
-  "src/swarm.ts"() {
+  "src/experiments/swarm.ts"() {
     Swarm = class {
       optimize(config) {
         const {
@@ -8370,10 +8370,10 @@ var init_swarm = __esm({
   }
 });
 
-// src/peer-review.ts
+// src/experiments/peer-review.ts
 var PeerReviewSystem, globalPeerReview;
 var init_peer_review = __esm({
-  "src/peer-review.ts"() {
+  "src/experiments/peer-review.ts"() {
     PeerReviewSystem = class {
       constructor() {
         this.reviewers = /* @__PURE__ */ new Map();
@@ -8401,10 +8401,10 @@ var init_peer_review = __esm({
   }
 });
 
-// src/compete.ts
+// src/experiments/compete.ts
 var Competition, globalCompetition;
 var init_compete = __esm({
-  "src/compete.ts"() {
+  "src/experiments/compete.ts"() {
     Competition = class {
       constructor() {
         this.competitors = /* @__PURE__ */ new Map();
@@ -8442,10 +8442,10 @@ var init_compete = __esm({
   }
 });
 
-// src/chain-agents.ts
+// src/experiments/chain-agents.ts
 var AgentChain, globalChain;
 var init_chain_agents = __esm({
-  "src/chain-agents.ts"() {
+  "src/experiments/chain-agents.ts"() {
     AgentChain = class _AgentChain {
       constructor() {
         this.agents = [];
@@ -8504,10 +8504,10 @@ var init_chain_agents = __esm({
   }
 });
 
-// src/orchestrate.ts
+// src/experiments/orchestrate.ts
 var Orchestrator, globalOrchestrator;
 var init_orchestrate = __esm({
-  "src/orchestrate.ts"() {
+  "src/experiments/orchestrate.ts"() {
     Orchestrator = class {
       constructor() {
         this.agents = /* @__PURE__ */ new Map();
@@ -8580,10 +8580,10 @@ var init_orchestrate = __esm({
   }
 });
 
-// src/multi-agent-hub.ts
+// src/experiments/multi-agent-hub.ts
 var MultiAgentHub, globalHub;
 var init_multi_agent_hub = __esm({
-  "src/multi-agent-hub.ts"() {
+  "src/experiments/multi-agent-hub.ts"() {
     init_consensus();
     init_delegate();
     init_vote();
@@ -8765,7 +8765,7 @@ var init_multi_agent_hub = __esm({
   }
 });
 
-// src/evolve.ts
+// src/experiments/evolve.ts
 function evolveNumbers(target, populationSize = 20, maxGenerations = 50) {
   const config = {
     populationSize,
@@ -8845,7 +8845,7 @@ function evolveStrings(target, populationSize = 30, maxGenerations = 100) {
 }
 var import_crypto, EvolutionEngine;
 var init_evolve = __esm({
-  "src/evolve.ts"() {
+  "src/experiments/evolve.ts"() {
     import_crypto = require("crypto");
     EvolutionEngine = class {
       constructor(config) {
@@ -8963,10 +8963,10 @@ var init_evolve = __esm({
   }
 });
 
-// src/mutate.ts
+// src/experiments/mutate.ts
 var DEFAULT_CONFIG, CHARS, Mutator, globalMutator;
 var init_mutate = __esm({
-  "src/mutate.ts"() {
+  "src/experiments/mutate.ts"() {
     DEFAULT_CONFIG = {
       rate: 0.1,
       strength: 0.1,
@@ -9128,10 +9128,10 @@ var init_mutate = __esm({
   }
 });
 
-// src/crossover.ts
+// src/experiments/crossover.ts
 var Crossover, globalCrossover;
 var init_crossover = __esm({
-  "src/crossover.ts"() {
+  "src/experiments/crossover.ts"() {
     Crossover = class {
       constructor(config) {
         this.config = {
@@ -9299,7 +9299,7 @@ var init_crossover = __esm({
   }
 });
 
-// src/fitness.ts
+// src/experiments/fitness.ts
 function levenshtein2(a, b) {
   const m = a.length;
   const n = b.length;
@@ -9320,7 +9320,7 @@ function levenshtein2(a, b) {
 }
 var FitnessEvaluator, globalFitness;
 var init_fitness = __esm({
-  "src/fitness.ts"() {
+  "src/experiments/fitness.ts"() {
     FitnessEvaluator = class {
       constructor(config = {}) {
         this.config = {
@@ -9476,10 +9476,10 @@ var init_fitness = __esm({
   }
 });
 
-// src/generation.ts
+// src/experiments/generation.ts
 var GenerationLoop;
 var init_generation = __esm({
-  "src/generation.ts"() {
+  "src/experiments/generation.ts"() {
     GenerationLoop = class {
       constructor(config) {
         this.statsHistory = [];
@@ -9599,7 +9599,7 @@ var init_generation = __esm({
   }
 });
 
-// src/prune.ts
+// src/experiments/prune.ts
 function average(nums) {
   if (nums.length === 0) return 0;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
@@ -9628,7 +9628,7 @@ function keepBest(items, scorer, k) {
 }
 var Pruner, globalPruner;
 var init_prune = __esm({
-  "src/prune.ts"() {
+  "src/experiments/prune.ts"() {
     Pruner = class {
       constructor(config) {
         this.config = config ?? {};
@@ -9737,10 +9737,10 @@ var init_prune = __esm({
   }
 });
 
-// src/benchmark-self.ts
+// src/experiments/benchmark-self.ts
 var SelfBenchmark, globalBenchmark;
 var init_benchmark_self = __esm({
-  "src/benchmark-self.ts"() {
+  "src/experiments/benchmark-self.ts"() {
     SelfBenchmark = class {
       constructor(suiteName = "default") {
         this.pendingFns = [];
@@ -9922,7 +9922,7 @@ var init_benchmark_self = __esm({
   }
 });
 
-// src/version-self.ts
+// src/experiments/version-self.ts
 function generateDiff(prev, next) {
   const prevStr = JSON.stringify(prev, null, 2);
   const nextStr = JSON.stringify(next, null, 2);
@@ -9939,7 +9939,7 @@ function parseVersion(v) {
 }
 var import_crypto2, SelfVersioning, globalVersioning;
 var init_version_self = __esm({
-  "src/version-self.ts"() {
+  "src/experiments/version-self.ts"() {
     import_crypto2 = require("crypto");
     SelfVersioning = class {
       constructor(maxHistory = 100) {
@@ -10087,10 +10087,10 @@ var init_version_self = __esm({
   }
 });
 
-// src/refactor-self.ts
+// src/experiments/refactor-self.ts
 var UNCLEAR_NAME_PATTERNS, ALLOWED_SHORT_NAMES, SelfRefactorer, globalRefactorer;
 var init_refactor_self = __esm({
-  "src/refactor-self.ts"() {
+  "src/experiments/refactor-self.ts"() {
     UNCLEAR_NAME_PATTERNS = [
       /\b([a-z])\b/g,
       // 단일 문자 변수 (i, j, k 제외)
@@ -10345,10 +10345,10 @@ var init_refactor_self = __esm({
   }
 });
 
-// src/self-evolution-hub.ts
+// src/experiments/self-evolution-hub.ts
 var import_crypto3, DEFAULT_CYCLE_CONFIG, SelfEvolutionHub, globalSelfEvolution;
 var init_self_evolution_hub = __esm({
-  "src/self-evolution-hub.ts"() {
+  "src/experiments/self-evolution-hub.ts"() {
     init_mutate();
     init_crossover();
     init_fitness();
@@ -10649,7 +10649,7 @@ var init_self_evolution_hub = __esm({
   }
 });
 
-// src/causal.ts
+// src/experiments/causal.ts
 function whyCaused(effect, cause) {
   const chains = globalCausal.findCausalChains(cause, effect);
   if (chains.length === 0) return null;
@@ -10657,7 +10657,7 @@ function whyCaused(effect, cause) {
 }
 var CausalGraph, globalCausal;
 var init_causal = __esm({
-  "src/causal.ts"() {
+  "src/experiments/causal.ts"() {
     CausalGraph = class {
       constructor() {
         this.nodes = /* @__PURE__ */ new Map();
@@ -10818,10 +10818,10 @@ var init_causal = __esm({
   }
 });
 
-// src/align.ts
+// src/experiments/align.ts
 var AlignmentSystem, globalAlignment;
 var init_align = __esm({
-  "src/align.ts"() {
+  "src/experiments/align.ts"() {
     AlignmentSystem = class {
       constructor() {
         this.goals = /* @__PURE__ */ new Map();
@@ -11061,10 +11061,10 @@ var init_align = __esm({
   }
 });
 
-// src/ethics-check.ts
+// src/experiments/ethics-check.ts
 var doNoHarmPrinciple, fairnessPrinciple, transparencyPrinciple, privacyPrinciple, autonomyPrinciple, DEFAULT_PRINCIPLES, EthicsChecker, globalEthics;
 var init_ethics_check = __esm({
-  "src/ethics-check.ts"() {
+  "src/experiments/ethics-check.ts"() {
     doNoHarmPrinciple = {
       id: "do-no-harm",
       name: "\uD574\uC545 \uAE08\uC9C0",
@@ -11433,10 +11433,10 @@ var init_ethics_check = __esm({
   }
 });
 
-// src/curiosity.ts
+// src/experiments/curiosity.ts
 var CuriosityEngine, globalCuriosity;
 var init_curiosity = __esm({
-  "src/curiosity.ts"() {
+  "src/experiments/curiosity.ts"() {
     CuriosityEngine = class {
       constructor(initialTopics) {
         this.state = {
@@ -11619,7 +11619,7 @@ var init_curiosity = __esm({
   }
 });
 
-// src/wisdom.ts
+// src/experiments/wisdom.ts
 function genExpId() {
   return `exp-${++_expIdCounter}-${Date.now()}`;
 }
@@ -11664,7 +11664,7 @@ function experiencesToHeuristic(exps, domain) {
 }
 var _expIdCounter, _heuristicIdCounter, WisdomEngine, globalWisdom;
 var init_wisdom = __esm({
-  "src/wisdom.ts"() {
+  "src/experiments/wisdom.ts"() {
     _expIdCounter = 0;
     _heuristicIdCounter = 0;
     WisdomEngine = class {
@@ -11887,10 +11887,10 @@ var init_wisdom = __esm({
   }
 });
 
-// src/explain.ts
+// src/experiments/explain.ts
 var Explainer, globalExplainer;
 var init_explain = __esm({
-  "src/explain.ts"() {
+  "src/experiments/explain.ts"() {
     Explainer = class {
       /**
        * 결정 설명 — factors로부터 reasoning, features, alternatives를 생성
@@ -12143,10 +12143,10 @@ var init_explain = __esm({
   }
 });
 
-// src/world-model.ts
+// src/experiments/world-model.ts
 var WorldModel, globalWorldModel;
 var init_world_model = __esm({
-  "src/world-model.ts"() {
+  "src/experiments/world-model.ts"() {
     WorldModel = class {
       constructor() {
         this._idCounter = 0;
@@ -12403,7 +12403,7 @@ var init_world_model = __esm({
   }
 });
 
-// src/counterfactual.ts
+// src/experiments/counterfactual.ts
 function genCfId() {
   return `cf-${++_cfIdCounter}-${Date.now()}`;
 }
@@ -12433,7 +12433,7 @@ function generateExplanation(baseScenario, intervention, originalOutcome, counte
 }
 var _cfIdCounter, CounterfactualReasoner, globalCounterfactual;
 var init_counterfactual = __esm({
-  "src/counterfactual.ts"() {
+  "src/experiments/counterfactual.ts"() {
     _cfIdCounter = 0;
     CounterfactualReasoner = class {
       constructor() {
@@ -12574,7 +12574,7 @@ var init_counterfactual = __esm({
   }
 });
 
-// src/predict.ts
+// src/experiments/predict.ts
 function mean(data) {
   if (data.length === 0) return 0;
   return data.reduce((a, b) => a + b, 0) / data.length;
@@ -12621,7 +12621,7 @@ function zScore(confidence) {
 }
 var Predictor, globalPredictor;
 var init_predict = __esm({
-  "src/predict.ts"() {
+  "src/experiments/predict.ts"() {
     Predictor = class {
       // 선형 회귀 예측
       linearRegression(data, horizon = 1) {

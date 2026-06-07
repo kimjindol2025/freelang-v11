@@ -3,20 +3,20 @@
 // Imported only if experimental features are used
 // Delegates to external modules to keep eval-builtins.ts focused on Core
 
-import { CausalGraph, globalCausal, whyCaused } from "./causal"; // Phase 142
+import { CausalGraph, globalCausal, whyCaused } from "./experiments/causal"; // Phase 142
 import { evalRefactorSelf, evalAlign, evalPredict_PHASE144, evalCuriosity, evalEthicsCheck, evalCounterfactual, evalWisdom, evalExplain_PHASE145, evalWorldModel141 } from "./eval-builtins-ai";
 
 // Consensus & Multi-Agent Ops (Phase 121-130)
-import { globalConsensus } from "./consensus"; // Phase 121
-import { globalDelegation } from "./delegate"; // Phase 122
-import { globalVoting } from "./vote"; // Phase 123
-import { globalNegotiator } from "./negotiate"; // Phase 124
-import { globalSwarm } from "./swarm"; // Phase 125
-import { globalOrchestrator } from "./orchestrate"; // Phase 126
-import { globalPeerReview } from "./peer-review"; // Phase 127
-import { AgentChain } from "./chain-agents"; // Phase 128
-import { globalCompetition } from "./compete"; // Phase 129
-import { globalHub } from "./multi-agent-hub"; // Phase 130
+import { globalConsensus } from "./experiments/consensus"; // Phase 121
+import { globalDelegation } from "./experiments/delegate"; // Phase 122
+import { globalVoting } from "./experiments/vote"; // Phase 123
+import { globalNegotiator } from "./experiments/negotiate"; // Phase 124
+import { globalSwarm } from "./experiments/swarm"; // Phase 125
+import { globalOrchestrator } from "./experiments/orchestrate"; // Phase 126
+import { globalPeerReview } from "./experiments/peer-review"; // Phase 127
+import { AgentChain } from "./experiments/chain-agents"; // Phase 128
+import { globalCompetition } from "./experiments/compete"; // Phase 129
+import { globalHub } from "./experiments/multi-agent-hub"; // Phase 130
 
 /**
  * Evaluate experimental builtins (Phase 141-149 + 121-130)

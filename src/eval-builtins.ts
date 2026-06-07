@@ -77,35 +77,35 @@ import { globalCompiler, PromptCompiler } from "./prompt-compiler"; // Phase 109
 import { sdk as flSDK } from "./fl-sdk"; // Phase 110: External AI SDK
 import { globalTester, HypothesisConfig } from "./hypothesis"; // Phase 111: Hypothesis
 import { maybeMap, maybeBind, maybeChain, maybeFilter, maybeCombine, maybeSelect } from "./maybe-chain"; // Phase 112: Maybe Chain
-import { globalDebater, Argument } from "./debate"; // Phase 113: Debate
-import { globalCheckpoint } from "./checkpoint"; // Phase 114: Checkpoint
-import { globalMetaReasoner } from "./meta-reason"; // Phase 115: Meta-Reason
-import { globalBeliefs, BeliefSystem } from "./belief"; // Phase 116: Belief System
-import { globalAnalogy } from "./analogy"; // Phase 117: Analogy
-import { globalCritique, defaultFinders, severityWeight } from "./critique"; // Phase 118: Critique Agent
-import { globalComposer, ReasonStep } from "./compose-reason"; // Phase 119: Compose-Reason
-import { globalCognition } from "./cognitive"; // Phase 120: Cognitive Architecture
-import { globalConsensus, AgentVote, ConsensusEngine } from "./consensus"; // Phase 121: Consensus
-import { globalDelegation, DelegateAgent, DelegateTask } from "./delegate"; // Phase 122: Delegation
-import { globalNegotiator, NegotiationPosition } from "./negotiate"; // Phase 124: Negotiate
-import { globalVoting, VotingSystem, Ballot } from "./vote"; // Phase 123: VOTE
-import { globalSwarm, Swarm } from "./swarm"; // Phase 125: Swarm Intelligence
-import { globalPeerReview, Reviewer, ReviewComment } from "./peer-review"; // Phase 127: Peer-Review
-import { globalCompetition, Competition, Competitor } from "./compete"; // Phase 129: Compete
-import { AgentChain, ChainAgent, ChainResult, ChainLink } from "./chain-agents"; // Phase 128: Chain-Agents
-import { globalHub, MultiAgentHub } from "./multi-agent-hub"; // Phase 130: Multi-Agent Hub
-import { globalOrchestrator, Orchestrator, OrchestrateTask } from "./orchestrate"; // Phase 126: Orchestrate
-import { EvolutionEngine, EvolutionConfig, evolveNumbers, evolveStrings } from "./evolve"; // Phase 131: EVOLVE
-import { Mutator, globalMutator, mutateNumbers as _mutateNumbers, mutateString as _mutateString, selectBest, MutationConfig, MutationType } from "./mutate"; // Phase 132: Mutate
-import { Crossover, globalCrossover, crossoverNumbers as _crossoverNumbers, crossoverStrings as _crossoverStrings } from "./crossover"; // Phase 133: Crossover
-import { FitnessEvaluator, globalFitness, fitnessScore, rankItems, FitnessConfig } from "./fitness"; // Phase 134: FITNESS
-import { GenerationLoop, GenerationConfig, GenerationStats, GenerationResult, runGeneration } from "./generation"; // Phase 135: GENERATION
-import { Pruner, globalPruner, keepBest as _keepBest, removeWeak as _removeWeak, PruneResult } from "./prune"; // Phase 136: PRUNE
-import { SelfBenchmark, globalBenchmark, bench as _bench, benchCompare as _benchCompare, BenchmarkResult, ComparisonResult, BenchmarkSuite } from "./benchmark-self"; // Phase 138: BENCHMARK-SELF
-import { SelfRefactorer, globalRefactorer, RefactorSuggestion, RefactorResult } from "./refactor-self"; // Phase 137: REFACTOR-SELF
-import { SelfVersioning, globalVersioning, Snapshot, RollbackResult } from "./version-self"; // Phase 139: VERSION-SELF
-import { SelfEvolutionHub, globalSelfEvolution, EvolutionCycleConfig, EvolutionCycleResult, SelfEvolutionReport } from "./self-evolution-hub"; // Phase 140: SELF-EVOLUTION HUB
-import { FreeLangV9, freelangV9, FREELANG_V9_MANIFEST } from "./freelang-v9-complete"; // Phase 150: COMPLETE
+import { globalDebater, Argument } from "./experiments/debate"; // Phase 113: Debate
+import { globalCheckpoint } from "./experiments/checkpoint"; // Phase 114: Checkpoint
+import { globalMetaReasoner } from "./experiments/meta-reason"; // Phase 115: Meta-Reason
+import { globalBeliefs, BeliefSystem } from "./experiments/belief"; // Phase 116: Belief System
+import { globalAnalogy } from "./experiments/analogy"; // Phase 117: Analogy
+import { globalCritique, defaultFinders, severityWeight } from "./experiments/critique"; // Phase 118: Critique Agent
+import { globalComposer, ReasonStep } from "./experiments/compose-reason"; // Phase 119: Compose-Reason
+import { globalCognition } from "./experiments/cognitive"; // Phase 120: Cognitive Architecture
+import { globalConsensus, AgentVote, ConsensusEngine } from "./experiments/consensus"; // Phase 121: Consensus
+import { globalDelegation, DelegateAgent, DelegateTask } from "./experiments/delegate"; // Phase 122: Delegation
+import { globalNegotiator, NegotiationPosition } from "./experiments/negotiate"; // Phase 124: Negotiate
+import { globalVoting, VotingSystem, Ballot } from "./experiments/vote"; // Phase 123: VOTE
+import { globalSwarm, Swarm } from "./experiments/swarm"; // Phase 125: Swarm Intelligence
+import { globalPeerReview, Reviewer, ReviewComment } from "./experiments/peer-review"; // Phase 127: Peer-Review
+import { globalCompetition, Competition, Competitor } from "./experiments/compete"; // Phase 129: Compete
+import { AgentChain, ChainAgent, ChainResult, ChainLink } from "./experiments/chain-agents"; // Phase 128: Chain-Agents
+import { globalHub, MultiAgentHub } from "./experiments/multi-agent-hub"; // Phase 130: Multi-Agent Hub
+import { globalOrchestrator, Orchestrator, OrchestrateTask } from "./experiments/orchestrate"; // Phase 126: Orchestrate
+import { EvolutionEngine, EvolutionConfig, evolveNumbers, evolveStrings } from "./experiments/evolve"; // Phase 131: EVOLVE
+import { Mutator, globalMutator, mutateNumbers as _mutateNumbers, mutateString as _mutateString, selectBest, MutationConfig, MutationType } from "./experiments/mutate"; // Phase 132: Mutate
+import { Crossover, globalCrossover, crossoverNumbers as _crossoverNumbers, crossoverStrings as _crossoverStrings } from "./experiments/crossover"; // Phase 133: Crossover
+import { FitnessEvaluator, globalFitness, fitnessScore, rankItems, FitnessConfig } from "./experiments/fitness"; // Phase 134: FITNESS
+import { GenerationLoop, GenerationConfig, GenerationStats, GenerationResult, runGeneration } from "./experiments/generation"; // Phase 135: GENERATION
+import { Pruner, globalPruner, keepBest as _keepBest, removeWeak as _removeWeak, PruneResult } from "./experiments/prune"; // Phase 136: PRUNE
+import { SelfBenchmark, globalBenchmark, bench as _bench, benchCompare as _benchCompare, BenchmarkResult, ComparisonResult, BenchmarkSuite } from "./experiments/benchmark-self"; // Phase 138: BENCHMARK-SELF
+import { SelfRefactorer, globalRefactorer, RefactorSuggestion, RefactorResult } from "./experiments/refactor-self"; // Phase 137: REFACTOR-SELF
+import { SelfVersioning, globalVersioning, Snapshot, RollbackResult } from "./experiments/version-self"; // Phase 139: VERSION-SELF
+import { SelfEvolutionHub, globalSelfEvolution, EvolutionCycleConfig, EvolutionCycleResult, SelfEvolutionReport } from "./experiments/self-evolution-hub"; // Phase 140: SELF-EVOLUTION HUB
+import { FreeLangV9, freelangV9, FREELANG_V9_MANIFEST } from "./experiments/freelang-v9-complete"; // Phase 150: COMPLETE
 import { evalExperimentBuiltin } from "./eval-builtins-experiments"; // Phase 141-149: Lazy Experiments
 
 // ── FL 파서 접근 ─────────────────────────────────────────────────────────

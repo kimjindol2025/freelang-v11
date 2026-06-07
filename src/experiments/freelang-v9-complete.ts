@@ -3,7 +3,7 @@
 
 // Tier 5 (Phase 91-100) — AI 사고 블록
 // import { maybe } from './maybe-type';
-// import { ChainOfThought } from './cot';
+// import { ChainOfThought } from '../cot';
 // import { AIStdLib } from './stdlib-ai';
 
 // Tier 6 (Phase 101-110) — AI가 편한 구조
