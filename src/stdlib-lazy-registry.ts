@@ -26,6 +26,7 @@ import { createServiceModule }      from "./stdlib-service";
 import { createMarkdownModule }     from "./stdlib-markdown";
 import { createBlogModule }         from "./stdlib-blog";
 import { createAuditModule }        from "./stdlib-audit";
+import { createHttpServerModule }   from "./stdlib-http-server";
 
 type ModuleFactory = () => Record<string, unknown>;
 
@@ -69,6 +70,7 @@ const LAZY_REGISTRY: Record<string, ModuleFactory> = {
   "cloud":       () => { throw new Error("cloud 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
   "matrix":      () => { throw new Error("matrix 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
   "audit":       () => createAuditModule(),
+  "http-server": (interp?: any) => createHttpServerModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null),
 };
 
 // 이미 로드된 모듈 캐시 (중복 로드 방지)

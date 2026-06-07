@@ -20,12 +20,9 @@ import { createWebauthnModule } from "./stdlib-webauthn";  // Phase J: WebAuthn 
 import { createQueueHelpersModule } from "./stdlib-queue-helpers"; // Phase X1: dclub-queue
 import { createCronModule } from "./stdlib-cron";          // Phase X3: dclub-tasks cron parser
 import { createQueueHelpersModule } from "./stdlib-queue-helpers"; // Phase X1: dclub-queue atomic dequeue
-import { createWorkflowModule } from "./stdlib-workflow"; // Phase 18: Workflow Engine
+// stdlib-workflow → lazy-registry (require "workflow")
 import { createResourceModule } from "./stdlib-resource"; // Phase 19: Server Resource Search
-import { createHttpServerModule } from "./stdlib-http-server"; // Phase 4a: Pure HTTP Server (Express-free)
-import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver
-import { createMariadbModule } from "./stdlib-mariadb";  // v11.5: MariaDB (mariadb CLI)
-import { createMongodbModule } from "./stdlib-mongodb";  // v11.6: MongoDB (Wire Protocol TCP)
+import { createDbModule } from "./stdlib-db";            // Phase 20: DB Driver (sqlite 기본)
 import { createAuthModule } from "./stdlib-auth";        // Phase 21: Auth (JWT, API key, hash)
 import { createCacheModule } from "./stdlib-cache";      // Phase 21: In-memory TTL cache
 import { createPubSubModule } from "./stdlib-pubsub";    // Phase 21: Pub/Sub events
@@ -48,8 +45,7 @@ import { createStatsModule } from "./stdlib-stats";         // Phase 10: 통계 
 import { createPlotModule } from "./stdlib-plot";           // Phase 10: 시각화
 import { createTestEnhancedModule } from "./stdlib-test-enhanced"; // Phase 11: 테스트 강화
 import { createServiceModule } from "./stdlib-service";     // Phase 12: 마이크로서비스 (서비스/큐/Circuit Breaker/메트릭)
-import { createWsModule } from "./stdlib-ws";              // Phase 21: WebSocket 서버
-import { createWscModule } from "./stdlib-wsc";            // Phase 21: WebSocket 클라이언트
+// stdlib-ws, stdlib-wsc → lazy-registry (require "ws" / require "wsc")
 import { createMarkdownModule } from "./stdlib-markdown";  // Q2-1: Markdown (CommonMark subset + frontmatter)
 import { createFeedModule } from "./stdlib-feed";          // Q2-2/3/4: RSS/Atom/sitemap/robots/JSON-LD
 import { createBlogModule } from "./stdlib-blog";          // Q2-5: 태그/관련글/검색인덱스/페이지네이션
@@ -87,16 +83,9 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createQueueHelpersModule()); // Phase X1: queue_dequeue_atomic/db_init/recover_stuck
   interp.registerModule(createCronModule());      // Phase X3: cron_validate/match/next_match
   interp.registerModule(createQueueHelpersModule()); // Phase X1: queue_dequeue_atomic, queue_db_init, queue_recover_stuck
-  interp.registerModule(createWorkflowModule());
+  // workflow, http-server, mariadb, mongodb → lazy-registry (require "workflow" 등으로 로드)
   interp.registerModule(createResourceModule());
-  // Phase 4a: Pure HTTP Server — callUserFunction/callFunctionValue 콜백 필요
-  interp.registerModule(createHttpServerModule(
-    (n: string, a: any[]) => interp.callUserFunction(n, a),
-    (fnValue: any, a: any[]) => interp.callFunctionValue(fnValue, a)
-  ));
   interp.registerModule(createDbModule());
-  interp.registerModule(createMariadbModule());   // v11.5: mariadb_exec/query/one/health/databases/tables
-  interp.registerModule(createMongodbModule());   // v11.6: mongodb_connect/find/insert/update/delete
   interp.registerModule(createAuthModule());
   interp.registerModule(createCacheModule());
   interp.registerModule(createPubSubModule((n, a) => interp.callUserFunction(n, a)));
@@ -124,12 +113,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createPlotModule());       // Phase 10: plot_histogram, plot_bar, plot_line, plot_scatter, plot_heatmap, plot_save
   interp.registerModule(createTestEnhancedModule()); // Phase 11: test_run_all, test_register, test_coverage, test_report
   interp.registerModule(createServiceModule());    // Phase 12: service_define, service_start, service_stop, queue_create, circuit_breaker_define, observe_metric
-  interp.registerModule(createWsModule(            // Phase 21: ws_start, ws_send, ws_broadcast, ws_on_connect_fn, ...
-    (n: string, a: any[]) => interp.callUserFunction(n, a)
-  ));
-  interp.registerModule(createWscModule(           // Phase 21: wsc_connect, wsc_send, wsc_on_open_fn, ...
-    (n: string, a: any[]) => interp.callUserFunction(n, a)
-  ));
+  // ws, wsc → lazy-registry (require "ws" / require "wsc")
   interp.registerModule(createMarkdownModule());   // Q2-1: markdown_to_html, markdown_frontmatter, markdown_render_full
   interp.registerModule(createFeedModule());       // Q2-2/3/4: rss_feed, atom_feed, sitemap_xml, robots_txt, jsonld_article/breadcrumb/organization
   interp.registerModule(createBlogModule());       // Q2-5: blog_all_tags, blog_posts_by_tag, blog_tag_counts, blog_related, blog_search_index, blog_search, blog_posts_sorted, blog_paginate
