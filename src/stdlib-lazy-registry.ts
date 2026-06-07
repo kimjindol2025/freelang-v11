@@ -26,40 +26,47 @@ interface InterpreterLike {
 type ModuleFactory = (interp?: InterpreterLike) => Record<string, unknown>;
 
 // 모듈명 → (번들파일, 팩토리함수명) 매핑
-// 번들별로 require() 경로를 분기해 필요한 번들만 로드
 const BUNDLE_MAP: Record<string, { bundle: string; factory: string; needsInterp?: boolean }> = {
+  // HTTP
   "http-server": { bundle: "./stdlib-ext-http.js",     factory: "createHttpServerModule", needsInterp: true },
+  // DB
   "mariadb":     { bundle: "./stdlib-ext-db.js",       factory: "createMariadbModule" },
   "mongodb":     { bundle: "./stdlib-ext-db.js",       factory: "createMongodbModule" },
   "db":          { bundle: "./stdlib-ext-db.js",       factory: "createDbModule" },
   "orm":         { bundle: "./stdlib-ext-db.js",       factory: "createOrmModule" },
+  // Workflow
   "workflow":    { bundle: "./stdlib-ext-workflow.js", factory: "createWorkflowModule" },
   "resource":    { bundle: "./stdlib-ext-workflow.js", factory: "createResourceModule" },
   "service":     { bundle: "./stdlib-ext-workflow.js", factory: "createServiceModule" },
+  // WebSocket
   "ws":          { bundle: "./stdlib-ext-ws.js",       factory: "createWsModule",  needsInterp: true },
   "wsc":         { bundle: "./stdlib-ext-ws.js",       factory: "createWscModule", needsInterp: true },
+  // Auth / security
+  "webauthn":    { bundle: "./stdlib-ext-auth.js",     factory: "createWebauthnModule" },
+  "totp":        { bundle: "./stdlib-ext-auth.js",     factory: "createTotpModule" },
+  "crypto-rsa":  { bundle: "./stdlib-ext-auth.js",     factory: "createCryptoRsaModule" },
+  "mail":        { bundle: "./stdlib-ext-auth.js",     factory: "createMailModule" },
+  // AI / observability
+  "ai":          { bundle: "./stdlib-ext-ai.js",       factory: "createAiNativeModule" },
+  "audit":       { bundle: "./stdlib-ext-ai.js",       factory: "createAuditModule" },
+  // Content
+  "markdown":    { bundle: "./stdlib-ext-content.js",  factory: "createMarkdownModule" },
+  "blog":        { bundle: "./stdlib-ext-content.js",  factory: "createBlogModule" },
+  "table":       { bundle: "./stdlib-ext-content.js",  factory: "createTableModule" },
+  "validation":  { bundle: "./stdlib-ext-content.js",  factory: "createValidationModule" },
+  "middleware":  { bundle: "./stdlib-ext-content.js",  factory: "createMiddlewareModule" },
+  // Compile (parser+AST 포함 — ~155KB)
+  "compile":     { bundle: "./stdlib-ext-compile.js",  factory: "createCompileModule" },
+  "registry":    { bundle: "./stdlib-ext-compile.js",  factory: "createRegistryModule" },
+  // Async / concurrency
+  "async":       { bundle: "./stdlib-ext-async.js",    factory: "createAsyncModule", needsInterp: true },
+  "channel":     { bundle: "./stdlib-ext-async.js",    factory: "createChannelModule" },
+  "queue":       { bundle: "./stdlib-ext-async.js",    factory: "createQueueHelpersModule" },
+  "immutable":   { bundle: "./stdlib-ext-async.js",    factory: "createImmutableModule" },
 };
 
-// 나머지 모듈은 misc 번들
-const MISC_MODULES: Record<string, string> = {
-  "crypto-rsa":  "createCryptoRsaModule",
-  "totp":        "createTotpModule",
-  "mail":        "createMailModule",
-  "webauthn":    "createWebauthnModule",
-  "queue":       "createQueueHelpersModule",
-  "async":       "createAsyncModule",
-  "channel":     "createChannelModule",
-  "immutable":   "createImmutableModule",
-  "ai":          "createAiNativeModule",
-  "compile":     "createCompileModule",
-  "registry":    "createRegistryModule",
-  "validation":  "createValidationModule",
-  "middleware":  "createMiddlewareModule",
-  "table":       "createTableModule",
-  "markdown":    "createMarkdownModule",
-  "blog":        "createBlogModule",
-  "audit":       "createAuditModule",
-};
+// misc 번들은 더 이상 사용 안 함 (모두 전용 번들로 이동)
+const MISC_MODULES: Record<string, string> = {};
 
 const NOT_AVAILABLE = new Set(["oci", "stats", "plot", "feed", "cloud", "matrix"]);
 
