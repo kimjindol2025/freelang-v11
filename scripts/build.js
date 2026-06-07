@@ -63,6 +63,10 @@ const NODE_EXTERNALS = [
   "better-sqlite3", "sqlite3", "mysql2", "sharp", "mongodb",
 ];
 
+// stdlib-extensions.js 빌드 대상: lazy-registry + 모든 extension 모듈
+// bootstrap.js에서 external로 지정 → 번들 분리
+const EXTENSIONS_EXTERNALS = [...NODE_EXTERNALS];
+
 function bootstrapOpts() {
   return {
     absWorkingDir: REPO,
@@ -73,17 +77,43 @@ function bootstrapOpts() {
     outfile: "bootstrap.js",
     loader: { ".json": "json" },
     minify: false,
+    // stdlib-lazy-registry를 external로 지정 → 번들에서 제외
+    // 런타임에 require("./stdlib-extensions.js")로 로드됨
+    external: [...NODE_EXTERNALS, "./stdlib-lazy-registry"],
+    logLevel: "info",
+  };
+}
+
+function extensionsOpts() {
+  return {
+    absWorkingDir: REPO,
+    entryPoints: ["src/stdlib-lazy-registry.ts"],
+    bundle: true,
+    platform: "node",
+    target: "node18",
+    outfile: "stdlib-extensions.js",
+    loader: { ".json": "json" },
+    minify: false,
     external: NODE_EXTERNALS,
+    // CommonJS 형식으로 출력 (require()로 로드 가능)
+    format: "cjs",
     logLevel: "info",
   };
 }
 
 function buildBootstrap() {
   const esbuild = require("esbuild");
-  return esbuild.build(bootstrapOpts()).then(() => {
-    const size = fs.statSync(path.join(REPO, "bootstrap.js")).size;
-    console.log(`bootstrap=built size=${Math.round(size / 1024)}KB`);
-  });
+  // 두 번들 병렬 빌드
+  return Promise.all([
+    esbuild.build(bootstrapOpts()).then(() => {
+      const size = fs.statSync(path.join(REPO, "bootstrap.js")).size;
+      console.log(`bootstrap=built size=${Math.round(size / 1024)}KB`);
+    }),
+    esbuild.build(extensionsOpts()).then(() => {
+      const size = fs.statSync(path.join(REPO, "stdlib-extensions.js")).size;
+      console.log(`stdlib-extensions=built size=${Math.round(size / 1024)}KB`);
+    }),
+  ]);
 }
 
 function watchBootstrap() {

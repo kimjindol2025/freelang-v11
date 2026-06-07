@@ -1,34 +1,13 @@
 // FreeLang v11: Lazy Module Registry
-// (require "audit") 호출 시 해당 모듈만 로드 — 번들 크기 무관하게 시작 빠름
+// (require "http-server") 등 호출 시 해당 모듈만 로드
+//
+// 번들 크기 최적화:
+//   정적 import 대신 factory 내에서 require() 동적 호출 사용
+//   → esbuild가 정적 분석 시 이 파일의 의존성을 추적하지 않음
+//   → 실제 호출 시점까지 모듈 코드가 번들에 포함되지 않음
+//   → bootstrap.js 크기 감소
 
-import { createWsModule }           from "./stdlib-ws";
-import { createWscModule }          from "./stdlib-wsc";
-import { createCryptoRsaModule }    from "./stdlib-crypto-rsa";
-import { createTotpModule }         from "./stdlib-totp";
-import { createMailModule }         from "./stdlib-mail";
-import { createWebauthnModule }     from "./stdlib-webauthn";
-import { createQueueHelpersModule } from "./stdlib-queue-helpers";
-import { createWorkflowModule }     from "./stdlib-workflow";
-import { createResourceModule }     from "./stdlib-resource";
-import { createMariadbModule }      from "./stdlib-mariadb";
-import { createMongodbModule }      from "./stdlib-mongodb";
-import { createAsyncModule }        from "./stdlib-async";
-import { createChannelModule }      from "./stdlib-channel";
-import { createImmutableModule }    from "./immutable";
-import { createAiNativeModule }     from "./stdlib-ai-native";
-import { createCompileModule }      from "./stdlib-compile";
-import { createRegistryModule }     from "./stdlib-registry";
-import { createOrmModule }          from "./stdlib-orm";
-import { createValidationModule }   from "./stdlib-validation";
-import { createMiddlewareModule }   from "./stdlib-middleware";
-import { createTableModule }        from "./stdlib-table";
-import { createServiceModule }      from "./stdlib-service";
-import { createMarkdownModule }     from "./stdlib-markdown";
-import { createBlogModule }         from "./stdlib-blog";
-import { createAuditModule }        from "./stdlib-audit";
-import { createHttpServerModule }   from "./stdlib-http-server";
-
-type ModuleFactory = () => Record<string, unknown>;
+/* eslint-disable @typescript-eslint/no-var-requires */
 
 interface InterpreterLike {
   registerModule(module: Record<string, unknown>): void;
@@ -36,44 +15,126 @@ interface InterpreterLike {
   callFunctionValue(fnValue: any, args: any[]): any;
 }
 
-// 모듈명 → 팩토리 함수 매핑
-// 새 stdlib 추가 시 여기에만 한 줄 추가하면 됨
+type ModuleFactory = (interp?: InterpreterLike) => Record<string, unknown>;
+
+// 모듈명 → 동적 factory 매핑
+// factory 내에서 require()를 호출해야 esbuild가 번들에서 제외함
 const LAZY_REGISTRY: Record<string, ModuleFactory> = {
-  "ws":          (interp?: any) => createWsModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null),
-  "wsc":         (interp?: any) => createWscModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null),
-  "crypto-rsa":  () => createCryptoRsaModule(),
-  "totp":        () => createTotpModule(),
-  "mail":        () => createMailModule(),
-  "webauthn":    () => createWebauthnModule(),
-  "queue":       () => createQueueHelpersModule(),
-  "workflow":    () => createWorkflowModule(),
-  "resource":    () => createResourceModule(),
-  "mariadb":     () => createMariadbModule(),
-  "mongodb":     () => createMongodbModule(),
-  "async":       (interp?: any) => createAsyncModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null),
-  "channel":     () => createChannelModule(),
-  "immutable":   () => createImmutableModule(),
-  "ai":          () => createAiNativeModule(),
-  "compile":     () => createCompileModule(),
-  "registry":    () => createRegistryModule(),
-  "oci":         () => { throw new Error("oci 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
-  "orm":         () => createOrmModule(),
-  "validation":  () => createValidationModule(),
-  "middleware":  () => createMiddlewareModule(),
-  "table":       () => createTableModule(),
-  "stats":       () => { throw new Error("stats 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
-  "plot":        () => { throw new Error("plot 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
-  "service":     () => createServiceModule(),
-  "markdown":    () => createMarkdownModule(),
-  "feed":        () => { throw new Error("feed 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
-  "blog":        () => createBlogModule(),
-  "cloud":       () => { throw new Error("cloud 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
-  "matrix":      () => { throw new Error("matrix 모듈은 별도 패키지가 필요합니다. 표준 배포에 포함되지 않습니다."); },
-  "audit":       () => createAuditModule(),
-  "http-server": (interp?: any) => createHttpServerModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null),
+  "ws":          (interp?) => {
+    const { createWsModule } = require("./stdlib-ws");
+    return createWsModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null);
+  },
+  "wsc":         (interp?) => {
+    const { createWscModule } = require("./stdlib-wsc");
+    return createWscModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null);
+  },
+  "crypto-rsa":  () => {
+    const { createCryptoRsaModule } = require("./stdlib-crypto-rsa");
+    return createCryptoRsaModule();
+  },
+  "totp":        () => {
+    const { createTotpModule } = require("./stdlib-totp");
+    return createTotpModule();
+  },
+  "mail":        () => {
+    const { createMailModule } = require("./stdlib-mail");
+    return createMailModule();
+  },
+  "webauthn":    () => {
+    const { createWebauthnModule } = require("./stdlib-webauthn");
+    return createWebauthnModule();
+  },
+  "queue":       () => {
+    const { createQueueHelpersModule } = require("./stdlib-queue-helpers");
+    return createQueueHelpersModule();
+  },
+  "workflow":    () => {
+    const { createWorkflowModule } = require("./stdlib-workflow");
+    return createWorkflowModule();
+  },
+  "resource":    () => {
+    const { createResourceModule } = require("./stdlib-resource");
+    return createResourceModule();
+  },
+  "mariadb":     () => {
+    const { createMariadbModule } = require("./stdlib-mariadb");
+    return createMariadbModule();
+  },
+  "mongodb":     () => {
+    const { createMongodbModule } = require("./stdlib-mongodb");
+    return createMongodbModule();
+  },
+  "async":       (interp?) => {
+    const { createAsyncModule } = require("./stdlib-async");
+    return createAsyncModule(interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null);
+  },
+  "channel":     () => {
+    const { createChannelModule } = require("./stdlib-channel");
+    return createChannelModule();
+  },
+  "immutable":   () => {
+    const { createImmutableModule } = require("./immutable");
+    return createImmutableModule();
+  },
+  "ai":          () => {
+    const { createAiNativeModule } = require("./stdlib-ai-native");
+    return createAiNativeModule();
+  },
+  "compile":     () => {
+    const { createCompileModule } = require("./stdlib-compile");
+    return createCompileModule();
+  },
+  "registry":    () => {
+    const { createRegistryModule } = require("./stdlib-registry");
+    return createRegistryModule();
+  },
+  "oci":         () => { throw new Error("oci 모듈은 별도 패키지가 필요합니다."); },
+  "orm":         () => {
+    const { createOrmModule } = require("./stdlib-orm");
+    return createOrmModule();
+  },
+  "validation":  () => {
+    const { createValidationModule } = require("./stdlib-validation");
+    return createValidationModule();
+  },
+  "middleware":  () => {
+    const { createMiddlewareModule } = require("./stdlib-middleware");
+    return createMiddlewareModule();
+  },
+  "table":       () => {
+    const { createTableModule } = require("./stdlib-table");
+    return createTableModule();
+  },
+  "stats":       () => { throw new Error("stats 모듈은 별도 패키지가 필요합니다."); },
+  "plot":        () => { throw new Error("plot 모듈은 별도 패키지가 필요합니다."); },
+  "service":     () => {
+    const { createServiceModule } = require("./stdlib-service");
+    return createServiceModule();
+  },
+  "markdown":    () => {
+    const { createMarkdownModule } = require("./stdlib-markdown");
+    return createMarkdownModule();
+  },
+  "feed":        () => { throw new Error("feed 모듈은 별도 패키지가 필요합니다."); },
+  "blog":        () => {
+    const { createBlogModule } = require("./stdlib-blog");
+    return createBlogModule();
+  },
+  "cloud":       () => { throw new Error("cloud 모듈은 별도 패키지가 필요합니다."); },
+  "matrix":      () => { throw new Error("matrix 모듈은 별도 패키지가 필요합니다."); },
+  "audit":       () => {
+    const { createAuditModule } = require("./stdlib-audit");
+    return createAuditModule();
+  },
+  "http-server": (interp?) => {
+    const { createHttpServerModule } = require("./stdlib-http-server");
+    return createHttpServerModule(
+      interp ? (n: string, a: any[]) => interp.callUserFunction(n, a) : () => null,
+      interp ? (fn: any, a: any[]) => interp.callFunctionValue(fn, a) : () => null,
+    );
+  },
 };
 
-// 이미 로드된 모듈 캐시 (중복 로드 방지)
 const loaded = new Set<string>();
 
 export function getAvailableModules(): string[] {
@@ -84,11 +145,9 @@ export function isModuleLoaded(name: string): boolean {
   return loaded.has(name);
 }
 
-// (require "audit") 호출 시 실행
 export function requireModule(name: string, interp: InterpreterLike): boolean {
   const normalized = name.replace(/_/g, "-");
-
-  if (loaded.has(normalized)) return true; // 이미 로드됨
+  if (loaded.has(normalized)) return true;
 
   const factory = LAZY_REGISTRY[normalized];
   if (!factory) {

@@ -1134,13 +1134,15 @@ export function evalBuiltin(interp: Interpreter, op: string, args: any[], expr: 
     case "require": {
       const modulePath = String(args[0] ?? "");
 
-      // Step 1: stdlib lazy registry 먼저 확인 (http-server, mariadb, workflow, ws, ...)
+      // Step 1: stdlib extension registry 확인 (http-server, mariadb, workflow, ws, ...)
+      // stdlib-extensions.js는 bootstrap.js와 분리된 번들 (번들 크기 최적화)
       try {
-        const { requireModule } = require("./stdlib-lazy-registry");
+        const extPath = require("path").resolve(__dirname, "./stdlib-extensions.js");
+        const { requireModule } = require(extPath);
         if (requireModule(modulePath, interp)) {
           return new Map<string, any>([["status", "loaded"], ["module", modulePath]]);
         }
-      } catch (_lazyErr) { /* lazy registry 없으면 파일 기반으로 계속 */ }
+      } catch (_lazyErr) { /* extensions 번들 없으면 파일 기반으로 계속 */ }
 
       const fs = require("fs");
       const path = require("path");
