@@ -919,6 +919,9 @@
   [(= $op "reduce")      (str "fl_reduce_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "append")      (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "push")        (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  ;; 가변 빌더 O(1) amortized — (vec-builder) → (append b v) → (freeze-builder b)
+  [(= $op "vec-builder")    "fl_vec_builder_new()"]
+  [(= $op "freeze-builder") (str "fl_vec_builder_freeze(" (cgc (get $args 0)) ")")]
   ;; task-native-stdlib-gap P1: 기존 C 구현 dispatch 연결
   [(= $op "flatten")     (str "flatten(" (cgc (get $args 0)) ")")]
   [(= $op "flatten-1")   (str "flatten(" (cgc (get $args 0)) ")")]
