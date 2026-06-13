@@ -515,6 +515,9 @@
         [(= $op "or")
          (r-pair (parse-consume-rparen $p2)
                  {:kind "or" :args $rest :line $line})]
+        [(= $op "throw")
+         (r-pair (parse-consume-rparen $p2)
+                 (make-throw (if (> (length $rest) 0) (get $rest 0) (make-sexpr "nil" (list) $line)) $line))]
         [true
          (r-pair (parse-consume-rparen $p2)
                  (make-sexpr $op $rest $line))])))))
@@ -710,7 +713,12 @@
     [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
     [(= (get $n :kind) "or")        (cgc-or (get $n :args))]
     [(= (get $n :kind) "try")       (cgc-try $n)]
-    [(= (get $n :kind) "throw")     (str "(fl_throw(" (cgc (get $n :expr)) "), fl_nil())")]
+    [(= (get $n :kind) "throw")
+     (let [[$line (get $n :line)]
+           [$expr-c (cgc (get $n :expr))]]
+       (if (and $line (> $line 0))
+         (str "(__fl_throw_line=" (to-string $line) ", fl_throw(" $expr-c "), fl_nil())")
+         (str "(fl_throw(" $expr-c "), fl_nil())")))]
     [true
      (do (println (str "[CGC-ERR] unsupported IR kind=" (get $n :kind) " line=" (get $n :line)))
          "fl_nil()")]))
