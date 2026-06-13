@@ -1276,6 +1276,15 @@
 
 ;; ── defn (최상위) ──
 
+;; defn 다중 body 처리: 중간 식은 (void)(expr);, 마지막만 return
+(defn cgc-defn-stmts [$args $i $acc]
+  (if (>= $i (length $args)) $acc
+  (let [[$last (= $i (- (length $args) 1))]
+        [$c (cgc (get $args $i))]]
+    (if $last
+      (str $acc "    return " $c ";\n")
+      (cgc-defn-stmts $args (+ $i 1) (str $acc "    (void)(" $c ");\n"))))))
+
 (defn cgc-defn [$args]
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$param-items (get-block-items (get $args 1))]
@@ -1288,8 +1297,8 @@
              "(FLClosure* _s, int _ac, FLValue* argv) {\n"
              "    (void)_s; (void)_ac;\n"
              "    return " $name "(" $call-args ");\n}"))
-      (let [[$body (cgc (get $args 2))]]
-        (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}")))))
+      (let [[$stmts (cgc-defn-stmts $args 2 "")]]
+        (str "FLValue " $name "(" $ps ") {\n" $stmts "}"))))))
 
 ;; ── define (전역 변수) ──
 
