@@ -400,24 +400,30 @@ function _callUserFunctionInterpPath(interp: InterpreterLike, name: string, args
     return result;
   }
 
-  // 일반 함수: 새 렉시컬 스코프
-  interp.context.variables.push();
+  // 일반 함수: 전역 함수는 [global_ref, params_frame] 2단 스택으로 실행
+  // capturedEnv가 없는 경우 → resetToGlobalFrame() 사용 (260엔트리 복사 없음, O(1) 탐색)
+  // tcoMode=true: 꼬리 위치 사용자 함수 호출 → TailCall 토큰으로 처리 (JS 스택 성장 방지)
+  const _savedGlobalStack = interp.context.variables.resetToGlobalFrame();
   interp.callDepth++;
   if (hasBudget()) checkBudget(Date.now(), 0, interp.callDepth);
   _callStack.push(_stackEntry);
   if (_callStack.length > 100) _callStack.shift();
+  const _prevTcoMode = (interp as any).tcoMode;
+  (interp as any).tcoMode = true;
+  let _currentFunc = func;
+  let _currentArgs = args;
   try {
     for (let recurIter = 0; recurIter < 2_000_000; recurIter++) {
       // budget max-ms 체크 (TCO 루프 — 1000회마다)
       if (recurIter > 0 && recurIter % 1000 === 0 && hasBudget()) {
         checkBudget(Date.now(), 0, 0);
       }
-      for (let i = 0; i < func.params.length; i++) {
-        bindParam(interp, func.params[i], args[i]);
+      for (let i = 0; i < _currentFunc.params.length; i++) {
+        bindParam(interp, _currentFunc.params[i], _currentArgs[i]);
       }
       let result: any;
       try {
-        result = interp.eval(func.body);
+        result = interp.eval(_currentFunc.body);
       } catch (e) {
         if (isReturnSignal(e)) return e.value;
         if (e instanceof Error && !(e as any).__flCallStack) {
@@ -425,17 +431,43 @@ function _callUserFunctionInterpPath(interp: InterpreterLike, name: string, args
         }
         throw e;
       }
+      // recur 키워드 → 같은 함수 재귀 (loop)
       if (result && typeof result === "object" && (result as any).__FL_RECUR__) {
-        args = (result as any).__args;
+        _currentArgs = (result as any).__args;
         continue;
+      }
+      // TailCall 토큰 → 꼬리 위치 함수 호출을 JS 스택 없이 처리
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          let nextName = result.fn;
+          let nextFunc = interp.context.functions.get(nextName);
+          if (!nextFunc) {
+            const alt = nextName.includes('_') ? nextName.replace(/_/g, '-') : nextName.replace(/-/g, '_');
+            if (alt !== nextName) nextFunc = interp.context.functions.get(alt);
+          }
+          if (nextFunc && !nextFunc.capturedEnv && typeof nextFunc.body !== "function") {
+            // 클로저 없는 일반 함수 → 루프 계속 (JS 스택 성장 없음)
+            _currentFunc = nextFunc;
+            _currentArgs = result.args;
+            continue;
+          }
+          // 클로저 함수 or 다른 케이스 → TCO trampoline으로 위임
+          (interp as any).tcoMode = _prevTcoMode;
+          return callUserFunctionTCO(interp, result.fn, result.args);
+        } else {
+          // function-value TailCall
+          (interp as any).tcoMode = _prevTcoMode;
+          return callFunctionValueTCO(interp, result.fn, result.args);
+        }
       }
       return result;
     }
     throw new Error(`recur: max iterations exceeded in '${baseName}'`);
   } finally {
+    (interp as any).tcoMode = _prevTcoMode;
     interp.callDepth--;
     _callStack.pop();
-    interp.context.variables.pop();
+    interp.context.variables.restoreStack(_savedGlobalStack);
     for (const alias of tempAliases) interp.context.functions.delete(alias);
     exitProfiler();
   }

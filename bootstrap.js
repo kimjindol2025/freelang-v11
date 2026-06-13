@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -2619,7 +2619,7 @@ function logUnknownFunction(name, file, line) {
   } catch {
   }
 }
-var import_fs, FL_ERROR_LOG, FL_BUILTIN_OPS, FL_BUILTIN_FN_REFS, ModuleError, ModuleNotFoundError, SelectiveImportError, InvalidModuleStructureError, FunctionRegistrationError, FunctionNotFoundError, ErrorCodes, RECOVERY_HINTS, FLRuntimeError, VariableNotFoundError, UnresolvedSymbolError;
+var import_fs, FL_ERROR_LOG, FL_BUILTIN_OPS, ModuleError, ModuleNotFoundError, SelectiveImportError, InvalidModuleStructureError, FunctionRegistrationError, FunctionNotFoundError, ErrorCodes, RECOVERY_HINTS, FLRuntimeError, VariableNotFoundError, UnresolvedSymbolError;
 var init_errors = __esm({
   "src/errors.ts"() {
     import_fs = require("fs");
@@ -2644,34 +2644,6 @@ var init_errors = __esm({
       "dec",
       "mod"
     ]);
-    // built-in 함수를 first-class value로 쓸 때 반환할 native JS 함수 맵
-    // (swap! a inc), (map inc arr), (filter nil? xs) 등을 가능하게 함
-    FL_BUILTIN_FN_REFS = {
-      "inc":    (v) => (typeof v === "number" ? v + 1 : v),
-      "dec":    (v) => (typeof v === "number" ? v - 1 : v),
-      "+":      (...a) => a.reduce((s, x) => s + x, 0),
-      "-":      (a, b) => b === undefined ? -a : a - b,
-      "*":      (...a) => a.reduce((s, x) => s * x, 1),
-      "/":      (a, b) => a / b,
-      "mod":    (a, b) => a % b,
-      "not":    (v) => !v,
-      "nil?":   (v) => v === null || v === undefined,
-      "str":    (...xs) => xs.map(x => x === null || x === undefined ? "" : String(x)).join(""),
-      "append": (arr, item) => Array.isArray(arr) ? [...arr, item] : [item],
-      "push":   (arr, item) => Array.isArray(arr) ? [...arr, item] : [item],
-      "first":  (arr) => Array.isArray(arr) && arr.length > 0 ? arr[0] : null,
-      "last":   (arr) => Array.isArray(arr) && arr.length > 0 ? arr[arr.length - 1] : null,
-      "rest":   (arr) => Array.isArray(arr) ? arr.slice(1) : [],
-      "length": (arr) => Array.isArray(arr) ? arr.length : 0,
-      "count":  (arr) => Array.isArray(arr) ? arr.length : 0,
-      "=":      (a, b) => a === b,
-      "not=":   (a, b) => a !== b,
-      ">":      (a, b) => a > b,
-      "<":      (a, b) => a < b,
-      ">=":     (a, b) => a >= b,
-      "<=":     (a, b) => a <= b,
-      "identity": (v) => v,
-    };
     ModuleError = class _ModuleError extends Error {
       constructor(message, moduleName, file, line, col, hint) {
         super(message);
@@ -2729,9 +2701,8 @@ var init_errors = __esm({
     };
     FunctionNotFoundError = class _FunctionNotFoundError extends Error {
       constructor(functionName, file, line, col, hint) {
-        const fileStr = file ? ` (${require("path").basename(file)}${line ? `:${line}` : ""})` : "";
-        const hintStr = hint ? `\n  힌트: ${hint}` : "";
-        super(`'${functionName}' 함수 없음${fileStr}${hintStr}`);
+        const hintStr = hint ? ` ${hint}` : "";
+        super(`Function not found: ${functionName}${hintStr}`);
         this.functionName = functionName;
         this.file = file;
         this.line = line;
@@ -2850,47 +2821,17 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 function suggestSimilar(name, candidates) {
+  let best = null;
+  let bestDist = Infinity;
   const threshold = name.length > 4 ? 3 : 2;
-  const results = [];
   for (const candidate of candidates) {
     const dist = levenshtein(name.toLowerCase(), candidate.toLowerCase());
-    if (dist <= threshold) results.push({ name: candidate, dist });
+    if (dist <= threshold && dist < bestDist) {
+      bestDist = dist;
+      best = candidate;
+    }
   }
-  results.sort((a, b) => a.dist - b.dist);
-  const top = results.slice(0, 3).map(r => r.name);
-  return top.length > 0 ? top : null;
-}
-function suggestSimilarOne(name, candidates) {
-  const top = suggestSimilar(name, candidates);
-  return top ? top[0] : null;
-}
-function userFnCandidates(allKeys, fnMap) {
-  return allKeys.filter(k => {
-    if (k.startsWith("__") || k.startsWith("page_") || k.includes("__inner") || k.startsWith("_fl_") || k.length <= 1) return false;
-    if (!fnMap) return true;
-    const fn = fnMap.get(k);
-    if (!fn) return false;
-    // 사용자 정의 함수: body가 JS 함수가 아닌 AST 노드
-    return fn.body && typeof fn.body !== "function" && !fn._builtin && !fn._call;
-  });
-}
-function buildFnNotFoundHint(baseName, allKeys, alias, fnMap) {
-  if (alias) return `'${baseName}'는 없습니다. 대신 '${alias.correct}'를 사용하세요.\n  사용법: ${alias.usage}`;
-  const user = userFnCandidates(allKeys, fnMap);
-  // 먼저 사용자 정의 함수에서 유사 후보 검색
-  const similarsUser = suggestSimilar(baseName, user);
-  if (similarsUser && similarsUser.length > 0) {
-    return `비슷한 함수: ${similarsUser.map(s => `'${s}'`).join(", ")}`;
-  }
-  // 사용자 정의 함수 중 유사 없으면 전체에서 검색
-  const similarsAll = suggestSimilar(baseName, allKeys.filter(k => !k.startsWith("__") && !k.includes("__inner")));
-  if (similarsAll && similarsAll.length > 0) {
-    return `비슷한 함수: ${similarsAll.map(s => `'${s}'`).join(", ")}`;
-  }
-  const recent = user.slice(-5).filter(k => k !== baseName);
-  return recent.length > 0
-    ? `정의된 함수: ${recent.join(", ")}`
-    : `'${baseName}' 함수가 정의되어 있는지 확인하세요.`;
+  return best;
 }
 var KNOWN_ALIASES;
 var init_error_formatter = __esm({
@@ -4772,6 +4713,9 @@ function evalSpecialForm(interp2, op, expr2) {
     const fnValue = interp2.evalSExpr(fnExpr);
     fnValue.name = name;
     if (_defnRetAnn) fnValue.returnAnnotation = _defnRetAnn;
+    if (ctx.variables.depth() === 1) {
+      fnValue.capturedEnv = void 0;
+    }
     try {
       const funcChunk = _vmCompiler.compileFunctionBody(fnValue.params, fnValue.body, name);
       const vmFuncObj = {
@@ -4788,8 +4732,7 @@ function evalSpecialForm(interp2, op, expr2) {
       name,
       params: fnValue.params,
       body: fnValue.body,
-      capturedEnv: fnValue.capturedEnv,
-      filePath: interp2.currentFilePath ?? null
+      capturedEnv: fnValue.capturedEnv
     };
     if (fnValue.paramDefaults) funcDef.paramDefaults = fnValue.paramDefaults;
     if (fnValue.paramAnnotations) funcDef.paramAnnotations = fnValue.paramAnnotations;
@@ -5828,32 +5771,17 @@ Test Results: ${r.passed}/${total} passed`);
     const macroName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
     const paramsNode = expr2.args[1];
     const params = [];
-    let restName = null;
-    let seenAmpersand = false;
     if (paramsNode.kind === "block" && paramsNode.type === "Array") {
       const items = paramsNode.fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
-          if (item.kind === "literal" && item.type === "symbol" && item.value === "&") {
-            seenAmpersand = true; continue;
-          }
-          if (item.kind === "variable" && item.name === "&") {
-            seenAmpersand = true; continue;
-          }
-          if (seenAmpersand) {
-            const rn = item.kind === "variable" ? item.name.replace(/^\$/, "") : String(item.value ?? item.name ?? "rest");
-            restName = rn;
-            params.push("$&rest");
-            break;
-          }
           if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
           else if (item.kind === "literal") params.push("$" + item.value);
         }
       }
     }
-    const body = expr2.args.length >= 3 ? (expr2.args.length === 3 ? expr2.args[2] : { kind: "sexpr", op: "do", args: expr2.args.slice(2) }) : { kind: "literal", type: "null", value: null };
-    const macroDef = { name: macroName, params, body, restName };
-    ctx.macroExpander.macros.set(macroName, macroDef);
+    const body = expr2.args[2];
+    ctx.macroExpander.define(macroName, params, body);
     return null;
   }
   if (op === "macroexpand") {
@@ -15124,48 +15052,6 @@ function flExecOpNative(op, vals) {
       }
       return cur !== void 0 ? cur : defaultVal;
     }
-    case "get!": {
-      if (v0 === null || v0 === void 0) throw new Error(`get!: nil\uC5D0\uC11C \uD0A4 '${v1}' \uC811\uADFC \uBD88\uAC00`);
-      let k2 = v1;
-      if (k2 !== null && typeof k2 === "object" && k2.kind === "keyword") k2 = k2.name;
-      const normalized2 = typeof k2 === "string" && k2.startsWith(":") ? k2.slice(1) : String(k2);
-      let val2;
-      if (Array.isArray(v0)) val2 = v0[k2];
-      else if (v0 instanceof Map) val2 = v0.has(normalized2) ? v0.get(normalized2) : void 0;
-      else if (typeof v0 === "object") val2 = v0[normalized2] !== void 0 ? v0[normalized2] : v0[k2];
-      if (val2 === void 0 || val2 === null) {
-        const keys = Array.isArray(v0) ? `\uAE38\uC774 ${v0.length}\uC778 \uBC30\uC5F4`
-          : v0 instanceof Map ? `\uD0A4: ${[...v0.keys()].map(k => `"${k}"`).join(", ")}`
-          : typeof v0 === "object" ? `\uD0A4: ${Object.keys(v0).map(k => `"${k}"`).join(", ")}`
-          : "\uC54C \uC218 \uC5C6\uC74C";
-        throw new Error(`get!: \uD0A4 "${k2}" \uC5C6\uC74C\n  ${keys}`);
-      }
-      return val2;
-    }
-    case "get-in!": {
-      if (!Array.isArray(v1)) throw new Error(`get-in!: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
-      let cur2 = v0;
-      for (let ki = 0; ki < v1.length; ki++) {
-        const k3 = v1[ki];
-        if (cur2 === null || cur2 === void 0) {
-          const path2 = v1.slice(0, ki).join(" \u2192 ");
-          throw new Error(`get-in!: ${path2 || "\uB8E8\uD2B8"}\uC5D0\uC11C nil \u2014 \uD0A4 "${k3}" \uC811\uADFC \uBD88\uAC00`);
-        }
-        const key2 = typeof k3 === "string" && k3.startsWith(":") ? k3.slice(1) : k3;
-        const prev = cur2;
-        if (Array.isArray(cur2)) cur2 = cur2[key2] !== void 0 ? cur2[key2] : null;
-        else if (cur2 !== null && typeof cur2 === "object") cur2 = cur2[key2] !== void 0 ? cur2[key2] : null;
-        if ((cur2 === null || cur2 === void 0) && ki < v1.length - 1) {
-          const availKeys = Array.isArray(prev) ? `\uAE38\uC774 ${prev.length}` : typeof prev === "object" && prev ? `\uD0A4: ${Object.keys(prev).map(k => `"${k}"`).join(", ")}` : "";
-          throw new Error(`get-in!: \uD0A4 "${k3}" \uC5C6\uC74C\n  ${availKeys}`);
-        }
-      }
-      if (cur2 === null || cur2 === void 0) {
-        const lastKey = v1[v1.length - 1];
-        throw new Error(`get-in!: \uD0A4 "${lastKey}" \uC5C6\uC74C`);
-      }
-      return cur2;
-    }
     case "append":
       return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
     case "slice":
@@ -15173,7 +15059,7 @@ function flExecOpNative(op, vals) {
     case "str":
     case "concat":
       return vals.map((v) => {
-        if (v === null || v === void 0) return "";
+        if (v === null || v === void 0) return "null";
         if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
         const isPlainObj = typeof v === "object" && !Array.isArray(v) && !(v instanceof Map) && v?.kind !== "function-value" && v?.kind !== "closure";
         if (Array.isArray(v) || isPlainObj) {
@@ -15238,45 +15124,16 @@ function flExecOpNative(op, vals) {
     }
     case "first":
       return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
-    case "first!":
-      if (!Array.isArray(v0) || v0.length === 0) {
-        const detail = v0 === null || v0 === void 0 ? "nil 전달됨" : `빈 배열 (길이 0)`;
-        throw new Error(`first!: 첫 번째 원소 없음 — ${detail}`);
-      }
-      return v0[0];
     case "second":
       return Array.isArray(v0) ? v0[1] !== void 0 ? v0[1] : null : null;
     case "last":
       return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
-    case "last!":
-      if (!Array.isArray(v0) || v0.length === 0) {
-        const detail2 = v0 === null || v0 === void 0 ? "nil 전달됨" : `빈 배열 (길이 0)`;
-        throw new Error(`last!: 마지막 원소 없음 — ${detail2}`);
-      }
-      return v0[v0.length - 1];
     case "rest":
       return Array.isArray(v0) ? v0.slice(1) : [];
     case "nth":
       return Array.isArray(v0) && args[1] !== void 0 ? v0[Number(args[1])] !== void 0 ? v0[Number(args[1])] : null : null;
     case "not=":
       return args[0] !== args[1];
-    case "or!": {
-      for (let _oi = 0; _oi < args.length - 1; _oi++) {
-        const _ov = args[_oi];
-        if (_ov !== null && _ov !== void 0 && _ov !== false) return _ov;
-      }
-      const _last = args[args.length - 1];
-      if (_last === null || _last === void 0 || _last === false)
-        throw new Error(`or!: 모든 값이 nil/false — 이 위치에서 nil은 허용되지 않습니다`);
-      return _last;
-    }
-    case "assert-not-nil": {
-      if (v0 === null || v0 === void 0) {
-        const msg = v1 !== null && v1 !== void 0 ? String(v1) : "nil 불가";
-        throw new Error(`assert-not-nil: ${msg}`);
-      }
-      return v0;
-    }
     // Phase C: nil-safe wrapper들 — default 값 반환 (Phase A의 E_TYPE_NIL 회피)
     case "get-or": {
       let k = v1;
@@ -15390,10 +15247,6 @@ function flExecOpNative(op, vals) {
       return fenv;
     }
     case "fl-env-get":
-      if (typeof v0 === "string") {
-        const envVal = process.env[v0];
-        return envVal !== void 0 ? envVal : (v1 !== null && v1 !== void 0 ? v1 : null);
-      }
       return flEnvGet(v0, String(v1 ?? ""));
     case "fl-exec-op":
       return flExecOpNative(String(v0 ?? ""), Array.isArray(v1) ? v1 : []);
@@ -15459,8 +15312,6 @@ function flExecOpNative(op, vals) {
     case "http-get":
     case "http_get": {
       const url2 = String(v0 ?? "");
-      const __ssrf = flSsrfBlockReason(url2);
-      if (__ssrf) return { status: 0, body: "", headers: {}, error: __ssrf };
       try {
         const { execSync: execSync2 } = require("child_process");
         const { writeFileSync: writeFileSync14, unlinkSync: unlinkSync5 } = require("fs");
@@ -15750,29 +15601,6 @@ function evalBuiltin(interp2, op, args3, expr2) {
   };
   const toDisplay2 = (val) => interp2.toDisplayString(val);
   switch (normalizedOp2) {
-    case "first!": {
-      const a0 = args3[0];
-      if (!Array.isArray(a0) || a0.length === 0) throw new Error(`first!: 첫 번째 원소 없음 — ${a0 === null || a0 === void 0 ? "nil 전달됨" : "빈 배열"}`);
-      return a0[0];
-    }
-    case "last!": {
-      const a0 = args3[0];
-      if (!Array.isArray(a0) || a0.length === 0) throw new Error(`last!: 마지막 원소 없음 — ${a0 === null || a0 === void 0 ? "nil 전달됨" : "빈 배열"}`);
-      return a0[a0.length - 1];
-    }
-    case "or!": {
-      for (let i = 0; i < args3.length - 1; i++) {
-        const v = args3[i];
-        if (v !== null && v !== void 0 && v !== false) return v;
-      }
-      const last = args3[args3.length - 1];
-      if (last === null || last === void 0 || last === false) throw new Error(`or!: 모든 값이 nil/false — 이 위치에서 nil은 허용되지 않습니다`);
-      return last;
-    }
-    case "assert-not-nil": {
-      if (args3[0] === null || args3[0] === void 0) throw new Error(`assert-not-nil: ${args3[1] !== null && args3[1] !== void 0 ? String(args3[1]) : "nil 불가"}`);
-      return args3[0];
-    }
     // atom: 변경 가능한 참조 컨테이너
     case "atom": {
       return { value: args3[0] !== void 0 ? args3[0] : null };
@@ -16143,7 +15971,7 @@ async function loop() {
       resp = { ok: false, error: e.message };
     }
     const respStr = JSON.stringify(resp);
-    data.writeInt32LE(Buffer.byteLength(respStr, 'utf8'), 0);
+    data.writeInt32LE(respStr.length, 0);
     data.write(respStr, 4, 'utf8');
     Atomics.store(control, 0, 2);
     Atomics.notify(control, 0);
@@ -16624,10 +16452,46 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const _rrReg = globalThis.__tcpServers ?? {};
       if (!globalThis.__tcpServers) globalThis.__tcpServers = _rrReg;
       if (_rrReg[_rrPort] && !_rrReg[_rrPort].stopped) return "already-running";
-      // IO Worker에서 tcp-server-raw 처리 (Atomics.wait와 충돌 방지)
-      __ensureIoWorker();
-      _rrReg[_rrPort] = { stopped: false };
-      globalThis.__ioWorker.postMessage({ cmd: "tcp-server-raw", port: _rrPort, handler: _rrHandler });
+      if (!globalThis.__flEventQueue) globalThis.__flEventQueue = [];
+      if (!globalThis.__flConnSocks) globalThis.__flConnSocks = {};
+      const _rrNet = require("net");
+      const _rrEntry = { server: null, sockets: /* @__PURE__ */ new Set(), stopped: false };
+      _rrReg[_rrPort] = _rrEntry;
+      let _rrSeq = 0;
+      _rrEntry.server = _rrNet.createServer((sock) => {
+        if (_rrEntry.stopped) {
+          sock.destroy();
+          return;
+        }
+        const _rrConnId = `conn_${++_rrSeq}`;
+        _rrEntry.sockets.add(sock);
+        globalThis.__flConnSocks[_rrConnId] = sock;
+        const _rrEnq = (evArgs) => {
+          try {
+            callFnVal(_rrHandler, evArgs);
+          } catch (e) {
+            if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+            globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e.message ?? e)]);
+          }
+        };
+        _rrEnq(["connect", _rrConnId, ""]);
+        sock.on("data", (chunk) => {
+          if (_rrEntry.stopped) return;
+          _rrEnq(["data", _rrConnId, chunk.toString("binary")]);
+        });
+        const _rrOnEnd = () => {
+          _rrEntry.sockets.delete(sock);
+          delete globalThis.__flConnSocks[_rrConnId];
+          _rrEnq(["close", _rrConnId, ""]);
+        };
+        sock.on("close", _rrOnEnd);
+        sock.on("error", _rrOnEnd);
+      });
+      _rrEntry.server.listen(_rrPort, "0.0.0.0");
+      _rrEntry.server.on("error", () => {
+        _rrEntry.stopped = true;
+        delete _rrReg[_rrPort];
+      });
       return "ok";
     }
     // (tcp-outbound host port "handler") → upstream-id (즉시 반환, 연결은 비동기)
@@ -16651,11 +16515,11 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return _upId;
     }
     // (tcp-write conn-id data) → "ok" | "error" | "not-found"
-    // IO Worker 아웃바운드(__ioUpstreams), IO Worker 인바운드(__ioInbounds), 구형(__flConnSocks)
+    // IO Worker 아웃바운드(__ioUpstreams), 인바운드(__flConnSocks), 구형(__flUpstreams)
     case "tcp-write": {
       const _twId = String(args3[0] ?? "");
       const _twData = String(args3[1] ?? "");
-      if (globalThis.__ioUpstreams?.has(_twId) || globalThis.__ioInbounds?.has(_twId)) {
+      if (globalThis.__ioUpstreams?.has(_twId)) {
         globalThis.__ioWorker?.postMessage({ cmd: "tcp-write", id: _twId, hex: Buffer.from(_twData, "binary").toString("hex") });
         return "ok";
       }
@@ -16675,11 +16539,6 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       const _tdId = String(args3[0] ?? "");
       if (globalThis.__ioUpstreams?.has(_tdId)) {
         globalThis.__ioUpstreams.delete(_tdId);
-        globalThis.__ioWorker?.postMessage({ cmd: "tcp-drop", id: _tdId });
-        return "ok";
-      }
-      if (globalThis.__ioInbounds?.has(_tdId)) {
-        globalThis.__ioInbounds.delete(_tdId);
         globalThis.__ioWorker?.postMessage({ cmd: "tcp-drop", id: _tdId });
         return "ok";
       }
@@ -16703,256 +16562,6 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       return "not-found";
     }
-    // ── SSH Crypto builtins (added for SSH server/proxy support) ─────────────
-    // ── SSH Crypto builtins (require 동기 — evalBuiltin은 non-async) ─────────
-    // (aes-ctr-encrypt key-hex iv-hex data-binary) → binary-string | "error:..."
-    case "aes-ctr-encrypt": {
-      try {
-        const _cr = require("crypto");
-        const _aeKey = Buffer.from(String(args3[0] ?? ""), "hex");
-        const _aeIv  = Buffer.from(String(args3[1] ?? ""), "hex");
-        const _aeIn  = Buffer.from(String(args3[2] ?? ""), "binary");
-        const _aeBits = _aeKey.length === 16 ? "aes-128-ctr" : "aes-256-ctr";
-        const _aeCipher = _cr.createCipheriv(_aeBits, _aeKey, _aeIv);
-        return Buffer.concat([_aeCipher.update(_aeIn), _aeCipher.final()]).toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (aes-ctr-decrypt key-hex iv-hex data-binary) → binary-string | "error:..."
-    case "aes-ctr-decrypt": {
-      try {
-        const _cr = require("crypto");
-        const _adKey = Buffer.from(String(args3[0] ?? ""), "hex");
-        const _adIv  = Buffer.from(String(args3[1] ?? ""), "hex");
-        const _adIn  = Buffer.from(String(args3[2] ?? ""), "binary");
-        const _adBits = _adKey.length === 16 ? "aes-128-ctr" : "aes-256-ctr";
-        const _adCipher = _cr.createDecipheriv(_adBits, _adKey, _adIv);
-        return Buffer.concat([_adCipher.update(_adIn), _adCipher.final()]).toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (aes-gcm-encrypt key-hex iv-hex data-binary) → {ct: binary, tag: hex} | "error:..."
-    case "aes-gcm-encrypt": {
-      try {
-        const _cr = require("crypto");
-        const _agKey = Buffer.from(String(args3[0] ?? ""), "hex");
-        const _agIv  = Buffer.from(String(args3[1] ?? ""), "hex");
-        const _agIn  = Buffer.from(String(args3[2] ?? ""), "binary");
-        const _agCipher = _cr.createCipheriv("aes-256-gcm", _agKey, _agIv);
-        const _agCt = Buffer.concat([_agCipher.update(_agIn), _agCipher.final()]);
-        return { ct: _agCt.toString("binary"), tag: _agCipher.getAuthTag().toString("hex") };
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (aes-gcm-decrypt key-hex iv-hex ct-binary tag-hex) → binary-string | "error:..."
-    case "aes-gcm-decrypt": {
-      try {
-        const _cr = require("crypto");
-        const _agdKey = Buffer.from(String(args3[0] ?? ""), "hex");
-        const _agdIv  = Buffer.from(String(args3[1] ?? ""), "hex");
-        const _agdIn  = Buffer.from(String(args3[2] ?? ""), "binary");
-        const _agdTag = Buffer.from(String(args3[3] ?? ""), "hex");
-        const _agdC = _cr.createDecipheriv("aes-256-gcm", _agdKey, _agdIv);
-        _agdC.setAuthTag(_agdTag);
-        return Buffer.concat([_agdC.update(_agdIn), _agdC.final()]).toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (ecdh-generate) → {pub: hex, priv: hex}  (x25519)
-    // pub/priv: 32바이트 raw hex. SPKI/PKCS8 DER에서 마지막 32바이트 추출.
-    case "ecdh-generate": {
-      try {
-        const _cr = require("crypto");
-        const { publicKey: _ecPub, privateKey: _ecPriv } = _cr.generateKeyPairSync("x25519");
-        return {
-          pub:  _ecPub.export({ type: "spki",  format: "der" }).slice(-32).toString("hex"),
-          priv: _ecPriv.export({ type: "pkcs8", format: "der" }).slice(-32).toString("hex")
-        };
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (ecdh-shared priv-hex peer-pub-hex) → shared-secret-hex
-    case "ecdh-shared": {
-      try {
-        const _cr = require("crypto");
-        const _x25519PrivHdr = Buffer.from("302e020100300506032b656e04220420", "hex");
-        const _x25519PubHdr  = Buffer.from("302a300506032b656e032100", "hex");
-        const _esPriv = _cr.createPrivateKey({ key: Buffer.concat([_x25519PrivHdr, Buffer.from(String(args3[0] ?? ""), "hex")]), format: "der", type: "pkcs8" });
-        const _esPub  = _cr.createPublicKey({ key: Buffer.concat([_x25519PubHdr, Buffer.from(String(args3[1] ?? ""), "hex")]), format: "der", type: "spki" });
-        return _cr.diffieHellman({ privateKey: _esPriv, publicKey: _esPub }).toString("hex");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (dh14-generate) → {pub: hex, priv: hex}  (modp14 = 2048-bit MODP group)
-    case "dh14-generate": {
-      try {
-        const _cr = require("crypto");
-        const _dh14 = _cr.createDiffieHellmanGroup("modp14");
-        _dh14.generateKeys();
-        return { pub: _dh14.getPublicKey("hex"), priv: _dh14.getPrivateKey("hex") };
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (dh14-shared priv-hex peer-pub-hex) → shared-secret-hex
-    case "dh14-shared": {
-      try {
-        const _cr = require("crypto");
-        // createDiffieHellmanGroup does NOT support setPrivateKey — use createDiffieHellman
-        const _grp = _cr.createDiffieHellmanGroup("modp14");
-        const _ds14 = _cr.createDiffieHellman(_grp.getPrime(), _grp.getGenerator());
-        _ds14.setPrivateKey(Buffer.from(String(args3[0] ?? ""), "hex"));
-        return _ds14.computeSecret(Buffer.from(String(args3[1] ?? ""), "hex"), null, "hex");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (crypto-random n) → n바이트 랜덤 binary-string
-    case "crypto-random": {
-      try {
-        return require("crypto").randomBytes(Number(args3[0] ?? 16)).toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (sha256-hex data-binary) → hex
-    case "sha256-hex": {
-      try {
-        return require("crypto").createHash("sha256").update(Buffer.from(String(args3[0] ?? ""), "binary")).digest("hex");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (hmac-sha256-hex key-binary data-binary) → hex
-    case "hmac-sha256-hex": {
-      try {
-        const _hk = Buffer.from(String(args3[0] ?? ""), "binary");
-        const _hd = Buffer.from(String(args3[1] ?? ""), "binary");
-        return require("crypto").createHmac("sha256", _hk).update(_hd).digest("hex");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // ── SSH RSA 호스트 키 빌트인 ─────────────────────────────────────────────
-    // (rsa-generate-keypair bits?) → {priv-pem: str, pub-pem: str}
-    case "rsa-generate-keypair": {
-      try {
-        const _cr = require("crypto");
-        const _bits = Number(args3[0] ?? 2048);
-        const { publicKey, privateKey } = _cr.generateKeyPairSync("rsa", {
-          modulusLength: _bits,
-          publicKeyEncoding:  { type: "spki",  format: "pem" },
-          privateKeyEncoding: { type: "pkcs8", format: "pem" }
-        });
-        return { "pub-pem": publicKey, "priv-pem": privateKey };
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (rsa-sign-sha256 priv-pem data-binary) → binary-string (DER signature)
-    case "rsa-sign-sha256": {
-      try {
-        const _cr = require("crypto");
-        const _priv = String(args3[0] ?? "");
-        const _data = Buffer.from(String(args3[1] ?? ""), "binary");
-        const _sig = _cr.createSign("SHA256").update(_data).sign(_priv);
-        return _sig.toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (rsa-pubkey-ssh-blob priv-pem) → binary-string (SSH wire format: [u32 "ssh-rsa"][u32 e][e][u32 n][n])
-    case "rsa-pubkey-ssh-blob": {
-      try {
-        const _cr = require("crypto");
-        const _kobj = _cr.createPublicKey(String(args3[0] ?? ""));
-        const _jk = _kobj.export({ format: "jwk" });
-        const _n = Buffer.from(_jk.n, "base64");
-        const _e = Buffer.from(_jk.e, "base64");
-        const _nameStr = Buffer.from("ssh-rsa");
-        const _nameBlock = Buffer.concat([Buffer.allocUnsafe(4), _nameStr]);
-        _nameBlock.writeUInt32BE(_nameStr.length, 0);
-        const _encodeMpint = (buf) => {
-          const needPad = (buf[0] & 0x80) !== 0;
-          const padded = needPad ? Buffer.concat([Buffer.alloc(1), buf]) : buf;
-          const hdr = Buffer.allocUnsafe(4); hdr.writeUInt32BE(padded.length, 0);
-          return Buffer.concat([hdr, padded]);
-        };
-        const blob = Buffer.concat([_nameBlock, _encodeMpint(_e), _encodeMpint(_n)]);
-        return blob.toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (sha256-binary data-binary) → 32-byte binary-string
-    case "sha256-binary": {
-      try {
-        const _data = Buffer.from(String(args3[0] ?? ""), "binary");
-        return require("crypto").createHash("sha256").update(_data).digest().toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // (hmac-sha256-binary key-binary data-binary) → 32-byte binary-string
-    case "hmac-sha256-binary": {
-      try {
-        const _hk = Buffer.from(String(args3[0] ?? ""), "binary");
-        const _hd = Buffer.from(String(args3[1] ?? ""), "binary");
-        return require("crypto").createHmac("sha256", _hk).update(_hd).digest().toString("binary");
-      } catch (e) { return "error:" + e.message; }
-    }
-    // ── End SSH RSA 빌트인 ────────────────────────────────────────────────────
-    // ── Binary Buffer builtins (SSH/TCP raw packet 처리용) ────────────────────
-    // (buf-byte binary-string i) → 0-255
-    case "buf-byte": {
-      const _bbS = String(args3[0] ?? ""); const _bbI = Number(args3[1] ?? 0);
-      return Buffer.from(_bbS, "binary")[_bbI] ?? 0;
-    }
-    // (buf-u32be binary-string offset) → uint32
-    case "buf-u32be": {
-      const _buS = Buffer.from(String(args3[0] ?? ""), "binary");
-      const _buO = Number(args3[1] ?? 0);
-      if (_buO + 4 > _buS.length) return 0;
-      return _buS.readUInt32BE(_buO);
-    }
-    // (buf-u16be binary-string offset) → uint16
-    case "buf-u16be": {
-      const _b16S = Buffer.from(String(args3[0] ?? ""), "binary");
-      const _b16O = Number(args3[1] ?? 0);
-      if (_b16O + 2 > _b16S.length) return 0;
-      return _b16S.readUInt16BE(_b16O);
-    }
-    // (buf-from-bytes [b0 b1 ...]) → binary-string
-    case "buf-from-bytes": {
-      const _bfb = Array.isArray(args3[0]) ? args3[0] : args3;
-      return Buffer.from(_bfb.map(x => Number(x) & 0xFF)).toString("binary");
-    }
-    // (buf-u32be-pack n) → 4-byte binary-string (big-endian)
-    case "buf-u32be-pack": {
-      const _bup = Buffer.allocUnsafe(4); _bup.writeUInt32BE(Number(args3[0] ?? 0) >>> 0, 0);
-      return _bup.toString("binary");
-    }
-    // (buf-u8-pack n) → 1-byte binary-string
-    case "buf-u8-pack": {
-      return Buffer.from([Number(args3[0] ?? 0) & 0xFF]).toString("binary");
-    }
-    // (buf-length binary-string) → number of bytes
-    case "buf-length": {
-      return Buffer.byteLength(String(args3[0] ?? ""), "binary");
-    }
-    // (buf-slice binary-string start end) → binary-string
-    case "buf-slice": {
-      const _bsS = Buffer.from(String(args3[0] ?? ""), "binary");
-      const _bsA = Number(args3[1] ?? 0); const _bsB = args3[2] != null ? Number(args3[2]) : _bsS.length;
-      return _bsS.slice(_bsA, _bsB).toString("binary");
-    }
-    // (buf-concat b1 b2 ...) → binary-string
-    case "buf-concat": {
-      return Buffer.concat(args3.map(x => Buffer.from(String(x ?? ""), "binary"))).toString("binary");
-    }
-    // (buf-to-hex binary-string) → hex-string
-    case "buf-to-hex": {
-      return Buffer.from(String(args3[0] ?? ""), "binary").toString("hex");
-    }
-    // (buf-from-hex hex-string) → binary-string
-    case "buf-from-hex": {
-      return Buffer.from(String(args3[0] ?? ""), "hex").toString("binary");
-    }
-    // (buf-to-str binary-string encoding?) → JS utf-8 string (default utf-8)
-    case "buf-to-str": {
-      return Buffer.from(String(args3[0] ?? ""), "binary").toString(String(args3[1] ?? "utf-8"));
-    }
-    // (buf-from-str str encoding?) → binary-string
-    case "buf-from-str": {
-      return Buffer.from(String(args3[0] ?? ""), String(args3[1] ?? "utf-8")).toString("binary");
-    }
-    // (buf-xor b1 b2) → binary-string (XOR of two equal-length binary strings)
-    case "buf-xor": {
-      const _bx1 = Buffer.from(String(args3[0] ?? ""), "binary");
-      const _bx2 = Buffer.from(String(args3[1] ?? ""), "binary");
-      const _bxR = Buffer.allocUnsafe(Math.min(_bx1.length, _bx2.length));
-      for (let _bxi = 0; _bxi < _bxR.length; _bxi++) _bxR[_bxi] = _bx1[_bxi] ^ _bx2[_bxi];
-      return _bxR.toString("binary");
-    }
-    // ── End Binary Buffer builtins ────────────────────────────────────────────
-    // ── End SSH Crypto builtins ───────────────────────────────────────────────
-
     // (fl-set-interval ms "handler-name") → interval-id
     // Node.js setInterval로 주기적으로 FL 핸들러 호출. 이벤트 루프 비블로킹.
     case "fl-set-interval": {
@@ -16988,25 +16597,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     // (fl-yield [timeout-ms]) → number (처리된 이벤트 수)
     case "fl-yield": {
       const _fyMs = Math.max(0, Number(args3[0] ?? 1));
-      if (!globalThis.__ioWorker) {
-        // IO Worker 없이도 __flInboundQueue 처리 (tcp-server-raw 단독 사용 시)
-        if (_fyMs > 0) {
-          if (!globalThis.__flYieldSab) globalThis.__flYieldSab = new SharedArrayBuffer(4);
-          Atomics.wait(new Int32Array(globalThis.__flYieldSab), 0, 0, _fyMs);
-        }
-        const _fyInQ0 = globalThis.__flInboundQueue ?? [];
-        if (_fyInQ0.length === 0) return 0;
-        const _fyBatch0 = _fyInQ0.splice(0, _fyInQ0.length);
-        let _fyCnt0 = 0;
-        for (const _fyEv0 of _fyBatch0) {
-          try { callFnVal(_fyEv0.handler, _fyEv0.args); _fyCnt0++; }
-          catch (e) {
-            if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
-            globalThis.__flErrorQueue.push(["io-err","recoverable","inbound",String(e?.message??e)]);
-          }
-        }
-        return _fyCnt0;
-      }
+      if (!globalThis.__ioWorker) return 0;
       const _fyCtrl = new Int32Array(globalThis.__ioCtrlBuf);
       const _fyBuf = Buffer.from(globalThis.__ioDataBuf);
       Atomics.wait(_fyCtrl, IO_SLOT_NOTIFY, 0, _fyMs);
@@ -17035,32 +16626,12 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         const _fyHandler = _fyEv.handler;
         if (!_fyHandler) continue;
         const _fyData = _fyEvType === "data" ? Buffer.from(_fyEv.hex ?? "", "hex").toString("binary") : _fyEv.msg ?? "";
-        // IO Worker inbound 연결 추적 (__ioInbounds)
-        if (!globalThis.__ioInbounds) globalThis.__ioInbounds = new Set();
-        if (_fyEvType === "connect" && !globalThis.__ioUpstreams?.has(_fyEv.id)) {
-          globalThis.__ioInbounds.add(_fyEv.id);
-        } else if ((_fyEvType === "close" || _fyEvType === "error") && globalThis.__ioInbounds.has(_fyEv.id)) {
-          globalThis.__ioInbounds.delete(_fyEv.id);
-        }
         try {
           callFnVal(_fyHandler, [_fyEvType, _fyEv.id, _fyData]);
           _fyCnt++;
         } catch (e) {
           if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
           globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e.message ?? e)]);
-        }
-      }
-      const _fyInQ = globalThis.__flInboundQueue ?? [];
-      if (_fyInQ.length > 0) {
-        const _fyInBatch = _fyInQ.splice(0, _fyInQ.length);
-        for (const _fyInEv of _fyInBatch) {
-          try {
-            callFnVal(_fyInEv.handler, _fyInEv.args);
-            _fyCnt++;
-          } catch (e) {
-            if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
-            globalThis.__flErrorQueue.push(["io-err", "recoverable", "inbound", String(e?.message ?? e)]);
-          }
         }
       }
       return _fyCnt;
@@ -17656,7 +17227,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return null;
     case "str":
       return args3.map((a) => {
-        if (a === null || a === void 0) return "";
+        if (a === null || a === void 0) return "null";
         if (typeof a === "string" || typeof a === "number" || typeof a === "boolean") return String(a);
         const isPlainObj = typeof a === "object" && !Array.isArray(a) && !(a instanceof Map) && a?.kind !== "function-value" && a?.kind !== "closure";
         if (Array.isArray(a) || isPlainObj) {
@@ -18498,41 +18069,6 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       }
       return _getDef;
     }
-    case "get!": {
-      const g1v = args3[0]; const g1k = args3[1];
-      if (g1v === null || g1v === void 0) throw new Error(`get!: nil에서 키 '${g1k}' 접근 불가`);
-      const g1n = typeof g1k === "string" && g1k.startsWith(":") ? g1k.slice(1) : String(g1k);
-      let g1r;
-      if (Array.isArray(g1v)) g1r = g1v[g1k];
-      else if (g1v instanceof Map) g1r = g1v.has(g1n) ? g1v.get(g1n) : void 0;
-      else if (typeof g1v === "object") g1r = g1v[g1n] !== void 0 ? g1v[g1n] : g1v[g1k];
-      if (g1r === void 0 || g1r === null) {
-        const g1keys = Array.isArray(g1v) ? `길이 ${g1v.length}인 배열`
-          : g1v instanceof Map ? `키: ${[...g1v.keys()].map(k => `"${k}"`).join(", ")}`
-          : typeof g1v === "object" ? `키: ${Object.keys(g1v).map(k => `"${k}"`).join(", ")}` : "";
-        throw new Error(`get!: 키 "${g1k}" 없음\n  ${g1keys}`);
-      }
-      return g1r;
-    }
-    case "get-in!": {
-      if (!Array.isArray(args3[1])) throw new Error(`get-in!: 두 번째 인자는 키 배열`);
-      let gi1cur = args3[0];
-      for (let gi1i = 0; gi1i < args3[1].length; gi1i++) {
-        const gi1k = args3[1][gi1i];
-        if (gi1cur === null || gi1cur === void 0) throw new Error(`get-in!: 경로 ${args3[1].slice(0,gi1i).join("→") || "루트"}에서 nil`);
-        const gi1n = typeof gi1k === "string" && gi1k.startsWith(":") ? gi1k.slice(1) : gi1k;
-        const gi1prev = gi1cur;
-        if (Array.isArray(gi1cur)) gi1cur = gi1cur[gi1n] !== void 0 ? gi1cur[gi1n] : null;
-        else if (gi1cur instanceof Map) gi1cur = gi1cur.has(String(gi1n)) ? gi1cur.get(String(gi1n)) : null;
-        else if (typeof gi1cur === "object") gi1cur = gi1cur[gi1n] !== void 0 ? gi1cur[gi1n] : null;
-        if (gi1cur === null && gi1i < args3[1].length - 1) {
-          const gi1keys = typeof gi1prev === "object" && gi1prev && !Array.isArray(gi1prev) ? `키: ${Object.keys(gi1prev).map(k => `"${k}"`).join(", ")}` : "";
-          throw new Error(`get-in!: 키 "${gi1k}" 없음\n  ${gi1keys}`);
-        }
-      }
-      if (gi1cur === null || gi1cur === void 0) throw new Error(`get-in!: 키 "${args3[1][args3[1].length-1]}" 없음`);
-      return gi1cur;
-    }
     case "safe-get":
     case "safe_get": {
       let sgKey = args3[1];
@@ -18562,10 +18098,6 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       if (Array.isArray(args3[0])) return args3[0];
       return [];
     case "fl-env-get": {
-      if (typeof args3[0] === "string") {
-        const envVal = process.env[args3[0]];
-        return envVal !== void 0 ? envVal : (args3[1] !== null && args3[1] !== void 0 ? args3[1] : null);
-      }
       let flenv = args3[0];
       const fname = String(args3[1]);
       while (flenv !== null && flenv !== void 0) {
@@ -22032,8 +21564,6 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
         case "http-get":
         case "http_get": {
           const url2 = String(args3[0] ?? "");
-          const __ssrf = flSsrfBlockReason(url2);
-          if (__ssrf) return { status: 0, body: "", headers: {}, error: __ssrf };
           try {
             const { execSync: execSync2 } = require("child_process");
             const { writeFileSync: writeFileSync14, unlinkSync: unlinkSync5 } = require("fs");
@@ -22253,7 +21783,7 @@ parentPort.on('message', (msg) => {
     const server = net.createServer((sock) => {
       const cid = 'conn_' + port + '_' + (++seq);
       sockets.set(cid, { sock, handler });
-      push(JSON.stringify({ ev: 'connect', id: cid, handler }));
+      push(JSON.stringify({ ev: 'accept', id: cid, handler }));
       sock.on('data', (chunk) =>
         push(JSON.stringify({ ev: 'data', id: cid, handler, hex: chunk.toString('hex') })));
       sock.on('close', () => {
@@ -22750,7 +22280,14 @@ function _callUserFunctionInterpPath(interp2, name, args3) {
   if (!func) {
     const candidates = [...interp2.context.functions.keys()];
     const alias = KNOWN_ALIASES[baseName] ?? KNOWN_ALIASES[baseName.replace(/-/g, "_")] ?? KNOWN_ALIASES[baseName.replace(/_/g, "-")];
-    const hint = buildFnNotFoundHint(baseName, candidates, alias, interp2.context.functions);
+    let hint;
+    if (alias) {
+      hint = `'${baseName}'\uB294 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2E0 '${alias.correct}'\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
+  \uC0AC\uC6A9\uBC95: ${alias.usage}`;
+    } else {
+      const similar = suggestSimilar(baseName, candidates);
+      hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+    }
     throw new FunctionNotFoundError(
       baseName,
       interp2.currentFilePath,
@@ -22790,12 +22327,7 @@ function _callUserFunctionInterpPath(interp2, name, args3) {
     const paramNames = func.params.map(
       (p) => typeof p === "string" ? p.replace(/^\$/, "") : p?.kind === "variable" ? p.name.replace(/^\$/, "") : "\u2026"
     );
-    const missing = paramNames.slice(args3.length);
-    throw new Error(
-      `'${baseName}': \uc778\uc790 ${func.params.length}\uac1c \ud544\uc694, ${args3.length}\uac1c \uc804\ub2ec\ub428\n` +
-      `  \uc2dc\uadf8\ub2c8\ucc98: (${baseName} ${paramNames.join(" ")})\n` +
-      `  \ub204\ub77d\ub41c \uc778\uc790: ${missing.join(", ")}`
-    );
+    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
     const _stack3 = interp2.callStack ?? [];
@@ -22825,8 +22357,7 @@ ${tail}` : "")
   const _argsBrief = args3.slice(0, 5).map(
     (a) => a === null ? "nil" : Array.isArray(a) ? `[${a.length}]` : typeof a === "object" ? "{obj}" : typeof a === "function" ? "<fn>" : typeof a === "string" ? a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"` : String(a)
   );
-  const _stackEntry = { name: baseName, line: interp2._pendingCallLine ?? interp2.currentLine, args: _argsBrief, file: interp2._pendingCallFile ?? interp2.currentFilePath ?? null, defFile: func.filePath ?? null };
-  interp2._pendingCallLine = null; interp2._pendingCallFile = null;
+  const _stackEntry = { name: baseName, line: interp2.currentLine, args: _argsBrief };
   if (process.env.FL_TRACE === "1") {
     console.error(`[trace] ${"  ".repeat(Math.min(interp2.callDepth, 20))}\u2192 ${baseName}(${_argsBrief.join(", ")}) (line ${interp2.currentLine})`);
   }
@@ -22878,22 +22409,26 @@ ${tail}` : "")
     }
     return result;
   }
-  interp2.context.variables.push();
+  const _savedGlobalStack = interp2.context.variables.resetToGlobalFrame();
   interp2.callDepth++;
   if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
   _callStack.push(_stackEntry);
   if (_callStack.length > 100) _callStack.shift();
+  const _prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
+  let _currentFunc = func;
+  let _currentArgs = args3;
   try {
     for (let recurIter = 0; recurIter < 2e6; recurIter++) {
       if (recurIter > 0 && recurIter % 1e3 === 0 && hasBudget()) {
         checkBudget(Date.now(), 0, 0);
       }
-      for (let i = 0; i < func.params.length; i++) {
-        bindParam(interp2, func.params[i], args3[i]);
+      for (let i = 0; i < _currentFunc.params.length; i++) {
+        bindParam(interp2, _currentFunc.params[i], _currentArgs[i]);
       }
       let result;
       try {
-        result = interp2.eval(func.body);
+        result = interp2.eval(_currentFunc.body);
       } catch (e) {
         if (isReturnSignal(e)) return e.value;
         if (e instanceof Error && !e.__flCallStack) {
@@ -22902,16 +22437,37 @@ ${tail}` : "")
         throw e;
       }
       if (result && typeof result === "object" && result.__FL_RECUR__) {
-        args3 = result.__args;
+        _currentArgs = result.__args;
         continue;
+      }
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          let nextName = result.fn;
+          let nextFunc = interp2.context.functions.get(nextName);
+          if (!nextFunc) {
+            const alt = nextName.includes("_") ? nextName.replace(/_/g, "-") : nextName.replace(/-/g, "_");
+            if (alt !== nextName) nextFunc = interp2.context.functions.get(alt);
+          }
+          if (nextFunc && !nextFunc.capturedEnv && typeof nextFunc.body !== "function") {
+            _currentFunc = nextFunc;
+            _currentArgs = result.args;
+            continue;
+          }
+          interp2.tcoMode = _prevTcoMode;
+          return callUserFunctionTCO(interp2, result.fn, result.args);
+        } else {
+          interp2.tcoMode = _prevTcoMode;
+          return callFunctionValueTCO(interp2, result.fn, result.args);
+        }
       }
       return result;
     }
     throw new Error(`recur: max iterations exceeded in '${baseName}'`);
   } finally {
+    interp2.tcoMode = _prevTcoMode;
     interp2.callDepth--;
     _callStack.pop();
-    interp2.context.variables.pop();
+    interp2.context.variables.restoreStack(_savedGlobalStack);
     for (const alias of tempAliases) interp2.context.functions.delete(alias);
     exitProfiler();
   }
@@ -23065,7 +22621,8 @@ function callUserFunctionTCO(interp2, name, args3) {
       }
       if (!func) {
         const candidates = [...interp2.context.functions.keys()];
-        const hint = buildFnNotFoundHint(baseName, candidates, null, interp2.context.functions);
+        const similar = suggestSimilar(baseName, candidates);
+        const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
         throw new FunctionNotFoundError(baseName, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0, void 0, hint);
       }
       if (func._call) return func._call(...currentArgs);
@@ -23993,6 +23550,18 @@ var ScopeStack = class {
   /** 함수 스코프 종료 */
   pop() {
     if (this.stack.length > 1) this.stack.pop();
+  }
+  /** 현재 스코프 깊이 (1 = 전역 스코프만 있음) */
+  depth() {
+    return this.stack.length;
+  }
+  /** 전역 함수 호출용: 현재 스택을 저장하고 [global_ref, new_frame]으로 리셋.
+   *  capturedEnv 없는 전역 함수 전용 — 260엔트리 복사 없이 O(1) 호출 비용.
+   *  반환값을 restoreStack()에 전달하여 복원. */
+  resetToGlobalFrame() {
+    const saved = [...this.stack];
+    this.stack = [this.stack[0], /* @__PURE__ */ new Map()];
+    return saved;
   }
   /** 클로저 캡처용: 현재 스코프 체인 전체를 단일 Map으로 병합 (메타정보 포함) */
   snapshot() {
@@ -26421,50 +25990,7 @@ function createErrorModule() {
 
 // src/stdlib-http.ts
 var import_child_process = require("child_process");
-// ── SSRF Guard (language-level, v11.9.x) ──────────────────────────────
-// Allowlist policy: private/loopback ranges are blocked by default; cloud
-// metadata (169.254.x / fe80:) and the unspecified address (0.0.0.0 / ::)
-// are ALWAYS blocked (not overridable). FL_HTTP_ALLOW="host1,host2" opts
-// specific private hosts back in; FL_HTTP_ALLOW="*" permits all private ranges
-// (metadata/unspecified stay always-blocked regardless of the allowlist).
-// Returns an error string if the URL must be blocked, or null if allowed.
-// NOTE v1: matches the literal hostname only (parity with flsc crawl-url-safe?);
-// DNS-rebinding (name → private IP) is a known follow-up, not covered here.
-function flSsrfBlockReason(rawUrl) {
-  let host;
-  try {
-    host = (new URL(String(rawUrl)).hostname || "").toLowerCase();
-  } catch {
-    return null;
-  }
-  if (!host) return null;
-  if (host[0] === "[" && host[host.length - 1] === "]") host = host.slice(1, -1);
-  const isIPv6 = host.includes(":");
-  if (host === "0.0.0.0" || host === "::" || host.startsWith("169.254.") || host.startsWith("fe80:")) {
-    return `SSRF blocked: ${host} (reserved/metadata)`;
-  }
-  const allowEnv = (process.env.FL_HTTP_ALLOW || "").trim();
-  if (allowEnv === "*") return null;
-  if (allowEnv) {
-    const allow = allowEnv.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-    if (allow.includes(host)) return null;
-  }
-  let isPrivate;
-  if (isIPv6) {
-    isPrivate = host === "::1" || host.startsWith("fc") || host.startsWith("fd");
-  } else {
-    const priv172 = host.startsWith("172.") && (() => {
-      const oct = parseInt(host.slice(4).split(".")[0], 10);
-      return oct >= 16 && oct <= 31;
-    })();
-    isPrivate = host === "localhost" || host.startsWith("127.") || host.startsWith("10.") || host.startsWith("192.168.") || priv172;
-  }
-  if (isPrivate) return `SSRF blocked: ${host} (private range; set FL_HTTP_ALLOW to permit)`;
-  return null;
-}
 function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4) {
-  const __ssrf = flSsrfBlockReason(url2);
-  if (__ssrf) return { status: 0, body: "", error: __ssrf };
   try {
     const headersObj = {};
     if (headers && typeof headers === "object") {
@@ -30600,7 +30126,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("X-XSS-Protection", "1; mode=block");
-        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'nonce-${cspNonce}'; img-src 'self' data: blob:; connect-src 'self' ws: wss:;`);
+        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'nonce-${cspNonce}'`);
         res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         if (method === "OPTIONS") {
           res.writeHead(200);
@@ -30638,7 +30164,6 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               const mwStatus = mwResult.status ?? (mwResult.__fl_status ?? 200);
               const headersObj = {};
               if (mwResult.__fl_headers) Object.assign(headersObj, mwResult.__fl_headers);
-              if (mwResult.headers) Object.assign(headersObj, mwResult.headers);
               const mwBody = mwResult.__fl_response ? typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? "") : typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult);
               const mwCT = mwResult.contentType ?? "application/json";
               sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
@@ -30872,19 +30397,20 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     // server_json [status] obj -> response object
     // (server_json data)        → 200 JSON
     // (server_json 201 data)    → 201 JSON
-    "server_json": (body, status = 200) => {
+    "server_json": (statusOrBody, maybeBody) => {
+      const isStatus = typeof statusOrBody === "number" && statusOrBody >= 100 && statusOrBody < 600;
       return {
         __fl_response: true,
-        status: status,
+        status: isStatus ? statusOrBody : 200,
         contentType: "application/json",
-        body
+        body: isStatus ? maybeBody : statusOrBody
       };
     },
     // server_text text -> response object
-    "server_text": (body, status = 200) => {
+    "server_text": (body) => {
       return {
         __fl_response: true,
-        status: status,
+        status: 200,
         contentType: "text/plain",
         body
       };
@@ -31770,7 +31296,7 @@ function loop() {
     try { resp = handle(JSON.parse(reqStr)); }
     catch(e) { resp = { ok: false, error: e.message }; }
     const respStr = JSON.stringify(resp);
-    data.writeInt32LE(Buffer.byteLength(respStr, 'utf8'), 0);
+    data.writeInt32LE(respStr.length, 0);
     data.write(respStr, 4, 'utf8');
     Atomics.store(control, 0, 2);
     Atomics.notify(control, 0);
@@ -31802,9 +31328,8 @@ function poolCall(req) {
   const control = new Int32Array(controlBuf);
   const data = Buffer.from(dataBuf);
   const reqStr = JSON.stringify(req);
-  const reqBytes = Buffer.byteLength(reqStr, 'utf8');
-  if (reqBytes + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
-  data.writeInt32LE(reqBytes, 0);
+  if (reqStr.length + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
+  data.writeInt32LE(reqStr.length, 0);
   data.write(reqStr, 4, "utf8");
   Atomics.store(control, 0, 1);
   Atomics.notify(control, 0);
@@ -32063,37 +31588,6 @@ function createMariadbModule(callFn) {
         else delete process.env.MARIADB_PORT;
         cachedSock = null;
       }
-    },
-    "db-one": (db, sql, params = []) => {
-      let rows;
-      if (isSqliteConfig(db)) rows = sqliteQuery(getSqlitePath(db), sql, params);
-      else if (typeof db === "string" && db.startsWith("pool_"))
-        rows = poolCall({ type: "query", poolId: db, sql, params }).rows ?? [];
-      else {
-        const dbName = getMariadbName(db);
-        const m2 = db instanceof Map ? db : new Map(Object.entries(db));
-        const su = process.env.MARIADB_USER, sp = process.env.MARIADB_PASS;
-        const sh = process.env.MARIADB_HOST, spo = process.env.MARIADB_PORT;
-        if (m2.get("user")) process.env.MARIADB_USER = String(m2.get("user"));
-        if (m2.get("password")) process.env.MARIADB_PASS = String(m2.get("password"));
-        if (m2.get("host")) process.env.MARIADB_HOST = String(m2.get("host"));
-        if (m2.get("port")) process.env.MARIADB_PORT = String(m2.get("port"));
-        try {
-          cachedSock = null;
-          rows = parseRows(runMariadb(dbName, bindParams(sql, params))).map((r) => {
-            const rm = new Map();
-            for (const [k, v] of Object.entries(r)) rm.set(k, v);
-            return rm;
-          });
-        } finally {
-          if (su !== void 0) process.env.MARIADB_USER = su; else delete process.env.MARIADB_USER;
-          if (sp !== void 0) process.env.MARIADB_PASS = sp; else delete process.env.MARIADB_PASS;
-          if (sh !== void 0) process.env.MARIADB_HOST = sh; else delete process.env.MARIADB_HOST;
-          if (spo !== void 0) process.env.MARIADB_PORT = spo; else delete process.env.MARIADB_PORT;
-          cachedSock = null;
-        }
-      }
-      return (rows && rows.length > 0) ? rows[0] : null;
     },
     "db-exec": (db, sql, params = []) => {
       if (isSqliteConfig(db)) return sqliteExec(getSqlitePath(db), sql, params);
@@ -38011,18 +37505,10 @@ var MacroExpander = class {
         const macro = this.macros.get(op);
         const expandedArgs = sexpr.args.map((arg) => this.expand(arg));
         const bindings = /* @__PURE__ */ new Map();
-        const restIdx = macro.params.indexOf("$&rest");
-        const fixedParams = restIdx === -1 ? macro.params : macro.params.slice(0, restIdx);
-        for (let i = 0; i < fixedParams.length; i++) {
-          const paramName = fixedParams[i];
+        for (let i = 0; i < macro.params.length; i++) {
+          const paramName = macro.params[i];
           const key = paramName.startsWith("$") ? paramName : "$" + paramName;
           bindings.set(key, expandedArgs[i] ?? { kind: "literal", type: "null", value: null });
-        }
-        if (restIdx !== -1) {
-          const restArgs = expandedArgs.slice(fixedParams.length);
-          const restBlock = { kind: "block", type: "Array", fields: new Map([["items", restArgs]]) };
-          bindings.set("$&rest", restBlock);
-          if (macro.restName) bindings.set("$" + macro.restName, restBlock);
         }
         const hygieneMap = /* @__PURE__ */ new Map();
         const hygieneBody = this.renameLocals(macro.body, bindings, hygieneMap);
@@ -38085,34 +37571,10 @@ var MacroExpander = class {
     }
     if (template.kind === "sexpr") {
       const sexpr = template;
-      // splice 마커 처리 — (splice x) 는 x의 items를 부모 args에 펼침
-      if (sexpr.op === "splice") {
-        const spliceArg = this.substitute(sexpr.args[0], bindings);
-        if (spliceArg.kind === "block" && spliceArg.type === "Array") {
-          const items = spliceArg.fields.get("items") ?? [];
-          return { kind: "__splice__", items };
-        }
-        return { kind: "__splice__", items: [spliceArg] };
-      }
-      // args 치환 (splice 마커 펼치기 포함)
-      const newArgs = [];
-      for (const arg of sexpr.args) {
-        const sub = this.substitute(arg, bindings);
-        if (sub.kind === "__splice__") newArgs.push(...sub.items);
-        else newArgs.push(sub);
-      }
-      const opKey = "$" + sexpr.op;
-      if (bindings.has(opKey)) {
-        const opVal = bindings.get(opKey);
-        if (opVal.kind === "literal" && opVal.type === "symbol") {
-          return { ...sexpr, op: opVal.value, args: newArgs };
-        }
-        if (opVal.kind === "variable") {
-          return { ...sexpr, op: opVal.name.replace(/^\$/, ""), args: newArgs };
-        }
-        return { kind: "sexpr", op: "call", args: [opVal, ...newArgs] };
-      }
-      return { ...sexpr, args: newArgs };
+      return {
+        ...sexpr,
+        args: sexpr.args.map((arg) => this.substitute(arg, bindings))
+      };
     }
     if (template.kind === "block") {
       const block = template;
@@ -40279,15 +39741,6 @@ var Interpreter = class _Interpreter {
           const line = lit.line;
           throw new Error(`[E_UNRESOLVED_SYMBOL] '${bareName}' at line ${line || this.currentLine}, col 0 \u2014 set FL_STRICT=0 to silence`);
         }
-        // symbol\uc744 first-class \ud568\uc218 \uac12\uc73c\ub85c \uc0ac\uc6a9\ud560 \ub54c built-in \ubc18\ud658
-        // \uc608: (map inc arr), (swap! a + 1), (filter nil? xs)
-        if (this.context.functions.has(bareName)) {
-          return { kind: "builtin-fn", name: bareName };
-        }
-        const _litAlias = KNOWN_ALIASES[bareName] ?? KNOWN_ALIASES[bareName.replace(/-/g, "_")] ?? KNOWN_ALIASES[bareName.replace(/_/g, "-")];
-        const _litResolved = _litAlias?.correct ?? bareName;
-        const _litNative = FL_BUILTIN_FN_REFS[_litResolved] ?? FL_BUILTIN_FN_REFS[_litResolved.replace(/-/g, "_")];
-        if (_litNative) return _litNative;
       }
       return lit.value;
     }
@@ -40339,14 +39792,6 @@ var Interpreter = class _Interpreter {
       }
       if (this.context.functions.has(varName) || this.context.functions.has("$" + varName)) {
         return { kind: "builtin-fn", name: varName };
-      }
-      // built-in 연산자/함수를 first-class value로 사용 가능하게 함
-      // 예: (swap! a inc), (map inc arr), (swap! a append item)
-      {
-        const _alias = KNOWN_ALIASES[varName] ?? KNOWN_ALIASES[varName.replace(/-/g, "_")] ?? KNOWN_ALIASES[varName.replace(/_/g, "-")];
-        const _resolved = _alias?.correct ?? varName;
-        const _nativeFn = FL_BUILTIN_FN_REFS[_resolved] ?? FL_BUILTIN_FN_REFS[_resolved.replace(/-/g, "_")];
-        if (_nativeFn) return _nativeFn;
       }
       const scopeVars = this.context.variables.getAllVars();
       const similar = suggestSimilar(varName, scopeVars);
@@ -40427,7 +39872,7 @@ var Interpreter = class _Interpreter {
     return null;
   }
   evalSExpr(expr2) {
-    if (expr2.line !== void 0) { this.currentLine = expr2.line; this._callSiteLine = expr2.line; }
+    if (expr2.line !== void 0) this.currentLine = expr2.line;
     let op = expr2.op;
     if (typeof op !== "string") {
       op = op?.name ? op.name : String(op);
@@ -40459,10 +39904,6 @@ var Interpreter = class _Interpreter {
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr2);
     if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr2);
     if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr2);
-    if (this.context.macroExpander.has(op)) {
-      const expanded = this.context.macroExpander.expand(expr2);
-      return this.eval(expanded);
-    }
     if (op === "REFLECT") {
       const interp2 = this;
       const ev = (node) => interp2.eval(node);
@@ -40656,8 +40097,6 @@ var Interpreter = class _Interpreter {
       }
     }
     const args3 = expr2.args.map((arg) => this.eval(arg));
-    this._pendingCallLine = expr2.line ?? this.currentLine;
-    this._pendingCallFile = this.currentFilePath;
     if (args3.length >= 1 && typeof args3[0] === "string") {
       const qualifiedName = `${op}:${args3[0]}`;
       if (this.context.functions.has(qualifiedName)) {
@@ -40966,32 +40405,17 @@ var Interpreter = class _Interpreter {
     const macroName = nameNode.kind === "literal" ? String(nameNode.value) : nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? nameNode.name ?? "");
     const paramsNode = expr2.args[1];
     const params = [];
-    let restName = null;
-    let seenAmpersand = false;
     if (paramsNode.kind === "block" && paramsNode.type === "Array") {
       const items = paramsNode.fields.get("items");
       if (Array.isArray(items)) {
         for (const item of items) {
-          if (item.kind === "literal" && item.type === "symbol" && item.value === "&") {
-            seenAmpersand = true; continue;
-          }
-          if (item.kind === "variable" && item.name === "&") {
-            seenAmpersand = true; continue;
-          }
-          if (seenAmpersand) {
-            const rn = item.kind === "variable" ? item.name.replace(/^\$/, "") : String(item.value ?? item.name ?? "rest");
-            restName = rn;
-            params.push("$&rest");
-            break;
-          }
           if (item.kind === "variable") params.push(item.name.startsWith("$") ? item.name : "$" + item.name);
           else if (item.kind === "literal") params.push("$" + item.value);
         }
       }
     }
-    const body = expr2.args.length === 3 ? expr2.args[2] : { kind: "sexpr", op: "do", args: expr2.args.slice(2) };
-    const macroDef = { name: macroName, params, body, restName };
-    this.context.macroExpander.macros.set(macroName, macroDef);
+    const body = expr2.args[2];
+    this.context.macroExpander.define(macroName, params, body);
   }
   // Phase 5 Week 2: Register built-in type classes and instances
   // Phase 58: Type class 관련 로직 eval-type-classes.ts로 분리
@@ -42451,26 +41875,26 @@ var FLExecutor = class {
    */
   injectHTTPServerHelpers() {
     const ctx = this.interpreter.context;
-    ctx["server_json"] = (body, status = 200) => {
+    ctx["server_json"] = (body) => {
       return {
         __fl_response: true,
-        status: status,
+        status: 200,
         contentType: "application/json",
         body
       };
     };
-    ctx["server_html"] = (body, status = 200) => {
+    ctx["server_html"] = (body) => {
       return {
         __fl_response: true,
-        status: status,
+        status: 200,
         contentType: "text/html; charset=utf-8",
         body
       };
     };
-    ctx["server_text"] = (body, status = 200) => {
+    ctx["server_text"] = (body) => {
       return {
         __fl_response: true,
-        status: status,
+        status: 200,
         contentType: "text/plain",
         body
       };
@@ -43114,17 +42538,10 @@ init_eval_special_forms();
 init_stdlib_property();
 function formatCallStack(stack) {
   if (!stack || stack.length === 0) return "";
-  const path19 = require("path");
   const frames = stack.slice().reverse().slice(0, 10);
-  return "\n\x1B[2m\uCF5C \uC2A4\uD0DD:\x1B[0m\n" + frames.map((f, i) => {
-    const fn = f.name ?? f.fn ?? "?";
-    const callFile = f.file ? path19.basename(f.file) : null;
-    const defFile  = f.defFile ? path19.basename(f.defFile) : null;
-    const loc = callFile ? `\x1B[36m${callFile}:${f.line ?? "?"}\x1B[0m` : `line ${f.line ?? "?"}`;
-    const defHint = defFile && defFile !== callFile ? ` \x1B[2m[${defFile}\uC5D0\uC11C \uC815\uC758]\x1B[0m` : "";
-    const arrow = i === 0 ? "\x1B[31m\u2192\x1B[0m" : "\x1B[2m \x1B[0m";
-    return `  ${arrow} \x1B[1m${fn}\x1B[0m ${loc}${defHint}`;
-  }).join("\n");
+  return "\n\x1B[2m\uCF5C \uC2A4\uD0DD:\x1B[0m\n" + frames.map(
+    (f, i) => `  \x1B[2m${i === 0 ? "\u2192" : " "} ${f.name ?? f.fn ?? "?"} (line ${f.line})\x1B[0m`
+  ).join("\n");
 }
 function mapJsError(msg) {
   if (msg.includes("Cannot read properties of null") || msg.includes("Cannot read properties of undefined")) {
