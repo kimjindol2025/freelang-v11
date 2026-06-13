@@ -31296,7 +31296,7 @@ function loop() {
     try { resp = handle(JSON.parse(reqStr)); }
     catch(e) { resp = { ok: false, error: e.message }; }
     const respStr = JSON.stringify(resp);
-    data.writeInt32LE(respStr.length, 0);
+    data.writeInt32LE(Buffer.byteLength(respStr, 'utf8'), 0);
     data.write(respStr, 4, 'utf8');
     Atomics.store(control, 0, 2);
     Atomics.notify(control, 0);
@@ -31328,8 +31328,9 @@ function poolCall(req) {
   const control = new Int32Array(controlBuf);
   const data = Buffer.from(dataBuf);
   const reqStr = JSON.stringify(req);
-  if (reqStr.length + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
-  data.writeInt32LE(reqStr.length, 0);
+  const reqBytes = Buffer.byteLength(reqStr, "utf8");
+  if (reqBytes + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
+  data.writeInt32LE(reqBytes, 0);
   data.write(reqStr, 4, "utf8");
   Atomics.store(control, 0, 1);
   Atomics.notify(control, 0);
