@@ -1288,20 +1288,128 @@
       (str $acc "    return " $c ";\n")
       (cgc-defn-stmts $args (+ $i 1) (str $acc "    (void)(" $c ");\n"))))))
 
+;; ── defn 직접재귀 TCO (goto 루프) ────────────────────────────────
+;; recur 감지
+(defn cgc-node-has-recur [$node]
+  (if (null? $node) false
+  (if (not (= (get $node :kind) "sexpr")) false
+  (let [[$op (get $node :op)] [$args (get $node :args)]]
+  (if (= $op "recur") true
+  (cgc-any-has-recur $args 0))))))
+
+(defn cgc-any-has-recur [$args $i]
+  (if (>= $i (length $args)) false
+  (if (cgc-node-has-recur (get $args $i)) true
+  (cgc-any-has-recur $args (+ $i 1)))))
+
+;; (recur a b) → goto 버전: ({ t0=a; t1=b; p0=t0; p1=t1; goto __tco; fl_nil(); })
+(defn cgc-recur-goto-stmt [$args $vars $label]
+  (let [[$temps (cgc-recur-temps $args 0 "")]
+        [$assigns (cgc-recur-assigns $vars 0 "")]]
+    (str "(__extension__ ({\n"
+         $temps $assigns
+         "    goto " $label "; fl_nil();\n}))")))
+
+;; cgc-with-recur의 goto 버전 (recur → goto 대체)
+(defn cgc-with-recur-goto [$node $vars $label]
+  (if (null? $node) "fl_nil()"
+  (let [[$k (get $node :kind)]]
+  (cond
+    [(= $k "sexpr")
+     (let [[$op (get $node :op)] [$args (get $node :args)]]
+     (cond
+       [(= $op "recur") (cgc-recur-goto-stmt $args $vars $label)]
+       [(= $op "if")    (cgc-if-wr-goto $args $vars $label)]
+       [(= $op "cond")  (cgc-cond-wr-goto $args $vars $label)]
+       [(= $op "do")    (cgc-do-wr-goto $args $vars $label)]
+       [(= $op "let")   (cgc-let-wr-goto $args $vars $label)]
+       [(= $op "loop")  (cgc-loop $args)]
+       [true            (cgc $node)]))]
+    [true (cgc $node)]))))
+
+(defn cgc-if-wr-goto [$args $vars $label]
+  (let [[$cond (cgc (get $args 0))]
+        [$then (cgc-with-recur-goto (get $args 1) $vars $label)]
+        [$else (if (>= (length $args) 3)
+                  (cgc-with-recur-goto (get $args 2) $vars $label)
+                  "fl_nil()")]]
+  (str "(fl_truthy(" $cond ") ? " $then " : " $else ")")))
+
+(defn cgc-cond-wr-goto [$args $vars $label]
+  (if (= (length $args) 0) "fl_nil()"
+  (let [[$first (get $args 0)]
+        [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]]
+    (if $nested
+      (cgc-cond-nested-wr-goto $args $vars $label (- (length $args) 1) "fl_nil()")
+      "fl_nil()"))))
+
+(defn cgc-cond-nested-wr-goto [$args $vars $label $i $acc]
+  (if (< $i 0) $acc
+  (let [[$items (get-block-items (get $args $i))]
+        [$test (get $items 0)]
+        [$body (get $items 1)]
+        [$is-else (and (= (get $test :kind) "literal")
+                       (or (= (get $test :value) true) (= (get $test :value) "true")))]]
+    (cgc-cond-nested-wr-goto $args $vars $label (- $i 1)
+      (if $is-else
+        (cgc-with-recur-goto $body $vars $label)
+        (str "(fl_truthy(" (cgc $test) ") ? "
+             (cgc-with-recur-goto $body $vars $label) " : " $acc ")"))))))
+
+(defn cgc-do-wr-goto [$args $vars $label]
+  (str "(__extension__ ({ " (cgc-stmts-wr-goto $args $vars $label 0 "") " }))"))
+(defn cgc-stmts-wr-goto [$args $vars $label $i $acc]
+  (if (>= $i (length $args)) $acc
+  (cgc-stmts-wr-goto $args $vars $label (+ $i 1)
+    (str $acc (cgc-with-recur-goto (get $args $i) $vars $label) "; "))))
+
+(defn cgc-let-wr-goto [$args $vars $label]
+  (let [[$items (get-block-items (get $args 0))]
+        [$first (get $items 0)]
+        [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]
+        [$decls (if $nested (cgc-let-2d $items 0 "") (cgc-let-1d $items 0 ""))]
+        [$body-c (cgc-body-wr-goto (slice $args 1 (length $args)) $vars $label 0 "")]]
+  (str "((__extension__ ({\n" $decls "    " $body-c ";\n})))")))
+
+(defn cgc-body-wr-goto [$args $vars $label $i $acc]
+  (if (>= $i (length $args)) $acc
+  (let [[$last (= $i (- (length $args) 1))]
+        [$c (cgc-with-recur-goto (get $args $i) $vars $label)]]
+    (if $last $c
+    (cgc-body-wr-goto $args $vars $label (+ $i 1) (str $acc $c ";\n    "))))))
+
+;; defn TCO body: 중간 식은 (void), 마지막만 return (recur는 goto)
+(defn cgc-defn-stmts-tco [$args $vars $label $i $acc]
+  (if (>= $i (length $args)) $acc
+  (let [[$last (= $i (- (length $args) 1))]
+        [$c (cgc-with-recur-goto (get $args $i) $vars $label)]]
+    (if $last
+      (str $acc "    return " $c ";\n")
+      (cgc-defn-stmts-tco $args $vars $label (+ $i 1) (str $acc "    (void)(" $c ");\n"))))))
+
 (defn cgc-defn [$args]
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$param-items (get-block-items (get $args 1))]
         [$ps (cgc-params $param-items)]
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
     (reset! outer-params-atom $pnames)
-    (let [[$call-args (cgc-wrapper-call-args $param-items 0 "")]]
+    (let [[$call-args (cgc-wrapper-call-args $param-items 0 "")]
+          [$has-recur (cgc-any-has-recur $args 2)]]
       (swap! wrapper-defs-atom append
         (str "static FLValue __fl_wrap_" $name
              "(FLClosure* _s, int _ac, FLValue* argv) {\n"
              "    (void)_s; (void)_ac;\n"
              "    return " $name "(" $call-args ");\n}"))
-      (let [[$stmts (cgc-defn-stmts $args 2 "")]]
-        (str "FLValue " $name "(" $ps ") {\n" $stmts "}"))))))
+      (if $has-recur
+        ;; TCO 경로: goto 루프로 직접재귀 제거
+        (let [[$label (str "__fl_tco_" $name)]
+              [$stmts (cgc-defn-stmts-tco $args $pnames $label 2 "")]]
+          (str "FLValue " $name "(" $ps ") {\n"
+               "    " $label ":;\n"
+               $stmts "}"))
+        ;; 일반 경로
+        (let [[$stmts (cgc-defn-stmts $args 2 "")]]
+          (str "FLValue " $name "(" $ps ") {\n" $stmts "}"))))))
 
 ;; ── define (전역 변수) ──
 
