@@ -1151,7 +1151,7 @@
                         [true             (str (c-name $op) "(" $deref
                                           (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
                       )]]
-            (str "fl_atom_reset(" $atom-c ", " $rhs ")"))))))))
+            (str "fl_atom_reset(" $atom-c ", " $rhs ")")))))))
 
 (defn cgc-dispatch-fallback [$op $args]
   (cond
