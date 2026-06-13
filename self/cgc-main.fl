@@ -1102,6 +1102,24 @@
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
+  ;; 매크로: when / unless → (if cond (do ...) nil)
+  [(= $op "when")
+   (let [$cond-c (cgc (get $args 0))
+         $body   (slice $args 1 (length $args))
+         $body-c (if (= (length $body) 1)
+                   (cgc (get $body 0))
+                   (cgc-do $body))]
+     (str "(fl_truthy(" $cond-c ") ? " $body-c " : fl_nil())"))]
+  [(= $op "unless")
+   (let [$cond-c (cgc (get $args 0))
+         $body   (slice $args 1 (length $args))
+         $body-c (if (= (length $body) 1)
+                   (cgc (get $body 0))
+                   (cgc-do $body))]
+     (str "(!fl_truthy(" $cond-c ") ? " $body-c " : fl_nil())"))]
+  ;; for-each: 부작용 전용 반복, nil 반환
+  [(= $op "for-each")
+   (str "(fl_for_each(" (cgc (get $args 0)) ", " (cgc (get $args 1)) "), fl_nil())")]
   ;; 예외 처리
   [(= $op "throw") (str "(fl_throw(" (cgc (get $args 0)) "), fl_nil())")]
   ;; N-09: 암호화 / JWT / 비밀번호
