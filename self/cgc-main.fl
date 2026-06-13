@@ -896,6 +896,8 @@
   [(= $op "deref")         (str "fl_atom_deref(" (cgc (get $args 0)) ")")]
   [(= $op "reset!")        (str "fl_atom_reset(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "swap!")         (cgc-swap! $args)]
+  ;; num: c-reserved? 목록에 있어 fl_num으로 잘못 변환되는 버그 수정
+  [(= $op "num")           (str "num(" (cgc (get $args 0)) ")")]
   ;; S26: stdlib 매핑
   [(= $op "includes-item")  (str "fl_includes_item(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-includes")    (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -1115,19 +1117,23 @@
   (let [[$atom-c  (cgc (get $args 0))]
         [$fn-node (get $args 1)]
         [$extra   (slice $args 2 (length $args))]]
-    (let [[$deref (str "fl_atom_deref(" $atom-c ")")]
-          [$op    (get $fn-node :value)]
-          [$ec    (cgc-args $extra)]]
-      (let [[$rhs (cond
-                    [(= $op "+")    (str "fl_add(" $deref ", " $ec ")")]
-                    [(= $op "-")    (str "fl_sub(" $deref ", " $ec ")")]
-                    [(= $op "*")    (str "fl_mul(" $deref ", " $ec ")")]
-                    [(= $op "push")   (str "fl_vec_push(" $deref ", " $ec ")")]
-                    [(= $op "append") (str "fl_vec_push(" $deref ", " $ec ")")]
-                    [true             (str (c-name $op) "(" $deref
-                                      (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
-                  )]]
-        (str "fl_atom_reset(" $atom-c ", " $rhs ")")))))
+    ;; fn 람다(클로저)가 전달된 경우 → swap_bang(atom, closure) 직접 호출
+    (let [[$is-lambda (and (= (get $fn-node :kind) "sexpr") (= (get $fn-node :op) "fn"))]]
+      (if $is-lambda
+        (str "swap_bang(" $atom-c ", " (cgc $fn-node) ")")
+        (let [[$deref (str "fl_atom_deref(" $atom-c ")")]
+              [$op    (get $fn-node :value)]
+              [$ec    (cgc-args $extra)]]
+          (let [[$rhs (cond
+                        [(= $op "+")      (str "fl_add(" $deref ", " $ec ")")]
+                        [(= $op "-")      (str "fl_sub(" $deref ", " $ec ")")]
+                        [(= $op "*")      (str "fl_mul(" $deref ", " $ec ")")]
+                        [(= $op "push")   (str "fl_vec_push(" $deref ", " $ec ")")]
+                        [(= $op "append") (str "fl_vec_push(" $deref ", " $ec ")")]
+                        [true             (str (c-name $op) "(" $deref
+                                          (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
+                      )]]
+            (str "fl_atom_reset(" $atom-c ", " $rhs ")"))))))))
 
 (defn cgc-dispatch-fallback [$op $args]
   (cond
@@ -1494,10 +1500,11 @@
   (if (= (length $args) 1) (cgc (get $args 0))
   (cgc-and-fold $args 1 (cgc (get $args 0))))))
 
+;; 단락평가(short-circuit): 첫 번째 인자가 falsy면 두 번째 평가 안 함
 (defn cgc-and-fold [$args $i $acc]
   (if (>= $i (length $args)) $acc
   (cgc-and-fold $args (+ $i 1)
-    (str "fl_and(" $acc ", " (cgc (get $args $i)) ")"))))
+    (str "(fl_truthy(" $acc ") ? " (cgc (get $args $i)) " : fl_bool(false))"))))
 
 (defn cgc-or [$args]
   (if (= (length $args) 0) "fl_bool(false)"
