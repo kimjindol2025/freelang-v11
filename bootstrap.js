@@ -2852,8 +2852,7 @@ var init_error_formatter = __esm({
       "obj_pick": { correct: "get", usage: '(get map "key")' },
       "dict": { correct: "map-set", usage: '(map-set {} "key" value)' },
       // 문자열
-      "str_length": { correct: "length", usage: '(length "hello")' },
-      "string_length": { correct: "length", usage: '(length "hello")' },
+      "string_length": { correct: "str-length", usage: '(str-length "hello")' },
       "str_concat": { correct: "str", usage: '(str "a" "b" "c")' },
       "str_to_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
       "parse_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
@@ -18435,6 +18434,8 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "str-to-lower":
     case "str-lower":
       return typeof args3[0] === "string" ? args3[0].toLowerCase() : args3[0] ?? "";
+    case "str-length":
+      return typeof args3[0] === "string" ? args3[0].length : 0;
     case "str-trim":
       return typeof args3[0] === "string" ? args3[0].trim() : args3[0] === null || args3[0] === void 0 ? null : "";
     case "str-trim-left":
