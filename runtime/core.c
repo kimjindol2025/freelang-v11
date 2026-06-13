@@ -284,13 +284,13 @@ FLValue fl_str_n(int count, ...) {
     if (count == 0) return fl_str_val("");
     va_list ap;
     va_start(ap, count);
-    char bufs[8][64];
+    char bufs[count][64];
     const char* parts[count];
     size_t lens[count];
     size_t total = 0;
     for (int i = 0; i < count; i++) {
         FLValue v = va_arg(ap, FLValue);
-        parts[i] = fl_display(v, bufs[i < 8 ? i : 0], 64);
+        parts[i] = fl_display(v, bufs[i], 64);
         lens[i] = strlen(parts[i]);
         total += lens[i];
     }

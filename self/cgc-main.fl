@@ -479,8 +479,8 @@
                  (get $op-node :value)
                  (if (= (get $op-node :kind) "variable")
                    (str "$" (get $op-node :name))
-                   "unknown"))]
-          [$rest (slice $args 1 (length $args))]]
+                   "__apply__"))]
+          [$rest (if (= $op "__apply__") $args (slice $args 1 (length $args)))]]
       (cond
         [(= $op "try")
          ;; try-catch-finally: (try body (catch param body) (finally body))
@@ -835,6 +835,9 @@
   (let [[$op (get $n :op)] [$args (get $n :args)]]
   (if (not (string? $op))
     (cgc-fncall (cgc $op) $args)
+  (if (= $op "__apply__")
+    ;; ((complex-expr) args...) — op-node at args[0], actual args at [1..]
+    (cgc-fncall (cgc (get $args 0)) (slice $args 1 (length $args)))
   (if (and (> (length $op) 0) (= (char-at $op 0) "$"))
     ;; $var 동적 호출 → fl_fn_call (FLValue 함수 객체 호출)
     (let [[$cn (c-name (substring $op 1 (length $op)))]]
@@ -842,7 +845,7 @@
                     (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
                     $cn)
                   $args))
-    (cgc-dispatch $op $args)))))
+    (cgc-dispatch $op $args))))))
 
 (defn cgc-dispatch [$op $args]
   (cond
