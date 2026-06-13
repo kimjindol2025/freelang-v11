@@ -1211,6 +1211,8 @@
         [$caps (cgc-fn-caps-filter $all-vars $param-names $outer 0 [])]
         [$nenv (length $caps)]
         [$env-decls (cgc-fn-env-decls $caps 0 "")]
+        ;; fn 파라미터를 scope에 등록 — body 컴파일 전에 경고 억제
+        [$_ (map (fn [$p] (swap! known-fncall-targets-atom append $p)) $param-names)]
         [$body-c (cgc $body-node)]
         [$decls (cgc-fn-argv-decls $param-items 0 "")]
         [$fn-name (str "__fl_anon_" $id)]]

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// .env 자동 로드 (cwd 기준)
+;(function(){const fs=require('fs'),p=require('path'),f=p.join(process.cwd(),'.env');if(fs.existsSync(f)){fs.readFileSync(f,'utf8').split('\n').forEach(l=>{const i=l.indexOf('=');if(i>0&&!l.startsWith('#')){const k=l.slice(0,i).trim(),v=l.slice(i+1).trim();if(k&&process.env[k]===undefined)process.env[k]=v;}});}})();
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -15018,7 +15020,7 @@ function flExecOpNative(op, vals) {
     case "length":
       return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
     case "get": {
-      if ((v0 === null || v0 === void 0) && process.env.FL_STRICT === "1") {
+      if (v0 === null || v0 === void 0) {
         throw new FLRuntimeError(
           ErrorCodes.TYPE_NIL,
           `(get nil ${typeof v1 === "string" ? '"' + v1 + '"' : String(v1)}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
@@ -18040,7 +18042,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return def;
     }
     case "get": {
-      if ((args3[0] === null || args3[0] === void 0) && process.env.FL_STRICT === "1") {
+      if (args3[0] === null || args3[0] === void 0) {
         throw new FLRuntimeError(
           ErrorCodes.TYPE_NIL,
           `(get nil ${typeof args3[1] === "string" ? '"' + args3[1] + '"' : String(args3[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
