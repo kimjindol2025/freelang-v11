@@ -703,6 +703,8 @@
     [(= (get $n :kind) "block")     (cgc-block $n)]
     [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
     [(= (get $n :kind) "or")        (cgc-or (get $n :args))]
+    [(= (get $n :kind) "try")       (cgc-try $n)]
+    [(= (get $n :kind) "throw")     (str "(fl_throw(" (cgc (get $n :expr)) "), fl_nil())")]
     [true
      (do (println (str "[CGC-ERR] unsupported IR kind=" (get $n :kind) " line=" (get $n :line)))
          "fl_nil()")]))
@@ -763,6 +765,39 @@
     [(= (get $node :kind) "variable") (c-name (get $node :name))]
     [(= (get $node :kind) "literal")  (c-name (str (get $node :value)))]
     [true "_anon"]))
+
+;; ── try/catch 코드젠 ──
+
+(defn cgc-try [$n]
+  (let [[$id @lambda-id-atom]
+        [$body-node (get $n :body)]
+        [$catch-node (get $n :catch)]
+        [$body-c (if (null? $body-node) "fl_nil()" (cgc $body-node))]
+        [$catch-args (if (null? $catch-node) (list) (get $catch-node :args))]
+        [$param-c (if (> (length $catch-args) 0)
+                    (cgc-extract-name (get $catch-args 0))
+                    "_fl_err")]
+        [$catch-body-c (if (> (length $catch-args) 1)
+                         (cgc (get $catch-args 1))
+                         "fl_nil()")]]
+    (swap! lambda-id-atom + 1)
+    (str "(__extension__ ({\n"
+         "    FLValue _fl_try_" $id ";\n"
+         "    if (fl_try_top < FL_TRY_MAX) {\n"
+         "        FLTryFrame* _fl_frame_" $id " = &fl_try_stack[fl_try_top++];\n"
+         "        if (setjmp(_fl_frame_" $id "->buf) == 0) {\n"
+         "            _fl_try_" $id " = " $body-c ";\n"
+         "            fl_try_top--;\n"
+         "        } else {\n"
+         "            fl_try_top--;\n"
+         "            FLValue " $param-c " __attribute__((unused)) = _fl_frame_" $id "->err;\n"
+         "            _fl_try_" $id " = " $catch-body-c ";\n"
+         "        }\n"
+         "    } else {\n"
+         "        _fl_try_" $id " = " $body-c ";\n"
+         "    }\n"
+         "    _fl_try_" $id ";\n"
+         "}))")))
 
 ;; ── sexpr ──
 
@@ -1018,6 +1053,8 @@
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
+  ;; 예외 처리
+  [(= $op "throw") (str "(fl_throw(" (cgc (get $args 0)) "), fl_nil())")]
   ;; N-09: 암호화 / JWT / 비밀번호
   [(= $op "auth-jwt-sign")       (str "fl_jwt_sign(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "auth-jwt-verify")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -1593,7 +1630,7 @@
 ;; ── IR Validator (S34-d) ────────────────────────────────────────────────────
 ;; shape 계약 gate: parse 직후, codegen 전에 실행
 
-(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or"])
+(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or" "try" "throw"])
 (define ir-lit-types ["number" "string" "boolean" "nil" "symbol"])
 
 (defn ir-err [$msg $n]

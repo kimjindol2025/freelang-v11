@@ -192,6 +192,8 @@ FLValue fl_concat(FLValue a, FLValue b);
 
 /* ── S27: FL 소스 → AST (cgc-bridge.c + parser.c에서 제공) ── */
 FLValue fl_parse(FLValue src);
+FLValue fl_map_p(FLValue v);
+FLValue fl_str_starts_with(FLValue str, FLValue prefix);
 
 /* ── JSON ── */
 FLValue fl_json_parse(FLValue src);
