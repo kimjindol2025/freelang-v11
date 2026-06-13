@@ -247,4 +247,17 @@ extern int fl_try_top;
 void fl_throw(FLValue err);
 FLValue fl_make_error(const char* type, const char* msg);
 
+/* ── 연산자 first-class 래퍼 (HOF 인자로 사용 가능, e.g. (map + list)) ── */
+static inline FLValue __fl_op_add_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_add(a[0], a[1]); }
+static inline FLValue __fl_op_sub_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_sub(a[0], a[1]); }
+static inline FLValue __fl_op_mul_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_mul(a[0], a[1]); }
+static inline FLValue __fl_op_div_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_div(a[0], a[1]); }
+static inline FLValue __fl_op_mod_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_mod(a[0], a[1]); }
+static inline FLValue __fl_op_eq_w (FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_eq (a[0], a[1]); }
+static inline FLValue __fl_op_neq_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_neq(a[0], a[1]); }
+static inline FLValue __fl_op_lt_w (FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_lt (a[0], a[1]); }
+static inline FLValue __fl_op_gt_w (FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_gt (a[0], a[1]); }
+static inline FLValue __fl_op_lte_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_lte(a[0], a[1]); }
+static inline FLValue __fl_op_gte_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_gte(a[0], a[1]); }
+
 #endif /* FREELANG_RUNTIME_H */

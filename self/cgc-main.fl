@@ -711,6 +711,22 @@
 
 ;; ── 리터럴 ──
 
+;; 연산자 심볼 → first-class 함수 래퍼 (HOF 인자: (map + list), (reduce + list 0) 등)
+(defn cgc-op-wrapper [$sym]
+  (cond
+    [(= $sym "+")  "fl_fn_new(__fl_op_add_w, 0, NULL)"]
+    [(= $sym "-")  "fl_fn_new(__fl_op_sub_w, 0, NULL)"]
+    [(= $sym "*")  "fl_fn_new(__fl_op_mul_w, 0, NULL)"]
+    [(= $sym "/")  "fl_fn_new(__fl_op_div_w, 0, NULL)"]
+    [(= $sym "%")  "fl_fn_new(__fl_op_mod_w, 0, NULL)"]
+    [(= $sym "=")  "fl_fn_new(__fl_op_eq_w, 0, NULL)"]
+    [(= $sym "!=") "fl_fn_new(__fl_op_neq_w, 0, NULL)"]
+    [(= $sym "<")  "fl_fn_new(__fl_op_lt_w, 0, NULL)"]
+    [(= $sym ">")  "fl_fn_new(__fl_op_gt_w, 0, NULL)"]
+    [(= $sym "<=") "fl_fn_new(__fl_op_lte_w, 0, NULL)"]
+    [(= $sym ">=") "fl_fn_new(__fl_op_gte_w, 0, NULL)"]
+    [true null]))
+
 (defn cgc-literal [$n]
   (let [[$t (get $n :type)] [$v (get $n :value)]]
   (cond
@@ -722,10 +738,13 @@
                         [(= $v "true")  "fl_bool(true)"]
                         [(= $v "false") "fl_bool(false)"]
                         [(or (= $v "nil") (= $v "null")) "fl_nil()"]
-                        [true (let [[$cn (c-name $v)]]
-                                (if (includes-item @known-defns-atom $cn)
-                                  (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
-                                  $cn))])]
+                        [true (let [[$opw (cgc-op-wrapper $v)]]
+                                (if (not (null? $opw))
+                                  $opw
+                                  (let [[$cn (c-name $v)]]
+                                    (if (includes-item @known-defns-atom $cn)
+                                      (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+                                      $cn))))])]
     [true
      (do (println (str "[CGC-ERR] unsupported literal type=" (get $n :type) " line=" (get $n :line)))
          "fl_nil()")])))
@@ -814,9 +833,16 @@
 
 (defn cgc-sexpr [$n]
   (let [[$op (get $n :op)] [$args (get $n :args)]]
-  (if (string? $op)
-    (cgc-dispatch $op $args)
-    (cgc-fncall (cgc $op) $args))))
+  (if (not (string? $op))
+    (cgc-fncall (cgc $op) $args)
+  (if (and (> (length $op) 0) (= (char-at $op 0) "$"))
+    ;; $var 동적 호출 → fl_fn_call (FLValue 함수 객체 호출)
+    (let [[$cn (c-name (substring $op 1 (length $op)))]]
+      (cgc-fncall (if (includes-item @known-defns-atom $cn)
+                    (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+                    $cn)
+                  $args))
+    (cgc-dispatch $op $args)))))
 
 (defn cgc-dispatch [$op $args]
   (cond
