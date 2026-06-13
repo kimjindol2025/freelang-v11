@@ -665,7 +665,13 @@
                   "char" "float" "double" "struct" "union" "enum"
                   "static" "const" "if" "switch" "case" "break"
                   "continue" "default" "goto" "sizeof" "auto" "inline"
-                  "bool" "true" "false"] $s))
+                  "bool" "true" "false"
+                  ;; runtime.h 함수명 충돌 방지 (static FLValue NAME 선언 시 충돌)
+                  "inc" "dec" "get" "length" "keys" "vals" "first" "last"
+                  "rest" "nth" "count" "sort" "reverse" "range" "merge"
+                  "flatten" "some" "every" "drop" "take" "zip" "trim"
+                  "join" "split" "num" "atom" "deref" "identity"
+                  "not" "and" "or" "type" "new" "delete" "update"] $s))
 
 (defn c-name [$n]
   ;; FL 식별자를 C 식별자로 변환 (-> → _to_ / - → _ / ? → _p / ! → _b)
@@ -1148,7 +1154,15 @@
      (let [[$n (c-name (get $node :name))]]
        (if (includes-item $acc $n) $acc (push $acc $n)))]
     [(= (get $node :kind) "sexpr")
-     (cgc-collect-vars-loop (get $node :args) 0 $acc)]
+     ;; :op 위치의 $var도 수집 (e.g. ($f ($g $x)) 에서 f, g 캡처)
+     (let [[$op (get $node :op)]
+           [$acc2 (if (and (string? $op)
+                           (> (length $op) 1)
+                           (= (char-at $op 0) "$"))
+                    (let [[$vn (c-name (substring $op 1 (length $op)))]]
+                      (if (includes-item $acc $vn) $acc (push $acc $vn)))
+                    $acc)]]
+       (cgc-collect-vars-loop (get $node :args) 0 $acc2))]
     [(= (get $node :kind) "block")
      (cgc-collect-vars-loop (get-block-items $node) 0 $acc)]
     [(= (get $node :kind) "and")
