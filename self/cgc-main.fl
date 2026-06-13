@@ -1217,6 +1217,8 @@
 
 (defn cgc-fn [$args]
   (let [[$id @lambda-id-atom]
+        ;; 중첩 fn이 같은 id를 가져가지 않도록 body 컴파일 전에 먼저 증가
+        [$id-bump (swap! lambda-id-atom + 1)]
         [$param-items (get-block-items (get $args 0))]
         [$param-names (cgc-fn-param-names $param-items 0 [])]
         [$body-node (get $args 1)]
@@ -1230,7 +1232,6 @@
         [$body-c (cgc $body-node)]
         [$decls (cgc-fn-argv-decls $param-items 0 "")]
         [$fn-name (str "__fl_anon_" $id)]]
-    (swap! lambda-id-atom + 1)
     (swap! lambda-defs-atom append
       (str "static FLValue " $fn-name
            "(FLClosure* _self, int _argc, FLValue* argv) {\n"
