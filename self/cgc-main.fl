@@ -325,8 +325,8 @@
 (defn make-throw [expr line]
   {:kind "throw" :expr expr :line line})
 
-(defn make-template-string [parts expressions line]
-  {:kind "template-string" :parts parts :expressions expressions :line line})
+(defn make-template-string [value expressions line]
+  {:kind "template-string" :value value :parts (list) :expressions expressions :line line})
 
 (defn make-loop [init condition update body line]
   {:kind "loop" :init init :condition condition :update update :body body :line line})
@@ -434,7 +434,7 @@
     [(= $k "Number")
      (r-pair (p-advance $p) (make-literal "number" $v $line))]
     [(= $k "String")
-     (if (string-contains? $v (str "$" "{"))
+     (if (or (string-contains? $v (str "$" "{")) (string-contains? $v (str "#" "{")))
        (r-pair (p-advance $p) (make-template-string $v (list) $line))
        (r-pair (p-advance $p) (make-literal "string" $v $line)))]
     [(= $k "Symbol")
@@ -695,7 +695,8 @@
     [(null? $n) "fl_nil()"]
     ;; raw-c: threading macro에서 C 코드 문자열을 AST 노드처럼 취급
     [(= (get $n :kind) "raw-c") (get $n "code")]
-    [(= (get $n :kind) "literal")   (cgc-literal $n)]
+    [(= (get $n :kind) "literal")          (cgc-literal $n)]
+    [(= (get $n :kind) "template-string") (cgc-template-string $n)]
     [(= (get $n :kind) "variable")
       (let [[$name (get $n :name)]
             [$cn   (c-name $name)]
@@ -742,6 +743,34 @@
     [(= $sym "<=") "fl_fn_new(__fl_op_lte_w, 0, NULL)"]
     [(= $sym ">=") "fl_fn_new(__fl_op_gte_w, 0, NULL)"]
     [true null]))
+
+;; ── 문자열 보간 (${var} 및 #{var} 지원) ──────────────────────────
+(defn template-to-parts [$s $prefix $acc]
+  (let [[$idx (str-index-of $s $prefix)]]
+    (if (= $idx -1)
+      (if (> (length $s) 0)
+        (push $acc (str "fl_str_val(\"" (c-esc $s) "\")"))
+        $acc)
+      (let [[$before   (substring $s 0 $idx)]
+            [$rest     (substring $s (+ $idx 2) (length $s))]
+            [$close    (str-index-of $rest "}")]
+            [$varname  (str-trim (substring $rest 0 $close))]
+            [$after    (substring $rest (+ $close 1) (length $rest))]
+            [$with-txt (if (> (length $before) 0)
+                         (push $acc (str "fl_str_val(\"" (c-esc $before) "\")"))
+                         $acc)]
+            [$with-var (push $with-txt (c-name $varname))]]
+        (template-to-parts $after $prefix $with-var)))))
+
+(defn cgc-template-string [$n]
+  (let [[$v (get $n :value)]
+        [$prefix (if (string-contains? $v (str "$" "{")) (str "$" "{") (str "#" "{"))]
+        [$parts  (template-to-parts $v $prefix (list))]]
+    (if (= (length $parts) 0)
+      "fl_str_val(\"\")"
+      (if (= (length $parts) 1)
+        (get $parts 0)
+        (str "fl_str_n(" (length $parts) ", " (str-join ", " $parts) ")")))))
 
 (defn cgc-literal [$n]
   (let [[$t (get $n :type)] [$v (get $n :value)]]
@@ -895,7 +924,7 @@
   [(= $op "while")  (cgc-while $args)]
   ;; S26: atom / deref / swap! / reset!
   [(= $op "atom")          (str "fl_atom_new(" (cgc (get $args 0)) ")")]
-  [(= $op "deref")         (str "fl_atom_deref(" (cgc (get $args 0)) ")")]
+  [(= $op "deref")         (str "fl_deref(" (cgc (get $args 0)) ")")]
   [(= $op "reset!")        (str "fl_atom_reset(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "swap!")         (cgc-swap! $args)]
   ;; num: c-reserved? 목록에 있어 fl_num으로 잘못 변환되는 버그 수정
@@ -1006,9 +1035,16 @@
   [(= $op "math-sqrt")   (str "fl_math_sqrt(" (cgc (get $args 0)) ")")]
   [(= $op "now")         "fl_now()"]
   [(= $op "now-ms")      "fl_now_ms()"]
-  [(= $op "str-join")    (str "join(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "str-replace") (str "str_replace(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "substring")   (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-join")    (str "join(" (cgc (get $args 1)) ", " (cgc (get $args 0)) ")")]
+  [(= $op "str-replace")     (str "str_replace(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-replace-re")  (str "str_replace_re(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-replace-all-re") (str "str_replace_all_re(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-match")      (str "str_match(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-match-all")  (str "str_match_all(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-test")       (str "str_test(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "future")         (str "fl_future(" (cgc (get $args 0)) ")")]
+  [(= $op "future-done?")   (str "fl_future_done(" (cgc (get $args 0)) ")")]
+  [(= $op "substring")      (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "trim")        (str "trim(" (cgc (get $args 0)) ")")]
   [(= $op "slice")       (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   ;; S16: list vararg → fl_vec_from, _fl-map-set alias
