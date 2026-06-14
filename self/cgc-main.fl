@@ -693,6 +693,8 @@
 (defn cgc [$n]
   (cond
     [(null? $n) "fl_nil()"]
+    ;; raw-c: threading macro에서 C 코드 문자열을 AST 노드처럼 취급
+    [(= (get $n :kind) "raw-c") (get $n "code")]
     [(= (get $n :kind) "literal")   (cgc-literal $n)]
     [(= (get $n :kind) "variable")
       (let [[$name (get $n :name)]
@@ -1129,6 +1131,10 @@
   [(= $op "auth-jwt-decode")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", fl_str_val(\"\"))")]
   [(= $op "auth-hash-password")  (str "fl_hash_password(" (cgc (get $args 0)) ")")]
   [(= $op "auth-verify-password")(str "fl_verify_password(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  ;; -> threading macro: (-> x f1 (f2 a) f3) → (f3 (f2 (f1 x) a))
+  [(= $op "->")   (cgc-thread-first $args)]
+  ;; ->> last-thread: (->> x f1 (f2 a)) → (f2 a (f1 x))
+  [(= $op "->>")  (cgc-thread-last $args)]
   [true             (cgc-dispatch-fallback $op $args)]))
 
 (defn cgc-swap! [$args]
@@ -1301,8 +1307,10 @@
   (let [[$first (get $args 0)]
         [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]]
     (if $nested
+      ;; [] 배열 방식: (cond [test1 val1] [test2 val2])
       (cgc-cond-nested $args (- (length $args) 1) "fl_nil()")
-      "fl_nil()"))))
+      ;; flat pair 방식: (cond test1 val1 test2 val2 ...)
+      (cgc-cond-flat $args (- (length $args) 2) "fl_nil()")))))
 
 (defn cgc-cond-nested [$args $i $acc]
   (if (< $i 0) $acc
@@ -1312,6 +1320,17 @@
         [$is-else (and (= (get $test :kind) "literal")
                        (or (= (get $test :value) true) (= (get $test :value) "true")))]]
     (cgc-cond-nested $args (- $i 1)
+      (if $is-else
+        (cgc $body)
+        (str "(fl_truthy(" (cgc $test) ") ? " (cgc $body) " : " $acc ")"))))))
+
+(defn cgc-cond-flat [$args $i $acc]
+  (if (< $i 0) $acc
+  (let [[$test     (get $args $i)]
+        [$body     (get $args (+ $i 1))]
+        [$is-else  (and (= (get $test :kind) "literal")
+                        (or (= (get $test :value) true) (= (get $test :value) "true")))]]
+    (cgc-cond-flat $args (- $i 2)
       (if $is-else
         (cgc $body)
         (str "(fl_truthy(" (cgc $test) ") ? " (cgc $body) " : " $acc ")"))))))
@@ -1404,6 +1423,8 @@
        [(= $op "begin") (cgc-do-wr-goto $args $vars $label)]
        [(= $op "let")   (cgc-let-wr-goto $args $vars $label)]
        [(= $op "loop")  (cgc-loop $args)]
+       [(= $op "->")    (cgc-thread-first $args)]
+       [(= $op "->>")   (cgc-thread-last $args)]
        [true            (cgc $node)]))]
     [true (cgc $node)]))))
 
@@ -1421,7 +1442,7 @@
         [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]]
     (if $nested
       (cgc-cond-nested-wr-goto $args $vars $label (- (length $args) 1) "fl_nil()")
-      "fl_nil()"))))
+      (cgc-cond-flat-wr-goto $args $vars $label (- (length $args) 2) "fl_nil()")))))
 
 (defn cgc-cond-nested-wr-goto [$args $vars $label $i $acc]
   (if (< $i 0) $acc
@@ -1431,6 +1452,67 @@
         [$is-else (and (= (get $test :kind) "literal")
                        (or (= (get $test :value) true) (= (get $test :value) "true")))]]
     (cgc-cond-nested-wr-goto $args $vars $label (- $i 1)
+      (if $is-else
+        (cgc-with-recur-goto $body $vars $label)
+        (str "(fl_truthy(" (cgc $test) ") ? "
+             (cgc-with-recur-goto $body $vars $label) " : " $acc ")"))))))
+
+;; ── -> / ->> threading macro ──
+;; raw-c 노드 {"kind" "raw-c" "code" "C코드"} : cgc가 code를 그대로 반환
+;; → cgc-dispatch/cgc-dispatch-fallback 완전 재사용 가능
+
+(defn cgc-thread-first [$args]
+  ;; (-> x f1 (f2 a) ...) — 앞에서부터 첫 번째 인수 자리에 삽입
+  (if (<= (length $args) 1)
+    (if (= (length $args) 1) (cgc (get $args 0)) "fl_nil()")
+    (cgc-tf-build (cgc (get $args 0)) $args 1)))
+
+(defn cgc-tf-build [$inner $args $i]
+  ;; left-to-right: (-> x f1 f2) → inner=cgc(x) → f1(inner) → f2(f1(inner))
+  (if (>= $i (length $args)) $inner
+  (let [[$form    (get $args $i)]
+        [$raw     {"kind" "raw-c" "code" $inner}]
+        [$is-call (= (get $form :kind) "sexpr")]
+        [$sym-name (if (= (get $form :kind) "variable")
+                      (get $form :name)
+                      (str (get $form :value)))]
+        [$new-inner
+          (if $is-call
+            ;; (f a b) → cgc-dispatch("f", [raw, a, b])
+            (cgc-dispatch (get $form :op) (concat (list $raw) (get $form :args)))
+            ;; bare 심볼 f → cgc-dispatch-fallback("f", [raw])
+            (cgc-dispatch-fallback $sym-name (list $raw)))]]
+    (cgc-tf-build $new-inner $args (+ $i 1)))))
+
+(defn cgc-thread-last [$args]
+  ;; (->> x f1 (f2 a) ...) — 마지막 인수 자리에 삽입
+  (if (<= (length $args) 1)
+    (if (= (length $args) 1) (cgc (get $args 0)) "fl_nil()")
+    (cgc-tl-build (cgc (get $args 0)) $args 1)))
+
+(defn cgc-tl-build [$inner $args $i]
+  (if (>= $i (length $args)) $inner
+  (let [[$form    (get $args $i)]
+        [$raw     {"kind" "raw-c" "code" $inner}]
+        [$is-call (= (get $form :kind) "sexpr")]
+        [$sym-name (if (= (get $form :kind) "variable")
+                      (get $form :name)
+                      (str (get $form :value)))]
+        [$new-inner
+          (if $is-call
+            ;; (f a b) → cgc-dispatch("f", [a, b, raw])
+            (cgc-dispatch (get $form :op) (append (get $form :args) $raw))
+            ;; bare f → cgc-dispatch-fallback("f", [raw])
+            (cgc-dispatch-fallback $sym-name (list $raw)))]]
+    (cgc-tl-build $new-inner $args (+ $i 1)))))
+
+(defn cgc-cond-flat-wr-goto [$args $vars $label $i $acc]
+  (if (< $i 0) $acc
+  (let [[$test     (get $args $i)]
+        [$body     (get $args (+ $i 1))]
+        [$is-else  (and (= (get $test :kind) "literal")
+                        (or (= (get $test :value) true) (= (get $test :value) "true")))]]
+    (cgc-cond-flat-wr-goto $args $vars $label (- $i 2)
       (if $is-else
         (cgc-with-recur-goto $body $vars $label)
         (str "(fl_truthy(" (cgc $test) ") ? "
