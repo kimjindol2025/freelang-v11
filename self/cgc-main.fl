@@ -1668,10 +1668,15 @@
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$param-items (get-block-items (get $args 1))]
         [$ps (cgc-params $param-items)]
-        [$pnames (cgc-fn-param-names $param-items 0 [])]]
+        [$pnames (cgc-fn-param-names $param-items 0 [])]
+        ;; FL 소스 라인 번호 (에러 추적용)
+        [$src-line (get (get $args 0) :line)]]
     (reset! outer-params-atom $pnames)
     (let [[$call-args (cgc-wrapper-call-args $param-items 0 "")]
-          [$has-recur (cgc-any-has-recur $args 2)]]
+          [$has-recur (cgc-any-has-recur $args 2)]
+          ;; #line 지시자 — GCC가 FL 소스 라인으로 오류 위치 보고
+          [$line-directive (if (null? $src-line) ""
+                             (str "#line " $src-line " \"<fl>\"\n"))]]
       (swap! wrapper-defs-atom append
         (str "static FLValue __fl_wrap_" $name
              "(FLClosure* _s, int _ac, FLValue* argv) {\n"
@@ -1681,12 +1686,14 @@
         ;; TCO 경로: goto 루프로 직접재귀 제거
         (let [[$label (str "__fl_tco_" $name)]
               [$stmts (cgc-defn-stmts-tco $args $pnames $label 2 "")]]
-          (str "FLValue " $name "(" $ps ") {\n"
+          (str $line-directive
+               "FLValue " $name "(" $ps ") {\n"
                "    " $label ":;\n"
                $stmts "}"))
         ;; 일반 경로
         (let [[$stmts (cgc-defn-stmts $args 2 "")]]
-          (str "FLValue " $name "(" $ps ") {\n" $stmts "}"))))))
+          (str $line-directive
+               "FLValue " $name "(" $ps ") {\n" $stmts "}"))))))
 
 ;; ── define (전역 변수) ──
 
