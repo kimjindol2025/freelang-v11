@@ -2110,7 +2110,11 @@
     (if (>= $i (length $items)) $a
       (recur (+ $i 1) (push $a (get $items $i))))))
 
+;; 이미 로드된 파일 경로 추적 (순환/중복 load 방지)
+(define loaded-paths-atom (atom []))
+
 ;; (load "file.fl") 를 컴파일 타임에 인라인 — 재귀적으로 처리
+;; visited set(loaded-paths-atom) 으로 순환/중복 load 안전하게 처리
 (defn expand-loads [$nodes $base-dir]
   (loop [$i 0 $acc []]
     (if (>= $i (length $nodes))
@@ -2124,15 +2128,20 @@
                           $rel-path
                           (str $base-dir $rel-path))]
                 [$src1 (file-read $try1)]
-                [$abs-path (if (null? $src1) $rel-path $try1)]
-                [$src  (if (null? $src1) (file-read $rel-path) $src1)]]
-            (if (null? $src)
-              (do (println (str "[load] 파일 없음: " $rel-path))
-                  (recur (+ $i 1) $acc))
-              (let [[$sub-dir  (path-dir $abs-path)]
-                    [$sub-raw  (parse (lex $src))]
-                    [$expanded (expand-loads $sub-raw $sub-dir)]]
-                (recur (+ $i 1) (append-all $acc $expanded)))))
+                [$abs-path (if (null? $src1) $rel-path $try1)]]
+            ;; 이미 로드한 파일이면 건너뜀 (순환/중복 방지)
+            (if (includes-item @loaded-paths-atom $abs-path)
+              (recur (+ $i 1) $acc)
+              (let [[$src (if (null? $src1) (file-read $rel-path) $src1)]]
+                (if (null? $src)
+                  (do (println (str "[load] 파일 없음: " $rel-path))
+                      (recur (+ $i 1) $acc))
+                  (do
+                    (swap! loaded-paths-atom (fn [$v] (push $v $abs-path)))
+                    (let [[$sub-dir  (path-dir $abs-path)]
+                          [$sub-raw  (parse (lex $src))]
+                          [$expanded (expand-loads $sub-raw $sub-dir)]]
+                      (recur (+ $i 1) (append-all $acc $expanded))))))))
           (recur (+ $i 1) (push $acc $node)))))))
 
 (defn cgc-run [$argv]
@@ -2140,7 +2149,8 @@
         [$output (get $argv 1)]]
   (if (or (null? $input) (null? $output))
     (println "usage: cgc-bin <input.fl> <output.c>")
-    (let [[$src      (file-read $input)]
+    (let [[$_reset  (swap! loaded-paths-atom (fn [$_] []))]  ;; 매 컴파일 시작 시 초기화
+          [$src      (file-read $input)]
           [$base-dir (path-dir $input)]
           [$raw      (parse (lex $src))]
           [$nodes    (expand-loads $raw $base-dir)]
