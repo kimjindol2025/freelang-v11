@@ -1135,6 +1135,20 @@
   [(= $op "->")   (cgc-thread-first $args)]
   ;; ->> last-thread: (->> x f1 (f2 a)) → (f2 a (f1 x))
   [(= $op "->>")  (cgc-thread-last $args)]
+  ;; when: (when test body...) → if test (do body...) nil
+  [(= $op "when")
+   (str "(fl_truthy(" (cgc (get $args 0)) ") ? ("
+        (cgc-body $args 1 "") ") : fl_nil())")]
+  ;; unless: (unless test body...) → if !test (do body...) nil
+  [(= $op "unless")
+   (str "(fl_truthy(" (cgc (get $args 0)) ") ? fl_nil() : ("
+        (cgc-body $args 1 "") "))")]
+  ;; case: (case val k1 v1 k2 v2 ... default) → if/else chain
+  [(= $op "case")  (cgc-case $args)]
+  ;; dotimes: (dotimes $i n body...) → for loop
+  [(= $op "dotimes") (cgc-dotimes $args)]
+  ;; doto: (doto x (f1 a) (f2 b)) → x after applying f1,f2 for side effects
+  [(= $op "doto")  (cgc-doto $args)]
   [true             (cgc-dispatch-fallback $op $args)]))
 
 (defn cgc-swap! [$args]
@@ -1505,6 +1519,55 @@
             ;; bare f → cgc-dispatch-fallback("f", [raw])
             (cgc-dispatch-fallback $sym-name (list $raw)))]]
     (cgc-tl-build $new-inner $args (+ $i 1)))))
+
+;; ── case 매크로 ──
+;; (case val k1 v1 k2 v2 ... [default]) → if-else chain
+;; args = [val, k1, v1, k2, v2, ..., ?default]
+;; n짝수 → default 있음(args[n-1]), n홀수 → default 없음
+(defn cgc-case [$args]
+  (let [[$val-c (cgc (get $args 0))]
+        [$n (length $args)]
+        [$has-default (= (% $n 2) 0)]
+        [$init-acc (if $has-default (cgc (get $args (- $n 1))) "fl_nil()")]
+        [$last-i (- (if $has-default (- $n 2) (- $n 1)) 1)]]
+    (cgc-case-rev $val-c $args $last-i $init-acc)))
+
+(defn cgc-case-rev [$val-c $args $i $acc]
+  ;; i: 현재 key 인덱스 (1, 3, 5 ...), 0 이하이면 종료
+  (if (< $i 1) $acc
+  (let [[$key-c  (cgc (get $args $i))]
+        [$res-c  (cgc (get $args (+ $i 1)))]]
+    (cgc-case-rev $val-c $args (- $i 2)
+      (str "(fl_truthy(fl_eq(" $val-c ", " $key-c ")) ? " $res-c " : " $acc ")")))))
+
+;; ── dotimes 매크로 ──
+;; (dotimes $i n body...) → C for loop
+(defn cgc-dotimes [$args]
+  (let [[$var-node (get $args 0)]
+        [$n-c  (cgc (get $args 1))]
+        [$body-c (cgc-body $args 2 "")]
+        [$var-c  (cgc-extract-name $var-node)]]
+    (str "(__extension__ ({ FLValue __n_" $var-c " = " $n-c ";"
+         " FLValue " $var-c " = fl_int(0);"
+         " for (; fl_truthy(fl_lt(" $var-c ", __n_" $var-c "));"
+         " " $var-c " = fl_add(" $var-c ", fl_int(1))) { " $body-c "; }"
+         " fl_nil(); }))")))
+
+;; ── doto 매크로 ──
+;; (doto x (f1 a) (f2 b)) → x 에 f1, f2 사이드이펙트 적용 후 x 반환
+(defn cgc-doto [$args]
+  (let [[$obj-c (cgc (get $args 0))]
+        [$forms (slice $args 1 (length $args))]
+        [$calls (cgc-doto-calls $obj-c $forms 0 "")]]
+    (str "(__extension__ ({ FLValue __doto = " $obj-c "; " $calls " __doto; }))")))
+
+(defn cgc-doto-calls [$obj-c $forms $i $acc]
+  (if (>= $i (length $forms)) $acc
+  (let [[$form (get $forms $i)]
+        [$raw  {"kind" "raw-c" "code" "__doto"}]
+        [$call (cgc-dispatch (get $form :op) (concat (list $raw) (get $form :args)))]]
+    (cgc-doto-calls $obj-c $forms (+ $i 1)
+      (str $acc $call "; ")))))
 
 (defn cgc-cond-flat-wr-goto [$args $vars $label $i $acc]
   (if (< $i 0) $acc
