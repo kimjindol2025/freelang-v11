@@ -1181,6 +1181,8 @@
         (cgc-body $args 1 "") "))")]
   ;; case: (case val k1 v1 k2 v2 ... default) → if/else chain
   [(= $op "case")  (cgc-case $args)]
+  ;; doseq: (doseq [$var coll] body...) → for loop (부작용 전용)
+  [(= $op "doseq")   (cgc-doseq $args)]
   ;; dotimes: (dotimes $i n body...) → for loop
   [(= $op "dotimes") (cgc-dotimes $args)]
   ;; doto: (doto x (f1 a) (f2 b)) → x after applying f1,f2 for side effects
@@ -1586,6 +1588,23 @@
         [$res-c  (cgc (get $args (+ $i 1)))]]
     (cgc-case-rev $val-c $args (- $i 2)
       (str "(fl_truthy(fl_eq(" $val-c ", " $key-c ")) ? " $res-c " : " $acc ")")))))
+
+;; ── doseq 매크로 ──
+;; (doseq [$var coll] body...) → C for loop, 부작용 전용, nil 반환
+(defn cgc-doseq [$args]
+  (let [[$items  (get-block-items (get $args 0))]
+        [$vnode  (get $items 0)]
+        [$cnode  (get $items 1)]
+        [$body-c (cgc-body $args 1 "")]
+        [$var-c  (cgc-extract-name $vnode)]
+        [$coll-c (cgc $cnode)]]
+    (str "(__extension__ ({ FLValue _ds_c = " $coll-c ";"
+         " FLValue _ds_len = length(_ds_c);"
+         " FLValue _ds_i = fl_int(0);"
+         " for (; fl_truthy(fl_lt(_ds_i, _ds_len));"
+         " _ds_i = fl_add(_ds_i, fl_int(1))) {"
+         " FLValue " $var-c " = nth(_ds_c, _ds_i);"
+         " " $body-c "; } fl_nil(); }))")))
 
 ;; ── dotimes 매크로 ──
 ;; (dotimes $i n body...) → C for loop
