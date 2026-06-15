@@ -1187,6 +1187,15 @@
   [(= $op "doto")  (cgc-doto $args)]
   ;; for: (for [$x col] expr) → map 기반 리스트 컴프리헨션
   [(= $op "for")   (cgc-for $args)]
+  ;; fx stdlib 갭 매핑
+  [(= $op "sha256")       (str "sha256(" (cgc (get $args 0)) ")")]
+  [(= $op "md5")          (str "md5(" (cgc (get $args 0)) ")")]
+  [(= $op "random")       "fl_random()"]
+  [(= $op "max-by")       (str "max_by(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "min-by")       (str "min_by(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "clamp")        (str "clamp(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "json-pretty")  (str "json_pretty(" (cgc (get $args 0)) ")")]
+  [(= $op "file-exists?") (str "file_exists_p(" (cgc (get $args 0)) ")")]
   [true             (cgc-dispatch-fallback $op $args)]))
 
 (defn cgc-swap! [$args]
