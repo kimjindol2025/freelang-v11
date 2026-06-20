@@ -5,20 +5,11 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res, err4) => function __init() {
-  if (err4) throw err4[0];
-  try {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  } catch (e) {
-    throw err4 = [e], e;
-  }
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
 var __commonJS = (cb, mod) => function __require() {
-  try {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  } catch (e) {
-    throw mod = 0, e;
-  }
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -29800,6 +29791,9 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   const pendingResponses = /* @__PURE__ */ new Map();
   let currentRequestId = null;
   let currentNonce = "";
+  const sseConnections = /* @__PURE__ */ new Map();
+  const sseRoutes = /* @__PURE__ */ new Map();
+  let sseConnIdCounter = 0;
   const wsPublicMap = /* @__PURE__ */ new Map();
   let upgradeHandler = null;
   let wsClientMessageHandler = null;
@@ -30172,6 +30166,25 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         if (!checkRateLimit(clientIp)) {
           res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(Math.ceil(rlWindowMs / 1e3)) });
           res.end(JSON.stringify({ error: "Too Many Requests", retry_after: Math.ceil(rlWindowMs / 1e3) }));
+          return;
+        }
+        if (method === "GET" && sseRoutes.has(path19)) {
+          const connId = String(++sseConnIdCounter);
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*"
+          });
+          res.write("retry: 3000\n\n");
+          sseConnections.set(connId, res);
+          req.on("close", () => sseConnections.delete(connId));
+          const handlerName = sseRoutes.get(path19);
+          try {
+            callFn(handlerName, [connId]);
+          } catch (_e) {
+          }
           return;
         }
         if (process.env.FL_DEV === "1" && path19 === "/__hot" && method === "GET") {
@@ -30874,7 +30887,63 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     // server_req_session_id req -> string | null
     "server_req_session_id": (req) => {
       return req?.session_id ?? null;
-    }
+    },
+    // ── SSE (Server-Sent Events) ────────────────────────────────────
+    // server_sse path handlerName → null (라우트 등록)
+    "server_sse": (path19, handlerName) => {
+      sseRoutes.set(path19, handlerName);
+      return null;
+    },
+    // sse_send connId data → boolean (특정 연결에 이벤트 전송)
+    "sse_send": (connId, data) => {
+      const res = sseConnections.get(connId);
+      if (!res || res.destroyed) {
+        sseConnections.delete(connId);
+        return false;
+      }
+      try {
+        res.write(`data: ${data}
+
+`);
+        return true;
+      } catch (_e) {
+        sseConnections.delete(connId);
+        return false;
+      }
+    },
+    // sse_broadcast data → integer (모든 연결에 브로드캐스트, 전송 수 반환)
+    "sse_broadcast": (data) => {
+      let count = 0;
+      for (const [connId, res] of sseConnections) {
+        if (res.destroyed) {
+          sseConnections.delete(connId);
+          continue;
+        }
+        try {
+          res.write(`data: ${data}
+
+`);
+          count++;
+        } catch (_e) {
+          sseConnections.delete(connId);
+        }
+      }
+      return count;
+    },
+    // sse_close connId → null (특정 연결 종료)
+    "sse_close": (connId) => {
+      const res = sseConnections.get(connId);
+      if (res && !res.destroyed) res.end();
+      sseConnections.delete(connId);
+      return null;
+    },
+    // sse_alive connId → boolean (연결 유효 여부)
+    "sse_alive": (connId) => {
+      const res = sseConnections.get(connId);
+      return !!(res && !res.destroyed);
+    },
+    // sse_count → integer (현재 활성 SSE 연결 수)
+    "sse_count": () => sseConnections.size
   };
 }
 
