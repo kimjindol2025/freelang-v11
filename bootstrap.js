@@ -1,17 +1,24 @@
 #!/usr/bin/env node
-// .env 자동 로드 (cwd 기준)
-;(function(){const fs=require('fs'),p=require('path'),f=p.join(process.cwd(),'.env');if(fs.existsSync(f)){fs.readFileSync(f,'utf8').split('\n').forEach(l=>{const i=l.indexOf('=');if(i>0&&!l.startsWith('#')){const k=l.slice(0,i).trim(),v=l.slice(i+1).trim();if(k&&process.env[k]===undefined)process.env[k]=v;}});}})();
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err4) => function __init() {
+  if (err4) throw err4[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err4 = [e], e;
+  }
 };
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -2854,7 +2861,8 @@ var init_error_formatter = __esm({
       "obj_pick": { correct: "get", usage: '(get map "key")' },
       "dict": { correct: "map-set", usage: '(map-set {} "key" value)' },
       // 문자열
-      "string_length": { correct: "str-length", usage: '(str-length "hello")' },
+      "str_length": { correct: "length", usage: '(length "hello")' },
+      "string_length": { correct: "length", usage: '(length "hello")' },
       "str_concat": { correct: "str", usage: '(str "a" "b" "c")' },
       "str_to_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
       "parse_int": { correct: "str_to_num", usage: '(str_to_num "42")' },
@@ -15020,7 +15028,7 @@ function flExecOpNative(op, vals) {
     case "length":
       return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
     case "get": {
-      if (v0 === null || v0 === void 0) {
+      if ((v0 === null || v0 === void 0) && process.env.FL_STRICT === "1") {
         throw new FLRuntimeError(
           ErrorCodes.TYPE_NIL,
           `(get nil ${typeof v1 === "string" ? '"' + v1 + '"' : String(v1)}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
@@ -18042,7 +18050,7 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
       return def;
     }
     case "get": {
-      if (args3[0] === null || args3[0] === void 0) {
+      if ((args3[0] === null || args3[0] === void 0) && process.env.FL_STRICT === "1") {
         throw new FLRuntimeError(
           ErrorCodes.TYPE_NIL,
           `(get nil ${typeof args3[1] === "string" ? '"' + args3[1] + '"' : String(args3[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
@@ -18436,8 +18444,6 @@ sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.w
     case "str-to-lower":
     case "str-lower":
       return typeof args3[0] === "string" ? args3[0].toLowerCase() : args3[0] ?? "";
-    case "str-length":
-      return typeof args3[0] === "string" ? args3[0].length : 0;
     case "str-trim":
       return typeof args3[0] === "string" ? args3[0].trim() : args3[0] === null || args3[0] === void 0 ? null : "";
     case "str-trim-left":
@@ -25812,6 +25818,7 @@ function createBitsModule() {
 // src/stdlib-timer.ts
 var timerRegistry = /* @__PURE__ */ new Map();
 var nextTimerId = 2e3;
+var intervalStats = /* @__PURE__ */ new Map();
 function createTimerModule(interpreter) {
   return {
     // set_interval fn ms -> number (fn: function name string, ms: interval)
@@ -25825,7 +25832,10 @@ function createTimerModule(interpreter) {
           throw new Error(`Interval must be positive number, got ${ms}`);
         }
         const timerId = nextTimerId++;
+        intervalStats.set(timerId, { ticks: 0, missed: 0, lastError: null, lastErrorAt: 0 });
         const callback = () => {
+          const st = intervalStats.get(timerId);
+          if (st) st.ticks++;
           try {
             if (isFnObj) {
               interpreter.callFunction(fnName, []);
@@ -25833,6 +25843,11 @@ function createTimerModule(interpreter) {
               interpreter.callUserFunction(fnName, []);
             }
           } catch (err4) {
+            if (st) {
+              st.missed++;
+              st.lastError = err4.message;
+              st.lastErrorAt = Date.now();
+            }
             const label = isFnObj ? "<fn>" : fnName;
             console.error(`set_interval callback error for '${label}':`, err4.message);
           }
@@ -25853,10 +25868,27 @@ function createTimerModule(interpreter) {
         }
         clearInterval(nodeTimer);
         timerRegistry.delete(timerId);
+        intervalStats.delete(timerId);
         return true;
       } catch (err4) {
         throw new Error(`clear_interval failed: ${err4.message}`);
       }
+    },
+    // interval_stats [timerId] -> stat | {id: stat,...}  (FL-P1 / ROS R9)
+    // Exposes silently-skipped ticks. healthy = (missed === 0).
+    // No arg: returns all live interval stats. Unknown id: nil.
+    // A watchdog polls this and alarms when missed > 0 or ticks stop advancing.
+    "interval_stats": (timerId) => {
+      if (timerId === void 0 || timerId === null) {
+        const out = {};
+        for (const [id, st2] of intervalStats) {
+          out[String(id)] = { ...st2, healthy: st2.missed === 0 };
+        }
+        return out;
+      }
+      const st = intervalStats.get(timerId);
+      if (st === void 0) return null;
+      return { ...st, healthy: st.missed === 0 };
     },
     // set_timeout fn ms -> number (fn: function name string, ms: delay)
     "set_timeout": (fnName, ms) => {
@@ -31299,7 +31331,7 @@ function loop() {
     try { resp = handle(JSON.parse(reqStr)); }
     catch(e) { resp = { ok: false, error: e.message }; }
     const respStr = JSON.stringify(resp);
-    data.writeInt32LE(Buffer.byteLength(respStr, 'utf8'), 0);
+    data.writeInt32LE(respStr.length, 0);
     data.write(respStr, 4, 'utf8');
     Atomics.store(control, 0, 2);
     Atomics.notify(control, 0);
@@ -31331,9 +31363,8 @@ function poolCall(req) {
   const control = new Int32Array(controlBuf);
   const data = Buffer.from(dataBuf);
   const reqStr = JSON.stringify(req);
-  const reqBytes = Buffer.byteLength(reqStr, "utf8");
-  if (reqBytes + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
-  data.writeInt32LE(reqBytes, 0);
+  if (reqStr.length + 4 > DATA_BUF_SIZE) throw new Error("MariaDB pool: request too large");
+  data.writeInt32LE(reqStr.length, 0);
   data.write(reqStr, 4, "utf8");
   Atomics.store(control, 0, 1);
   Atomics.notify(control, 0);
