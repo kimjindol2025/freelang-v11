@@ -187,10 +187,16 @@ export function createCollectionModule() {
 
     // ── Range / Sequence ─────────────────────────────────────
 
-    // range start end -> [number]  (inclusive start, exclusive end)
-    "range": (start: number, end: number): number[] => {
+    // range end -> [number]  (0..end-1)
+    // range start end -> [number]  (start..end-1)
+    // range start end step -> [number]  (stepped)
+    "range": (startOrEnd: number, end?: number, step?: number): number[] => {
+      const start = end === undefined ? 0 : startOrEnd;
+      const realEnd = end === undefined ? startOrEnd : end;
+      const realStep = step ?? 1;
       const result: number[] = [];
-      for (let i = start; i < end; i++) result.push(i);
+      if (realStep > 0) for (let i = start; i < realEnd; i += realStep) result.push(i);
+      else if (realStep < 0) for (let i = start; i > realEnd; i += realStep) result.push(i);
       return result;
     },
 
