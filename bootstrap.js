@@ -25836,19 +25836,47 @@ function ringPush(type, payload) {
   received_count++;
   return true;
 }
+var QUARANTINE_THRESHOLD = 3;
+var policyState = /* @__PURE__ */ new Map();
+var policy_event_count = 0;
+var policy_fire_count = 0;
+var quarantine_count = 0;
+var policy_error_count = 0;
+function sisPolicyOnEvent(type, payload) {
+  policy_event_count++;
+  if (type !== E_TIMER_EXCEPTION) return;
+  const tid = payload && payload.timer_id || 0;
+  let s = policyState.get(tid);
+  if (!s) {
+    s = { score: 0, quarantined: false };
+    policyState.set(tid, s);
+  }
+  s.score++;
+  if (s.score >= QUARANTINE_THRESHOLD && !s.quarantined) {
+    s.quarantined = true;
+    quarantine_count++;
+    policy_fire_count++;
+    console.error(`[SIS] event=E_TIMER_EXCEPTION score=${s.score} quarantined=true action=QUARANTINE timer=${tid}`);
+  }
+}
 function sisEmit(type, payload) {
   emit_count++;
   if (dropped_since_notice > 0 && type !== E_EVENT_DROPPED) {
     if (ringPush(E_EVENT_DROPPED, { emit_count, dropped_count })) dropped_since_notice = 0;
   }
-  if (!ringPush(type, payload)) {
+  const ok2 = ringPush(type, payload);
+  if (!ok2) {
     dropped_count++;
     dropped_since_notice++;
     drop_latch = { emit_count, dropped_count };
     drop_latch_seq++;
-    return false;
   }
-  return true;
+  try {
+    sisPolicyOnEvent(type, payload);
+  } catch {
+    policy_error_count++;
+  }
+  return ok2;
 }
 function sisStats() {
   const queued = (head + CAP - tail) % CAP;
@@ -25859,7 +25887,12 @@ function sisStats() {
     queued,
     drop_latch_seq,
     drop_latch,
-    invariant_ok: emit_count === received_count + dropped_count
+    invariant_ok: emit_count === received_count + dropped_count,
+    // Phase 3 정책 카운터
+    policy_event_count,
+    policy_fire_count,
+    quarantine_count,
+    policy_error_count
   };
 }
 
