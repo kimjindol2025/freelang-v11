@@ -1,87 +1,97 @@
-;; stdlib/retry.fl — 재시도 유틸 (v11.7.3)
+;; stdlib/retry.fl — 재시도 유틸 (v11 + cgc VERIFIED)
 ;; (load "stdlib/retry.fl")
 ;;
 ;; 사용법:
-;;   (retry fn opts)                  ;; 재시도 실행
-;;   (retry-fixed fn 3 100)           ;; 3회 고정 100ms 간격
-;;   (retry-expo fn 3 100)            ;; 3회 지수 백오프 (100→200→400ms)
-;;   (retry-with-jitter fn 3 100 50)  ;; 지수 + 랜덤 지터
+;;   (retry-result fn opts)            ;; {ok, value|error} 반환 (권장)
+;;   (retry-safe fn opts default)      ;; 실패 시 default 반환 (권장)
+;;   (retry fn opts)                   ;; 성공 시 값, 실패 시 throw
+;;   (retry-fixed fn max delay-ms)     ;; 고정 간격 재시도
+;;   (retry-expo fn max delay-ms)      ;; 지수 백오프 재시도
 ;;
-;; opts 맵:
-;;   :max-tries   최대 시도 횟수 (기본 3)
-;;   :delay-ms    초기 대기 시간 (기본 100)
-;;   :backoff     "fixed" | "expo" | "linear" (기본 "expo")
-;;   :jitter      jitter ms (기본 0)
-;;   :on-fail     실패 시 호출할 함수 (fn [err attempt])
-;;   :should-retry 재시도 여부 결정 함수 (fn [err] → bool)
+;; opts 맵 ("string" 키 사용):
+;;   "max-tries"    최대 시도 횟수 (기본 3)
+;;   "delay-ms"     초기 대기 시간ms (기본 100)
+;;   "backoff"      "fixed" | "expo" | "linear" (기본 "expo")
+;;   "on-fail"      실패 콜백 함수 (fn [err attempt])
+;;   "should-retry" 재시도 여부 결정 (fn [err] → bool)
 ;;
-;; 실무 예제:
-;;   (load "stdlib/retry.fl")
-;;   ;; 외부 API 호출 — 네트워크 오류 시 3회 재시도
-;;   (defn call-payment-api [payload]
-;;     (retry
-;;       (fn []
-;;         (let [r (http-post "https://api.payment.com/charge" payload)]
-;;           (if (get r :ok) (get r :body)
-;;             (throw (str "API 오류: " (get r :status))))))
-;;       {:max-tries 3 :delay-ms 500 :backoff "expo"}))
+;; v11 검증: 2026-06-20 VERIFIED (retry-result/retry-safe)
+;; cgc 검증: 2026-06-20 VERIFIED (retry-result/retry-safe)
+;;
+;; [v11 트랩] defn 내부 throw → v11이 함수 전체 재실행:
+;;   (retry fn opts) 는 fn을 2×max-tries 회 호출할 수 있음.
+;;   부작용 없는 함수에서만 retry 직접 사용 권장.
+;;   부작용 있는 함수는 retry-result / retry-safe 사용.
+;;
+;; 수정 내역 (2026-06-20):
+;;   - :keyword → "string" 키 (cgc 호환)
+;;   - try + map literal → try + hash-map (v11 파싱 오류 수정)
+;;   - js-eval(Atomics.wait) → sleep (v11+cgc 공통)
+;;   - pow() 미존재 → loop/recur 수동 계산
+;;   - rand-int 미존재 → jitter 기능 제거 (cgc에 random_int 없음)
+;;   - -retry-core: throw 없음 (v11 defn-throw 재실행 트랩 우회)
 
-;; ── 내부 ─────────────────────────────────────────────────────────────────────
+;; ── 내부 헬퍼 ────────────────────────────────────────────────────
+
+(defn -int-pow [base exp-n]
+  (loop [n exp-n acc 1]
+    (if (<= n 0) acc (recur (- n 1) (* acc base)))))
+
+;; (get m k default): cgc의 get은 2인자 → nil 검사 인라인
+(defn -rget [m k default]
+  (let [v (get m k)]
+    (if (nil? v) default v)))
 
 (defn -retry-delay [opts attempt]
-  (let [base    (get opts :delay-ms 100)
-        backoff (get opts :backoff "expo")
-        jitter  (get opts :jitter 0)
-        base-d  (cond
-                  (= backoff "fixed")  base
-                  (= backoff "expo")   (* base (pow 2 (- attempt 1)))
-                  (= backoff "linear") (* base attempt)
-                  true base)
-        jitter-d (if (> jitter 0) (rand-int 0 jitter) 0)]
-    (int (+ base-d jitter-d))))
+  (let [base    (-rget opts "delay-ms" 100)
+        backoff (-rget opts "backoff" "expo")]
+    (if (= backoff "fixed")
+      base
+      (if (= backoff "expo")
+        (* base (-int-pow 2 (- attempt 1)))
+        (* base attempt)))))
 
-;; ── 공개 API ─────────────────────────────────────────────────────────────────
-
-(defn retry [fn-to-call opts]
-  (let [max-tries    (get opts :max-tries 3)
-        on-fail      (get opts :on-fail nil)
-        should-retry (get opts :should-retry nil)]
-    (loop [attempt 1 last-err nil]
+;; -retry-core: 절대 throw 하지 않음.
+;; 항상 {"ok" bool "value"|"error" ...} 반환.
+;; fn-to-call을 정확히 max-tries 회 이하로 호출.
+(defn -retry-core [fn-to-call opts]
+  (let [max-tries    (-rget opts "max-tries" 3)
+        on-fail      (-rget opts "on-fail" nil)
+        should-retry (-rget opts "should-retry" nil)]
+    (loop [attempt 1]
       (let [result (try
-                     {:ok true :value (fn-to-call)}
-                     (catch err {:ok false :error err}))]
-        (if (get result :ok)
-          (get result :value)
-          (let [err (get result :error)
-                can-retry (if (nil? should-retry)
-                            true
-                            (should-retry err))]
-            (when (not (nil? on-fail))
-              (on-fail err attempt))
+                     (hash-map "ok" true "value" (fn-to-call))
+                     (catch err (hash-map "ok" false "error" err)))]
+        (if (get result "ok")
+          result
+          (let [the-err   (get result "error")
+                can-retry (if (nil? should-retry) true (should-retry the-err))]
+            (if (not (nil? on-fail)) (on-fail the-err attempt) nil)
             (if (or (>= attempt max-tries) (not can-retry))
-              (throw err)
+              result
               (let [d (-retry-delay opts attempt)]
-                (when (> d 0)
-                  (js-eval (str "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0," d ")")))
-                (recur (+ attempt 1) err)))))))))
+                (if (> d 0) (sleep d) nil)
+                (recur (+ attempt 1))))))))))
 
-
-
-(defn retry-fixed [fn-to-call max-tries delay-ms]
-  (retry fn-to-call {:max-tries max-tries :delay-ms delay-ms :backoff "fixed"}))
-
-(defn retry-expo [fn-to-call max-tries delay-ms]
-  (retry fn-to-call {:max-tries max-tries :delay-ms delay-ms :backoff "expo"}))
-
-(defn retry-with-jitter [fn-to-call max-tries delay-ms jitter-ms]
-  (retry fn-to-call {:max-tries max-tries :delay-ms delay-ms :backoff "expo" :jitter jitter-ms}))
-
-(defn retry-safe [fn-to-call opts default]
-  (try
-    (retry fn-to-call opts)
-    (catch err default)))
+;; ── 공개 API ─────────────────────────────────────────────────────
 
 (defn retry-result [fn-to-call opts]
-  (try
-    {:ok true :value (retry fn-to-call opts)}
-    (catch err {:ok false :error err})))
+  (-retry-core fn-to-call opts))
+
+(defn retry-safe [fn-to-call opts default]
+  (let [r (-retry-core fn-to-call opts)]
+    (if (get r "ok") (get r "value") default)))
+
+;; [주의] v11에서 defn-throw 재실행 트랩으로 fn이 2×max-tries 호출 가능.
+;; 부작용 없는 순수 함수에만 사용 권장.
+(defn retry [fn-to-call opts]
+  (let [r (-retry-core fn-to-call opts)]
+    (if (get r "ok")
+      (get r "value")
+      (throw (get r "error")))))
+
+(defn retry-fixed [fn-to-call max-tries delay-ms]
+  (retry-result fn-to-call {"max-tries" max-tries "delay-ms" delay-ms "backoff" "fixed"}))
+
+(defn retry-expo [fn-to-call max-tries delay-ms]
+  (retry-result fn-to-call {"max-tries" max-tries "delay-ms" delay-ms "backoff" "expo"}))

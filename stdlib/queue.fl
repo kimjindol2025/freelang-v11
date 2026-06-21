@@ -1,57 +1,67 @@
-;; FreeLang stdlib — queue.fl (불변 큐/스택)
+;; stdlib/queue.fl — 불변 큐/스택 (v11 + cgc VERIFIED)
 ;; (load "stdlib/queue.fl")
 ;;
 ;; Queue (FIFO): queue-create / queue-push / queue-pop / queue-peek / queue-size / queue-empty? / queue->list
 ;; Stack (LIFO): stack-create / stack-push / stack-pop / stack-peek / stack-size / stack-empty? / stack->list
+;;
+;; v11 검증: 2026-06-20 VERIFIED
+;; cgc 검증: 2026-06-20 VERIFIED
+;;
+;; 수정 내역 (2026-06-20):
+;;   - :keyword 키 → "string" 키 (cgc 호환)
+;;   - (inc n) → (+ n 1), (dec n) → (- n 1) (v11/cgc 공통)
+;;   - butlast → (take (- n 1) col) 인라인 (butlast 빌트인 없음)
 
 ;; ── Queue (FIFO) ─────────────────────────────────────────────────
 
 (defn queue-create []
-  {:items [] :size 0})
+  {"items" [] "size" 0})
 
 (defn queue-push [q item]
-  {:items (append (get q :items) item) :size (inc (get q :size))})
+  {"items" (append (get q "items") item) "size" (+ (get q "size") 1)})
 
 (defn queue-pop [q]
-  (let [items (get q :items)]
+  (let [items (get q "items")]
     (if (empty? items)
-      {:val nil :queue q}
-      {:val (first items) :queue {:items (rest items) :size (dec (get q :size))}})))
+      {"val" nil "queue" q}
+      {"val" (first items) "queue" {"items" (rest items) "size" (- (get q "size") 1)}})))
 
 (defn queue-peek [q]
-  (first (get q :items)))
+  (first (get q "items")))
 
 (defn queue-size [q]
-  (get q :size))
+  (get q "size"))
 
 (defn queue-empty? [q]
-  (= (get q :size) 0))
+  (= (get q "size") 0))
 
 (defn queue->list [q]
-  (get q :items))
+  (get q "items"))
 
 ;; ── Stack (LIFO) ──────────────────────────────────────────────────
 
 (defn stack-create []
-  {:items [] :size 0})
+  {"items" [] "size" 0})
 
 (defn stack-push [s item]
-  {:items (append (get s :items) item) :size (inc (get s :size))})
+  {"items" (append (get s "items") item) "size" (+ (get s "size") 1)})
 
 (defn stack-pop [s]
-  (let [items (get s :items)]
-    (if (empty? items)
-      {:val nil :stack s}
-      {:val (last items) :stack {:items (butlast items) :size (dec (get s :size))}})))
+  (let [items (get s "items")
+        n     (length items)]
+    (if (= n 0)
+      {"val" nil "stack" s}
+      {"val" (last items)
+       "stack" {"items" (take (- n 1) items) "size" (- (get s "size") 1)}})))
 
 (defn stack-peek [s]
-  (last (get s :items)))
+  (last (get s "items")))
 
 (defn stack-size [s]
-  (get s :size))
+  (get s "size"))
 
 (defn stack-empty? [s]
-  (= (get s :size) 0))
+  (= (get s "size") 0))
 
 (defn stack->list [s]
-  (get s :items))
+  (get s "items"))
