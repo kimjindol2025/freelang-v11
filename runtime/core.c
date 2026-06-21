@@ -104,7 +104,16 @@ static int write_repr(FLValue v, char* buf, int pos, int sz) {
 const char* fl_to_str(FLValue v, char* buf, size_t sz) {
     switch (v.tag) {
         case FL_INT:    snprintf(buf, sz, "%lld", (long long)v.i); return buf;
-        case FL_FLOAT:  snprintf(buf, sz, "%g", v.f); return buf;
+        case FL_FLOAT: {
+            /* D002: shortest round-trippable — round-trip 되는 최소 정밀도 채택 (정준 인터프리터 정합) */
+            int prec = 1;
+            for (; prec < 17; prec++) {
+                snprintf(buf, sz, "%.*g", prec, v.f);
+                if (strtod(buf, NULL) == v.f) return buf;
+            }
+            snprintf(buf, sz, "%.17g", v.f);
+            return buf;
+        }
         case FL_BOOL:   return v.b ? "true" : "false";
         case FL_NIL:    return "nil";
         case FL_STRING: {
@@ -212,11 +221,22 @@ FLValue fl_div(FLValue a, FLValue b) {
         return fl_float(av / bv);
     }
     if (b.i == 0) { fprintf(stderr, "[FL Error] ArithmeticError: 0으로 나눌 수 없습니다\n"); exit(1); }
-    return fl_int(a.i / b.i);
+    return fl_float((double)a.i / (double)b.i);  /* D001: / = float (정준 인터프리터 정합) */
 }
 
 FLValue fl_mod(FLValue a, FLValue b) {
     if (b.i == 0) { fputs("error: mod by zero\n", stderr); exit(1); }
+    return fl_int(a.i % b.i);
+}
+
+/* D001: quot=0 방향 정수나눗셈, rem=피제수 부호 따르는 나머지 (C / 와 % 의미와 일치) */
+FLValue fl_quot(FLValue a, FLValue b) {
+    if (b.i == 0) { fputs("error: quot by zero\n", stderr); exit(1); }
+    return fl_int(a.i / b.i);
+}
+
+FLValue fl_rem(FLValue a, FLValue b) {
+    if (b.i == 0) { fputs("error: rem by zero\n", stderr); exit(1); }
     return fl_int(a.i % b.i);
 }
 

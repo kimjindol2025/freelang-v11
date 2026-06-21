@@ -80,6 +80,8 @@ FLValue fl_sub(FLValue a, FLValue b);
 FLValue fl_mul(FLValue a, FLValue b);
 FLValue fl_div(FLValue a, FLValue b);
 FLValue fl_mod(FLValue a, FLValue b);
+FLValue fl_quot(FLValue a, FLValue b);
+FLValue fl_rem(FLValue a, FLValue b);
 
 /* ── 비교 ── */
 FLValue fl_eq(FLValue a, FLValue b);
