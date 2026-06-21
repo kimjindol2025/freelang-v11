@@ -3,6 +3,7 @@
 // Essential for periodic tasks like checkpoint and WAL rotation
 
 type TimerCallback = () => void;
+import { sisEmit, sisStats, E_TIMER_EXCEPTION } from "./sis-bus";
 
 // Global timer registry
 const timerRegistry: Map<number, NodeJS.Timer> = new Map();
@@ -57,6 +58,8 @@ export function createTimerModule(interpreter: any) {
           } catch (err: any) {
             // FL-P1: record the silently-skipped cycle as observable state
             if (st) { st.missed++; st.lastError = err.message; st.lastErrorAt = Date.now(); }
+            // SIS Phase 2: 실제 timer 실패를 Evidence Bus로 (E_TIMER_EXCEPTION)
+            sisEmit(E_TIMER_EXCEPTION, { timer_id: timerId, exception_count: st ? st.missed : 0 });
             const label = isFnObj ? "<fn>" : fnName;
             console.error(`set_interval callback error for '${label}':`, err.message);
           }
@@ -153,6 +156,8 @@ export function createTimerModule(interpreter: any) {
     "timer_count": (): number => {
       return timerRegistry.size;
     },
+    // SIS Phase 2: Evidence Bus 통계 노출(검증/관측용)
+    "sis_stats": (): any => sisStats(),
 
     // timer_clear_all -> boolean (clear all active timers)
     "timer_clear_all": (): boolean => {

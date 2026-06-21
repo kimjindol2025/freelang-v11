@@ -1,29 +1,108 @@
-;; stdlib/cache.fl — LRU+TTL 인메모리 캐시 래퍼 (v11.6.36)
+;; stdlib/cache.fl — 인메모리 캐시 + TTL (v11 + cgc VERIFIED)
 ;; (load "stdlib/cache.fl")
 ;;
-;; 내장 cache-* 함수를 감싸는 얇은 레이어.
-;; 내장 함수 직접 사용 가능 — 이 파일은 문서/편의용.
+;; 순수 FL 구현 (atom + map). v11 내장 cache-* 함수 불필요.
+;;
+;; 핸들 구조: atom {"entries" {key → {"val" v "exp" ms|nil}} "hits" N "misses" N "max" N}
+;;
+;; [주의] max-size 파라미터는 저장되지만 LRU 강제 없음.
+;;         TTL은 now_ms 비교로 지원 (get 시 만료 항목 자동 제거).
+;;
+;; API:
+;;   (cache-create N)                    → 핸들 (atom)
+;;   (cache-set ch key val)              → 영구 저장
+;;   (cache-set-ttl ch key val ttl-ms)  → TTL 저장
+;;   (cache-get ch key)                  → val | nil (만료 시 nil)
+;;   (cache-has ch key)                  → bool
+;;   (cache-del ch key)                  → true
+;;   (cache-clear ch)                    → true
+;;   (cache-size ch)                     → int
+;;   (cache-stats ch)                    → {"size" "hits" "misses" "hit-rate"}
+;;   (cache-get-or-set ch key loader)    → val (미스 시 loader 호출 후 저장)
+;;   (cache-get-or-set-ttl ch key ttl-ms loader)
+;;
+;; v11 검증: 2026-06-21 VERIFIED
+;; cgc 검증: 2026-06-21 VERIFIED
+;;
+;; 수정 내역:
+;;   - v11 내장 cache-* 대신 atom+map 순수 FL 구현 (cgc 호환)
+;;   - cache-set 4인자(TTL) → cache-set-ttl 분리 (FL 고정 arity 제약)
+;;   - now_ms (underscore) = v11+cgc 공통
 
-;; ── 캐시 생성 ────────────────────────────────────────────────────────────────
-;; (cache-create 100)       → maxSize=100 캐시 핸들
-;; (cache-create)           → maxSize=100 기본값
-(defn make-cache [max-size]
-  (cache-create max-size))
+;; ── 생성 ─────────────────────────────────────────────────────────────────────
 
-(defn make-cache-default []
-  (cache-create 100))
+(defn cache-create [max-size]
+  (atom {"entries" {} "hits" 0 "misses" 0 "max" max-size}))
 
-;; ── 캐시 조작 ────────────────────────────────────────────────────────────────
-;; (cache-set ch "key" value)         → 영구 저장
-;; (cache-set ch "key" value 60000)   → TTL 60초(ms)
-;; (cache-get ch "key")               → value or nil
-;; (cache-has ch "key")               → bool
-;; (cache-del ch "key")               → bool
-;; (cache-clear ch)                   → bool
-;; (cache-stats ch)                   → {:size N :hits N :misses N :hit-rate N}
+;; ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
+
+(defn -cache-expired? [entry]
+  (let [exp (get entry "exp")]
+    (if (nil? exp) false (> (now_ms) exp))))
+
+;; ── 쓰기 ─────────────────────────────────────────────────────────────────────
+
+(defn cache-set [ch key val]
+  (let [st @ch]
+    (reset! ch (assoc st "entries"
+                      (assoc (get st "entries") key {"val" val "exp" nil})))))
+
+(defn cache-set-ttl [ch key val ttl-ms]
+  (let [st @ch
+        exp (+ (now_ms) ttl-ms)]
+    (reset! ch (assoc st "entries"
+                      (assoc (get st "entries") key {"val" val "exp" exp})))))
+
+;; ── 읽기 ─────────────────────────────────────────────────────────────────────
+
+(defn cache-get [ch key]
+  ;; [cgc GC fix] fl_atom_deref returns raw pointer (no RC inc).
+  ;; fl_atom_reset frees old value → using 'entry' after reset = freed memory.
+  ;; Hit case: update atom FIRST, then re-deref to read value from NEW (heap-safe) state.
+  (let [st      @ch
+        entries (get st "entries")
+        entry   (get entries key)]
+    (if (nil? entry)
+      (do (reset! ch (assoc st "misses" (+ (get st "misses") 1))) nil)
+      (if (-cache-expired? entry)
+        (do (reset! ch (assoc (assoc st "misses" (+ (get st "misses") 1))
+                              "entries" (dissoc entries key)))
+            nil)
+        (let [new-st (assoc st "hits" (+ (get st "hits") 1))]
+          (reset! ch new-st)
+          (get (get (get @ch "entries") key) "val"))))))
+
+(defn cache-has [ch key]
+  (let [entry (get (get @ch "entries") key)]
+    (if (nil? entry) false (not (-cache-expired? entry)))))
+
+;; ── 삭제 ─────────────────────────────────────────────────────────────────────
+
+(defn cache-del [ch key]
+  (let [st @ch]
+    (reset! ch (assoc st "entries" (dissoc (get st "entries") key)))
+    true))
+
+(defn cache-clear [ch]
+  (let [st @ch]
+    (reset! ch (assoc (assoc (assoc st "entries" {}) "hits" 0) "misses" 0))
+    true))
+
+;; ── 메타 ─────────────────────────────────────────────────────────────────────
+
+(defn cache-size [ch]
+  (length (get @ch "entries")))
+
+(defn cache-stats [ch]
+  (let [st    @ch
+        h     (get st "hits")
+        m     (get st "misses")
+        total (+ h m)
+        rate  (if (= total 0) 0.0 (/ (* h 1.0) total))]
+    {"size" (length (get st "entries")) "hits" h "misses" m "hit-rate" rate}))
 
 ;; ── 헬퍼 패턴 ────────────────────────────────────────────────────────────────
-;; get-or-set: 캐시 미스 시 fn 호출 후 결과 저장
+
 (defn cache-get-or-set [ch key loader]
   (let [cached (cache-get ch key)]
     (if (nil? cached)
@@ -32,11 +111,15 @@
         val)
       cached)))
 
-;; get-or-set with TTL
 (defn cache-get-or-set-ttl [ch key ttl-ms loader]
   (let [cached (cache-get ch key)]
     (if (nil? cached)
       (let [val (loader)]
-        (cache-set ch key val ttl-ms)
+        (cache-set-ttl ch key val ttl-ms)
         val)
       cached)))
+
+;; ── 하위 호환 ────────────────────────────────────────────────────────────────
+
+(defn make-cache [max-size] (cache-create max-size))
+(defn make-cache-default [] (cache-create 100))

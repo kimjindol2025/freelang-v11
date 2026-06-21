@@ -5,11 +5,20 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err4) => function __init() {
+  if (err4) throw err4[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err4 = [e], e;
+  }
 };
 var __commonJS = (cb, mod) => function __require() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -6381,8 +6390,8 @@ var init_effect_enforcer = __esm({
 });
 
 // src/lazy-seq.ts
-function lazySeq(head, tail) {
-  return { [LAZY_SEQ]: true, head, tail };
+function lazySeq(head2, tail2) {
+  return { [LAZY_SEQ]: true, head: head2, tail: tail2 };
 }
 function isLazySeq(v) {
   return v != null && typeof v === "object" && v[LAZY_SEQ] === true;
@@ -22331,11 +22340,11 @@ function _callUserFunctionInterpPath(interp2, name, args3) {
   }
   if (interp2.callDepth >= MAX_CALL_DEPTH) {
     const _stack3 = interp2.callStack ?? [];
-    const tail = _stack3.slice(-10).map((s, i) => `  #${_stack3.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
+    const tail2 = _stack3.slice(-10).map((s, i) => `  #${_stack3.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
     throw new Error(
       `[E_STACK_OVERFLOW] line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'
-` + (tail ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
-${tail}` : "")
+` + (tail2 ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
+${tail2}` : "")
     );
   }
   const prefixMatch = baseName.match(/^([^:]+):/);
@@ -25806,6 +25815,87 @@ function createBitsModule() {
   };
 }
 
+// src/sis-bus.ts
+var E_TIMER_EXCEPTION = 1;
+var E_EVENT_DROPPED = 3;
+var CAP = 4096;
+var ring = new Array(CAP);
+var head = 0;
+var tail = 0;
+var emit_count = 0;
+var received_count = 0;
+var dropped_count = 0;
+var dropped_since_notice = 0;
+var drop_latch = null;
+var drop_latch_seq = 0;
+function ringPush(type, payload) {
+  const next = (head + 1) % CAP;
+  if (next === tail) return false;
+  ring[head] = { ts: Date.now(), type, payload };
+  head = next;
+  received_count++;
+  return true;
+}
+var QUARANTINE_THRESHOLD = 3;
+var policyState = /* @__PURE__ */ new Map();
+var policy_event_count = 0;
+var policy_fire_count = 0;
+var quarantine_count = 0;
+var policy_error_count = 0;
+function sisPolicyOnEvent(type, payload) {
+  policy_event_count++;
+  if (type !== E_TIMER_EXCEPTION) return;
+  const tid = payload && payload.timer_id || 0;
+  let s = policyState.get(tid);
+  if (!s) {
+    s = { score: 0, quarantined: false };
+    policyState.set(tid, s);
+  }
+  s.score++;
+  if (s.score >= QUARANTINE_THRESHOLD && !s.quarantined) {
+    s.quarantined = true;
+    quarantine_count++;
+    policy_fire_count++;
+    console.error(`[SIS] event=E_TIMER_EXCEPTION score=${s.score} quarantined=true action=QUARANTINE timer=${tid}`);
+  }
+}
+function sisEmit(type, payload) {
+  emit_count++;
+  if (dropped_since_notice > 0 && type !== E_EVENT_DROPPED) {
+    if (ringPush(E_EVENT_DROPPED, { emit_count, dropped_count })) dropped_since_notice = 0;
+  }
+  const ok2 = ringPush(type, payload);
+  if (!ok2) {
+    dropped_count++;
+    dropped_since_notice++;
+    drop_latch = { emit_count, dropped_count };
+    drop_latch_seq++;
+  }
+  try {
+    sisPolicyOnEvent(type, payload);
+  } catch {
+    policy_error_count++;
+  }
+  return ok2;
+}
+function sisStats() {
+  const queued = (head + CAP - tail) % CAP;
+  return {
+    emit_count,
+    received_count,
+    dropped_count,
+    queued,
+    drop_latch_seq,
+    drop_latch,
+    invariant_ok: emit_count === received_count + dropped_count,
+    // Phase 3 정책 카운터
+    policy_event_count,
+    policy_fire_count,
+    quarantine_count,
+    policy_error_count
+  };
+}
+
 // src/stdlib-timer.ts
 var timerRegistry = /* @__PURE__ */ new Map();
 var nextTimerId = 2e3;
@@ -25839,6 +25929,7 @@ function createTimerModule(interpreter) {
               st.lastError = err4.message;
               st.lastErrorAt = Date.now();
             }
+            sisEmit(E_TIMER_EXCEPTION, { timer_id: timerId, exception_count: st ? st.missed : 0 });
             const label = isFnObj ? "<fn>" : fnName;
             console.error(`set_interval callback error for '${label}':`, err4.message);
           }
@@ -25924,6 +26015,8 @@ function createTimerModule(interpreter) {
     "timer_count": () => {
       return timerRegistry.size;
     },
+    // SIS Phase 2: Evidence Bus 통계 노출(검증/관측용)
+    "sis_stats": () => sisStats(),
     // timer_clear_all -> boolean (clear all active timers)
     "timer_clear_all": () => {
       try {
@@ -30325,7 +30418,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           logAccess(method, path19, status, duration, requestId);
         }
       });
-      server.on("upgrade", (req, socket, head) => {
+      server.on("upgrade", (req, socket, head2) => {
         if (!upgradeHandler) {
           socket.destroy();
           return;
@@ -43313,10 +43406,10 @@ function cmdRepl() {
       const stack = sessionInterp.callStack ?? [];
       if (stack.length === 0) console.log("  (callStack \uBE44\uC5B4\uC788\uC74C \u2014 \uD638\uCD9C \uC911\uC77C \uB54C\uB9CC \uD45C\uC2DC)");
       else {
-        const tail = stack.slice(-20);
-        for (let i = 0; i < tail.length; i++) {
-          const argsStr = tail[i].args ? `(${tail[i].args.join(", ")})` : "";
-          console.log(`  #${stack.length - tail.length + i}: ${tail[i].fn}${argsStr} (line ${tail[i].line})`);
+        const tail2 = stack.slice(-20);
+        for (let i = 0; i < tail2.length; i++) {
+          const argsStr = tail2[i].args ? `(${tail2[i].args.join(", ")})` : "";
+          console.log(`  #${stack.length - tail2.length + i}: ${tail2[i].fn}${argsStr} (line ${tail2[i].line})`);
         }
       }
       rl.prompt();
