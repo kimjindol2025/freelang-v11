@@ -27345,7 +27345,9 @@ function createCollectionModule() {
       const idx = arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(item));
       if (idx === -1) return arr;
       return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
-    }
+    },
+    "str-repeat": (s, n) => n > 0 ? s.repeat(Math.floor(n)) : "",
+    "str-repeat": (s, n) => s.repeat(Math.max(0, Math.floor(n)))
   };
 }
 
@@ -30161,7 +30163,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("X-XSS-Protection", "1; mode=block");
-        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'nonce-${cspNonce}'`);
+        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'`);
         res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         if (method === "OPTIONS") {
           res.writeHead(200);

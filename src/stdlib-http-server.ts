@@ -492,7 +492,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           res.setHeader("X-Content-Type-Options", "nosniff");
           res.setHeader("X-Frame-Options", "SAMEORIGIN");
           res.setHeader("X-XSS-Protection", "1; mode=block");
-          res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'nonce-${cspNonce}'`);
+          res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'`);
           res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
           if (method === "OPTIONS") {
