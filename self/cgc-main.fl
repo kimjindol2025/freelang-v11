@@ -1255,15 +1255,18 @@
              "(FLClosure* _s, int _ac, FLValue* argv) {\n"
              "    (void)_s; (void)_ac;\n"
              "    return " $name "(" $call-args ");\n}"))
-      (let [[$body (cgc (get $args 2))]]
+      (let [[$bodies (slice $args 2 (length $args))]
+            [$body (if (= (length $bodies) 1)
+                     (cgc (get $bodies 0))
+                     (cgc-do $bodies))]]
         (str "FLValue " $name "(" $ps ") {\n    return " $body ";\n}")))))
 
 (defn cgc-defn [$args]
   (let [[$depth @cgc-defn-depth-atom]
         [$saved-params @outer-params-atom]]
-    (swap! cgc-defn-depth-atom (fn [$d] (+ $d 1)))
+    (reset! cgc-defn-depth-atom (+ @cgc-defn-depth-atom 1))
     (let [[$result (cgc-defn-impl $args)]]
-      (swap! cgc-defn-depth-atom (fn [$d] (- $d 1)))
+      (reset! cgc-defn-depth-atom (- @cgc-defn-depth-atom 1))
       (reset! outer-params-atom $saved-params)
       (if (> $depth 0)
         (let [[$name (c-name (cgc-extract-name (get $args 0)))]
@@ -1271,10 +1274,10 @@
               [$ps (cgc-params $param-items)]]
           (swap! cgc-hoisted-fns-atom push $result)
           (swap! known-defns-atom push $name)
-          (swap! cgc-hoisted-fwds-atom (fn [$acc]
-            (str $acc
+          (reset! cgc-hoisted-fwds-atom
+            (str @cgc-hoisted-fwds-atom
                  "FLValue " $name "(" $ps ");\n"
-                 "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n")))
+                 "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n"))
           "fl_nil()")
         $result))))
 
