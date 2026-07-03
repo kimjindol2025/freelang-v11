@@ -31289,7 +31289,7 @@ function buildArgs(db, sql) {
   }
   if (pass) args3.push("-p" + pass);
   if (db) args3.push(db);
-  args3.push("--batch", "-e", sql);
+  args3.push("--default-character-set=utf8mb4", "--batch", "-e", sql);
   return args3;
 }
 var MARIADB_SEARCH_PATHS = [
