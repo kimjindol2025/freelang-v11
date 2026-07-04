@@ -57,6 +57,7 @@
 
 ;; ── 버그 #5: 값 위치 연산자 → 합성 함수값 ──
 (define op-emitted-atom (atom []))
+(define op-fwd-decls-atom (atom []))
 (defn op-spec [$name]
   (cond
     [(= $name "+")  {"sfx" "add" "fn" "fl_add" "kind" "chain" "id" "fl_int(0)"}]
@@ -83,12 +84,15 @@
       (str "static FLValue __fl_op_" $sfx "(FLClosure* _s, int _ac, FLValue* argv) {\n"
            "    (void)_s; (void)_ac;\n"
            "    return " $fn "(argv[0], argv[1]);\n}"))))
+(defn op-forward-decl-c [$spec]
+  (str "static FLValue __fl_op_" (get $spec "sfx") "(FLClosure*, int, FLValue*);\n"))
 (defn cgc-op-value-ref [$name]
   (let [[$spec (op-spec $name)]]
     (if (null? $spec) nil
       (let [[$sfx (get $spec "sfx")]]
         (if (not (includes-item (deref op-emitted-atom) $sfx))
           (do (swap! op-emitted-atom push $sfx)
+              (swap! op-fwd-decls-atom push (op-forward-decl-c $spec))
               (swap! wrapper-defs-atom push (op-wrapper-c $spec)))
           nil)
         (str "fl_fn_new(__fl_op_" $sfx ", 0, NULL)")))))
@@ -692,6 +696,9 @@
 (defn cgc-join-wrappers []
   (cgc-join-lambda-loop (deref wrapper-defs-atom) 0 ""))
 
+(defn cgc-join-op-fwds []
+  (cgc-join-lambda-loop (deref op-fwd-decls-atom) 0 ""))
+
 ;; S24: global define 선언 목록 이어붙이기
 (defn cgc-join-globals []
   (cgc-join-lambda-loop (deref global-decls-atom) 0 ""))
@@ -703,6 +710,7 @@
         [$stmts (get $parts :stmts)]
         [$gdecls (cgc-join-globals)]
         [$lfwd (cgc-lambda-fwds)]
+        [$opfwds (cgc-join-op-fwds)]
         [$ldefs (cgc-join-lambdas)]
         [$wdefs (cgc-join-wrappers)]]
   (str
@@ -711,6 +719,7 @@
     "#pragma GCC diagnostic ignored \"-Wunused-parameter\"\n\n"
     $fwd
     $gdecls "\n"
+    $opfwds
     $lfwd "\n"
     $ldefs
     $wdefs "\n"
