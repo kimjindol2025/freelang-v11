@@ -5,20 +5,11 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res, err4) => function __init() {
-  if (err4) throw err4[0];
-  try {
-    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-  } catch (e) {
-    throw err4 = [e], e;
-  }
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
 var __commonJS = (cb, mod) => function __require() {
-  try {
-    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
-  } catch (e) {
-    throw mod = 0, e;
-  }
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -30256,7 +30247,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         res.setHeader("X-Content-Type-Options", "nosniff");
         res.setHeader("X-Frame-Options", "SAMEORIGIN");
         res.setHeader("X-XSS-Protection", "1; mode=block");
-        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'`);
+        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;`);
         res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         if (method === "OPTIONS") {
           res.writeHead(200);
@@ -33268,6 +33259,8 @@ function _plus(...args) { if (args.length === 0) return 0; if (args.length === 1
 function _minus(...args) { if (args.length === 0) return 0; if (args.length === 1) return -args[0]; return args.reduce((a, b) => a - b); }
 function _star(...args) { if (args.length === 0) return 1; if (args.length === 1) return args[0]; return args.reduce((a, b) => a * b); }
 function _slash(...args) { if (args.length === 0) return 1; if (args.length === 1) return 1/args[0]; return args.reduce((a, b) => a / b); }
+const rem = (a, b) => a % b;
+const mod = rem;
 function _gt(a, b) { return a > b; }
 function _lt(a, b) { return a < b; }
 function _eq(a, b) { return a === b; }
@@ -33319,12 +33312,25 @@ function _fl_first(l) { return (l && l.length > 0) ? l[0] : null; }
 function _fl_last(l) { return (l && l.length > 0) ? l[l.length - 1] : null; }
 function _fl_rest(l) { return (l && l.length > 0) ? l.slice(1) : []; }
 function _fl_append(l, x) { return [...(l || []), x]; }
+const push = _fl_append;
+const append = _fl_append;
 function _fl_concat(a, b) { return Array.isArray(a) && Array.isArray(b) ? [...a, ...b] : String(a || "") + String(b || ""); }
 function _fl_keys(o) { return o ? Object.keys(o) : []; }
 function _fl_values(o) { return o ? Object.values(o) : []; }
 var _fl_entries = (o) => o ? Object.entries(o).map(([k,v]) => [k,v]) : [];
+var map_entries = _fl_entries;
+var map_keys = _fl_keys;
+var map_values = _fl_values;
 function _fl_map_set(o, ...args) { const result = {...(o || {})}; for (let i = 0; i + 1 < args.length; i += 2) { result[args[i]] = args[i + 1]; } return result; }
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
+function _fl_atom(v) { return { value: v }; }
+function _fl_atom_deref(a) { return a == null ? null : a.value; }
+function _fl_atom_reset(a, v) { if (a == null) return v; a.value = v; return v; }
+function _fl_atom_swap(a, fn, ...args) { return _fl_atom_reset(a, fn(_fl_atom_deref(a), ...args)); }
+const atom = _fl_atom;
+const deref = _fl_atom_deref;
+const reset_bang = _fl_atom_reset;
+const swap_bang = _fl_atom_swap;
 
 // \u2500 \uBB38\uC790\uC5F4 \uC870\uC791 \u2500
 function _fl_str(...xs) { return xs.map(x => x === null || x === undefined ? "" : (typeof x === "object" ? JSON.stringify(x) : String(x))).join(""); }
@@ -33501,6 +33507,10 @@ var HELPER_FUNCTIONS = [
   "_fl_entries",
   "_fl_map_set",
   "_fl_has_key_q",
+  "_fl_atom",
+  "_fl_atom_deref",
+  "_fl_atom_reset",
+  "_fl_atom_swap",
   "_fl_str",
   "_fl_char_at",
   "_fl_substring",
@@ -33636,7 +33646,11 @@ var BUILTIN_MAP = {
   "map-set": "_fl_map_set",
   "json-set": "_fl_map_set",
   "json_set": "_fl_map_set",
-  "has-key?": "_fl_has_key_q"
+  "has-key?": "_fl_has_key_q",
+  // 가변 참조
+  "atom": "_fl_atom",
+  "deref": "_fl_atom_deref",
+  "reset!": "_fl_atom_reset"
 };
 var JS_RESERVED = /* @__PURE__ */ new Set([
   "abstract",
@@ -33895,6 +33909,7 @@ ${exportsStr}
         items = bindingsArg.fields.get("items") || [];
       }
       const inits = [];
+      const declarations = [];
       const names = [];
       for (let i = 0; i < items.length; i += 2) {
         const nameNode = items[i];
@@ -33903,7 +33918,8 @@ ${exportsStr}
         const name = this.extractVarName(nameNode);
         const val = valNode ? this.genNode(valNode) : "null";
         const tmpName = `__fl_loop_${i}`;
-        inits.push(`let ${tmpName} = ${val}; let ${name} = ${tmpName};`);
+        inits.push(`let ${tmpName} = ${val};`);
+        declarations.push(`let ${name} = ${tmpName};`);
         names.push(name);
       }
       const bodyParts = bodyExprs.map((e) => this.genNode(e).trim()).filter((s) => s !== "");
@@ -33916,7 +33932,7 @@ ${exportsStr}
         const stmts = bodyParts.slice(0, -1).map((s) => s.endsWith(";") ? s : s + ";");
         bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
       }
-      return `((() => { ${inits.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } })())`;
+      return `((() => { ${inits.join(" ")} { ${declarations.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } } })())`;
     }
     if (op === "let") {
       if (args3.length >= 2) {
@@ -33987,6 +34003,23 @@ ${exportsStr}
     }
     if (op === "not" && args3.length === 1) {
       return `(!${this.genNode(args3[0])})`;
+    }
+    if (op === "atom" && args3.length === 1) {
+      return `_fl_atom(${this.genNode(args3[0])})`;
+    }
+    if (op === "deref" && args3.length === 1) {
+      return `_fl_atom_deref(${this.genNode(args3[0])})`;
+    }
+    if (op === "reset!" && args3.length === 2) {
+      return `_fl_atom_reset(${this.genNode(args3[0])}, ${this.genNode(args3[1])})`;
+    }
+    if (op === "swap!" && args3.length >= 2) {
+      const atomRef = this.genNode(args3[0]);
+      const fnNode = args3[1];
+      const extra = args3.slice(2).map((a) => this.genNode(a));
+      const current = `_fl_atom_deref(${atomRef})`;
+      const fnCall = this.genSwapFunctionCall(fnNode, current, extra);
+      return `_fl_atom_reset(${atomRef}, ${fnCall})`;
     }
     if (op === "if") {
       const cond = this.genNode(args3[0]);
@@ -34196,6 +34229,20 @@ ${exportsStr}
     const argStrs = args3.map((a) => this.genNode(a));
     const jsOp = flNameToJs(op);
     return `${jsOp}(${argStrs.join(", ")})`;
+  }
+  genSwapFunctionCall(fnNode, current, extra) {
+    if (fnNode.kind === "literal" && fnNode.type === "symbol") {
+      const op = String(fnNode.value);
+      if (op === "+") return `(${[current, ...extra].join(" + ")})`;
+      if (op === "-") return extra.length === 0 ? `(-${current})` : `(${[current, ...extra].join(" - ")})`;
+      if (op === "*") return `(${[current, ...extra].join(" * ")})`;
+      if (op === "/") return `(${[current, ...extra].join(" / ")})`;
+      return `${flNameToJs(op)}(${[current, ...extra].join(", ")})`;
+    }
+    if (fnNode.kind === "variable") {
+      return `${this.genNode(fnNode)}(${[current, ...extra].join(", ")})`;
+    }
+    return `${this.genNode(fnNode)}(${[current, ...extra].join(", ")})`;
   }
   genBlock(node) {
     switch (node.type) {

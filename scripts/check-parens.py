@@ -29,12 +29,15 @@ def check_file(path: str, verbose: bool = False) -> bool:
     in_string = False
     in_comment = False
 
+    escaped = False
+
     for i, ch in enumerate(content):
         col += 1
         if ch == '\n':
             line += 1
             col = 0
             in_comment = False
+            escaped = False
             continue
 
         if in_comment:
@@ -44,11 +47,20 @@ def check_file(path: str, verbose: bool = False) -> bool:
             in_comment = True
             continue
 
-        if ch == '"':
-            in_string = not in_string
+        if in_string:
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\':
+                escaped = True
+                continue
+            if ch == '"':
+                in_string = False
+                continue
             continue
 
-        if in_string:
+        if ch == '"':
+            in_string = True
             continue
 
         if ch == '(':
