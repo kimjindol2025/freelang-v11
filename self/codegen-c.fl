@@ -310,9 +310,10 @@
   [(= $op "_fl_run_inherit")       "fl_nil()"]
   [(= $op "cli-args")              "fl_get_argv()"]
   [(= $op "bit-xor")               (str "fl_int(" (cgc (get $args 0)) ".i ^ " (cgc (get $args 1)) ".i)")]
-  ;; S17: json — 타입 안전 stub (S18에서 실 구현)
-  [(= $op "json-parse")      (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
-  [(= $op "json-stringify")  (str "fl_str_n(1, " (cgc (get $args 0)) ")")]
+  ;; json-parse/json-stringify: 예전엔 여기 S17 stub(fl_str_n으로 그냥 통과)이 있었으나
+  ;; runtime/json.c에 실구현(json_parse/json_stringify)이 이미 있고, 그 자리를 차지해서
+  ;; 실구현 호출을 막고 있었을 뿐이었다. json-try-parse처럼 아래 fallback으로 넘기면
+  ;; 케밥→언더스코어 변환으로 실제 함수가 정상 호출된다 (2026-07-04 확인).
   ;; S19: fn lambda → static FLClosure 추출
   [(= $op "fn")      (cgc-fn $args)]
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
