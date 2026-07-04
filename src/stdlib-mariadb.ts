@@ -42,7 +42,8 @@ function buildArgs(db: string, sql: string): string[] {
   }
   if (pass) args.push("-p" + pass);
   if (db) args.push(db);
-  args.push("--batch", "-e", sql);
+  // 4바이트 이모지 등 utf8mb4 데이터가 CLI에서 '?'로 잘리지 않도록 클라이언트 charset 고정
+  args.push("--default-character-set=utf8mb4", "--batch", "-e", sql);
   return args;
 }
 
