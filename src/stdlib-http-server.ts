@@ -501,8 +501,10 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
             ? ((req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown").split(",")[0].trim()
             : (req.socket.remoteAddress || "unknown");
           if (!checkRateLimit(clientIp)) {
-            res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(Math.ceil(rlWindowMs / 1000)) });
-            res.end(JSON.stringify({ error: "Too Many Requests", retry_after: Math.ceil(rlWindowMs / 1000) }));
+            const rlEntry = rlStore.get(clientIp);
+            const retryAfterSec = rlEntry ? Math.max(1, Math.ceil((rlEntry.resetAt - Date.now()) / 1000)) : Math.ceil(rlWindowMs / 1000);
+            res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(retryAfterSec) });
+            res.end(JSON.stringify({ error: "Too Many Requests", retry_after: retryAfterSec }));
             return;
           }
 
