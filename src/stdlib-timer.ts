@@ -3,10 +3,25 @@
 // Essential for periodic tasks like checkpoint and WAL rotation
 
 type TimerCallback = () => void;
+import { sisEmit, sisStats, E_TIMER_EXCEPTION } from "./sis-bus";
 
 // Global timer registry
 const timerRegistry: Map<number, NodeJS.Timer> = new Map();
 let nextTimerId = 2000; // Start from 2000 to avoid conflicts
+
+// FL-P1 fix (ROS Round 9): missed-tick observability.
+// Before: a throwing interval callback was swallowed to stderr only — the
+// daemon kept running while a cycle was silently skipped (P-01 Silent Blindness).
+// After: every skipped tick is recorded in observable state, queryable via
+// interval_stats. This MOVEs the seam from stderr-only to a first-class status
+// value; an external watchdog can ABSORB it (P-08).
+interface IntervalStat {
+  ticks: number;        // total callback fires
+  missed: number;       // fires that threw (silently skipped work)
+  lastError: string | null;
+  lastErrorAt: number;  // epoch ms of last skip (0 = never)
+}
+const intervalStats: Map<number, IntervalStat> = new Map();
 
 /**
  * Create the timer module for FreeLang
@@ -29,8 +44,11 @@ export function createTimerModule(interpreter: any) {
         }
 
         const timerId = nextTimerId++;
+        intervalStats.set(timerId, { ticks: 0, missed: 0, lastError: null, lastErrorAt: 0 });
 
         const callback = () => {
+          const st = intervalStats.get(timerId);
+          if (st) st.ticks++;
           try {
             if (isFnObj) {
               interpreter.callFunction(fnName, []);
@@ -38,6 +56,10 @@ export function createTimerModule(interpreter: any) {
               interpreter.callUserFunction(fnName as string, []);
             }
           } catch (err: any) {
+            // FL-P1: record the silently-skipped cycle as observable state
+            if (st) { st.missed++; st.lastError = err.message; st.lastErrorAt = Date.now(); }
+            // SIS Phase 2: 실제 timer 실패를 Evidence Bus로 (E_TIMER_EXCEPTION)
+            sisEmit(E_TIMER_EXCEPTION, { timer_id: timerId, exception_count: st ? st.missed : 0 });
             const label = isFnObj ? "<fn>" : fnName;
             console.error(`set_interval callback error for '${label}':`, err.message);
           }
@@ -60,10 +82,28 @@ export function createTimerModule(interpreter: any) {
         }
         clearInterval(nodeTimer);
         timerRegistry.delete(timerId);
+        intervalStats.delete(timerId);
         return true;
       } catch (err: any) {
         throw new Error(`clear_interval failed: ${err.message}`);
       }
+    },
+
+    // interval_stats [timerId] -> stat | {id: stat,...}  (FL-P1 / ROS R9)
+    // Exposes silently-skipped ticks. healthy = (missed === 0).
+    // No arg: returns all live interval stats. Unknown id: nil.
+    // A watchdog polls this and alarms when missed > 0 or ticks stop advancing.
+    "interval_stats": (timerId?: number): any => {
+      if (timerId === undefined || timerId === null) {
+        const out: Record<string, any> = {};
+        for (const [id, st] of intervalStats) {
+          out[String(id)] = { ...st, healthy: st.missed === 0 };
+        }
+        return out;
+      }
+      const st = intervalStats.get(timerId);
+      if (st === undefined) return null;
+      return { ...st, healthy: st.missed === 0 };
     },
 
     // set_timeout fn ms -> number (fn: function name string, ms: delay)
@@ -116,6 +156,8 @@ export function createTimerModule(interpreter: any) {
     "timer_count": (): number => {
       return timerRegistry.size;
     },
+    // SIS Phase 2: Evidence Bus 통계 노출(검증/관측용)
+    "sis_stats": (): any => sisStats(),
 
     // timer_clear_all -> boolean (clear all active timers)
     "timer_clear_all": (): boolean => {

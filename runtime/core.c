@@ -9,9 +9,6 @@
 FLTryFrame fl_try_stack[FL_TRY_MAX];
 int fl_try_top = 0;
 
-/* ── CLI Arguments Global State ── */
-static FLValue* global_argv = NULL;
-static int global_argc = 0;
 
 /* ── 값 생성 ── */
 
@@ -53,48 +50,107 @@ bool fl_truthy(FLValue v) {
     }
 }
 
+/* ── 타입 이름 (에러 메시지용) ── */
+
+const char* fl_type_name(FLValue v) {
+    switch (v.tag) {
+        case FL_INT:    return "int";
+        case FL_FLOAT:  return "float";
+        case FL_BOOL:   return "bool";
+        case FL_NIL:    return "nil";
+        case FL_STRING: return "string";
+        case FL_VECTOR: return "array";
+        case FL_MAP:    return "map";
+        case FL_FN:     return "function";
+        default:        return "unknown";
+    }
+}
+
+static void fl_type_error(const char* op, const char* expected, FLValue got) {
+    fprintf(stderr, "[FL Error] TypeError: %s — %s 필요, %s 제공\n",
+            op, expected, fl_type_name(got));
+    exit(1);
+}
+
+static int fl_is_num(FLValue v) {
+    return v.tag == FL_INT || v.tag == FL_FLOAT;
+}
+
 /* ── 문자열 변환 (출력용) ── */
+
+/* forward declaration */
+const char* fl_to_str(FLValue v, char* buf, size_t sz);
+
+/* repr 모드로 값을 buf[pos]에 쓰고 새 pos 반환 (문자열은 따옴표 포함) */
+static int write_repr(FLValue v, char* buf, int pos, int sz) {
+    if (pos >= sz - 4) return pos;
+    if (v.tag == FL_STRING) {
+        const char* s = ((FLString*)v.obj)->data;
+        int slen = (int)strlen(s);
+        if (pos + slen + 2 >= sz - 2) { memcpy(buf+pos,"...",3); return pos+3; }
+        buf[pos++] = '"';
+        memcpy(buf+pos, s, slen); pos += slen;
+        buf[pos++] = '"';
+        return pos;
+    }
+    char tmp[512];
+    const char* s = fl_to_str(v, tmp, sizeof(tmp));
+    int slen = (int)strlen(s);
+    if (pos + slen >= sz - 2) { memcpy(buf+pos,"...",3); return pos+3; }
+    memcpy(buf+pos, s, slen);
+    return pos + slen;
+}
 
 const char* fl_to_str(FLValue v, char* buf, size_t sz) {
     switch (v.tag) {
         case FL_INT:    snprintf(buf, sz, "%lld", (long long)v.i); return buf;
-        case FL_FLOAT:  snprintf(buf, sz, "%g", v.f); return buf;
+        case FL_FLOAT: {
+            /* D002: shortest round-trippable — round-trip 되는 최소 정밀도 채택 (정준 인터프리터 정합) */
+            int prec = 1;
+            for (; prec < 17; prec++) {
+                snprintf(buf, sz, "%.*g", prec, v.f);
+                if (strtod(buf, NULL) == v.f) return buf;
+            }
+            snprintf(buf, sz, "%.17g", v.f);
+            return buf;
+        }
         case FL_BOOL:   return v.b ? "true" : "false";
         case FL_NIL:    return "nil";
-        case FL_STRING: return ((FLString*)v.obj)->data;
+        case FL_STRING: {
+            /* repr: 따옴표 포함 반환 (fl_print에서 직접 처리로 display 모드 구현) */
+            const char* s = ((FLString*)v.obj)->data;
+            int slen = (int)strlen(s);
+            if (slen + 2 >= (int)sz) { snprintf(buf, sz, "\"...\""); return buf; }
+            buf[0] = '"';
+            memcpy(buf+1, s, slen);
+            buf[slen+1] = '"';
+            buf[slen+2] = '\0';
+            return buf;
+        }
         case FL_VECTOR: {
             FLVector* vec = (FLVector*)v.obj;
-            char tmp[128];
             int pos = 0;
             buf[pos++] = '[';
             for (uint32_t i = 0; i < vec->len && pos < (int)sz - 4; i++) {
-                if (i) buf[pos++] = ' ';
-                const char* s = fl_to_str(vec->data[i], tmp, sizeof(tmp));
-                int tlen = (int)strlen(s);
-                if (pos + tlen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
-                memcpy(buf+pos, s, tlen); pos += tlen;
+                if (i) { buf[pos++] = ','; buf[pos++] = ' '; }
+                pos = write_repr(vec->data[i], buf, pos, (int)sz);
             }
-            buf[pos++] = ']'; buf[pos] = '\0';
+            if (pos < (int)sz - 1) buf[pos++] = ']';
+            buf[pos] = '\0';
             return buf;
         }
         case FL_MAP: {
             FLMap* mp = (FLMap*)v.obj;
-            char tmp[128];
             int pos = 0;
             buf[pos++] = '{';
             for (uint32_t i = 0; i < mp->len && pos < (int)sz - 4; i++) {
-                if (i) buf[pos++] = ' ';
-                const char* ks = fl_to_str(mp->entries[i].key, tmp, sizeof(tmp));
-                int klen = (int)strlen(ks);
-                if (pos + klen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
-                memcpy(buf+pos, ks, klen); pos += klen;
-                buf[pos++] = ' ';
-                const char* vs = fl_to_str(mp->entries[i].val, tmp, sizeof(tmp));
-                int vlen = (int)strlen(vs);
-                if (pos + vlen >= (int)sz - 4) { memcpy(buf+pos,"...",3); pos+=3; break; }
-                memcpy(buf+pos, vs, vlen); pos += vlen;
+                if (i) { buf[pos++] = ','; buf[pos++] = ' '; }
+                pos = write_repr(mp->entries[i].key, buf, pos, (int)sz);
+                if (pos < (int)sz - 3) { buf[pos++] = ':'; buf[pos++] = ' '; }
+                pos = write_repr(mp->entries[i].val, buf, pos, (int)sz);
             }
-            buf[pos++] = '}'; buf[pos] = '\0';
+            if (pos < (int)sz - 1) buf[pos++] = '}';
+            buf[pos] = '\0';
             return buf;
         }
         case FL_FN: return "#<fn>";
@@ -104,11 +160,17 @@ const char* fl_to_str(FLValue v, char* buf, size_t sz) {
 
 /* ── 산술 ── */
 
+/* 문자열 display 변환 (따옴표 없이) — str/add 연결용 */
+static const char* fl_display(FLValue v, char* buf, size_t sz) {
+    if (v.tag == FL_STRING) return ((FLString*)v.obj)->data;
+    return fl_to_str(v, buf, sz);
+}
+
 FLValue fl_add(FLValue a, FLValue b) {
     if (a.tag == FL_STRING || b.tag == FL_STRING) {
-        char ba[64], bb[64];
-        const char* sa = fl_to_str(a, ba, sizeof(ba));
-        const char* sb = fl_to_str(b, bb, sizeof(bb));
+        char ba[256], bb[256];
+        const char* sa = fl_display(a, ba, sizeof(ba));
+        const char* sb = fl_display(b, bb, sizeof(bb));
         size_t la = strlen(sa), lb = strlen(sb);
         FLString* obj = malloc(sizeof(FLString) + la + lb + 1);
         obj->base.type = FL_STRING; obj->base.rc = 1;
@@ -117,6 +179,8 @@ FLValue fl_add(FLValue a, FLValue b) {
         memcpy(obj->data + la, sb, lb + 1);
         FLValue r; r.tag = FL_STRING; r.obj = (FLObject*)obj; return r;
     }
+    if (!fl_is_num(a)) fl_type_error("+ (add)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("+ (add)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
@@ -126,6 +190,8 @@ FLValue fl_add(FLValue a, FLValue b) {
 }
 
 FLValue fl_sub(FLValue a, FLValue b) {
+    if (!fl_is_num(a)) fl_type_error("- (sub)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("- (sub)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
@@ -135,6 +201,8 @@ FLValue fl_sub(FLValue a, FLValue b) {
 }
 
 FLValue fl_mul(FLValue a, FLValue b) {
+    if (!fl_is_num(a)) fl_type_error("* (mul)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("* (mul)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
@@ -144,17 +212,31 @@ FLValue fl_mul(FLValue a, FLValue b) {
 }
 
 FLValue fl_div(FLValue a, FLValue b) {
+    if (!fl_is_num(a)) fl_type_error("/ (div)", "number", a);
+    if (!fl_is_num(b)) fl_type_error("/ (div)", "number", b);
     if (a.tag == FL_FLOAT || b.tag == FL_FLOAT) {
         double av = (a.tag == FL_FLOAT) ? a.f : (double)a.i;
         double bv = (b.tag == FL_FLOAT) ? b.f : (double)b.i;
+        if (bv == 0.0) { fprintf(stderr, "[FL Error] ArithmeticError: 0으로 나눌 수 없습니다\n"); exit(1); }
         return fl_float(av / bv);
     }
-    if (b.i == 0) { fl_throw(fl_make_error("ArithmeticError", "Division by zero")); }
-    return fl_int(a.i / b.i);
+    if (b.i == 0) { fprintf(stderr, "[FL Error] ArithmeticError: 0으로 나눌 수 없습니다\n"); exit(1); }
+    return fl_float((double)a.i / (double)b.i);  /* D001: / = float (정준 인터프리터 정합) */
 }
 
 FLValue fl_mod(FLValue a, FLValue b) {
     if (b.i == 0) { fputs("error: mod by zero\n", stderr); exit(1); }
+    return fl_int(a.i % b.i);
+}
+
+/* D001: quot=0 방향 정수나눗셈, rem=피제수 부호 따르는 나머지 (C / 와 % 의미와 일치) */
+FLValue fl_quot(FLValue a, FLValue b) {
+    if (b.i == 0) { fputs("error: quot by zero\n", stderr); exit(1); }
+    return fl_int(a.i / b.i);
+}
+
+FLValue fl_rem(FLValue a, FLValue b) {
+    if (b.i == 0) { fputs("error: rem by zero\n", stderr); exit(1); }
     return fl_int(a.i % b.i);
 }
 
@@ -222,13 +304,13 @@ FLValue fl_str_n(int count, ...) {
     if (count == 0) return fl_str_val("");
     va_list ap;
     va_start(ap, count);
-    char bufs[8][64];
+    char bufs[count][64];
     const char* parts[count];
     size_t lens[count];
     size_t total = 0;
     for (int i = 0; i < count; i++) {
         FLValue v = va_arg(ap, FLValue);
-        parts[i] = fl_to_str(v, bufs[i < 8 ? i : 0], 64);
+        parts[i] = fl_display(v, bufs[i], 64);
         lens[i] = strlen(parts[i]);
         total += lens[i];
     }
@@ -248,14 +330,22 @@ FLValue fl_str_n(int count, ...) {
 /* ── I/O ── */
 
 FLValue fl_println(FLValue v) {
-    char buf[64];
-    puts(fl_to_str(v, buf, sizeof(buf)));
+    if (v.tag == FL_STRING) {
+        puts(((FLString*)v.obj)->data);
+    } else {
+        char buf[4096];
+        puts(fl_to_str(v, buf, sizeof(buf)));
+    }
     return fl_nil();
 }
 
 FLValue fl_print(FLValue v) {
-    char buf[64];
-    fputs(fl_to_str(v, buf, sizeof(buf)), stdout);
+    if (v.tag == FL_STRING) {
+        fputs(((FLString*)v.obj)->data, stdout);
+    } else {
+        char buf[4096];
+        fputs(fl_to_str(v, buf, sizeof(buf)), stdout);
+    }
     return fl_nil();
 }
 
@@ -284,7 +374,7 @@ FLValue fl_file_write(FLValue path, FLValue content) {
     if (path.tag != FL_STRING) return fl_nil();
     const char* p = ((FLString*)path.obj)->data;
     char buf[64];
-    const char* s = fl_to_str(content, buf, sizeof(buf));
+    const char* s = fl_display(content, buf, sizeof(buf));
     FILE* f = fopen(p, "wb");
     if (!f) return fl_nil();
     fwrite(s, 1, strlen(s), f);

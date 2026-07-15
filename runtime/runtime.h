@@ -80,6 +80,8 @@ FLValue fl_sub(FLValue a, FLValue b);
 FLValue fl_mul(FLValue a, FLValue b);
 FLValue fl_div(FLValue a, FLValue b);
 FLValue fl_mod(FLValue a, FLValue b);
+FLValue fl_quot(FLValue a, FLValue b);
+FLValue fl_rem(FLValue a, FLValue b);
 
 /* ── 비교 ── */
 FLValue fl_eq(FLValue a, FLValue b);
@@ -192,6 +194,8 @@ FLValue fl_concat(FLValue a, FLValue b);
 
 /* ── S27: FL 소스 → AST (cgc-bridge.c + parser.c에서 제공) ── */
 FLValue fl_parse(FLValue src);
+FLValue fl_map_p(FLValue v);
+FLValue fl_str_starts_with(FLValue str, FLValue prefix);
 
 /* ── JSON ── */
 FLValue fl_json_parse(FLValue src);
@@ -244,5 +248,18 @@ extern FLTryFrame fl_try_stack[FL_TRY_MAX];
 extern int fl_try_top;
 void fl_throw(FLValue err);
 FLValue fl_make_error(const char* type, const char* msg);
+
+/* ── 연산자 first-class 래퍼 (HOF 인자로 사용 가능, e.g. (map + list)) ── */
+static inline FLValue __fl_op_add_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_add(a[0], a[1]); }
+static inline FLValue __fl_op_sub_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_sub(a[0], a[1]); }
+static inline FLValue __fl_op_mul_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_mul(a[0], a[1]); }
+static inline FLValue __fl_op_div_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_div(a[0], a[1]); }
+static inline FLValue __fl_op_mod_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_mod(a[0], a[1]); }
+static inline FLValue __fl_op_eq_w (FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_eq (a[0], a[1]); }
+static inline FLValue __fl_op_neq_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_neq(a[0], a[1]); }
+static inline FLValue __fl_op_lt_w (FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_lt (a[0], a[1]); }
+static inline FLValue __fl_op_gt_w (FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_gt (a[0], a[1]); }
+static inline FLValue __fl_op_lte_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_lte(a[0], a[1]); }
+static inline FLValue __fl_op_gte_w(FLClosure* _s, int _ac, FLValue* a) { (void)_s;(void)_ac; return fl_gte(a[0], a[1]); }
 
 #endif /* FREELANG_RUNTIME_H */

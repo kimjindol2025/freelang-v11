@@ -1,0 +1,101 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "FreeLang",
+  "scopeName": "source.freelang",
+  "fileTypes": ["fl"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#number" },
+    { "include": "#boolean" },
+    { "include": "#keyword" },
+    { "include": "#special-form" },
+    { "include": "#builtin-fn" },
+    { "include": "#variable" },
+    { "include": "#sexpr" },
+    { "include": "#bracket" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.semicolon.freelang",
+      "match": ";.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.freelang",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.freelang",
+          "match": "\\\\."
+        },
+        {
+          "name": "variable.other.interpolated.freelang",
+          "match": "\\{\\$[a-zA-Z_][a-zA-Z0-9_\\-?]*\\}"
+        },
+        {
+          "name": "meta.embedded.line.freelang",
+          "match": "\\{\\([^}]+\\)\\}"
+        }
+      ]
+    },
+    "number": {
+      "name": "constant.numeric.freelang",
+      "match": "-?\\b[0-9]+(\\.[0-9]+)?\\b"
+    },
+    "boolean": {
+      "name": "constant.language.freelang",
+      "match": "\\b(true|false|nil|null)\\b"
+    },
+    "keyword": {
+      "name": "keyword.control.freelang",
+      "match": "\\b(if|cond|do|begin|let|when|unless|and|or|not|recur)\\b"
+    },
+    "special-form": {
+      "name": "keyword.other.special-form.freelang",
+      "match": "\\b(defn|define|fn|lambda|load|require|try|catch|finally|throw|return)\\b"
+    },
+    "builtin-fn": {
+      "name": "support.function.builtin.freelang",
+      "match": "\\b(println|print|str|length|map|filter|reduce|list|get|set|push|append|first|last|rest|nth|count|keys|vals|type|string\\?|number\\?|list\\?|map\\?|nil\\?|boolean\\?|fn\\?|json-parse|json-stringify|http-get|http-post|mariadb-query|sqlite-query|file-read|file-write|atom|deref|swap!|reset!)\\b"
+    },
+    "variable": {
+      "name": "variable.other.freelang",
+      "match": "\\$[a-zA-Z_][a-zA-Z0-9_\\-?]*"
+    },
+    "sexpr": {
+      "name": "meta.sexpr.freelang",
+      "begin": "\\(",
+      "end": "\\)",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#keyword" },
+        { "include": "#special-form" },
+        { "include": "#builtin-fn" },
+        { "include": "#variable" },
+        { "include": "#function-call" },
+        { "include": "#sexpr" },
+        { "include": "#bracket" }
+      ]
+    },
+    "function-call": {
+      "name": "entity.name.function.freelang",
+      "match": "(?<=\\()[a-zA-Z_][a-zA-Z0-9_\\-?!*+/<>=]*"
+    },
+    "bracket": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.parameters.freelang",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.definition.map.freelang",
+          "match": "[{}]"
+        }
+      ]
+    }
+  }
+}

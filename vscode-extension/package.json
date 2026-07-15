@@ -1,0 +1,28 @@
+{
+  "name": "freelang",
+  "displayName": "FreeLang",
+  "description": "FreeLang v11 — syntax highlighting, hover, completions",
+  "version": "1.1.0",
+  "publisher": "kimjin",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:freelang"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "freelang",
+        "aliases": ["FreeLang", "FL"],
+        "extensions": [".fl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "freelang",
+        "scopeName": "source.freelang",
+        "path": "./syntaxes/freelang.tmLanguage.json"
+      }
+    ]
+  }
+}

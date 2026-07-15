@@ -88,21 +88,33 @@ const RULES = {
       desc: 'let 벡터 내 바인딩은 한 줄에 하나씩만',
       check: (content) => {
         const issues = [];
-        // (let [x 1 y 2] 패턴 (한 줄에 여러 바인딩)
-        const badLetRegex = /\(let\s*\[([^\]]*?[a-zA-Z_$]\w*\s+[^\]\s]+\s+[a-zA-Z_$]\w+)/g;
-        let match;
-        while ((match = badLetRegex.exec(content)) !== null) {
-          // 한 줄인지 확인 (개행이 없으면 같은 줄)
-          if (!match[1].includes('\n')) {
-            const lineNum = content.substring(0, match.index).split('\n').length;
+        // (let [...] 가 같은 줄에 열리고 닫히는 경우만 체크
+        // 괄호 깊이를 고려해 최상위 토큰 수가 4개 이상(2쌍)이면 위반
+        const lines = content.split('\n');
+        lines.forEach((line, idx) => {
+          const m = line.match(/\(let\s*\[([^\]]+)\]/);
+          if (!m) return;
+          const inner = m[1];
+          let depth = 0, tokens = 0, inToken = false;
+          for (const c of inner) {
+            if ('([{'.includes(c)) { depth++; inToken = true; }
+            else if (')]}'.includes(c)) { depth--; }
+            else if (/\s/.test(c)) {
+              if (depth === 0 && inToken) { tokens++; inToken = false; }
+            } else {
+              inToken = true;
+            }
+          }
+          if (inToken) tokens++;
+          if (tokens >= 4) {
             issues.push({
-              line: lineNum,
-              col: match.index,
-              code: `(let [${match[1]}]`,
+              line: idx + 1,
+              col: 0,
+              code: line.trim(),
               fix: '각 바인딩을 새 줄에 배치: (let [x 1\\n      y 2]'
             });
           }
-        }
+        });
         return issues;
       }
     },

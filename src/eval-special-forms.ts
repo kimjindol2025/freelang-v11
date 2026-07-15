@@ -591,6 +591,13 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
     fnValue.name = name;
     if (_defnRetAnn) fnValue.returnAnnotation = _defnRetAnn;
 
+    // Fix A: 전역 defn은 클로저 불필요 — capturedEnv 제거
+    // depth=1 → 전역 스코프만 존재 → 매 호출마다 ~260개 엔트리 복사 불필요
+    // push/pop 경로로 전환되어 전역 변수는 스코프 체인으로 자연스럽게 접근
+    if (ctx.variables.depth() === 1) {
+      fnValue.capturedEnv = undefined;
+    }
+
     // Phase 3-E: VM 함수 컴파일 및 등록
     try {
       const funcChunk = _vmCompiler.compileFunctionBody(fnValue.params, fnValue.body, name);

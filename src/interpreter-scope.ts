@@ -102,6 +102,20 @@ export class ScopeStack {
     if (this.stack.length > 1) this.stack.pop();
   }
 
+  /** 현재 스코프 깊이 (1 = 전역 스코프만 있음) */
+  depth(): number {
+    return this.stack.length;
+  }
+
+  /** 전역 함수 호출용: 현재 스택을 저장하고 [global_ref, new_frame]으로 리셋.
+   *  capturedEnv 없는 전역 함수 전용 — 260엔트리 복사 없이 O(1) 호출 비용.
+   *  반환값을 restoreStack()에 전달하여 복원. */
+  resetToGlobalFrame(): Map<string, any>[] {
+    const saved = [...this.stack];          // 현재 스택 저장 (얕은 참조 복사)
+    this.stack = [this.stack[0], new Map()]; // global 참조 유지 + 새 파라미터 프레임
+    return saved;
+  }
+
   /** 클로저 캡처용: 현재 스코프 체인 전체를 단일 Map으로 병합 (메타정보 포함) */
   snapshot(): Map<string, any> {
     const merged = new Map<string, any>();

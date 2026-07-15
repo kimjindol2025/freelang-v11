@@ -59,6 +59,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   let currentRequestId: string | null = null;
   let currentNonce = "";
 
+  // SSE (Server-Sent Events)
+  const sseConnections = new Map<string, http.ServerResponse>(); // connId → res
+  const sseRoutes = new Map<string, string>(); // path → handlerName
+  let sseConnIdCounter = 0;
+
   // WebSocket 공개 클라이언트 (터널 WS 프록시용)
   const wsPublicMap = new Map<string, WebSocket>();
   let upgradeHandler: string | null = null;
@@ -505,6 +510,24 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
             const retryAfterSec = rlEntry ? Math.max(1, Math.ceil((rlEntry.resetAt - Date.now()) / 1000)) : Math.ceil(rlWindowMs / 1000);
             res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(retryAfterSec) });
             res.end(JSON.stringify({ error: "Too Many Requests", retry_after: retryAfterSec }));
+            return;
+          }
+
+          // SSE 라우트 처리 (server_sse 등록)
+          if (method === "GET" && sseRoutes.has(path)) {
+            const connId = String(++sseConnIdCounter);
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              "Connection": "keep-alive",
+              "X-Accel-Buffering": "no",
+              "Access-Control-Allow-Origin": "*",
+            });
+            res.write("retry: 3000\n\n");
+            sseConnections.set(connId, res);
+            req.on("close", () => sseConnections.delete(connId));
+            const handlerName = sseRoutes.get(path)!;
+            try { callFn(handlerName, [connId]); } catch (_e) { /* ignore */ }
             return;
           }
 
@@ -1264,5 +1287,48 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     "server_req_session_id": (req: any): string | null => {
       return req?.session_id ?? null;
     },
+
+    // ── SSE (Server-Sent Events) ────────────────────────────────────
+    // server_sse path handlerName → null (라우트 등록)
+    "server_sse": (path: string, handlerName: string): null => {
+      sseRoutes.set(path, handlerName);
+      return null;
+    },
+
+    // sse_send connId data → boolean (특정 연결에 이벤트 전송)
+    "sse_send": (connId: string, data: string): boolean => {
+      const res = sseConnections.get(connId);
+      if (!res || (res as any).destroyed) { sseConnections.delete(connId); return false; }
+      try { res.write(`data: ${data}\n\n`); return true; }
+      catch (_e) { sseConnections.delete(connId); return false; }
+    },
+
+    // sse_broadcast data → integer (모든 연결에 브로드캐스트, 전송 수 반환)
+    "sse_broadcast": (data: string): number => {
+      let count = 0;
+      for (const [connId, res] of sseConnections) {
+        if ((res as any).destroyed) { sseConnections.delete(connId); continue; }
+        try { res.write(`data: ${data}\n\n`); count++; }
+        catch (_e) { sseConnections.delete(connId); }
+      }
+      return count;
+    },
+
+    // sse_close connId → null (특정 연결 종료)
+    "sse_close": (connId: string): null => {
+      const res = sseConnections.get(connId);
+      if (res && !(res as any).destroyed) res.end();
+      sseConnections.delete(connId);
+      return null;
+    },
+
+    // sse_alive connId → boolean (연결 유효 여부)
+    "sse_alive": (connId: string): boolean => {
+      const res = sseConnections.get(connId);
+      return !!(res && !(res as any).destroyed);
+    },
+
+    // sse_count → integer (현재 활성 SSE 연결 수)
+    "sse_count": (): number => sseConnections.size,
   };
 }
