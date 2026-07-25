@@ -14,6 +14,10 @@
   (println (str "[IR-ERR] " $msg " | kind=" (get $n :kind) " line=" (get $n :line)))
   false)
 
+(defn ir-array? [$v]
+  (let [[$t (type-of $v)]]
+    (or (= $t "array") (= $t "list"))))
+
 (defn ir-chk [$n]
   (if (null? $n) true
   (let [[$k (get $n :kind)]]
@@ -45,12 +49,12 @@
        [(or (= (get $n :op) "and") (= (get $n :op) "or"))
         (ir-err (str "and/or must be canonical kind node, not sexpr op=" (get $n :op)) $n)]
        [(null? (get $n :args)) (ir-err "sexpr missing :args" $n)]
-       [(not (= (type-of (get $n :args)) "array")) (ir-err "sexpr :args must be array" $n)]
+       [(not (ir-array? (get $n :args))) (ir-err "sexpr :args must be array" $n)]
        [true true])]
     [(= $k "block")
      (if (null? (get $n :type)) (ir-err "block missing :type" $n) true)]
     [(or (= $k "and") (= $k "or"))
-     (if (or (null? (get $n :args)) (not (= (type-of (get $n :args)) "array")))
+     (if (or (null? (get $n :args)) (not (ir-array? (get $n :args))))
        (ir-err (str $k " missing/invalid :args") $n) true)]
     [true true]))))
 

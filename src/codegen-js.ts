@@ -132,6 +132,11 @@ const BUILTIN_MAP: Record<string, string> = {
   "map-values": "_fl_values",
   "map-set": "_fl_map_set", "json-set": "_fl_map_set", "json_set": "_fl_map_set",
   "has-key?": "_fl_has_key_q",
+
+  // 가변 참조
+  "atom": "_fl_atom",
+  "deref": "_fl_atom_deref",
+  "reset!": "_fl_atom_reset",
 };
 
 // JavaScript 예약어 목록
@@ -389,6 +394,7 @@ export class JSCodegen {
       }
 
       const inits: string[] = [];
+      const declarations: string[] = [];
       const names: string[] = [];
       for (let i = 0; i < items.length; i += 2) {
         const nameNode = items[i];
@@ -397,7 +403,8 @@ export class JSCodegen {
         const name = this.extractVarName(nameNode);
         const val = valNode ? this.genNode(valNode) : "null";
         const tmpName = `__fl_loop_${i}`;
-        inits.push(`let ${tmpName} = ${val}; let ${name} = ${tmpName};`);
+        inits.push(`let ${tmpName} = ${val};`);
+        declarations.push(`let ${name} = ${tmpName};`);
         names.push(name);
       }
 
@@ -412,7 +419,7 @@ export class JSCodegen {
         bodyCode = `${stmts.join(" ")} return ${bodyParts[bodyParts.length - 1]};`;
       }
 
-      return `((() => { ${inits.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } })())`;
+      return `((() => { ${inits.join(" ")} { ${declarations.join(" ")} while (true) { const __r = (() => { ${bodyCode} })(); if (__r && __r.__recur) { [${names.join(", ")}] = __r.a; continue; } return __r; } } })())`;
     }
 
     if (op === "let") {
@@ -484,6 +491,27 @@ export class JSCodegen {
 
     if (op === "not" && args.length === 1) {
       return `(!${this.genNode(args[0])})`;
+    }
+
+    if (op === "atom" && args.length === 1) {
+      return `_fl_atom(${this.genNode(args[0])})`;
+    }
+
+    if (op === "deref" && args.length === 1) {
+      return `_fl_atom_deref(${this.genNode(args[0])})`;
+    }
+
+    if (op === "reset!" && args.length === 2) {
+      return `_fl_atom_reset(${this.genNode(args[0])}, ${this.genNode(args[1])})`;
+    }
+
+    if (op === "swap!" && args.length >= 2) {
+      const atomRef = this.genNode(args[0]);
+      const fnNode = args[1];
+      const extra = args.slice(2).map((a) => this.genNode(a));
+      const current = `_fl_atom_deref(${atomRef})`;
+      const fnCall = this.genSwapFunctionCall(fnNode, current, extra);
+      return `_fl_atom_reset(${atomRef}, ${fnCall})`;
     }
 
     if (op === "if") {
@@ -728,6 +756,23 @@ export class JSCodegen {
     const argStrs = args.map((a) => this.genNode(a));
     const jsOp = flNameToJs(op);
     return `${jsOp}(${argStrs.join(", ")})`;
+  }
+
+  private genSwapFunctionCall(fnNode: ASTNode, current: string, extra: string[]): string {
+    if (fnNode.kind === "literal" && fnNode.type === "symbol") {
+      const op = String(fnNode.value);
+      if (op === "+") return `(${[current, ...extra].join(" + ")})`;
+      if (op === "-") return extra.length === 0 ? `(-${current})` : `(${[current, ...extra].join(" - ")})`;
+      if (op === "*") return `(${[current, ...extra].join(" * ")})`;
+      if (op === "/") return `(${[current, ...extra].join(" / ")})`;
+      return `${flNameToJs(op)}(${[current, ...extra].join(", ")})`;
+    }
+
+    if (fnNode.kind === "variable") {
+      return `${this.genNode(fnNode)}(${[current, ...extra].join(", ")})`;
+    }
+
+    return `${this.genNode(fnNode)}(${[current, ...extra].join(", ")})`;
   }
 
   genBlock(node: Block): string {

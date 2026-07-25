@@ -1,8 +1,8 @@
 ;; run-cgc.fl — codegen-c.fl 드라이버
 ;; 사용: node bootstrap.js run self/run-cgc.fl <input.fl> <output.c>
 
-(load "self/codegen-c.fl")
-(load "self/ir-validator.fl")
+(load "codegen-c.fl")
+(load "ir-validator.fl")
 
 (defn main [argv]
   (let [[input  (get argv 0)]

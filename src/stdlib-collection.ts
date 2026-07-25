@@ -229,5 +229,9 @@ export function createCollectionModule() {
       if (idx === -1) return arr;
       return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
     },
+
+    "str-repeat": (s: string, n: number): string => n > 0 ? s.repeat(Math.floor(n)) : "",
+
+    "str-repeat": (s: string, n: number): string => s.repeat(Math.max(0, Math.floor(n))),
   };
 }
