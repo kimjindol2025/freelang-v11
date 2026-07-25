@@ -15767,9 +15767,9 @@ function evalBuiltin(interp2, op, args3, expr2) {
       }
     }
     case "shell-exec-result": {
-      const { spawnSync: spawnSync8 } = require("child_process");
+      const { spawnSync: spawnSync7 } = require("child_process");
       const cmd2 = String(args3[0] ?? "");
-      const res = spawnSync8("sh", ["-c", cmd2], { encoding: "utf-8" });
+      const res = spawnSync7("sh", ["-c", cmd2], { encoding: "utf-8" });
       return {
         stdout: res.stdout ?? "",
         stderr: res.stderr ?? "",
@@ -15810,7 +15810,7 @@ function evalBuiltin(interp2, op, args3, expr2) {
       const port = Number(args3[1] ?? 27017);
       const hexData = String(args3[2] ?? "");
       const timeout = Number(args3[3] ?? 1e4);
-      const { spawnSync: spawnSync8 } = require("child_process");
+      const { spawnSync: spawnSync7 } = require("child_process");
       const inlineScript = `
 const net = require('net');
 const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
@@ -15860,7 +15860,7 @@ sock.setTimeout(timeout, () => {
 `;
       const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
       try {
-        const r = spawnSync8(
+        const r = spawnSync7(
           process.execPath,
           ["-e", inlineScript],
           { input: reqJson, timeout: timeout + 1e3, encoding: "utf-8" }
@@ -15876,7 +15876,7 @@ sock.setTimeout(timeout, () => {
       const host = String(args3[0] ?? "localhost");
       const port = Number(args3[1] ?? 27017);
       const timeout = Number(args3[2] ?? 5e3);
-      const { spawnSync: spawnSync8 } = require("child_process");
+      const { spawnSync: spawnSync7 } = require("child_process");
       const inlineScript = `
 const net = require('net');
 const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
@@ -15886,7 +15886,7 @@ sock.on('error', () => { process.exit(1); });
 sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
 `;
       try {
-        const r = spawnSync8(
+        const r = spawnSync7(
           process.execPath,
           ["-e", inlineScript],
           { input: JSON.stringify({ host, port, timeout }), timeout: timeout + 500, encoding: "utf-8" }
@@ -16413,7 +16413,7 @@ loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); 
       const port = Number(args3[1] ?? 30390);
       const line = String(args3[2] ?? "");
       const timeout = Number(args3[3] ?? 3e3);
-      const { spawnSync: spawnSync8 } = require("child_process");
+      const { spawnSync: spawnSync7 } = require("child_process");
       const script = `
 const net = require('net');
 const r = JSON.parse(require('fs').readFileSync(0,'utf8'));
@@ -16426,7 +16426,7 @@ sock.on('error',()=>process.exit(1));
 sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.write(resp.trim());process.exit(resp?0:1);}});
 `;
       try {
-        const r = spawnSync8(process.execPath, ["-e", script], {
+        const r = spawnSync7(process.execPath, ["-e", script], {
           input: JSON.stringify({ host, port, line, timeout }),
           timeout: timeout + 500,
           encoding: "utf-8"
@@ -26108,7 +26108,102 @@ function createErrorModule() {
 }
 
 // src/stdlib-http.ts
-var import_child_process = require("child_process");
+var import_worker_threads = require("worker_threads");
+var HTTP_SYNC_WORKER_SOURCE = `
+const { parentPort, workerData } = require("worker_threads");
+const http = require("http");
+const https = require("https");
+const { URL } = require("url");
+const signal = new Int32Array(workerData.sab);
+function handle(port, msg) {
+  let settled = false;
+  const done = (r) => {
+    if (settled) return;
+    settled = true;
+    port.postMessage(r);
+    Atomics.store(signal, 0, 1);
+    Atomics.notify(signal, 0);
+  };
+  try {
+    const u = new URL(msg.url);
+    const mod = u.protocol === "https:" ? https : http;
+    const headers = Object.assign({}, msg.headers || {});
+    if (msg.body != null) {
+      headers["Content-Length"] = Buffer.byteLength(msg.body, "utf-8");
+    }
+    const req = mod.request(
+      {
+        hostname: u.hostname,
+        port: u.port || undefined,
+        path: u.pathname + (u.search || ""),
+        method: msg.method || "GET",
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (d) => chunks.push(d));
+        res.on("end", () =>
+          done({
+            status: res.statusCode || 0,
+            body: Buffer.concat(chunks).toString("utf-8"),
+          })
+        );
+      }
+    );
+    req.on("error", (e) =>
+      done({ status: 0, body: "", error: String(e && e.message ? e.message : e) })
+    );
+    const ms = msg.timeoutMs || 10000;
+    req.setTimeout(ms, () => {
+      req.destroy();
+      done({ status: 0, body: "", error: "timeout" });
+    });
+    if (msg.body != null) req.write(msg.body, "utf-8");
+    req.end();
+  } catch (e) {
+    done({ status: 0, body: "", error: String(e && e.message ? e.message : e) });
+  }
+}
+parentPort.once("message", (init) => {
+  const port = init.port;
+  port.on("message", (msg) => handle(port, msg));
+  Atomics.store(signal, 1, 1);
+  Atomics.notify(signal, 1);
+});
+`;
+var httpWorkerState = null;
+function ensureHttpWorker() {
+  if (httpWorkerState) return httpWorkerState;
+  const sab = new SharedArrayBuffer(8);
+  const signal = new Int32Array(sab);
+  const { port1, port2 } = new import_worker_threads.MessageChannel();
+  const worker = new import_worker_threads.Worker(HTTP_SYNC_WORKER_SOURCE, {
+    eval: true,
+    workerData: { sab }
+  });
+  worker.on("error", (err4) => {
+    httpWorkerState = null;
+    console.error("[FreeLang] http sync worker error:", err4 && err4.message ? err4.message : err4);
+  });
+  worker.on("exit", () => {
+    httpWorkerState = null;
+  });
+  worker.postMessage({ port: port2 }, [port2]);
+  const ready = Atomics.wait(signal, 1, 0, 5e3);
+  if (ready === "timed-out" || Atomics.load(signal, 1) !== 1) {
+    try {
+      worker.terminate();
+    } catch {
+    }
+    throw new Error("http sync worker failed to start");
+  }
+  try {
+    worker.unref();
+  } catch {
+  }
+  httpWorkerState = { worker, port: port1, signal };
+  return httpWorkerState;
+}
 function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4) {
   try {
     const headersObj = {};
@@ -26118,15 +26213,30 @@ function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4) {
         headersObj[String(k)] = String(v);
       }
     }
-    const encodedUrl = JSON.stringify(url2);
-    const encodedMethod = JSON.stringify(method.toUpperCase());
-    const encodedHeaders = JSON.stringify(headersObj);
-    const encodedBody = body ? JSON.stringify(body) : "null";
-    const script = `const {URL}=require('url');const u=new URL(${encodedUrl});const mod=u.protocol==='https:'?require('https'):require('http');const method=${encodedMethod};const hdrs=${encodedHeaders};const bodyStr=${encodedBody};const opts={hostname:u.hostname,port:u.port||undefined,path:u.pathname+(u.search||''),method,headers:hdrs};if(bodyStr!=null)opts.headers['Content-Length']=Buffer.byteLength(bodyStr,'utf-8');const chunks=[];const req=mod.request(opts,res=>{res.on('data',d=>chunks.push(d));res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString('utf-8')}))})});let done=false;const fail=(msg)=>{if(done)return;done=true;process.stdout.write(JSON.stringify({s:0,b:'',e:msg}))};req.on('error',e=>fail(e.message));req.on('socket',s=>{s.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')})});req.setTimeout(${timeoutMs},()=>{req.destroy();fail('timeout')});if(bodyStr!=null)req.write(bodyStr,'utf-8');req.end();`;
-    const r = (0, import_child_process.spawnSync)("node", ["-e", script], { encoding: "utf-8", timeout: timeoutMs + 2e3 });
-    if (r.error) return { status: 0, body: "", error: r.error.message };
-    const parsed = JSON.parse(r.stdout || "{}");
-    return { status: parsed.s || 0, body: parsed.b || "", ...parsed.e && { error: parsed.e } };
+    const { port, signal } = ensureHttpWorker();
+    Atomics.store(signal, 0, 0);
+    port.postMessage({
+      url: String(url2),
+      method: String(method || "GET").toUpperCase(),
+      headers: headersObj,
+      body: body != null ? String(body) : null,
+      timeoutMs
+    });
+    const waitMs = Math.max(1, Number(timeoutMs) || 1e4) + 2e3;
+    const wr = Atomics.wait(signal, 0, 0, waitMs);
+    if (wr === "timed-out") {
+      return { status: 0, body: "", error: "timeout" };
+    }
+    const msg = (0, import_worker_threads.receiveMessageOnPort)(port);
+    if (!msg || !msg.message) {
+      return { status: 0, body: "", error: "no response from http worker" };
+    }
+    const result = msg.message;
+    return {
+      status: result.status || 0,
+      body: result.body || "",
+      ...result.error && { error: result.error }
+    };
   } catch (err4) {
     return { status: 0, body: "", error: err4.message };
   }
@@ -26535,12 +26645,12 @@ function createHttpModule() {
 }
 
 // src/stdlib-shell.ts
-var import_child_process2 = require("child_process");
+var import_child_process = require("child_process");
 function createShellModule() {
   return {
     // shell cmd -> string (run command, return stdout)
     "shell": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
       if (result.error) throw new Error(`shell failed: ${result.error.message}`);
       if ((result.status ?? 1) !== 0) {
         const stderr = result.stderr?.toString().trim() ?? "";
@@ -26550,17 +26660,17 @@ function createShellModule() {
     },
     // shell_status cmd -> number (run command, return exit code)
     "shell_status": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
       return result.status ?? 1;
     },
     // shell_ok cmd -> boolean (returns true if exit code is 0)
     "shell_ok": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
       return (result.status ?? 1) === 0;
     },
     // shell_pipe cmd1 cmd2 -> string (pipe output of cmd1 into cmd2)
     "shell_pipe": (cmd1, cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", `${cmd1} | ${cmd2}`], { timeout: 3e4 });
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", `${cmd1} | ${cmd2}`], { timeout: 3e4 });
       if (result.error) throw new Error(`shell_pipe failed: ${result.error.message}`);
       if ((result.status ?? 1) !== 0) {
         const stderr = result.stderr?.toString().trim() ?? "";
@@ -26570,7 +26680,7 @@ function createShellModule() {
     },
     // shell_capture cmd -> {stdout, stderr, code} (capture all output)
     "shell_capture": (cmd2) => {
-      const result = (0, import_child_process2.spawnSync)("sh", ["-c", cmd2], {
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], {
         encoding: "utf-8",
         timeout: 3e4
       });
@@ -26582,14 +26692,14 @@ function createShellModule() {
     },
     // shell_exists program -> boolean (check if a program is in PATH)
     "shell_exists": (program) => {
-      const result = (0, import_child_process2.spawnSync)("which", [program], { timeout: 5e3 });
+      const result = (0, import_child_process.spawnSync)("which", [program], { timeout: 5e3 });
       return (result.status ?? 1) === 0;
     },
     // shell_safe program args -> string (인자 배열 방식 — 사용자 입력 안전 실행, sh -c 미사용)
     "shell_safe": (program, args3) => {
       if (typeof program !== "string" || !program) throw new Error("shell_safe: program\uC740 \uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
       if (!Array.isArray(args3)) throw new Error("shell_safe: args\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
-      const result = (0, import_child_process2.spawnSync)(program, args3.map(String), { timeout: 3e4, encoding: "utf-8" });
+      const result = (0, import_child_process.spawnSync)(program, args3.map(String), { timeout: 3e4, encoding: "utf-8" });
       if (result.error) throw new Error(`shell_safe failed: ${result.error.message}`);
       if ((result.status ?? 1) !== 0) {
         const stderr = result.stderr?.trim() ?? "";
@@ -28591,9 +28701,9 @@ function fieldMatch(f, v) {
 }
 
 // src/stdlib-queue-helpers.ts
-var import_child_process3 = require("child_process");
+var import_child_process2 = require("child_process");
 function sqliteJson(dbPath, sql) {
-  const r = (0, import_child_process3.spawnSync)("sqlite3", ["-json", dbPath, sql], { timeout: 1e4, encoding: "utf-8" });
+  const r = (0, import_child_process2.spawnSync)("sqlite3", ["-json", dbPath, sql], { timeout: 1e4, encoding: "utf-8" });
   if (r.error) throw new Error(`sqlite3 error: ${r.error.message}`);
   if ((r.status ?? 1) !== 0) {
     const stderr = r.stderr?.trim() ?? "";
@@ -28645,7 +28755,7 @@ function createQueueHelpersModule() {
         PRAGMA busy_timeout=5000;
         PRAGMA synchronous=NORMAL;
       `;
-      const r = (0, import_child_process3.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3 });
+      const r = (0, import_child_process2.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3 });
       return (r.status ?? 1) === 0;
     },
     // queue_recover_stuck db_path stuck_seconds -> count
@@ -28660,7 +28770,7 @@ function createQueueHelpersModule() {
         WHERE status='in_flight' AND locked_until < ${cutoff};
         SELECT changes();
       `;
-      const r = (0, import_child_process3.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3, encoding: "utf-8" });
+      const r = (0, import_child_process2.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3, encoding: "utf-8" });
       if ((r.status ?? 1) !== 0) return 0;
       const out = r.stdout?.trim() ?? "0";
       return parseInt(out, 10) || 0;
@@ -29460,11 +29570,11 @@ function createWorkflowModule() {
 }
 
 // src/stdlib-resource.ts
-var import_child_process4 = require("child_process");
+var import_child_process3 = require("child_process");
 var os = __toESM(require("os"));
 function run(cmd2, timeout = 1e4) {
   try {
-    return (0, import_child_process4.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
+    return (0, import_child_process3.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
   } catch {
     return "";
   }
@@ -29598,7 +29708,7 @@ function createResourceModule() {
     // res_proc_exists name -> boolean
     "res_proc_exists": (name) => {
       const safeName = name.replace(/[^a-zA-Z0-9_\-\.]/g, "");
-      const result = (0, import_child_process4.spawnSync)("sh", ["-c", `pgrep -f "${safeName}" > /dev/null 2>&1`]);
+      const result = (0, import_child_process3.spawnSync)("sh", ["-c", `pgrep -f "${safeName}" > /dev/null 2>&1`]);
       return (result.status ?? 1) === 0;
     },
     // res_proc_pid name -> number | null
@@ -29639,7 +29749,7 @@ function createResourceModule() {
     },
     // res_port_used port -> boolean
     "res_port_used": (port) => {
-      const result = (0, import_child_process4.spawnSync)("sh", ["-c", `ss -tlnp 2>/dev/null | grep -q ":${port} "`]);
+      const result = (0, import_child_process3.spawnSync)("sh", ["-c", `ss -tlnp 2>/dev/null | grep -q ":${port} "`]);
       return (result.status ?? 1) === 0;
     },
     // res_port_info port -> PortInfo | null
@@ -31049,7 +31159,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
 }
 
 // src/stdlib-db.ts
-var import_child_process5 = require("child_process");
+var import_child_process4 = require("child_process");
 var _DatabaseSync = null;
 function getDatabaseSync() {
   if (!_DatabaseSync) _DatabaseSync = eval("require")("node:sqlite").DatabaseSync;
@@ -31078,7 +31188,7 @@ function kimdbReq(method, path19, body) {
     }
   }
   args3.push(url2);
-  const r = (0, import_child_process5.spawnSync)("curl", args3, { timeout: 6e3 });
+  const r = (0, import_child_process4.spawnSync)("curl", args3, { timeout: 6e3 });
   if (r.error) throw new Error(`kimdb request failed: ${r.error.message}`);
   const raw = r.stdout?.toString().trim() ?? "";
   if (!raw) return null;
@@ -31253,7 +31363,7 @@ function createDbModule() {
 }
 
 // src/stdlib-mariadb.ts
-var import_child_process6 = require("child_process");
+var import_child_process5 = require("child_process");
 var cachedSock = null;
 function resolveSocket() {
   if (cachedSock) return cachedSock;
@@ -31326,7 +31436,7 @@ function runMariadb(db, sql) {
   const bin = resolveMariadBin();
   const extraPath = MARIADB_SEARCH_PATHS.join(":");
   const env = { ...process.env, PATH: `${extraPath}:${process.env.PATH ?? ""}` };
-  const r = (0, import_child_process6.spawnSync)(bin, buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8", env });
+  const r = (0, import_child_process5.spawnSync)(bin, buildArgs(db, sql), { timeout: 15e3, encoding: "utf-8", env });
   const isProd = process.env.NODE_ENV === "production";
   const sqlHint = isProd ? "" : `
 SQL: ${sql.slice(0, 200)}`;
@@ -31515,11 +31625,11 @@ var controlBuf = null;
 var dataBuf = null;
 function ensureWorker() {
   if (poolWorker) return;
-  const { Worker } = require("worker_threads");
+  const { Worker: Worker2 } = require("worker_threads");
   controlBuf = new SharedArrayBuffer(4);
   dataBuf = new SharedArrayBuffer(DATA_BUF_SIZE);
   Atomics.store(new Int32Array(controlBuf), 0, 0);
-  poolWorker = new Worker(WORKER_CODE, {
+  poolWorker = new Worker2(WORKER_CODE, {
     eval: true,
     workerData: { controlBuf, dataBuf }
   });
@@ -31753,7 +31863,7 @@ function createMariadbModule(callFn) {
         "--socket=" + resolveSocket(),
         "ping"
       ];
-      const r = (0, import_child_process6.spawnSync)("mariadb-admin", args3, { timeout: 3e3, encoding: "utf-8" });
+      const r = (0, import_child_process5.spawnSync)("mariadb-admin", args3, { timeout: 3e3, encoding: "utf-8" });
       return (r.status ?? 1) === 0;
     },
     "mariadb_databases": () => parseRows(runMariadb("", "SHOW DATABASES")).map((r) => r.Database),
@@ -31865,7 +31975,7 @@ function createMariadbModule(callFn) {
 }
 
 // src/stdlib-mongodb.ts
-var import_child_process7 = require("child_process");
+var import_child_process6 = require("child_process");
 var path10 = __toESM(require("path"));
 function createMongodbModule() {
   const helperPath = path10.join(__dirname, "_mongodb_helper.js");
@@ -31883,7 +31993,7 @@ function createMongodbModule() {
         }
         return obj;
       };
-      const result = (0, import_child_process7.execFileSync)("node", [helperPath, JSON.stringify(toSerializable2(req))], {
+      const result = (0, import_child_process6.execFileSync)("node", [helperPath, JSON.stringify(toSerializable2(req))], {
         timeout: req.timeout ? req.timeout + 2e3 : 15e3,
         encoding: "utf-8"
       });
@@ -36855,23 +36965,23 @@ function createBlogModule() {
 }
 
 // src/stdlib-cloud.ts
-var import_child_process8 = require("child_process");
+var import_child_process7 = require("child_process");
 var cliAvailable = {};
 function checkAwsCLI() {
   if (cliAvailable.aws !== void 0) return cliAvailable.aws;
-  const result = (0, import_child_process8.spawnSync)("aws", ["--version"], { timeout: 3e3 });
+  const result = (0, import_child_process7.spawnSync)("aws", ["--version"], { timeout: 3e3 });
   cliAvailable.aws = !result.error && result.status === 0;
   return cliAvailable.aws;
 }
 function checkGcloudCLI() {
   if (cliAvailable.gcloud !== void 0) return cliAvailable.gcloud;
-  const result = (0, import_child_process8.spawnSync)("gcloud", ["--version"], { timeout: 3e3 });
+  const result = (0, import_child_process7.spawnSync)("gcloud", ["--version"], { timeout: 3e3 });
   cliAvailable.gcloud = !result.error && result.status === 0;
   return cliAvailable.gcloud;
 }
 function checkAzCLI() {
   if (cliAvailable.az !== void 0) return cliAvailable.az;
-  const result = (0, import_child_process8.spawnSync)("az", ["--version"], { timeout: 3e3 });
+  const result = (0, import_child_process7.spawnSync)("az", ["--version"], { timeout: 3e3 });
   cliAvailable.az = !result.error && result.status === 0;
   return cliAvailable.az;
 }
@@ -36880,7 +36990,7 @@ function runAws(args3) {
     return { status: "cli_not_found", reason: "aws CLI not installed", details: "install aws-cli" };
   }
   try {
-    const result = (0, import_child_process8.spawnSync)("aws", args3, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process7.spawnSync)("aws", args3, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -36897,7 +37007,7 @@ function runGcloud(args3) {
     return { status: "cli_not_found", reason: "gcloud CLI not installed", details: "install google-cloud-sdk" };
   }
   try {
-    const result = (0, import_child_process8.spawnSync)("gcloud", args3, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process7.spawnSync)("gcloud", args3, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -36914,7 +37024,7 @@ function runAz(args3) {
     return { status: "cli_not_found", reason: "az CLI not installed", details: "install azure-cli" };
   }
   try {
-    const result = (0, import_child_process8.spawnSync)("az", args3, { timeout: 3e4, encoding: "utf-8" });
+    const result = (0, import_child_process7.spawnSync)("az", args3, { timeout: 3e4, encoding: "utf-8" });
     if (result.error) throw new Error(result.error.message);
     if ((result.status ?? 1) !== 0) {
       const stderr = result.stderr?.trim() ?? "";
@@ -37078,7 +37188,7 @@ function createCloudModule() {
       if (res.status === "cli_not_found") return res;
       if (res.status === "error") return { status: "invoke_failed", reason: res.reason, serviceName };
       const url2 = res.output;
-      const curlResult = (0, import_child_process8.spawnSync)("curl", ["-s", "-X", "POST", "-H", "Content-Type: application/json", "-d", dataJson, url2], { timeout: 1e4, encoding: "utf-8" });
+      const curlResult = (0, import_child_process7.spawnSync)("curl", ["-s", "-X", "POST", "-H", "Content-Type: application/json", "-d", dataJson, url2], { timeout: 1e4, encoding: "utf-8" });
       const output = curlResult.stdout?.trim() ?? "";
       return { status: "invoked", serviceName, url: url2, output };
     },
