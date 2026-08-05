@@ -97,6 +97,5 @@ node bootstrap.js run stdlib/core-v1-truth.fl
 
 ## Limits
 
-- `map/object/json` currently standardizes map/object helpers and JSON encode only
-- JSON decode is intentionally excluded from core-v1 until its runtime contract is pinned
+- `map/object/json` now standardizes map/object helpers plus JSON encode/decode on top of the bootstrap runtime contract
 - this is a stable minimum set, not the whole stdlib

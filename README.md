@@ -27,6 +27,7 @@ compiler flow, and deterministic verification points for real software projects.
 
 - [getting-started](docs/)
 - [architecture](docs/LIBS10_PLAN.md)
+- [ai stdlib core v1](docs/STDLIB_CORE_V1.md)
 - [language spec](SPEC.airc)
 - [latest validation report](reports/latest.md)
 

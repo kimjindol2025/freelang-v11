@@ -46,6 +46,7 @@
 (truth-assert "core-map-get" (core-map-get {:a 1} :a 0) 1)
 (truth-assert "core-map-has?" (core-map-has? {:a 1} :a) true)
 (truth-assert "core-json-encode" (core-json-encode {:ok true}) "{\"ok\":true}")
+(truth-assert "core-json-decode" (get (core-json-decode "{\"ok\":true}") "ok") true)
 
 (section "result")
 (truth-assert "core-result-ok?" (core-result-ok? (core-result-ok 42)) true)

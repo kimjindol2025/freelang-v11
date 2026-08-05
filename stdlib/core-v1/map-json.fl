@@ -22,3 +22,6 @@
 
 (defn core-json-encode [v]
   (json-stringify v))
+
+(defn core-json-decode [s]
+  (json-parse s))
