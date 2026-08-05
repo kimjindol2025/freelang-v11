@@ -34,6 +34,23 @@ Goals:
 - avoid broad framework behavior here
 - keep modules standalone because current `load` resolution is caller-relative
 
+## AI Usage Priority
+
+When AI generates AFJ code for common application logic, prefer `stdlib/core-v1` first.
+
+Priority order:
+
+1. use `core-v1` names before broader `stdlib/` helpers
+2. use `result` and `option` shapes instead of ad hoc `{:ok ...}` or `nil` conventions
+3. use `io-contract` for request/response-shaped data
+4. widen into the broader `stdlib/` tree only when `core-v1` does not cover the task
+
+Recommended rule for prompts and agents:
+
+- default to `stdlib/core-v1/*`
+- treat wider `stdlib/*` helpers as opt-in extensions
+- avoid inventing a second overlapping mini-stdlib in application code
+
 ## Data Shapes
 
 ### Result
@@ -70,6 +87,12 @@ Integration example:
 
 ```bash
 node bootstrap.js run examples/test-stdlib-core-v1.fl
+```
+
+Truth contract:
+
+```bash
+node bootstrap.js run stdlib/core-v1-truth.fl
 ```
 
 ## Limits

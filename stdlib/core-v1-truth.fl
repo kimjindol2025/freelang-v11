@@ -1,0 +1,82 @@
+;; stdlib/core-v1-truth.fl — AFJ stdlib core-v1 동작 계약
+;; 실행: node bootstrap.js run stdlib/core-v1-truth.fl
+
+(load "core-v1/string.fl")
+(load "core-v1/list.fl")
+(load "core-v1/map-json.fl")
+(load "core-v1/result.fl")
+(load "core-v1/option.fl")
+(load "core-v1/validate-schema.fl")
+(load "core-v1/time-date.fl")
+(load "core-v1/io-contract.fl")
+(load "core-v1/config-env.fl")
+(load "core-v1/log-debug.fl")
+
+(define pass-count (atom 0))
+(define fail-count (atom 0))
+(define total-count (atom 0))
+
+(defn truth-assert [label got expected]
+  (swap! total-count + 1)
+  (let [ok (= (str got) (str expected))]
+    (if ok
+      (do
+        (swap! pass-count + 1)
+        (println (str "  PASS  " label " = " (str got))))
+      (do
+        (swap! fail-count + 1)
+        (println (str "  FAIL  " label))
+        (println (str "        got:      " (str got)))
+        (println (str "        expected: " (str expected)))))))
+
+(defn section [name]
+  (println (str "\n── " name " ──────────────────────────")))
+
+(section "string")
+(truth-assert "core-string-trim" (core-string-trim "  hi  ") "hi")
+(truth-assert "core-string-blank?" (core-string-blank? "") true)
+(truth-assert "core-string-default" (core-string-default "" "fallback") "fallback")
+
+(section "list")
+(truth-assert "core-list-count" (core-list-count [1 2 3]) 3)
+(truth-assert "core-list-first-or" (core-list-first-or [] "none") "none")
+(truth-assert "core-list-distinct" (core-list-distinct [1 1 2 3 3]) [1 2 3])
+
+(section "map-json")
+(truth-assert "core-map-get" (core-map-get {:a 1} :a 0) 1)
+(truth-assert "core-map-has?" (core-map-has? {:a 1} :a) true)
+(truth-assert "core-json-encode" (core-json-encode {:ok true}) "{\"ok\":true}")
+
+(section "result")
+(truth-assert "core-result-ok?" (core-result-ok? (core-result-ok 42)) true)
+(truth-assert "core-result-value" (core-result-value (core-result-ok 42) 0) 42)
+(truth-assert "core-result-error?" (core-result-error? (core-result-error "BAD" "bad" {})) true)
+
+(section "option")
+(truth-assert "core-option-some?" (core-option-some? (core-option-some 7)) true)
+(truth-assert "core-option-none?" (core-option-none? (core-option-none)) true)
+(truth-assert "core-option-value" (core-option-value (core-option-none) "fallback") "fallback")
+
+(section "validate-schema")
+(truth-assert "core-validate-email" (core-validate-email "kim@example.com") true)
+(truth-assert "core-validate-required" (core-validate-required {:name "kim"} ["name" "email"]) ["email"])
+(truth-assert "core-schema-valid?" (core-schema-valid? {:type "object" :required ["name"] :properties {:name {:type "string"}}} {:name "kim"}) true)
+
+(section "time-date")
+(truth-assert "core-time-add/diff" (core-time-diff-days 0 (core-time-add-days 0 3)) 3)
+
+(section "io-contract")
+(truth-assert "core-io-request-valid?" (core-io-request-valid? (core-io-request "GET" "/health" {} {} nil)) true)
+(truth-assert "core-io-response-valid?" (core-io-response-valid? (core-io-response 200 {} {:ok true})) true)
+
+(section "config-env")
+(truth-assert "core-config-get" (core-config-get "AFJ_CORE_V1_TRUTH_MISSING" "fallback") "fallback")
+
+(section "log-debug")
+(truth-assert "core-log-debug" (core-log-debug "truth.test" {:ok true}) nil)
+
+(println (str "\n══════════════════════════════════════════"))
+(println (str "결과: " (str @pass-count) " PASS / " (str @fail-count) " FAIL  (total " (str @total-count) ")"))
+(if (= @fail-count 0)
+  (println "✓ core-v1 truth 통과")
+  (println (str "✗ " (str @fail-count) "개 실패 — 위 FAIL 항목 확인")))
