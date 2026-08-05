@@ -1,0 +1,33 @@
+;; AI-focused log/debug core
+
+(define *core-log-file* nil)
+
+(defn core-log-to-file! [path]
+  (define *core-log-file* path))
+
+(defn -core-log-format [level event ctx]
+  (let [ts (now-ms)
+        entry {:ts ts :level level :event event :ctx ctx}]
+    (json-stringify entry)))
+
+(defn -core-log-write [level event ctx]
+  (let [line (-core-log-format level event ctx)]
+    (println line)
+    (if (not (nil? *core-log-file*))
+      (file-append-line *core-log-file* line)
+      nil)))
+
+(defn core-log-info [event ctx]
+  (-core-log-write "INFO" event ctx))
+
+(defn core-log-warn [event ctx]
+  (-core-log-write "WARN" event ctx))
+
+(defn core-log-error [event ctx]
+  (-core-log-write "ERROR" event ctx))
+
+(defn core-log-debug [event ctx]
+  (let [debug-env (fl-env-get "FL_DEBUG" "")]
+    (if (= debug-env "1")
+      (-core-log-write "DEBUG" event ctx)
+      nil)))

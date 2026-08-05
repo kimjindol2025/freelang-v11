@@ -1,0 +1,79 @@
+;; Integration check for stdlib/core-v1
+(load "../stdlib/core-v1/string.fl")
+(load "../stdlib/core-v1/list.fl")
+(load "../stdlib/core-v1/map-json.fl")
+(load "../stdlib/core-v1/result.fl")
+(load "../stdlib/core-v1/option.fl")
+(load "../stdlib/core-v1/validate-schema.fl")
+(load "../stdlib/core-v1/time-date.fl")
+(load "../stdlib/core-v1/io-contract.fl")
+(load "../stdlib/core-v1/config-env.fl")
+(load "../stdlib/core-v1/log-debug.fl")
+
+(define pass-count (atom 0))
+(define fail-count (atom 0))
+
+(defn assert-eq [label expected actual]
+  (if (= expected actual)
+    (do
+      (swap! pass-count + 1)
+      (println (str "PASS " label)))
+    (do
+      (swap! fail-count + 1)
+      (println (str "FAIL " label))
+      (println (str "  expected: " (str expected)))
+      (println (str "  actual:   " (str actual))))))
+
+(defn assert-ok [label actual]
+  (assert-eq label true actual))
+
+(println "[string]")
+(assert-eq "trim" "hello" (core-string-trim "  hello  "))
+(assert-ok "blank?" (core-string-blank? ""))
+(assert-ok "contains?" (core-string-contains? "alpha-beta" "beta"))
+
+(println "[list]")
+(assert-eq "count" 3 (core-list-count [1 2 3]))
+(assert-eq "first-or" 9 (core-list-first-or [] 9))
+(assert-eq "distinct" [1 2 3] (core-list-distinct [1 2 2 3 3]))
+
+(println "[map-json]")
+(assert-eq "map-get" 7 (core-map-get {:a 7} :a 0))
+(assert-eq "map-merge" 2 (core-map-get (core-map-merge {:a 1} {:b 2}) :b 0))
+(assert-eq "json-encode" "{\"a\":1}" (core-json-encode {:a 1}))
+
+(println "[result]")
+(assert-ok "result-ok?" (core-result-ok? (core-result-ok 1)))
+(assert-eq "result-value" 5 (core-result-value (core-result-ok 5) 0))
+(assert-ok "result-error?" (core-result-error? (core-result-error "BAD" "bad" {})))
+
+(println "[option]")
+(assert-ok "option-some?" (core-option-some? (core-option-some 3)))
+(assert-eq "option-value" 8 (core-option-value (core-option-none) 8))
+(assert-eq "option-map" 6 (core-option-value (core-option-map (core-option-some 3) (fn [x] (* x 2))) 0))
+
+(println "[validate-schema]")
+(assert-ok "validate-email" (core-validate-email "kim@example.com"))
+(assert-eq "validate-required" ["email"] (core-validate-required {:name "kim"} ["name" "email"]))
+(assert-ok "schema-valid?" (core-schema-valid? {:type "object" :required ["name"] :properties {:name {:type "string"}}} {:name "kim"}))
+
+(println "[time-date]")
+(let [base 0
+      plus-two (core-time-add-days base 2)]
+  (assert-eq "time-diff-days" 2 (core-time-diff-days base plus-two)))
+
+(println "[io-contract]")
+(assert-ok "request-valid?" (core-io-request-valid? (core-io-request "GET" "/v1/health" {} {} nil)))
+(assert-ok "response-valid?" (core-io-response-valid? (core-io-response 200 {} {:ok true})))
+
+(println "[config-env]")
+(assert-eq "config-default" "fallback" (core-config-get "AFJ_CORE_V1_MISSING" "fallback"))
+(assert-eq "config-pick" "dev" (get (core-config-pick [{:key "AFJ_CORE_V1_APP_ENV" :default "dev"}]) "AFJ_CORE_V1_APP_ENV"))
+
+(println "[log-debug]")
+(assert-eq "log-wrapper-return" nil (core-log-debug "core.test" {:ok true}))
+
+(println "")
+(println (str "pass=" (deref pass-count)))
+(println (str "fail=" (deref fail-count)))
+(println (if (= 0 (deref fail-count)) "CORE_V1_OK" "CORE_V1_FAIL"))

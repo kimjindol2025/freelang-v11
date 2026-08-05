@@ -1,0 +1,39 @@
+;; AI-focused config/env core
+
+(defn core-config-get [key fallback]
+  (let [v (fl-env-get key nil)]
+    (if (nil? v) fallback v)))
+
+(defn core-config-require [key]
+  (let [v (fl-env-get key nil)]
+    (if (nil? v)
+      (throw (str "missing env: " key))
+      v)))
+
+(defn core-config-int [key fallback]
+  (let [v (fl-env-get key nil)]
+    (if (nil? v)
+      fallback
+      (let [n (str-to-num v)]
+        (if (nil? n) fallback (int n))))))
+
+(defn core-config-bool [key fallback]
+  (let [v (fl-env-get key nil)]
+    (if (nil? v)
+      fallback
+      (or (= v "true") (= v "1") (= v "yes")))))
+
+(defn core-config-pick [spec]
+  (reduce
+    (fn [acc item]
+      (let [key (get item :key)
+            kind (get item :kind "string")
+            default (get item :default)
+            value (cond
+                    (= kind "int") (core-config-int key default)
+                    (= kind "bool") (core-config-bool key default)
+                    (= kind "required") (core-config-require key)
+                    true (core-config-get key default))]
+        (assoc acc key value)))
+    {}
+    spec))

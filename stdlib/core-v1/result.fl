@@ -1,0 +1,23 @@
+;; AI-focused result core
+
+(defn core-result-ok [value]
+  {:ok true :value value})
+
+(defn core-result-error [code message details]
+  {:ok false :code code :message message :details details})
+
+(defn core-result-ok? [result]
+  (= true (get result :ok)))
+
+(defn core-result-error? [result]
+  (not (core-result-ok? result)))
+
+(defn core-result-value [result fallback]
+  (if (core-result-ok? result)
+    (get result :value)
+    fallback))
+
+(defn core-result-map [result f]
+  (if (core-result-ok? result)
+    (core-result-ok (f (get result :value)))
+    result))

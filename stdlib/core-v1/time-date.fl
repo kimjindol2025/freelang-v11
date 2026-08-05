@@ -1,0 +1,22 @@
+;; AI-focused time/date core
+
+(defn core-time-now-ms []
+  (now-ms))
+
+(defn core-time-today-iso []
+  (let [parts (date-parts (now-ms))]
+    (str (get parts "year") "-"
+         (str-pad-left (str (get parts "month")) 2 "0") "-"
+         (str-pad-left (str (get parts "day")) 2 "0"))))
+
+(defn core-time-add-days [ts days]
+  (+ ts (* days 86400000)))
+
+(defn core-time-diff-days [ts1 ts2]
+  (floor (/ (abs (- ts2 ts1)) 86400000)))
+
+(defn core-time-past? [ts]
+  (< ts (now-ms)))
+
+(defn core-time-future? [ts]
+  (> ts (now-ms)))

@@ -1,0 +1,34 @@
+;; AI-focused list/collection core
+
+(defn core-list-empty? [items]
+  (= (length items) 0))
+
+(defn core-list-count [items]
+  (length items))
+
+(defn core-list-first-or [items fallback]
+  (if (core-list-empty? items) fallback (first items)))
+
+(defn core-list-map [f items]
+  (map f items))
+
+(defn core-list-filter [pred items]
+  (filter pred items))
+
+(defn core-list-includes? [items value]
+  (> (length (filter (fn [item] (= item value)) items)) 0))
+
+(defn core-list-distinct [items]
+  (get
+    (reduce
+      (fn [acc item]
+        (let [token (json-stringify item)
+              seen (get acc :seen)
+              out (get acc :out)]
+          (if (get seen token)
+            acc
+            {:seen (assoc seen token true)
+             :out (append out item)})))
+      {:seen {} :out []}
+      items)
+    :out))

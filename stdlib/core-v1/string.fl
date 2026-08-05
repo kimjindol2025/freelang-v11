@@ -1,0 +1,31 @@
+;; AI-focused string core
+
+(defn core-string-trim [s]
+  (if (nil? s) "" (str-trim (str s))))
+
+(defn core-string-blank? [s]
+  (or (nil? s) (str-blank? (str s))))
+
+(defn core-string-contains? [s needle]
+  (if (or (nil? s) (nil? needle))
+    false
+    (>= (str-index-of (str s) (str needle)) 0)))
+
+(defn core-string-starts-with? [s prefix]
+  (if (or (nil? s) (nil? prefix))
+    false
+    (str-starts-with? (str s) (str prefix))))
+
+(defn core-string-ends-with? [s suffix]
+  (if (or (nil? s) (nil? suffix))
+    false
+    (str-ends-with? (str s) (str suffix))))
+
+(defn core-string-default [s fallback]
+  (if (core-string-blank? s) fallback (str s)))
+
+(defn core-string-lines [s]
+  (if (nil? s) [] (str-lines (str s))))
+
+(defn core-string-join [items sep]
+  (str-join (if (nil? sep) "" sep) items))

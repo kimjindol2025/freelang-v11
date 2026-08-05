@@ -1,0 +1,24 @@
+;; AI-focused map/object/json core
+
+(defn core-map-get [m k fallback]
+  (let [v (get m k)]
+    (if (nil? v) fallback v)))
+
+(defn core-map-has? [m k]
+  (not (nil? (get m k))))
+
+(defn core-map-keys [m]
+  (obj-keys m))
+
+(defn core-map-set [m k v]
+  (assoc m k v))
+
+(defn core-map-merge [left right]
+  (reduce
+    (fn [acc k]
+      (assoc acc k (get right k)))
+    left
+    (obj-keys right)))
+
+(defn core-json-encode [v]
+  (json-stringify v))

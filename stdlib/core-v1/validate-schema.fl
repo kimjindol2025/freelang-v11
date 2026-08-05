@@ -1,0 +1,87 @@
+;; AI-focused validate/schema core
+
+(defn core-validate-email [s]
+  (if (not (string? s))
+    false
+    (let [at (str-index-of s "@")
+          dot (str-index-of s ".")
+          len (length s)]
+      (and (> at 0)
+           (> dot (+ at 1))
+           (< dot (- len 1))))))
+
+(defn core-validate-url [s]
+  (if (not (string? s))
+    false
+    (or (core-string-starts-with? s "http://")
+        (core-string-starts-with? s "https://"))))
+
+(defn core-validate-required [m fields]
+  (filter
+    (fn [k]
+      (let [v (get m k)]
+        (or (nil? v)
+            (and (string? v) (str-blank? v)))))
+    fields))
+
+(defn -core-schema-check-type [val expected-type field]
+  (cond
+    (= expected-type "string")  (if (string? val)  nil (str field ": expected string"))
+    (= expected-type "number")  (if (number? val)  nil (str field ": expected number"))
+    (= expected-type "integer") (if (integer? val) nil (str field ": expected integer"))
+    (= expected-type "boolean") (if (boolean? val) nil (str field ": expected boolean"))
+    (= expected-type "array")   (if (array? val)   nil (str field ": expected array"))
+    (= expected-type "object")  (if (map? val)     nil (str field ": expected object"))
+    true nil))
+
+(defn -core-schema-check-format [val fmt field]
+  (cond
+    (= fmt "email") (if (core-validate-email val) nil (str field ": invalid email"))
+    (= fmt "url") (if (core-validate-url val) nil (str field ": invalid url"))
+    true nil))
+
+(defn -core-schema-check-field [val rules field]
+  (let [errors (atom [])]
+    (when (not (nil? (get rules :type)))
+      (let [err (-core-schema-check-type val (get rules :type) field)]
+        (when err (swap! errors append err))))
+    (when (and (string? val) (not (nil? (get rules :min-length))))
+      (when (< (length val) (get rules :min-length))
+        (swap! errors append (str field ": too short"))))
+    (when (and (string? val) (not (nil? (get rules :max-length))))
+      (when (> (length val) (get rules :max-length))
+        (swap! errors append (str field ": too long"))))
+    (when (and (number? val) (not (nil? (get rules :min))))
+      (when (< val (get rules :min))
+        (swap! errors append (str field ": below min"))))
+    (when (and (number? val) (not (nil? (get rules :max))))
+      (when (> val (get rules :max))
+        (swap! errors append (str field ": above max"))))
+    (when (not (nil? (get rules :format)))
+      (let [err (-core-schema-check-format val (get rules :format) field)]
+        (when err (swap! errors append err))))
+    (deref errors)))
+
+(defn core-schema-check [schema data]
+  (let [errors (atom [])
+        req (get schema :required [])
+        props (get schema :properties {})]
+    (doseq [field req]
+      (let [val (get data field)]
+        (when (nil? val)
+          (swap! errors append (str field ": required")))))
+    (doseq [field (obj-keys props)]
+      (let [val (get data field)
+            rules (get props field)]
+        (when (not (nil? val))
+          (let [field-errors (-core-schema-check-field val rules field)]
+            (doseq [e field-errors]
+              (swap! errors append e))))))
+    (let [errs (deref errors)]
+      {:ok (empty? errs) :errors errs})))
+
+(defn core-schema-valid? [schema data]
+  (get (core-schema-check schema data) :ok))
+
+(defn core-validate-schema [data schema]
+  (core-schema-check schema data))

@@ -1,0 +1,38 @@
+;; AI-focused IO contract core
+
+(defn core-io-request [method path headers query body]
+  {:method method
+   :path path
+   :headers (if (nil? headers) {} headers)
+   :query (if (nil? query) {} query)
+   :body body})
+
+(defn core-io-response [status headers body]
+  {:status status
+   :headers (if (nil? headers) {} headers)
+   :body body})
+
+(defn core-io-validate-request [req]
+  (let [errors (atom [])
+        method (get req :method)
+        path (get req :path)]
+    (when (or (nil? method) (not (string? method)) (str-blank? method))
+      (swap! errors append "method: required string"))
+    (when (or (nil? path) (not (string? path)) (str-blank? path))
+      (swap! errors append "path: required string"))
+    (let [errs (deref errors)]
+      {:ok (empty? errs) :errors errs})))
+
+(defn core-io-validate-response [res]
+  (let [errors (atom [])
+        status (get res :status)]
+    (when (or (not (number? status)) (< status 100) (> status 599))
+      (swap! errors append "status: must be 100..599"))
+    (let [errs (deref errors)]
+      {:ok (empty? errs) :errors errs})))
+
+(defn core-io-request-valid? [req]
+  (get (core-io-validate-request req) :ok))
+
+(defn core-io-response-valid? [res]
+  (get (core-io-validate-response res) :ok))

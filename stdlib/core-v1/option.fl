@@ -1,0 +1,28 @@
+;; AI-focused option/null-safe core
+
+(defn core-option-some [value]
+  {:present true :value value})
+
+(defn core-option-none []
+  {:present false :value nil})
+
+(defn core-option-from [value]
+  (if (nil? value)
+    (core-option-none)
+    (core-option-some value)))
+
+(defn core-option-some? [opt]
+  (= true (get opt :present)))
+
+(defn core-option-none? [opt]
+  (not (core-option-some? opt)))
+
+(defn core-option-value [opt fallback]
+  (if (core-option-some? opt)
+    (get opt :value)
+    fallback))
+
+(defn core-option-map [opt f]
+  (if (core-option-some? opt)
+    (core-option-some (f (get opt :value)))
+    opt))
