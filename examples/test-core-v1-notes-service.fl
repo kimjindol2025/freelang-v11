@@ -1,0 +1,56 @@
+(load "core-v1-notes-service.fl")
+
+(define pass-count (atom 0))
+(define fail-count (atom 0))
+
+(defn assert-eq [label expected actual]
+  (if (= (str expected) (str actual))
+    (do
+      (swap! pass-count + 1)
+      (println (str "PASS " label)))
+    (do
+      (swap! fail-count + 1)
+      (println (str "FAIL " label))
+      (println (str "  expected: " (str expected)))
+      (println (str "  actual:   " (str actual))))))
+
+(defn assert-ok [label actual]
+  (assert-eq label true actual))
+
+(notes-service-reset!)
+
+(let [health (notes-service-dispatch (core-io-request "GET" "/health" {} {} nil))]
+  (assert-eq "health status" 200 (get health :status))
+  (assert-eq "health service" "core-v1-notes" (get (get health :body) "service")))
+
+(let [created (notes-service-dispatch
+                (core-io-request "POST" "/notes" {} {}
+                  {"title" " first note " "content" "hello core v1" "tags" ["ops" "ai"]}))]
+  (assert-eq "create status" 201 (get created :status))
+  (assert-eq "create id" 1 (get (get created :body) "id"))
+  (assert-eq "create trim" "first note" (get (get created :body) "title")))
+
+(let [listed (notes-service-dispatch (core-io-request "GET" "/notes" {} {} nil))]
+  (assert-eq "list status" 200 (get listed :status))
+  (assert-eq "list count" 1 (get (get listed :body) "count")))
+
+(let [fetched (notes-service-dispatch (core-io-request "GET" "/notes/show" {} {"id" "1"} nil))]
+  (assert-eq "get status" 200 (get fetched :status))
+  (assert-eq "get content" "hello core v1" (get (get fetched :body) "content")))
+
+(let [missing (notes-service-dispatch (core-io-request "GET" "/notes/show" {} {"id" "999"} nil))]
+  (assert-eq "missing status" 404 (get missing :status))
+  (assert-eq "missing code" "NOTE_NOT_FOUND" (get (get missing :body) :code)))
+
+(let [bad (notes-service-dispatch (core-io-request "POST" "/notes" {} {} {"title" "" "content" "x"}))]
+  (assert-eq "bad request status" 400 (get bad :status))
+  (assert-eq "bad request code" "INVALID_NOTE" (get (get bad :body) :code)))
+
+(let [route (notes-service-dispatch (core-io-request "GET" "/unknown" {} {} nil))]
+  (assert-eq "route status" 404 (get route :status))
+  (assert-eq "route code" "ROUTE_NOT_FOUND" (get (get route :body) :code)))
+
+(println "")
+(println (str "pass=" (deref pass-count)))
+(println (str "fail=" (deref fail-count)))
+(println (if (= 0 (deref fail-count)) "CORE_V1_SERVICE_OK" "CORE_V1_SERVICE_FAIL"))

@@ -24,3 +24,6 @@ v11으로 구현한 **99.9%+ 프로덕션 수준** SQLite 앱의 참조 파일�
 - **재사용 헬퍼**: 21개 (escape-html, rate-check, require-auth 등)
 
 v11으로 프로덕션 앱을 만들 때 이 저장소를 템플릿으로 사용하세요.
+
+| `core-v1-notes-service.fl` | core-v1만으로 만든 작은 서비스 코어 예제 |
+| `test-core-v1-notes-service.fl` | core-v1 서비스 코어 검증 예제 |

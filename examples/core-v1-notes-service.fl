@@ -1,0 +1,107 @@
+;; core-v1-notes-service.fl — stdlib/core-v1만으로 만든 작은 서비스 코어
+;; 실행 예: node bootstrap.js run examples/test-core-v1-notes-service.fl
+
+(load "../stdlib/core-v1/string.fl")
+(load "../stdlib/core-v1/list.fl")
+(load "../stdlib/core-v1/map-json.fl")
+(load "../stdlib/core-v1/result.fl")
+(load "../stdlib/core-v1/option.fl")
+(load "../stdlib/core-v1/validate-schema.fl")
+(load "../stdlib/core-v1/time-date.fl")
+(load "../stdlib/core-v1/io-contract.fl")
+(load "../stdlib/core-v1/config-env.fl")
+(load "../stdlib/core-v1/log-debug.fl")
+
+(define *notes-store* (atom []))
+(define *notes-next-id* (atom 1))
+
+(define *note-schema*
+  {:type "object"
+   :required ["title" "content"]
+   :properties {:title {:type "string" :min-length 1 :max-length 120}
+                :content {:type "string" :min-length 1 :max-length 2000}
+                :tags {:type "array"}}})
+
+(defn notes-service-reset! []
+  (do
+    (reset! *notes-store* [])
+    (reset! *notes-next-id* 1)
+    true))
+
+(defn notes-service-port []
+  (core-config-int "AFJ_NOTES_PORT" 40210))
+
+(defn -notes-error-body [code message details]
+  (core-result-error code message details))
+
+(defn -notes-response [status payload]
+  (core-io-response status {"content-type" "application/json"} payload))
+
+(defn -notes-created-at []
+  {"timestamp_ms" (core-time-now-ms)
+   "day" (core-time-today-iso)})
+
+(defn -notes-parse-id [raw-id]
+  (let [n (str-to-num raw-id)]
+    (if (nil? n)
+      (core-result-error "INVALID_ID" "id must be an integer" {:id raw-id})
+      (core-result-ok (int n)))))
+
+(defn -notes-find-by-id [note-id]
+  (core-option-from
+    (first
+      (filter (fn [note] (= (get note "id") note-id))
+              (deref *notes-store*)))))
+
+(defn notes-service-health [_req]
+  (-notes-response 200
+    {"ok" true
+     "service" "core-v1-notes"
+     "port" (notes-service-port)
+     "count" (core-list-count (deref *notes-store*))}))
+
+(defn notes-service-list [_req]
+  (-notes-response 200
+    {"ok" true
+     "count" (core-list-count (deref *notes-store*))
+     "items" (deref *notes-store*)}))
+
+(defn notes-service-create [req]
+  (let [request-check (core-io-validate-request req)]
+    (if (not (get request-check :ok))
+      (-notes-response 400 (-notes-error-body "INVALID_REQUEST" "request shape mismatch" request-check))
+      (let [req-body (core-map-get req "body" {})
+            body-check (core-schema-check *note-schema* req-body)]
+        (if (not (get body-check :ok))
+          (-notes-response 400 (-notes-error-body "INVALID_NOTE" "note body validation failed" body-check))
+          (let [note-id (deref *notes-next-id*)
+                note {"id" note-id
+                      "title" (core-string-trim (get req-body "title"))
+                      "content" (core-string-trim (get req-body "content"))
+                      "tags" (core-map-get req-body "tags" [])
+                      "created_at" (-notes-created-at)}]
+            (swap! *notes-store* append note)
+            (swap! *notes-next-id* + 1)
+            (core-log-info "notes.created" {:id note-id})
+            (-notes-response 201 note)))))))
+
+(defn notes-service-get [req]
+  (let [query (core-map-get req "query" {})
+        parse-result (-notes-parse-id (core-map-get query "id" nil))]
+    (if (core-result-error? parse-result)
+      (-notes-response 400 parse-result)
+      (let [note-id (core-result-value parse-result nil)
+            note-opt (-notes-find-by-id note-id)]
+        (if (core-option-none? note-opt)
+          (-notes-response 404 (-notes-error-body "NOTE_NOT_FOUND" "note not found" {:id note-id}))
+          (-notes-response 200 (core-option-value note-opt nil)))))))
+
+(defn notes-service-dispatch [req]
+  (let [method (core-map-get req "method" "GET")
+        path (core-map-get req "path" "/")]
+    (cond
+      (and (= method "GET") (= path "/health")) (notes-service-health req)
+      (and (= method "GET") (= path "/notes")) (notes-service-list req)
+      (and (= method "POST") (= path "/notes")) (notes-service-create req)
+      (and (= method "GET") (= path "/notes/show")) (notes-service-get req)
+      true (-notes-response 404 (-notes-error-body "ROUTE_NOT_FOUND" "route not found" {:method method :path path})))))
