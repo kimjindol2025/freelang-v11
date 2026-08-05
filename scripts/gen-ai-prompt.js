@@ -180,11 +180,36 @@ parallel race with-timeout fl-try use\`
 - \`FL_TRACE=1\` 으로 함수 호출 trace 출력
 - 에러 메시지에 자동으로 마지막 10개 호출 체인 dump
 - REPL 명령: \`:ls\` (함수 목록), \`:src <함수>\` (소스), \`:inspect <변수>\` (값)
+
+## 8. stdlib/core-v1 우선 규칙
+
+AI가 일반 애플리케이션 로직을 작성할 때는 **기존 stdlib 전체를 바로 펼치지 말고** \`stdlib/core-v1\`를 먼저 사용합니다.
+
+우선 사용 모듈:
+
+1. \`core-v1/string.fl\`
+2. \`core-v1/list.fl\`
+3. \`core-v1/map-json.fl\`
+4. \`core-v1/result.fl\`
+5. \`core-v1/option.fl\`
+6. \`core-v1/validate-schema.fl\`
+7. \`core-v1/time-date.fl\`
+8. \`core-v1/io-contract.fl\`
+9. \`core-v1/config-env.fl\`
+10. \`core-v1/log-debug.fl\`
+
+규칙:
+
+- 문자열, 컬렉션, 맵/JSON, 검증, 시간, 설정, 로깅은 먼저 \`core-v1\` 이름을 찾는다
+- 성공/실패 흐름은 ad hoc map 대신 \`result\` shape를 우선 사용한다
+- nil/optional 값은 ad hoc nil 규칙 대신 \`option\` shape를 우선 사용한다
+- 요청/응답 형태 데이터는 \`io-contract\` shape를 우선 사용한다
+- \`core-v1\`에 없는 경우에만 더 넓은 \`stdlib/*\` 함수로 내려간다
 `;
 
-const SECTION_STDLIB_HEADER = `\n## 8. 표준 라이브러리 함수 (자동 생성)\n\n총 N_FUNCS개 함수, M_MODULES 모듈. \`(use MODULE)\`로 일부는 명시 import 필요.\n`;
+const SECTION_STDLIB_HEADER = `\n## 9. 표준 라이브러리 함수 (자동 생성)\n\n총 N_FUNCS개 함수, M_MODULES 모듈. \`(use MODULE)\`로 일부는 명시 import 필요.\n`;
 
-const FOOTER = `\n## 9. 코드 생성 시 체크리스트
+const FOOTER = `\n## 10. 코드 생성 시 체크리스트
 
 작성 후 자체 검증:
 - [ ] 모든 \`(defn ...)\` body는 single expression (또는 \`(do ...)\`)
