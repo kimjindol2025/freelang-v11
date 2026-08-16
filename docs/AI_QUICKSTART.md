@@ -20,7 +20,10 @@
 
 ```bash
 # 파일 저장: hello.fl
-node bootstrap.js run hello.fl
+node scripts/fl-cli.js run hello.fl
+
+# 프로젝트 루트에서는 같은 명령을 짧게 사용할 수 있습니다.
+npm run fl -- run hello.fl
 ```
 
 ---
