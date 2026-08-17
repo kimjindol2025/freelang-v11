@@ -231,12 +231,15 @@ export class Interpreter {
     // TS built-in: (ok v)→{tag:"Ok",...}  (some v)→{tag:"Some",...}  etc.
     const isSomeVal = (m: any) => Array.isArray(m) ? m[0] === "some" : m?.tag === "Some";
     const getVal    = (m: any) => Array.isArray(m) ? m[1] : m?.value;
+    const isOkVal   = (r: any) => Array.isArray(r) ? r[0] === "ok" : r?._tag === "Ok" || r?.tag === "Ok";
+    const isErrVal  = (r: any) => Array.isArray(r) ? r[0] === "err" : r?._tag === "Err" || r?.tag === "Err";
+    const getResultVal = (r: any) => Array.isArray(r) ? r[1] : r?.value;
     const callFn    = (fn: any, v: any) =>
       typeof fn === "string" ? this.callUserFunction(fn, [v]) : fn(v);
 
     const tsHelpers: Record<string, (...a: any[]) => any> = {
-      "ok?":          (r: any) => r?.tag === "Ok",
-      "err?":         (r: any) => r?.tag === "Err",
+      "ok?":          (r: any) => isOkVal(r),
+      "err?":         (r: any) => isErrVal(r),
       "some?":        (m: any) => isSomeVal(m),
       "none?":        (m: any) => Array.isArray(m) ? m[0] === "none" : m?.tag === "None",
       "maybe-or":     (m: any, d: any) => isSomeVal(m) ? getVal(m) : d,
@@ -244,11 +247,11 @@ export class Interpreter {
         ? { tag: "Some", kind: "Option", value: callFn(fn, getVal(m)) }
         : m,
       "maybe-chain":  (m: any, fn: any) => isSomeVal(m) ? callFn(fn, getVal(m)) : m,
-      "result-or":    (r: any, d: any) => (r?._tag === "Ok" || r?.tag === "Ok") ? r.value : d,
-      "result-map":   (r: any, fn: any) => (r?._tag === "Ok" || r?.tag === "Ok")
-        ? { _tag: "Ok", tag: "Ok", kind: "Result", value: callFn(fn, r.value) }
+      "result-or":    (r: any, d: any) => isOkVal(r) ? getResultVal(r) : d,
+      "result-map":   (r: any, fn: any) => isOkVal(r)
+        ? ["ok", callFn(fn, getResultVal(r))]
         : r,
-      "result-chain": (r: any, fn: any) => (r?._tag === "Ok" || r?.tag === "Ok") ? callFn(fn, r.value) : r,
+      "result-chain": (r: any, fn: any) => isOkVal(r) ? callFn(fn, getResultVal(r)) : r,
     };
     for (const [name, fn] of Object.entries(tsHelpers)) {
       this.context.functions.set(name, { name, params: [], body: fn as any });

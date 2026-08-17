@@ -38,8 +38,8 @@ export function createTimeModule() {
   return {
     // ── Time ──────────────────────────────────────────────────
 
-    // now -> number (current timestamp ms)
-    "now": (): number => Date.now(),
+    // now -> string (ISO 8601; use now_ms for numeric timestamps)
+    "now": (): string => new Date().toISOString(),
 
     // now_ms -> number (ms since epoch, always returns number)
     "now_ms": (): number => Date.now(),
@@ -51,14 +51,14 @@ export function createTimeModule() {
     "now_unix": (): number => Math.floor(Date.now() / 1000),
 
     // time_diff t1 t2 -> number (ms, positive if t2 > t1)
-    "time_diff": (t1: number, t2: number): number => t2 - t1,
+    "time_diff": (t1: number | string, t2: number | string): number => new Date(t2).getTime() - new Date(t1).getTime(),
 
     // time_since ts -> number (ms elapsed since ts)
-    "time_since": (ts: number): number => Date.now() - ts,
+    "time_since": (ts: number | string): number => Date.now() - new Date(ts).getTime(),
 
     // time_ago ts -> string (human-readable: "3s ago", "2m ago", "1h ago")
-    "time_ago": (ts: number): string => {
-      const ms = Date.now() - ts;
+    "time_ago": (ts: number | string): string => {
+      const ms = Date.now() - new Date(ts).getTime();
       if (ms < 1000) return `${ms}ms ago`;
       if (ms < 60000) return `${Math.floor(ms / 1000)}s ago`;
       if (ms < 3600000) return `${Math.floor(ms / 60000)}m ago`;

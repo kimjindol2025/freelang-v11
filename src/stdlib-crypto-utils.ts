@@ -35,7 +35,7 @@ function calculatePasswordStrength(password: string): number {
 // ── Module ─────────────────────────────────────────────────────────────────
 
 export function createCryptoUtilsModule() {
-  return {
+  const api = {
     // AES-256-GCM encryption: plaintext key → base64 ciphertext (IV+tag embedded)
     crypto_aes_encrypt: (plaintext: string, key: string): string | null => {
       try {
@@ -163,5 +163,18 @@ export function createCryptoUtilsModule() {
 
       return { score, label, feedback };
     },
+  };
+
+  // 하이픈 표기법을 정식 이름으로 제공하고 기존 underscore 이름은 호환 유지한다.
+  return {
+    ...api,
+    "crypto-aes-encrypt": api.crypto_aes_encrypt,
+    "crypto-aes-decrypt": api.crypto_aes_decrypt,
+    "crypto-sha512": api.crypto_sha512,
+    "crypto-md5": api.crypto_md5,
+    "crypto-b64url-encode": api.crypto_b64url_encode,
+    "crypto-b64url-decode": api.crypto_b64url_decode,
+    "crypto-pbkdf2": api.crypto_pbkdf2,
+    "crypto-password-strength": api.crypto_password_strength,
   };
 }

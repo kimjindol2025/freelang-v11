@@ -145,15 +145,11 @@
 ; 표현: ["some" value] 또는 ["none"]
 
 [FUNC some :params [v]
-  :body (
-    (let [[r (append ["some"] [v])]] r)
-  )
+  :body ((append ["some"] [v]))
 ]
 
 [FUNC none :params []
-  :body (
-    (let [[r ["none"]]] r)
-  )
+  :body (["none"])
 ]
 
 [FUNC some? :params [m]
@@ -195,15 +191,11 @@
 ; 표현: ["ok" value] 또는 ["err" reason]
 
 [FUNC ok :params [v]
-  :body (
-    (let [[r (append ["ok"] [v])]] r)
-  )
+  :body ((append ["ok"] [v]))
 ]
 
 [FUNC err :params [e]
-  :body (
-    (let [[r (append ["err"] [e])]] r)
-  )
+  :body ((append ["err"] [e]))
 ]
 
 [FUNC ok? :params [r]
