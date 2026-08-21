@@ -195,6 +195,137 @@ function afjDbResult(root, m, full) {
   return { name: "afj_db", required: true, status: failed ? "FAIL" : "PASS", command: stages.connect?.command || null, exit_code: failedStage?.exit_code ?? 0, duration_ms: Date.now() - started, reason: failed ? (failed + " failed") : (full ? "AFJ DB smoke and integrity checks passed" : "AFJ DB connect/write/read/compare/verify/cleanup passed"), connect: stages.connect?.status || "FAIL", write: stages.write?.status || "SKIP", read: stages.read?.status || "SKIP", compare: stages.compare?.status || "SKIP", verify: stages.verify?.status || "SKIP", replay: stages.replay?.status || (full ? "FAIL" : "NOT_APPLICABLE"), snapshot: stages.snapshot?.status || (full ? "FAIL" : "NOT_APPLICABLE"), restore: stages.restore?.status || (full ? "FAIL" : "NOT_APPLICABLE"), cleanup: stages.cleanup?.status || "FAIL", run_id: runId, namespace, endpoint: cli, error_code: failedStage?.error_code || null, phase: failedStage?.phase || null, message: failedStage?.message || null, suggestion: failedStage?.suggestion || null, evidence };
 }
 
+
+function apiDeclared(m) {
+  return Boolean(m.api?.required || /freelang[-_ ]?afj/i.test(String(m.backend?.type || "")) || m.backend?.start_command || m.backend?.start);
+}
+function apiPort() {
+  return 40000 + Math.floor(Math.random() * 10000);
+}
+function shellDisplay(command, args) {
+  return [command, ...(args || [])].map(value => JSON.stringify(String(value))).join(" ");
+}
+function apiRequest(port, method, route, body) {
+  const args = ["-sS", "-o", "-", "-w", "\n%{http_code}", "-X", method, "-H", "Content-Type: application/json"] ;
+  if (body !== undefined) args.push("--data", JSON.stringify(body));
+  args.push("http://127.0.0.1:" + port + route);
+  const started = Date.now();
+  const result = cp.spawnSync("curl", args, { encoding: "utf8", timeout: 10000, maxBuffer: 1024 * 1024 });
+  const output = String(result.stdout || "");
+  const match = output.match(/\n(\d{3})$/);
+  const statusCode = match ? Number(match[1]) : null;
+  const responseText = match ? output.slice(0, match.index) : output;
+  let json = null;
+  try { json = JSON.parse(responseText); } catch { /* invalid JSON is an explicit API failure */ }
+  return { method, route, status: statusCode, body: responseText.slice(-8000), json, exit_code: result.status, duration_ms: Date.now() - started, error: String(result.stderr || "").trim(), command: shellDisplay("curl", args) };
+}
+function apiResult(root, m) {
+  const base = { name: "api", required: true, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "FreeLang AFJ API is not declared by this project", evidence: [] };
+  if (!apiDeclared(m)) return { ...base, required: false, status: "NOT_APPLICABLE" };
+  const started = Date.now();
+  const port = apiPort();
+  const namespace = fs.mkdtempSync(path.join(os.tmpdir(), "fl-verify-afj-api-"));
+  const dbRoot = afjDbRoot(root, m);
+  const dbCli = path.resolve(dbRoot, "src/cli.js");
+  const buildCommand = m.backend?.build_command || m.backend?.build || configuredCommand(m, "backend_build");
+  const startCommand = m.backend?.start_command || m.backend?.start;
+  const healthRoute = m.backend?.health || "/health";
+  const expected = { name: "BIGWASH TEST", phone: "01000000000", ...(m.api?.smoke?.expected || {}) };
+  const stages = {};
+  const evidence = [];
+  const add = (name, result) => { stages[name] = result; evidence.push(...(result.evidence || [])); };
+  let child = null;
+  let stdoutFile = null;
+  let stderrFile = null;
+  const requestEvidence = (request, ok, code, message, suggestion) => ({ name: request.method + " " + request.route, status: ok ? "PASS" : "FAIL", command: request.command, method: request.method, route: request.route, http_status: request.status, duration_ms: request.duration_ms, response_summary: request.json || request.body.slice(-1000), exit_code: request.exit_code, error_code: ok ? null : code, message: ok ? null : message, suggestion: ok ? null : suggestion, captured_at: new Date().toISOString() });
+  const stageFromRequest = (name, request, predicate, code, message, suggestion) => {
+    const ok = request.exit_code === 0 && predicate(request);
+    add(name, { name, status: ok ? "PASS" : "FAIL", command: request.command, exit_code: request.exit_code, duration_ms: request.duration_ms, error_code: ok ? null : code, phase: ok ? null : "api", message: ok ? null : message, suggestion: ok ? null : suggestion, evidence: [requestEvidence(request, ok, code, message, suggestion)] });
+    return ok;
+  };
+  try {
+    if (!startCommand) {
+      add("start", { name: "api_start", status: "FAIL", command: null, exit_code: null, duration_ms: 0, error_code: "FL_AFJ_BACKEND_START_FAILED", phase: "api", message: "FreeLang AFJ backend start command is not configured", suggestion: "declare backend.start_command in the project manifest", evidence: [] });
+    } else {
+      let build = null;
+      if (buildCommand) {
+        build = commandResult(root, "api_backend_build", buildCommand, true, "FreeLang AFJ backend build");
+        evidence.push(...(build.evidence || []));
+      }
+      if (build && build.status !== "PASS") {
+        add("start", { name: "api_start", status: "FAIL", command: startCommand, exit_code: build.exit_code, duration_ms: build.duration_ms, error_code: "FL_AFJ_BACKEND_START_FAILED", phase: "api", message: "FreeLang AFJ backend build failed", suggestion: "inspect backend build stdout/stderr", evidence: [] });
+      } else {
+        stdoutFile = path.join(namespace, "server.stdout.log");
+        stderrFile = path.join(namespace, "server.stderr.log");
+        const out = fs.openSync(stdoutFile, "w");
+        const err = fs.openSync(stderrFile, "w");
+        child = cp.spawn("/bin/sh", ["-c", startCommand], { cwd: root, env: { ...process.env, PORT: String(port), AFJ_API_DB_DIR: path.join(namespace, "db") }, detached: true, stdio: ["ignore", out, err] });
+        fs.closeSync(out);
+        fs.closeSync(err);
+        const startDeadline = Date.now() + 5000;
+        let alive = true;
+        let startupHealthy = false;
+        while (Date.now() < startDeadline) {
+          try { process.kill(child.pid, 0); alive = true; } catch { alive = false; }
+          if (!alive) break;
+          const wait = new Int32Array(new SharedArrayBuffer(4));
+          Atomics.wait(wait, 0, 0, 50);
+          const healthProbe = apiRequest(port, "GET", "/health");
+          if (healthProbe.status === 200) { startupHealthy = true; break; }
+        }
+        const aliveAfterStart = (() => { try { process.kill(child.pid, 0); return true; } catch { return false; } })();
+        const backendStarted = aliveAfterStart && startupHealthy;
+        add("start", { name: "api_start", status: backendStarted ? "PASS" : "FAIL", command: startCommand, pid: child.pid, port, exit_code: backendStarted ? null : 1, duration_ms: Date.now() - started, error_code: backendStarted ? null : "FL_AFJ_BACKEND_START_FAILED", phase: backendStarted ? null : "api", message: backendStarted ? null : "FreeLang AFJ backend did not serve /health", suggestion: aliveAfterStart ? null : "inspect the captured server stdout/stderr", evidence: [{ name: "api_start", command: startCommand, pid: child.pid, port, status: backendStarted ? "PASS" : "FAIL", stdout_path: stdoutFile, stderr_path: stderrFile, captured_at: new Date().toISOString() }] });
+      }
+    }
+    if (stages.start?.status === "PASS") {
+      const health = apiRequest(port, "GET", healthRoute);
+      stageFromRequest("health", health, request => request.status === 200 && request.json && request.json.status === "ok", "FL_API_HEALTH_FAILED", "FreeLang AFJ health endpoint did not return status ok", "inspect server route and startup logs");
+      const write = apiRequest(port, "POST", "/api/customers", { name: "BIGWASH TEST", phone: "01000000000" });
+      const writeOk = stageFromRequest("write", write, request => request.status === 201 && request.json && typeof request.json.id === "string", "FL_API_WRITE_FAILED", "POST did not return a customer id", "inspect FreeLang AFJ request body parsing and AFJ DB append");
+      const id = write.json?.id;
+      if (writeOk) {
+        const direct = afjDbStep(dbCli, dbRoot, ["read-key", path.join(namespace, "db"), id], "api_db_read", data => Boolean(data && data.value && data.value.id === id && data.value.phone === "01000000000"), "FL_API_READ_FAILED", "direct AFJ DB read did not match the API write");
+        add("db_read", direct);
+        const read = apiRequest(port, "GET", "/api/customers/" + encodeURIComponent(id));
+        const readOk = stageFromRequest("read", read, request => request.status === 200 && request.json && request.json.id === id, "FL_API_READ_FAILED", "GET did not return the created customer", "inspect route parameter handling and AFJ DB read");
+        const compareOk = readOk && read.json.name === expected.name && read.json.phone === expected.phone && direct.status === "PASS";
+        add("compare", { name: "api_compare", status: compareOk ? "PASS" : "FAIL", command: "POST -> AFJ DB read -> GET comparison", exit_code: compareOk ? 0 : 1, duration_ms: 0, error_code: compareOk ? null : "FL_API_VALUE_MISMATCH", phase: compareOk ? null : "api", message: compareOk ? null : "API and AFJ DB values differ", suggestion: "compare POST, direct AFJ DB read, and GET response fields", evidence: [{ status: compareOk ? "PASS" : "FAIL", expected: { id, name: expected.name, phone: expected.phone }, api_read: read.json || null, afj_db_read: direct.data?.value || null, captured_at: new Date().toISOString() }] });
+      } else {
+        add("db_read", { name: "api_db_read", status: "FAIL", command: null, exit_code: null, error_code: "FL_API_READ_FAILED", phase: "api", message: "DB read skipped because API write failed", suggestion: "fix API write first", evidence: [] });
+        add("read", { name: "api_read", status: "FAIL", command: null, exit_code: null, error_code: "FL_API_READ_FAILED", phase: "api", message: "GET skipped because API write failed", suggestion: "fix API write first", evidence: [] });
+        add("compare", { name: "api_compare", status: "FAIL", command: null, exit_code: null, error_code: "FL_API_VALUE_MISMATCH", phase: "api", message: "API compare skipped because API write failed", suggestion: "fix API write first", evidence: [] });
+      }
+      const validation = apiRequest(port, "POST", "/api/customers", { name: "TEST" });
+      stageFromRequest("validation", validation, request => request.status === 400 && request.json && request.json.error === "PHONE_REQUIRED", "FL_API_VALIDATION_FAILED", "invalid request was not rejected with PHONE_REQUIRED", "inspect FreeLang AFJ validation response");
+    }
+  } finally {
+    if (child && child.pid) {
+      try { process.kill(-child.pid, "SIGTERM"); } catch {}
+      try { child.kill("SIGTERM"); } catch {}
+      const stopDeadline = Date.now() + 3000;
+      while (Date.now() < stopDeadline) {
+        let alive = true;
+        try { process.kill(child.pid, 0); } catch { alive = false; }
+        if (!alive) break;
+        const wait = new Int32Array(new SharedArrayBuffer(4));
+        Atomics.wait(wait, 0, 0, 50);
+      }
+      try { process.kill(-child.pid, "SIGKILL"); } catch {}
+      try { child.kill("SIGKILL"); } catch {}
+      const stopped = child.killed || (() => { try { process.kill(child.pid, 0); return false; } catch { return true; } })();
+      add("stop", { name: "api_stop", status: stopped ? "PASS" : "FAIL", command: "terminate FreeLang AFJ backend process group", pid: child.pid, exit_code: stopped ? 0 : 1, duration_ms: 0, error_code: stopped ? null : "FL_API_STOP_FAILED", phase: stopped ? null : "api", message: stopped ? null : "backend process did not stop", suggestion: stopped ? null : "inspect process group cleanup", evidence: [{ command: "terminate FreeLang AFJ backend process group", pid: child.pid, status: stopped ? "PASS" : "FAIL", stdout_path: stdoutFile, stderr_path: stderrFile, captured_at: new Date().toISOString() }] });
+    } else {
+      add("stop", { name: "api_stop", status: "PASS", command: "no backend process to terminate", exit_code: 0, duration_ms: 0, evidence: [{ command: "no backend process to terminate", status: "PASS", captured_at: new Date().toISOString() }] });
+    }
+    try { fs.rmSync(namespace, { recursive: true, force: true }); } catch {}
+  }
+  const requiredStages = ["start", "health", "write", "db_read", "read", "compare", "validation", "stop"];
+  const failed = requiredStages.find(name => !stages[name] || stages[name].status !== "PASS");
+  const failedStage = failed ? stages[failed] : null;
+  return { name: "api", required: true, status: failed ? "FAIL" : "PASS", command: startCommand || buildCommand || null, exit_code: failedStage?.exit_code ?? 0, duration_ms: Date.now() - started, reason: failed ? failed + " failed" : "FreeLang AFJ backend HTTP/API/AFJ DB flow passed", backend: "freelang-afj", port, namespace, start: stages.start?.status || "FAIL", health: stages.health?.status || "SKIP", write: stages.write?.status || "SKIP", db_read: stages.db_read?.status || "SKIP", read: stages.read?.status || "SKIP", compare: stages.compare?.status || "SKIP", validation: stages.validation?.status || "SKIP", stop: stages.stop?.status || "FAIL", error_code: failedStage?.error_code || null, phase: failedStage?.phase || null, message: failedStage?.message || null, suggestion: failedStage?.suggestion || null, evidence };
+}
+
 function normalizeOutput(value) {
   return String(value || "").trim().split(/\r?\n/).map(line => {
     if (line.trim() === "nil") return "null";
@@ -229,7 +360,7 @@ function aflEvidenceResult(root, m, checks) {
   const execution = path.join(dir, "freelang-verify-execution.json");
   fs.writeFileSync(execution, JSON.stringify({ project: m.project.name, generated_at: new Date().toISOString(), checks }, null, 2) + "\n");
   const evidenceId = "verify-execution";
-  const gates = ["project", "syntax", "type", "interpreter", "native", "parity"].concat(checks.afj_db?.required ? ["afj_db"] : []).map(name => ({ gate_id: name, gate_type: name === "project" ? "schema" : name === "parity" ? "integrity" : "test", status: "pass", command: checks[name].command || "project manifest discovery", exit_code: checks[name].exit_code === null ? 0 : checks[name].exit_code, evidence_refs: ["evidence://" + evidenceId] }));
+  const gates = ["project", "syntax", "type", "interpreter", "native", "parity"].concat(checks.afj_db?.required ? ["afj_db"] : []).concat(checks.api?.required ? ["api"] : []).map(name => ({ gate_id: name, gate_type: name === "project" ? "schema" : name === "parity" ? "integrity" : "test", status: "pass", command: checks[name].command || "project manifest discovery", exit_code: checks[name].exit_code === null ? 0 : checks[name].exit_code, evidence_refs: ["evidence://" + evidenceId] }));
   const claim = path.join(dir, "freelang.done-claim.json");
   const document = { done_claim_version: "1.0.0", claim_id: "claim-" + m.project.name + "-verify", contract_id: "contract-" + m.project.name + "-verify", project: m.project.name, work_item: "language-core-runtime-parity", source: { repository: root, changed_paths: [m.verify?.input || "project"], source_state: "dirty-working-tree", working_tree_hash: sha256File(execution) }, target_truth: { runtime: "freelang-v11-fx2", entrypoint: m.verify?.input || "configured parity cases", environment_hash: sha256File(execution) }, gates, evidence: [{ evidence_id: evidenceId, evidence_type: "execution_log", path: execution, sha256: sha256File(execution) }], trace_refs: [], repairs: [], done_claim_pass: true, patch_scope: { changed_paths: [m.verify?.input || "project"] } };
   fs.writeFileSync(claim, JSON.stringify(document, null, 2) + "\n");
@@ -287,12 +418,13 @@ function verify(root, args) {
   checks.parity = parityResult(root, m);
   const hasFront = Boolean(m.frontend?.files?.length);
   checks.afj_db = afjDbResult(root, m, full);
-  checks.api = full ? commandResult(root, "api", configuredCommand(m, "api"), Boolean(m.routes?.length)) : { name: "api", required: false, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "use fl verify --full", evidence: [] };
+  checks.api = apiResult(root, m);
   checks.front = hasFront ? commandResult(root, "front", configuredCommand(m, "front") || (fs.existsSync(path.join(root, "fl-front-build.js")) ? "node fl-front-build.js" : null), true, "FreeLang Front build command is not configured") : { name: "front", required: false, status: "NOT_APPLICABLE", command: null, exit_code: null, duration_ms: 0, reason: "no FreeLang Front sources detected", evidence: [] };
   checks.browser = full ? commandResult(root, "browser", configuredCommand(m, "browser"), hasFront) : { name: "browser", required: false, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "use fl verify --full", evidence: [] };
   checks.flsc = withFlsc ? commandResult(root, "flsc", configuredCommand(m, "flsc") || process.env.FLSC_VERIFY_COMMAND, false) : { name: "flsc", required: false, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "use --with-flsc", evidence: [] };
   const requiredCore = ["project", "syntax", "type", "interpreter", "native", "parity"];
   if (checks.afj_db.required) requiredCore.push("afj_db");
+  if (checks.api.required) requiredCore.push("api");
   const coreReady = requiredCore.every(name => checks[name].status === "PASS");
   checks.evidence = configuredCommand(m, "evidence") ? commandResult(root, "evidence", configuredCommand(m, "evidence"), true) : coreReady ? aflEvidenceResult(root, m, checks) : { name: "evidence", required: true, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: full ? "core checks must pass before AFL-Core evidence validation" : "use fl verify --full", evidence: [] };
   for (const check of Object.values(checks)) if (check.status === "FAIL") errors.push({ code: check.error_code || ("FL_" + check.name.toUpperCase() + "_FAILED"), phase: check.phase || check.name, status: "FAIL", file: m.verify?.input || null, line: null, column: null, problem: check.name === "afj_db" ? "afj_db_verification_failed" : "verification_command_failed", symbol: null, message: check.message || (check.name + " verification failed"), suggestion: check.suggestion || ("inspect the captured command, stdout, and stderr in checks." + check.name + ".evidence"), endpoint: check.endpoint || null });
@@ -306,4 +438,4 @@ function verify(root, args) {
   }
   return result.status === "PASS" ? 0 : 1;
 }
-module.exports = { inspect, verify, manifest, commandResult, afjDbResult, afjDbStep };
+module.exports = { inspect, verify, manifest, commandResult, afjDbResult, afjDbStep, apiResult };
