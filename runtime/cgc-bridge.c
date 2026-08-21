@@ -3,11 +3,11 @@
 #include <string.h>
 
 /* parser.c에서 제공 */
-extern FLValue lex(FLValue src);
-extern FLValue parse(FLValue tokens);
+extern FLValue fl_user_lex(FLValue src);
+extern FLValue fl_user_parse(FLValue tokens);
 
 FLValue fl_parse(FLValue src) {
-    return parse(lex(src));
+    return fl_user_parse(fl_user_lex(src));
 }
 
 /* cgc-main.fl이 사용하는 추가 헬퍼 */

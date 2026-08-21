@@ -47,6 +47,21 @@ FLValue fl_vec_push(FLValue vec, FLValue val) {
     FLValue r; r.tag = FL_VECTOR; r.obj = (FLObject*)v; return r;
 }
 
+FLValue fl_append(FLValue left, FLValue right) {
+    if (left.tag == FL_VECTOR && right.tag == FL_VECTOR) {
+        FLVector* a = (FLVector*)left.obj;
+        FLVector* b = (FLVector*)right.obj;
+        uint32_t n = a->len + b->len;
+        FLValue* items = n ? malloc(sizeof(FLValue) * n) : NULL;
+        if (a->len) memcpy(items, a->data, sizeof(FLValue) * a->len);
+        if (b->len) memcpy(items + a->len, b->data, sizeof(FLValue) * b->len);
+        FLValue out = fl_vec_from(items, n);
+        free(items);
+        return out;
+    }
+    return fl_vec_push(left, right);
+}
+
 FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val) {
     if (vec.tag != FL_VECTOR) return fl_vec_new();
     FLVector* src = (FLVector*)vec.obj;

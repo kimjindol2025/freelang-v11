@@ -113,6 +113,7 @@ FLValue fl_vec_from(FLValue* items, uint32_t n);
 FLValue fl_vec_get(FLValue vec, FLValue idx);
 FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val);
 FLValue fl_vec_push(FLValue vec, FLValue val);
+FLValue fl_append(FLValue left, FLValue right);
 FLValue fl_vec_len(FLValue vec);
 
 /* ── Map ── */

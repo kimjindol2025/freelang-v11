@@ -40397,6 +40397,16 @@ var Interpreter = class _Interpreter {
       op = op?.name ? op.name : String(op);
     }
     op = String(op).trim();
+    // $name in operator position denotes a callable parameter/local value.
+    // defn/fn parameter binding canonicalizes $name to name.
+    if (op.startsWith("$") && this.context.variables.has(op.slice(1))) {
+      const callable = this.context.variables.get(op.slice(1));
+      const callArgs = expr2.args.map((arg) => this.eval(arg));
+      if (callable?.kind === "function-value" || callable?.kind === "async-function-value") {
+        return this.callFunctionValue(callable, callArgs);
+      }
+      if (typeof callable === "function") return callable(...callArgs);
+    }
     if (op.includes(":")) {
       const [className, methodName] = op.split(":");
       if (expr2.args.length > 0) {
