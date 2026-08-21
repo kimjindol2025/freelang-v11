@@ -279,6 +279,12 @@ function apiResult(root, m) {
       }
     }
     if (stages.start?.status === "PASS") {
+      const frontPage = apiRequest(port, "GET", "/");
+      const frontMarkup = String(frontPage.body || "");
+      const frontContract = frontPage.status === 200 && frontMarkup.includes("FreeLang Front Customer");
+      stageFromRequest("front_routes", frontPage, request => request.status === 200 && frontMarkup.includes("id='name'") && frontMarkup.includes("id='phone'"), "FL_FRONT_ROUTES_FAILED", "Front route did not expose the customer screen controls", "inspect the FreeLang Front route registration");
+      stageFromRequest("front_render", frontPage, request => request.status === 200 && frontContract && frontMarkup.includes("id='save'") && frontMarkup.includes("id='result'"), "FL_FRONT_RENDER_FAILED", "Front route did not render the customer screen contract", "inspect the FreeLang Front HTML renderer");
+      stageFromRequest("front_api", frontPage, request => request.status === 200 && frontMarkup.includes("fetch('/api/customers'") && frontMarkup.includes("fetch('/api/customers/"), "FL_FRONT_API_FAILED", "Front markup is not wired to the AFJ API routes", "inspect the Front fetch bindings");
       const health = apiRequest(port, "GET", healthRoute);
       stageFromRequest("health", health, request => request.status === 200 && request.json && request.json.status === "ok", "FL_API_HEALTH_FAILED", "FreeLang AFJ health endpoint did not return status ok", "inspect server route and startup logs");
       const write = apiRequest(port, "POST", "/api/customers", { name: "BIGWASH TEST", phone: "01000000000" });
@@ -287,6 +293,7 @@ function apiResult(root, m) {
       if (writeOk) {
         const direct = afjDbStep(dbCli, dbRoot, ["read-key", path.join(namespace, "db"), id], "api_db_read", data => Boolean(data && data.value && data.value.id === id && data.value.phone === "01000000000"), "FL_API_READ_FAILED", "direct AFJ DB read did not match the API write");
         add("db_read", direct);
+        add("front_afj_db", { name: "front_afj_db", status: direct.status === "PASS" && stages.front_api?.status === "PASS" ? "PASS" : "FAIL", command: "Front API contract -> AFJ DB direct read", exit_code: direct.status === "PASS" && stages.front_api?.status === "PASS" ? 0 : 1, duration_ms: 0, error_code: direct.status === "PASS" && stages.front_api?.status === "PASS" ? null : "FL_FRONT_AFJ_DB_FAILED", phase: direct.status === "PASS" && stages.front_api?.status === "PASS" ? null : "front", message: direct.status === "PASS" && stages.front_api?.status === "PASS" ? null : "Front/API/AFJ DB contract could not be cross-checked", suggestion: "inspect Front API bindings and AFJ DB read evidence", evidence: [{ status: direct.status === "PASS" && stages.front_api?.status === "PASS" ? "PASS" : "FAIL", front_api: stages.front_api?.status || "FAIL", afj_db: direct.status, expected_phone: "01000000000", actual: direct.data?.value || null, captured_at: new Date().toISOString() }] });
         const read = apiRequest(port, "GET", "/api/customers/" + encodeURIComponent(id));
         const readOk = stageFromRequest("read", read, request => request.status === 200 && request.json && request.json.id === id, "FL_API_READ_FAILED", "GET did not return the created customer", "inspect route parameter handling and AFJ DB read");
         const compareOk = readOk && read.json.name === expected.name && read.json.phone === expected.phone && direct.status === "PASS";
@@ -321,9 +328,12 @@ function apiResult(root, m) {
     try { fs.rmSync(namespace, { recursive: true, force: true }); } catch {}
   }
   const requiredStages = ["start", "health", "write", "db_read", "read", "compare", "validation", "stop"];
+  const frontStages = ["front_routes", "front_render", "front_api", "front_afj_db"];
+  const frontFailed = frontStages.find(name => !stages[name] || stages[name].status !== "PASS");
+  const frontStage = frontFailed ? stages[frontFailed] : null;
   const failed = requiredStages.find(name => !stages[name] || stages[name].status !== "PASS");
   const failedStage = failed ? stages[failed] : null;
-  return { name: "api", required: true, status: failed ? "FAIL" : "PASS", command: startCommand || buildCommand || null, exit_code: failedStage?.exit_code ?? 0, duration_ms: Date.now() - started, reason: failed ? failed + " failed" : "FreeLang AFJ backend HTTP/API/AFJ DB flow passed", backend: "freelang-afj", port, namespace, start: stages.start?.status || "FAIL", health: stages.health?.status || "SKIP", write: stages.write?.status || "SKIP", db_read: stages.db_read?.status || "SKIP", read: stages.read?.status || "SKIP", compare: stages.compare?.status || "SKIP", validation: stages.validation?.status || "SKIP", stop: stages.stop?.status || "FAIL", error_code: failedStage?.error_code || null, phase: failedStage?.phase || null, message: failedStage?.message || null, suggestion: failedStage?.suggestion || null, evidence };
+  return { name: "api", required: true, status: failed ? "FAIL" : "PASS", command: startCommand || buildCommand || null, front: { name: "front", required: true, status: frontFailed ? "FAIL" : "PASS", reason: frontFailed ? frontFailed + " failed" : "Front route/API/AFJ DB contract passed", build: stages.start?.status || "FAIL", start: stages.start?.status || "FAIL", routes: stages.front_routes?.status || "FAIL", render: stages.front_render?.status || "FAIL", api: stages.front_api?.status || "FAIL", afj_db: stages.front_afj_db?.status || "FAIL", issues: "NOT_APPLICABLE", stop: stages.stop?.status || "FAIL", error_code: frontStage?.error_code || null, evidence: evidence.filter(item => String(item.name || "").startsWith("GET /") || item.name === "front_afj_db") }, exit_code: failedStage?.exit_code ?? 0, duration_ms: Date.now() - started, reason: failed ? failed + " failed" : "FreeLang AFJ backend HTTP/API/AFJ DB flow passed", backend: "freelang-afj", port, namespace, start: stages.start?.status || "FAIL", health: stages.health?.status || "SKIP", write: stages.write?.status || "SKIP", db_read: stages.db_read?.status || "SKIP", read: stages.read?.status || "SKIP", compare: stages.compare?.status || "SKIP", validation: stages.validation?.status || "SKIP", stop: stages.stop?.status || "FAIL", error_code: failedStage?.error_code || null, phase: failedStage?.phase || null, message: failedStage?.message || null, suggestion: failedStage?.suggestion || null, evidence };
 }
 
 function normalizeOutput(value) {
@@ -400,6 +410,17 @@ function inspect(root, args) {
   }
   return 0;
 }
+function browserResult(root, m, full) {
+  const required = Boolean(m.frontend?.required);
+  if (!required) return { name: "browser", required: false, status: "NOT_APPLICABLE", command: null, exit_code: null, duration_ms: 0, reason: "no FreeLang Front declared", evidence: [] };
+  if (!full) return { name: "browser", required: true, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "use fl verify --full for browser smoke", evidence: [] };
+  const configured = configuredCommand(m, "browser");
+  if (configured) return commandResult(root, "browser", configured, true, "FreeLang Front browser smoke");
+  const candidates = ["/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/opt/google/chrome/google-chrome"];
+  const executable = candidates.find(file => fs.existsSync(file));
+  if (!executable) return { name: "browser", required: true, status: "BLOCKED", command: null, exit_code: null, duration_ms: 0, error_code: "FL_BROWSER_UNAVAILABLE", reason: "Chrome/Chromium is not installed; browser smoke was not executed", suggestion: "install Chrome/Chromium and configure the existing fl-browser.js scenario", evidence: [{ status: "BLOCKED", reason: "no Chrome/Chromium executable found", scenario: m.frontend?.browser_scenario || "open -> input -> POST -> GET -> refresh -> compare -> console/network" }] };
+  return { name: "browser", required: true, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "browser executable found but no existing fl-browser.js command is configured", evidence: [{ status: "SKIP", executable }] };
+}
 function verify(root, args) {
   const m = manifest(root);
   const full = args.includes("--full");
@@ -416,15 +437,16 @@ function verify(root, args) {
   const nativeCommand = configuredCommand(m, "native") || officialFx2Command(root, m);
   checks.native = commandResult(root, "native", nativeCommand, true);
   checks.parity = parityResult(root, m);
-  const hasFront = Boolean(m.frontend?.files?.length);
+  const hasFront = Boolean(m.frontend?.required || m.frontend?.files?.length);
   checks.afj_db = afjDbResult(root, m, full);
   checks.api = apiResult(root, m);
-  checks.front = hasFront ? commandResult(root, "front", configuredCommand(m, "front") || (fs.existsSync(path.join(root, "fl-front-build.js")) ? "node fl-front-build.js" : null), true, "FreeLang Front build command is not configured") : { name: "front", required: false, status: "NOT_APPLICABLE", command: null, exit_code: null, duration_ms: 0, reason: "no FreeLang Front sources detected", evidence: [] };
-  checks.browser = full ? commandResult(root, "browser", configuredCommand(m, "browser"), hasFront) : { name: "browser", required: false, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "use fl verify --full", evidence: [] };
+  checks.front = hasFront ? (checks.api.front || { name: "front", required: true, status: "FAIL", reason: "Front result was not returned by API verification", evidence: [] }) : { name: "front", required: false, status: "NOT_APPLICABLE", command: null, exit_code: null, duration_ms: 0, reason: "no FreeLang Front sources detected", evidence: [] };
+  checks.browser = browserResult(root, m, full);
   checks.flsc = withFlsc ? commandResult(root, "flsc", configuredCommand(m, "flsc") || process.env.FLSC_VERIFY_COMMAND, false) : { name: "flsc", required: false, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: "use --with-flsc", evidence: [] };
   const requiredCore = ["project", "syntax", "type", "interpreter", "native", "parity"];
   if (checks.afj_db.required) requiredCore.push("afj_db");
   if (checks.api.required) requiredCore.push("api");
+  if (checks.front.required) requiredCore.push("front");
   const coreReady = requiredCore.every(name => checks[name].status === "PASS");
   checks.evidence = configuredCommand(m, "evidence") ? commandResult(root, "evidence", configuredCommand(m, "evidence"), true) : coreReady ? aflEvidenceResult(root, m, checks) : { name: "evidence", required: true, status: "SKIP", command: null, exit_code: null, duration_ms: 0, reason: full ? "core checks must pass before AFL-Core evidence validation" : "use fl verify --full", evidence: [] };
   for (const check of Object.values(checks)) if (check.status === "FAIL") errors.push({ code: check.error_code || ("FL_" + check.name.toUpperCase() + "_FAILED"), phase: check.phase || check.name, status: "FAIL", file: m.verify?.input || null, line: null, column: null, problem: check.name === "afj_db" ? "afj_db_verification_failed" : "verification_command_failed", symbol: null, message: check.message || (check.name + " verification failed"), suggestion: check.suggestion || ("inspect the captured command, stdout, and stderr in checks." + check.name + ".evidence"), endpoint: check.endpoint || null });
