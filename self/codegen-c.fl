@@ -61,7 +61,7 @@
   (str "fl_user_" (c-name $n)))
 
 (defn c-runtime-builtin? [$n]
-  (includes-item ["rest"] $n))
+  (includes-item ["rest" "fxb-net-listen-address" "fxb-net-set-nonblocking" "fxb-net-wait" "fxb-net-accept-timeout" "fxb-net-connect-timeout" "fxb-net-read-timeout" "fxb-net-write-timeout" "fxb-net-set-keepalive" "fxb-net-track-connection" "fxb-net-untrack-connection" "fxb-net-listener-shutdown" "fxb-net-close" "fxb-net-accept" "fxb-net-listen" "fxb-net-connect" "fxb-net-readline" "fxb-net-read-bytes" "fxb-net-write" "fxb-net-writeline" "fxb-net-pasv-open" "fxb-net-pasv-accept" "fxb-net-send-file" "fxb-net-recv-file" "fxb-net-local-ip" "num-to-str" "fl-future" "fl-sleep-ms" "fl-deref"] $n))
 
 ;; ── 버그 #5: 값 위치 연산자 → 합성 함수값 ──
 (define op-emitted-atom (atom []))
@@ -456,6 +456,14 @@
         (c-name (get $caps 0))
         (str $acc ", " (get $caps $i)))))))
 
+(defn cgc-fn-append [$base $items $i $acc]
+  (if (>= $i (length $items))
+    $acc
+    (cgc-fn-append $base $items (+ $i 1)
+      (if (includes-item $acc (get $items $i))
+        $acc
+        (push $acc (get $items $i))))))
+
 (defn cgc-fn [$args]
   (let [[$id (deref lambda-id-atom)]
         [$param-items (get-block-items (get $args 0))]
@@ -463,25 +471,31 @@
         [$body-node (get $args 1)]
         [$all-vars (cgc-collect-vars $body-node [])]
         [$outer (deref outer-params-atom)]
-        [$caps (cgc-fn-caps-filter $outer $param-names $outer 0 [])]
-        [$nenv (length $caps)]
-        [$env-decls (cgc-fn-env-decls $caps 0 "")]
-        [$body-c (cgc $body-node)]
-        [$decls (cgc-fn-argv-decls $param-items 0 "")]
-        [$fn-name (str "__fl_anon_" $id)]]
+        [$caps (cgc-fn-caps-filter $all-vars $param-names $outer 0 [])]]
     (swap! lambda-id-atom + 1)
-    (swap! lambda-defs-atom push
-      (str "static FLValue " $fn-name
-           "(FLClosure* _self, int _argc, FLValue* argv) {\n"
-           "    (void)_self; (void)_argc;\n"
-           $env-decls
-           $decls
-           "    return " $body-c ";\n}"))
-    (if (= $nenv 0)
-      (str "fl_fn_new(" $fn-name ", 0, NULL)")
-      (str "(__extension__ ({ FLValue __env_" $id "[" $nenv "] = {"
-           (cgc-env-arr $caps 0 "") "};"
-           " fl_fn_new(" $fn-name ", " $nenv ", __env_" $id "); }))"))))
+    (reset! outer-params-atom
+      (cgc-fn-append $outer $param-names 0
+        (cgc-fn-append $outer $caps 0 $outer)))
+    (let [[$result
+           (let [[$nenv (length $caps)]
+                 [$env-decls (cgc-fn-env-decls $caps 0 "")]
+                 [$body-c (cgc $body-node)]
+                 [$decls (cgc-fn-argv-decls $param-items 0 "")]
+                 [$fn-name (str "__fl_anon_" $id)]]
+             (swap! lambda-defs-atom push
+               (str "static FLValue " $fn-name
+                    "(FLClosure* _self, int _argc, FLValue* argv) {\n"
+                    "    (void)_self; (void)_argc;\n"
+                    $env-decls
+                    $decls
+                    "    return " $body-c ";\n}"))
+             (if (= $nenv 0)
+               (str "fl_fn_new(" $fn-name ", 0, NULL)")
+               (str "(__extension__ ({ FLValue __env_" $id "[" $nenv "] = {"
+                    (cgc-env-arr $caps 0 "") "};"
+                    " fl_fn_new(" $fn-name ", " $nenv ", __env_" $id "); }))")))]]
+      (reset! outer-params-atom $outer)
+      $result)))
 
 ;; ── list (vararg → fl_vec_from) ──
 
