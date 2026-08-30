@@ -56,6 +56,7 @@ import { createFeedModule } from "./stdlib-feed";          // Q2-2/3/4: RSS/Atom
 import { createBlogModule } from "./stdlib-blog";          // Q2-5: 태그/관련글/검색인덱스/페이지네이션
 import { createCloudModule } from "./stdlib-cloud";        // Phase 58: Cloud (AWS/GCP/Azure)
 import { createMatrixModule } from "./stdlib-matrix";      // Phase 99: Matrix/Vector + Parallel for GPT training
+import { createBinaryFoundationModule } from "./stdlib-binary-0b"; // Phase 0B: binary/UTF-8 foundation
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -72,6 +73,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createFileModule());
   interp.registerModule(createFdModule());
   interp.registerModule(createBitsModule());
+  interp.registerModule(createBinaryFoundationModule());
   interp.registerModule(createTimerModule(interp)); // Pass interp for callback invocation
   interp.registerModule(createErrorModule());
   interp.registerModule(createHttpModule());

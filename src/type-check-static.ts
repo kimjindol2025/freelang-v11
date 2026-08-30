@@ -8,6 +8,7 @@
 
 import { lex } from "./lexer";
 import { parse } from "./parser";
+import { createBinaryFoundationModule } from "./stdlib-binary-0b";
 
 // ─────────────────────────────────────────
 // 타입
@@ -139,6 +140,15 @@ const STDLIB_ARITY: Map<string, { min: number; max: number }> = new Map([
   ["server-json", { min: 1, max: 2 }],
 ]);
 
+// Loader-registered native functions expose their canonical arity through the
+// same module factory used by the evaluator. Keep the checker data-driven:
+// aliases and future binary foundation functions are covered automatically.
+for (const [name, fn] of Object.entries(createBinaryFoundationModule())) {
+  if (typeof fn === "function") {
+    STDLIB_ARITY.set(name, { min: fn.length, max: fn.length });
+  }
+}
+
 // 특수 형식 — arity 체크 제외
 const SPECIAL_FORMS = new Set([
   "define", "defn", "defun", "fn", "lambda",
@@ -240,9 +250,15 @@ function collectDefns(ast: any): { defs: Map<string, FnDef>; varTypes: Map<strin
           const paramNode = items[i];
           if (paramNode?.kind === "variable") {
             params.push({ name: paramNode.name, type: paramType });
+          } else if (paramNode?.kind === "literal" && paramNode?.type === "symbol") {
+            params.push({ name: String(paramNode.value ?? ""), type: paramType });
           }
         } else if (item?.kind === "variable") {
           const pname = item.name;
+          if (pname.startsWith("...") || pname.startsWith("rest")) variadic = true;
+          params.push({ name: pname, type: "any" });
+        } else if (item?.kind === "literal" && item?.type === "symbol") {
+          const pname = String(item.value ?? "");
           if (pname.startsWith("...") || pname.startsWith("rest")) variadic = true;
           params.push({ name: pname, type: "any" });
         }
