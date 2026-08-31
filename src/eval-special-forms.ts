@@ -1331,8 +1331,14 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
           const isTruthy = condVal !== null && condVal !== undefined && condVal !== false;
           if (!isTruthy) break;
 
-          for (const bodyNode of bodyNodes) {
-            result = ev(bodyNode);
+          const savedTcoMode = (interp as any).tcoMode;
+          (interp as any).tcoMode = false;
+          try {
+            for (const bodyNode of bodyNodes) {
+              result = ev(bodyNode);
+            }
+          } finally {
+            (interp as any).tcoMode = savedTcoMode;
           }
           const newVal = ev(updateExpr);
           ctx.variables.set(varName, newVal);
@@ -1369,16 +1375,22 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
         // budget max-ms 체크 (1000회마다)
         if (iter % 1000 === 0) checkBudgetInLoop();
         let recurred = false;
-        for (const bodyNode of bodyNodes) {
-          result = ev(bodyNode);
-          if (result && typeof result === "object" && result.__FL_RECUR__) {
-            const newVals = result.__args as any[];
-            for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
-              ctx.variables.set(loopVars[i], newVals[i]);
+        const savedTcoMode = (interp as any).tcoMode;
+        (interp as any).tcoMode = false;
+        try {
+          for (const bodyNode of bodyNodes) {
+            result = ev(bodyNode);
+            if (result && typeof result === "object" && result.__FL_RECUR__) {
+              const newVals = result.__args as any[];
+              for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
+                ctx.variables.set(loopVars[i], newVals[i]);
+              }
+              recurred = true;
+              break;
             }
-            recurred = true;
-            break;
           }
+        } finally {
+          (interp as any).tcoMode = savedTcoMode;
         }
         if (!recurred) break;
       }

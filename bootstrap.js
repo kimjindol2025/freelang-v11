@@ -5324,8 +5324,14 @@ function evalSpecialForm(interp2, op, expr2) {
           const condVal = ev(condExpr);
           const isTruthy = condVal !== null && condVal !== void 0 && condVal !== false;
           if (!isTruthy) break;
-          for (const bodyNode of bodyNodes) {
-            result2 = ev(bodyNode);
+          const savedTcoMode = interp2.tcoMode;
+          interp2.tcoMode = false;
+          try {
+            for (const bodyNode of bodyNodes) {
+              result2 = ev(bodyNode);
+            }
+          } finally {
+            interp2.tcoMode = savedTcoMode;
           }
           const newVal = ev(updateExpr);
           ctx.variables.set(varName, newVal);
@@ -5355,16 +5361,22 @@ function evalSpecialForm(interp2, op, expr2) {
       while (iter++ < maxIter) {
         if (iter % 1e3 === 0) checkBudgetInLoop();
         let recurred = false;
-        for (const bodyNode of bodyNodes) {
-          result = ev(bodyNode);
-          if (result && typeof result === "object" && result.__FL_RECUR__) {
-            const newVals = result.__args;
-            for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
-              ctx.variables.set(loopVars[i], newVals[i]);
+        const savedTcoMode = interp2.tcoMode;
+        interp2.tcoMode = false;
+        try {
+          for (const bodyNode of bodyNodes) {
+            result = ev(bodyNode);
+            if (result && typeof result === "object" && result.__FL_RECUR__) {
+              const newVals = result.__args;
+              for (let i = 0; i < loopVars.length && i < newVals.length; i++) {
+                ctx.variables.set(loopVars[i], newVals[i]);
+              }
+              recurred = true;
+              break;
             }
-            recurred = true;
-            break;
           }
+        } finally {
+          interp2.tcoMode = savedTcoMode;
         }
         if (!recurred) break;
       }
