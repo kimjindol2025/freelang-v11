@@ -40785,7 +40785,14 @@ var Interpreter = class _Interpreter {
       } catch (_vmErr) {
       }
     }
-    const args3 = expr2.args.map((arg) => this.eval(arg));
+    const _savedTcoModeForArgs = this.tcoMode;
+    this.tcoMode = false;
+    let args3;
+    try {
+      args3 = expr2.args.map((arg) => this.eval(arg));
+    } finally {
+      this.tcoMode = _savedTcoModeForArgs;
+    }
     if (args3.length >= 1 && typeof args3[0] === "string") {
       const qualifiedName = `${op}:${args3[0]}`;
       if (this.context.functions.has(qualifiedName)) {

@@ -1,0 +1,21 @@
+;; Independent regression for normal user-function argument evaluation.
+(defn identity [x] x)
+(defn outer [x] x)
+(defn inner [x] x)
+
+(let [ascii (identity "A")
+      unicode (identity "가")
+      bytes (identity (buf-concat [(buf-u8 65) (buf-u8 0) (buf-u8 66)]))
+      nested (outer (inner "가"))
+      encoded (identity (utf8-encode "가"))
+      decoded (identity (utf8-decode-strict encoded))]
+  (do
+    (println (str "USER_FN_STRING_ARG=" (if (= ascii "A") "PASS" "FAIL")))
+    (println (str "USER_FN_UNICODE_ARG=" (if (= unicode "가") "PASS" "FAIL")))
+    (println (str "USER_FN_BYTES_ARG="
+      (if (and (= (buf-len bytes) 3)
+               (= (buf-read-u8 bytes 1) 0)) "PASS" "FAIL")))
+    (println (str "USER_FN_NESTED_CALL_ARG="
+      (if (= nested "가") "PASS" "FAIL")))
+    (println (str "USER_FN_CALL_RESULT_ARG="
+      (if (and (= (buf-len encoded) 3) (= decoded "가")) "PASS" "FAIL")))))

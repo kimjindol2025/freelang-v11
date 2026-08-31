@@ -1928,8 +1928,16 @@ export class Interpreter {
       }
     }
 
-    // Evaluate args for builtins
-    const args = expr.args.map((arg) => this.eval(arg));
+    // Normal calls are eager: nested calls used as arguments must produce
+    // concrete values even while a user-function body is in TCO mode.
+    const _savedTcoModeForArgs = this.tcoMode;
+    this.tcoMode = false;
+    let args: any[];
+    try {
+      args = expr.args.map((arg) => this.eval(arg));
+    } finally {
+      this.tcoMode = _savedTcoModeForArgs;
+    }
 
     // Phase 52: qualified function call (module:func pattern) — check BEFORE switch
     if (args.length >= 1 && typeof args[0] === "string") {
