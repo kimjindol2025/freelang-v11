@@ -1,0 +1,13 @@
+(defn identity-value [x] x)
+(let [n (identity-value null)
+      b (identity-value true)
+      i (identity-value 7)
+      f (identity-value 1.5)
+      a (identity-value [1 2])
+      m (identity-value {:a 1})]
+  (do
+    (println (str "ARG_NULL=" (if (= n null) "PASS" "FAIL")))
+    (println (str "ARG_BOOL=" (if (= b true) "PASS" "FAIL")))
+    (println (str "ARG_NUMBER=" (if (= (+ i f) 8.5) "PASS" "FAIL")))
+    (println (str "ARG_ARRAY=" (if (= (get a 0) 1) "PASS" "FAIL")))
+    (println (str "ARG_OBJECT=" (if (= (get m :a) 1) "PASS" "FAIL")))))
