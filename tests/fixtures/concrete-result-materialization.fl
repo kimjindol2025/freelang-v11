@@ -1,0 +1,18 @@
+;; Runtime-only regression: function results must be concrete at every value boundary.
+(defn make-bytes [] (utf8-encode "가"))
+(defn consume [x] (buf-len x))
+
+(let [a (utf8-encode "a")
+      b (buf_str "a")
+      c (make-bytes)
+      d (buf-concat [(utf8-encode "a") (utf8-encode "b")])
+      e (consume (utf8-encode "가"))
+      f [(utf8-encode "a") (utf8-encode "b")]]
+  (do
+    (println (str "LET_UTF8_RESULT_CONCRETE=" (if (= (buf-len a) 1) "PASS" "FAIL")))
+    (println (str "LET_BUILTIN_RESULT_CONCRETE=" (if (= (buf-len b) 1) "PASS" "FAIL")))
+    (println (str "USER_FN_BYTES_RETURN_CONCRETE=" (if (= (buf-len c) 3) "PASS" "FAIL")))
+    (println (str "NESTED_BUILTIN_RESULT_CONCRETE=" (if (= (buf-len d) 2) "PASS" "FAIL")))
+    (println (str "FUNCTION_ARG_BYTES_CONCRETE=" (if (= e 3) "PASS" "FAIL")))
+    (println (str "CONTAINER_BYTES_CONCRETE="
+      (if (and (= (buf-len (get f 0)) 1) (= (buf-len (get f 1)) 1)) "PASS" "FAIL")))))

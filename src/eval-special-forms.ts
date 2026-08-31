@@ -1225,7 +1225,12 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
         // 사용자 정의 함수이거나 아직 알 수 없는 함수 호출 — 일단 eval해서 확인
         // (builtin이면 그냥 실행, user-func이면 TailCall)
         const ctx = interp.context;
-        if (typeof bop === "string" && ctx.functions.has(bop)) {
+        const candidate = typeof bop === "string" ? ctx.functions.get(bop) : undefined;
+        // context.functions에는 native stdlib도 등록되어 있다. native 함수까지
+        // user-function으로 오인하면 (if ... (buf_str ...))가 실제 값을
+        // 반환하지 않고 TailCall 토큰을 사용자 값으로 노출한다. TCO는
+        // 해석 가능한 user-function body에만 적용한다.
+        if (candidate && typeof candidate.body !== "function") {
           // 꼬리 위치 user-function 호출 → TailCall 토큰 반환 (스택 없이)
           const tailArgs = b.args.map((a: any) => ev(a));
           return tailCall(bop, tailArgs);
@@ -2230,6 +2235,13 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
   const bindings = args[0];
   const ctx = interp.context;
   const ev = (node: any) => (interp as any).eval(node);
+  // let RHS는 값 위치다. 함수 본문의 tcoMode가 전파되어도
+  // binding 안의 if가 TailCall 토큰을 사용자 값으로 노출하지 않게 한다.
+  const evValue = (node: any) => {
+    const previous = (interp as any).tcoMode;
+    (interp as any).tcoMode = false;
+    try { return ev(node); } finally { (interp as any).tcoMode = previous; }
+  };
 
   const toVarName = (node: any): string => {
     if (node?.kind === "variable") {
@@ -2275,7 +2287,7 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
             const bindingItems = (item as any).fields.get("items");
             if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
               const varName = toVarName(bindingItems[0]);
-              const value = ev(bindingItems[1]);
+              const value = evValue(bindingItems[1]);
               // Phase Y-1: 메타정보 저장
               const meta: Partial<ScopeVarMeta> = {
                 line: (bindingItems[0] as any).line,
@@ -2300,7 +2312,7 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
             const mapFields = (pattern as any).fields as Map<string, any>;
             const keysField = mapFields?.get("keys");
             if (keysField?.kind === "block" && keysField?.type === "Array") {
-              const sourceMap = ev(items[i + 1]);
+              const sourceMap = evValue(items[i + 1]);
               const keyItems: any[] = keysField.fields.get("items") ?? [];
               for (const keyNode of keyItems) {
                 const rawName: string | null =
@@ -2324,7 +2336,7 @@ function evalLet(interp: Interpreter, args: ASTNode[]): any {
           }
 
           const varName = toVarName(pattern);
-          const value = ev(items[i + 1]);
+          const value = evValue(items[i + 1]);
           // Phase Y-1: 메타정보 저장
           const meta: Partial<ScopeVarMeta> = {
             line: (items[i] as any).line,

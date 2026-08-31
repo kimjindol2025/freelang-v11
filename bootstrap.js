@@ -5248,7 +5248,8 @@ function evalSpecialForm(interp2, op, expr2) {
       if (b.kind === "sexpr") {
         const bop = b.op;
         const ctx2 = interp2.context;
-        if (typeof bop === "string" && ctx2.functions.has(bop)) {
+        const candidate = typeof bop === "string" ? ctx2.functions.get(bop) : void 0;
+        if (candidate && typeof candidate.body !== "function") {
           const tailArgs = b.args.map((a) => ev(a));
           return tailCall(bop, tailArgs);
         }
@@ -6009,6 +6010,15 @@ function evalLet(interp2, args3) {
   const bindings = args3[0];
   const ctx = interp2.context;
   const ev = (node) => interp2.eval(node);
+  const evValue = (node) => {
+    const previous = interp2.tcoMode;
+    interp2.tcoMode = false;
+    try {
+      return ev(node);
+    } finally {
+      interp2.tcoMode = previous;
+    }
+  };
   const toVarName = (node) => {
     if (node?.kind === "variable") {
       const n = node.name;
@@ -6040,7 +6050,7 @@ function evalLet(interp2, args3) {
             const bindingItems = item.fields.get("items");
             if (Array.isArray(bindingItems) && bindingItems.length >= 2) {
               const varName = toVarName(bindingItems[0]);
-              const value = ev(bindingItems[1]);
+              const value = evValue(bindingItems[1]);
               const meta = {
                 line: bindingItems[0].line,
                 col: bindingItems[0].col,
@@ -6061,7 +6071,7 @@ function evalLet(interp2, args3) {
             const mapFields = pattern.fields;
             const keysField = mapFields?.get("keys");
             if (keysField?.kind === "block" && keysField?.type === "Array") {
-              const sourceMap = ev(items[i + 1]);
+              const sourceMap = evValue(items[i + 1]);
               const keyItems = keysField.fields.get("items") ?? [];
               for (const keyNode of keyItems) {
                 const rawName = keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value : keyNode?.kind === "variable" ? keyNode.name.replace(/^\$/, "") : null;
@@ -6079,7 +6089,7 @@ function evalLet(interp2, args3) {
             continue;
           }
           const varName = toVarName(pattern);
-          const value = ev(items[i + 1]);
+          const value = evValue(items[i + 1]);
           const meta = {
             line: items[i].line,
             col: items[i].col,

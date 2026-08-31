@@ -1,0 +1,11 @@
+(defn part-encode [part]
+  (let [payload (get part :body)
+        raw (buf_str payload)]
+    (buf-len raw)))
+(defn all-parts [items]
+  (loop [xs items out []]
+    (if (empty? xs) out
+        (recur (rest xs) (append out [(part-encode (first xs))])))))
+(let [result (all-parts [{:body "진돌"} {:body "a"}])]
+  (println (str "NESTED_LOOP_BUILTIN_RESULT="
+    (if (and (= (get result 0) 6) (= (get result 1) 1)) "PASS" "FAIL"))))

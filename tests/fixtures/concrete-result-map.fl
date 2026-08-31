@@ -1,0 +1,6 @@
+(defn encode-part [part]
+  (let [payload (get part :body)
+        raw (buf_str payload)]
+    (buf-len raw)))
+(let [part {:body "진돌"}]
+  (println (str "MAP_BUILTIN_RESULT_CONCRETE=" (if (= (encode-part part) 6) "PASS" "FAIL"))))
