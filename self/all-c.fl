@@ -478,8 +478,15 @@
         [(= $op "try")
          ;; try-catch-finally: (try body (catch param body) (finally body))
          (let [[$body (if (> (length $rest) 0) (get $rest 0) null)]
-               [$catch-clause (if (> (length $rest) 1) (get $rest 1) null)]
-               [$finally-clause (if (> (length $rest) 2) (get $rest 2) null)]]
+               [$second (if (> (length $rest) 1) (get $rest 1) null)]
+               [$second-op (if (and (not (null? $second))
+                                    (= (get $second :kind) "sexpr"))
+                               (get $second :op)
+                               "")]
+               [$catch-clause (if (= $second-op "finally") null $second)]
+               [$finally-clause (if (= $second-op "finally")
+                                    $second
+                                    (if (> (length $rest) 2) (get $rest 2) null))]]
            (r-pair (parse-consume-rparen $p2)
                    (make-try $body $catch-clause $finally-clause $line)))]
         [(= $op "loop")
@@ -738,6 +745,9 @@
                 (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
                 $cn)))))]
     [(= (get $n :kind) "keyword")   (str "fl_str_val(\"" (c-esc (get $n :name)) "\")")]
+    [(= (get $n :kind) "try")       (cgc-try $n)]
+    [(= (get $n :kind) "try-block") (cgc-try $n)]
+    [(= (get $n :kind) "throw")     (cgc-throw $n)]
     [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
     [(= (get $n :kind) "block")     (cgc-block $n)]
     [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
@@ -745,6 +755,70 @@
     [true
      (do (println (str "[CGC-ERR] unsupported IR kind=" (get $n :kind) " line=" (get $n :line)))
          "fl_nil()")]))
+
+;; Exception code generation. Pop the frame before catch/finally so rethrows
+;; and errors raised by finally propagate to the enclosing frame.
+(defn cgc-catch-var [$catch]
+  (let [[$pattern (if (= (get $catch :kind) "catch")
+                    (get $catch :param)
+                    (get (get $catch :args) 0))]]
+    (if (null? $pattern) "fl_user_error"
+      (if (= (get $pattern :kind) "block")
+        (let [[$items (get (get $pattern :fields) :items)]]
+          (if (or (null? $items) (= (length $items) 0)) "fl_user_error"
+            (cgc-extract-name (get $items 0))))
+        (cgc-extract-name $pattern)))))
+
+(defn cgc-catch-body [$catch]
+  (if (= (get $catch :kind) "catch")
+    (cgc (get $catch :body))
+    (let [[$args (get $catch :args)]]
+      (if (and (not (null? $args)) (> (length $args) 1))
+        (cgc (get $args 1))
+        "fl_nil()"))))
+
+(defn cgc-finally-body [$finally]
+  (if (null? $finally) null
+    (if (and (= (get $finally :kind) "sexpr")
+             (= (get $finally :op) "finally"))
+      (get (get $finally :args) 0)
+      $finally)))
+
+(defn cgc-try [$node]
+  (let [[$id (deref lambda-id-atom)]
+        [$body (get $node :body)]
+        [$catch (if (= (get $node :kind) "try-block")
+                  (get (get $node :catchClauses) 0)
+                  (get $node :catch))]
+        [$finally (if (= (get $node :kind) "try-block")
+                    (get $node :finallyBlock)
+                    (get $node :finally))]
+        [$frame (str "__fl_try_frame_" $id)]
+        [$jump (str "__fl_try_jump_" $id)]
+        [$result (str "__fl_try_result_" $id)]
+        [$err (str "__fl_try_error_" $id)]
+        [$finally-expr (cgc-finally-body $finally)]
+        [$finally-c (if (null? $finally-expr) "" (str " " (cgc $finally-expr) ";"))]
+        [$catch-c (if (null? $catch)
+                    (str " fl_throw(" $err ");")
+                    (str " FLValue " (cgc-catch-var $catch) " = " $err ";"
+                         " " $result " = " (cgc-catch-body $catch) ";"))]]
+    (swap! lambda-id-atom + 1)
+    (str "(__extension__ ({ FLValue " $result " = fl_nil();"
+         " FLTryFrame* volatile " $frame "; volatile int " $jump ";"
+         " if (fl_try_top >= FL_TRY_MAX) fl_throw(fl_str_val(\"try stack overflow\"));"
+         " fl_try_top++; " $frame " = &fl_try_stack[fl_try_top - 1]; " $jump " = setjmp(" $frame "->buf);"
+         " if (" $jump " == 0) { " $result " = " (cgc $body) ";"
+         " fl_try_top--;" $finally-c " }"
+         " else { FLValue " $err " = " $frame "->err; fl_try_top--;"
+         $catch-c $finally-c " } " $result "; }))")))
+
+(defn cgc-throw [$node]
+  (let [[$argument (if (null? (get $node :expr)) (get $node :argument) (get $node :expr))]]
+    (str "(fl_set_throw_line(" (get $node :line) "), fl_throw(" (cgc $argument) "), fl_nil())")))
+
+(defn cgc-throw-sexpr [$args]
+  (str "(fl_set_throw_line(1), fl_throw(" (cgc (get $args 0)) "), fl_nil())"))
 
 ;; ── 리터럴 ──
 
@@ -832,6 +906,7 @@
 
 (defn cgc-dispatch [$op $args]
   (cond
+  [(= $op "throw")   (cgc-throw-sexpr $args)]
   [(= $op "if")     (cgc-if $args)]
   [(= $op "cond")   (cgc-cond $args)]
   [(= $op "do")     (cgc-do $args)]
@@ -1695,7 +1770,7 @@
       (if (= (get arr i) val) true
         (recur (+ i 1))))))
 
-(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or"])
+(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or" "try" "try-block" "throw" "catch" "catch-clause"])
 (define ir-lit-types ["number" "string" "boolean" "nil" "symbol"])
 
 (defn ir-err [$msg $n]

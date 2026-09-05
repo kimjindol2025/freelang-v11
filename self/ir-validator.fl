@@ -7,7 +7,7 @@
       (if (= (get arr i) val) true
         (recur (+ i 1))))))
 
-(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or"])
+(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or" "try" "try-block" "throw" "catch" "catch-clause"])
 (define ir-lit-types ["number" "string" "boolean" "nil" "symbol"])
 
 (defn ir-err [$msg $n]

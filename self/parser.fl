@@ -475,8 +475,15 @@
         [(= $op "try")
          ;; try-catch-finally: (try body (catch param body) (finally body))
          (let [[$body (if (> (length $rest) 0) (get $rest 0) null)]
-               [$catch-clause (if (> (length $rest) 1) (get $rest 1) null)]
-               [$finally-clause (if (> (length $rest) 2) (get $rest 2) null)]]
+               [$second (if (> (length $rest) 1) (get $rest 1) null)]
+               [$second-op (if (and (not (null? $second))
+                                    (= (get $second :kind) "sexpr"))
+                               (get $second :op)
+                               "")]
+               [$catch-clause (if (= $second-op "finally") null $second)]
+               [$finally-clause (if (= $second-op "finally")
+                                    $second
+                                    (if (> (length $rest) 2) (get $rest 2) null))]]
            (r-pair (parse-consume-rparen $p2)
                    (make-try $body $catch-clause $finally-clause $line)))]
         [(= $op "loop")
