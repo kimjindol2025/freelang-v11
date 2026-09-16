@@ -539,7 +539,7 @@ var init_parser = __esm({
     init_token();
     init_ast();
     ParserError = class extends Error {
-      constructor(message, line, col, hint, code, stage = "parse") {
+      constructor(message, line, col, hint, code, stage = "parse", repairHint = null) {
         const codeStr = code ? `[${code}]` : "";
         const loc = `[${line}:${col}]`;
         const hintLine = hint ? `
@@ -550,6 +550,7 @@ var init_parser = __esm({
         this.hint = hint;
         this.code = code;
         this.stage = stage;
+        this.repairHint = repairHint;
       }
       toJSON() {
         return {
@@ -561,7 +562,8 @@ var init_parser = __esm({
           column: this.col,
           symbol: void 0,
           cause: void 0,
-          hint: this.hint
+          hint: this.hint,
+          "repair-hint": this.repairHint
         };
       }
     };
@@ -573,6 +575,18 @@ var init_parser = __esm({
       "Unexpected token: Colon": "\uCF5C\uB860 \uD0A4\uC6CC\uB4DC (:key)\uB294 \uB9F5 \uB9AC\uD130\uB7F4 \uB610\uB294 \uBE14\uB85D \uD544\uB4DC\uC5D0\uC11C\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
       "Expected block type": "\uBE14\uB85D\uC740 [FUNC name :params [...] :body ...] \uD615\uC2DD\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.",
       "Unterminated string": '\uBB38\uC790\uC5F4\uC774 \uB2EB\uD788\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uB2EB\uB294 " \uB97C \uCD94\uAC00\uD558\uC138\uC694.'
+    };
+    REPAIR_HINTS = {
+      "Expected RParen, got Symbol": "\uAD04\uD638\uB97C \uB2EB\uC73C\uC2DC\uACA0\uC2B5\uB2C8\uAE4C? \uB2E4\uC74C \uC694\uC18C \uB4E4\uC5D0\uAC8C \uB2EB\uB294 \uAD04\uD638\uB97C \uCD94\uAC00\uD558\uC138\uC694: (_ expr)",
+      "Expected RParen, got EOF": "\uAD04\uD638\uB97C \uB2EB\uC73C\uC2DC\uACA0\uC2B5\uB2C8\uAE4C? \uB2E4\uC74C \uC790\uB9AC\uB97C \uB2EB\uB294 \uAD04\uD638\uB97C \uCD94\uAC00\uD558\uC138\uC694: (defn name [args] body)",
+      "Expected operator": "\uCCAB \uC694\uC18C\uB294 \uD568\uC218\uBA85\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4: (+ 1 2), (if x 1 2)",
+      "Expected ':' keyword in map literal": "\uB9F5 \uD0A4\uB294 : \uC694\uC18C\uB85C \uC2DC\uC791\uD574\uC57C \uD569\uB2C8\uB2E4: {:key value}",
+      "Unexpected token: Colon": "\uCF5C\uB860(:key)\uB294 \uB9F5 \uB9AC\uD130\uB7F4 \uB610\uB294 \uBE14\uB85D \uB0B4\uC5D0\uC11C\uB9CC \uC0AC\uC6A9\uD569\uB2C8\uB2E4. \uB2E4\uB978 \uC704\uCE58\uC5D0\uC11C \uC0AC\uC6A9\uD558\uC138\uC694.",
+      "Expected block type": "\uBE14\uB85D \uD615\uC2DD: [FUNC name :params [...] :body ...]",
+      "Unterminated string": '\uBB38\uC790\uC5F4 \uB05D\uC5D0 " \uB97C \uCD94\uAC00\uD558\uC138\uC694.',
+      "Unexpected token: EOF": "\uBB38\uC790\uC5F4, \uAD04\uD638, \uB610\uB294 \uBE14\uB85D\uC774 \uB2EB\uD788\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. \uB2E4\uC74C \uD1A0\uD070\uC744 \uC608\uC0C1\uD558\uC138\uC694.",
+      "Expected Symbol": "\uB9F5 \uD0A4\uB41C \uBB38\uC790\uC5F4(\uB85C \uAE00\uB41C \uAC83)\uC774 \uD544\uC694\uD569\uB2C8\uB2E4: :key 또는 variable",
+      "Expected literal": "\uBB38\uC790\uC5F4, \uBCF8\uC218, \uB610\uB294 \uB9F5\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4: \"hello\", 42, true"
     };
     Parser = class {
       constructor(tokens) {
@@ -1453,8 +1467,10 @@ var init_parser = __esm({
         return this.pos >= this.tokens.length;
       }
       error(message, token) {
-        let hint = Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
-        if (this.parenStack.length > 0 && (token.type === "EOF" /* EOF */ || message.includes("Expected R") || message.includes("Unexpected"))) {
+        // AI-friendly: JSON output mode via FL_JSON env var
+        const jsonMode = process.env.FL_JSON === '1';
+        let hint = jsonMode ? '' : Object.entries(ERROR_HINTS).find(([k]) => message.includes(k))?.[1];
+        if (this.parenStack.length > 0 && jsonMode === false && (token.type === "EOF" /* EOF */ || message.includes("Expected R") || message.includes("Unexpected"))) {
           const stackInfo = this.parenStack.map((opening, idx) => {
             const openSym = opening.type === "LParen" /* LParen */ ? "(" : opening.type === "LBracket" /* LBracket */ ? "[" : "{";
             const depth = idx + 1;
@@ -1481,7 +1497,14 @@ ${parenHint}` : parenHint;
         } else if (message.includes("Expected block")) {
           code = "E_PARSE_SYNTAX_ERROR";
         }
-        return new ParserError(message, token.line, token.col, hint, code, "parse");
+        let repairHint = null;
+        for (const [key, value] of Object.entries(REPAIR_HINTS)) {
+          if (message.includes(key)) {
+            repairHint = value;
+            break;
+          }
+        }
+        return new ParserError(message, token.line, token.col, hint, code, "parse", repairHint);
       }
       // Synchronization for error recovery
       synchronize() {
@@ -43286,10 +43309,24 @@ function mapJsError(msg) {
   }
   return msg;
 }
+function serializeError(err, code, stage) {
+  return {
+    code: code,
+    stage: stage,
+    message: String(err.message || err),
+    line: 0,
+    column: 0,
+    hint: "",
+    "repair-hint": null
+  };
+}
 function formatError(err4, source, filePath, callStack) {
   const fileName = filePath ? path18.basename(filePath) : "<stdin>";
   const lines = [];
   if (err4 instanceof ParserError) {
+    if (process.env.FL_JSON === "1") {
+      return JSON.stringify(err4.toJSON());
+    }
     lines.push(`
 \x1B[31m\uD30C\uC2F1 \uC624\uB958\x1B[0m  ${fileName}:${err4.line}:${err4.col}`);
     if (source) {
@@ -43303,6 +43340,9 @@ function formatError(err4, source, filePath, callStack) {
     }
     lines.push(`  ${err4.message}`);
   } else if (err4 instanceof Error) {
+    if (process.env.FL_JSON === "1") {
+      return JSON.stringify(serializeError(err4, "E_RUNTIME_ERROR", "runtime"));
+    }
     const lineMatch = err4.message.match(/^FreeLang line (\d+):\s*/);
     const errLine = lineMatch ? parseInt(lineMatch[1]) : 0;
     const cleanMsg = lineMatch ? err4.message.slice(lineMatch[0].length) : err4.message;
@@ -43324,6 +43364,9 @@ function formatError(err4, source, filePath, callStack) {
     const stack = callStack ?? err4.__flCallStack;
     if (stack && stack.length > 0) lines.push(formatCallStack(stack));
   } else {
+    if (process.env.FL_JSON === "1") {
+      return JSON.stringify(serializeError(err4, "E_UNKNOWN_ERROR", "unknown"));
+    }
     lines.push(`
 \x1B[31m\uC624\uB958\x1B[0m  ${String(err4)}`);
   }
@@ -45146,6 +45189,67 @@ switch (cmd) {
   case "--help":
     printUsage();
     break;
+  case "ai-generate":
+  case "ai-gen": {
+    const description = args2.slice(1).join(" ");
+    if (!description) {
+      console.error("Usage: fl ai-generate <description>");
+      process.exit(1);
+    }
+    const prompt = `FreeLang 코드를 작성해주세요. 설명: ${description}\n\nFreeLang 문법 예시:\n- 함수 정의: (defn name [args] body)\n- 변수: (def x 10)\n- 조건문: (if condition then else)\n- 반복문: (loop [i 0] (when (< i 10) (println i) (recur (+ i 1))))\n- 리스트: [1 2 3]\n- 맵: {:key value}\n\n코드만 출력해주세요.`;
+    if (typeof ollama === "function") {
+      const result = ollama(prompt);
+      console.log(result);
+    } else {
+      console.error("AI functions not available. Install ollama or configure AI backend.");
+      process.exit(1);
+    }
+    break;
+  }
+  case "ai-debug": {
+    const errorJson = args2.slice(1).join(" ");
+    if (!errorJson) {
+      console.error("Usage: fl ai-debug <error-json>");
+      process.exit(1);
+    }
+    try {
+      const error = JSON.parse(errorJson);
+      const prompt = `FreeLang 에러를 분석하고 수정 방법을 제안해주세요.\n\n에러 정보:\n- 코드: ${error.code}\n- 메시지: ${error.message}\n- 라인: ${error.line}\n- 컬럼: ${error.column}\n- repair-hint: ${error["repair-hint"] || "없음"}\n\n수정된 FreeLang 코드와 설명을 제공해주세요.`;
+      if (typeof ollama === "function") {
+        const result = ollama(prompt);
+        console.log(result);
+      } else {
+        console.error("AI functions not available. Install ollama or configure AI backend.");
+        process.exit(1);
+      }
+    } catch (e) {
+      console.error("Invalid JSON input. Please provide valid error JSON.");
+      process.exit(1);
+    }
+    break;
+  }
+  case "ai-explain": {
+    const filePath = args2[1];
+    if (!filePath) {
+      console.error("Usage: fl ai-explain <file.fl>");
+      process.exit(1);
+    }
+    const absPath = path18.resolve(filePath);
+    if (!fs20.existsSync(absPath)) {
+      console.error(`File not found: ${filePath}`);
+      process.exit(1);
+    }
+    const source = fs20.readFileSync(absPath, "utf-8");
+    const prompt = `다음 FreeLang 코드를 분석하고 설명해주세요.\n\n코드:\n${source}\n\n다음 항목을 포함해주세요:\n1. 코드의 목적\n2. 주요 함수/변수 설명\n3. 실행 흐름\n4. 개선 제안`;
+    if (typeof ollama === "function") {
+      const result = ollama(prompt);
+      console.log(result);
+    } else {
+      console.error("AI functions not available. Install ollama or configure AI backend.");
+      process.exit(1);
+    }
+    break;
+  }
   default:
     if (cmd) {
       printUsage(cmd);

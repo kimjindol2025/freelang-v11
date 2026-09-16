@@ -313,10 +313,30 @@ npm run fl -- run hello.fl
 
 | 환경변수/명령 | 효과 |
 |---------------|------|
+| `FL_JSON=1` | 파싱·런타임 에러를 JSON으로 stderr 출력 (AI 에이전트 파싱용) |
 | `FL_STRICT=1` | nil 접근을 즉시 `E_TYPE_NIL`로 throw (디버깅 모드) |
 | `FL_TRACE=1` | 모든 함수 호출 trace 출력 (stderr) |
 | `node bootstrap.js repl` | 대화형 REPL — `:ls` `:src` `:inspect` 등 |
 | 에러 메시지 `[E_xxx]` | 코드별 자동 복구 힌트 표시 |
+
+### FL_JSON=1 사용법
+
+```bash
+# 파싱 오류 → JSON 출력
+printf '(println "ok"\n' | FL_JSON=1 fl
+# stderr: {"code":"E_PARSE_UNEXPECTED_TOKEN","stage":"parse","message":"...","line":2,"column":1,"hint":"","repair-hint":"문자열, 괄호, 또는 블록이 닫히지 않았습니다."}
+
+# 정상 실행 → JSON 없음, stdout만 출력
+printf '(println "ok")\n' | FL_JSON=1 fl
+# stdout: ok
+
+# AI CLI (Ollama 필요)
+fl ai-generate "더하기 함수"
+fl ai-debug '{"code":"E_PARSE_UNEXPECTED_TOKEN","message":"..."}'
+fl ai-explain code.fl
+```
+
+**JSON 필드**: `code`, `stage`, `message`, `line`, `column`, `hint`, `repair-hint`
 
 ---
 

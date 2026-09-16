@@ -440,6 +440,11 @@ parallel race with-timeout
 | `E_ASYNC` | 비동기 오류 | Promise 거부 |
 | `E_IO` | 입출력 오류 | 파일 읽기 실패 |
 | `E_ASSERTION` | assert 실패 | `(assert false "failed")` |
+| `E_PARSE_UNEXPECTED_TOKEN` | 예상치 못한 토큰 | `(println "ok"\n` (괄호 미닫힘) |
+| `E_PARSE_UNCLOSED_PAREN` | 닫히지 않은 괄호/문자열 | `(def x 1` (닫는 괄호 누락) |
+| `E_PARSE_SYNTAX_ERROR` | 문법 오류 | 일반 파싱 에러 |
+| `E_RUNTIME_ERROR` | 런타임 에러 | `(/ 1 0)` (0으로 나누기) |
+| `E_UNKNOWN_ERROR` | 알 수 없는 오류 | 예상치 못한 JS 런타임 에러 |
 
 **사용법**:
 ```fl
@@ -475,7 +480,30 @@ node bootstrap.js run input.fl        # FL 직접 해석 + 실행
 **장점**: 즉시 결과, 디버깅 용이, REPL 가능
 **사용처**: 개발 서버, 테스트, REPL
 
-### 8.3 Web Server (Full-stack)
+### 8.3 JSON 에러 출력 (AI 에이전트용)
+
+```bash
+FL_JSON=1 node bootstrap.js run input.fl   # 에러를 JSON으로 stderr 출력
+FL_JSON=1 fl input.fl                       # CLI wrapper 경유 (동일)
+```
+
+**출력 형식** (파싱 오류 시 stderr):
+```json
+{
+  "code": "E_PARSE_UNEXPECTED_TOKEN",
+  "stage": "parse",
+  "message": "[E_PARSE_UNEXPECTED_TOKEN] [2:1] Unexpected token: EOF",
+  "line": 2,
+  "column": 1,
+  "hint": "",
+  "repair-hint": "문자열, 괄호, 또는 블록이 닫히지 않았습니다."
+}
+```
+
+**정상 실행 시**: JSON 출력 없이 stdout만 출력
+**직렬화 경로**: `ParserError` → `toJSON()`, 기타 → `serializeError()` 헬퍼
+
+### 8.4 Web Server (Full-stack)
 
 ```bash
 node bootstrap.js serve app/ --port 3000

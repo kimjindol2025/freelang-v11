@@ -1,5 +1,70 @@
 # FreeLang v11 변경 이력
 
+## [FL_JSON-1.0] — 2026-09-16 (AI 친화적 JSON 에러 출력 + repair-hint)
+
+### 신규 기능
+
+| 기능 | 설명 |
+|------|------|
+| `FL_JSON=1` 환경변수 | 파싱·런타임 에러를 JSON으로 stderr 출력 (AI 에이전트 파싱용) |
+| `repair-hint` 필드 | 에러 JSON에 한국어 복구 힌트 포함 |
+| `serializeError()` 헬퍼 | formatError 내 일관된 JSON 직렬화 (수동 조립 없음) |
+| `ai-generate` 명령 | FreeLang 코드 생성 (Ollama 필요) |
+| `ai-debug` 명령 | 에러 JSON 분석 및 수정 제안 (Ollama 필요) |
+| `ai-explain` 명령 | FreeLang 코드 설명 (Ollama 필요) |
+
+### JSON 출력 형식
+
+파싱 오류 시 stderr에 다음 형식으로 출력:
+
+```json
+{
+  "code": "E_PARSE_UNEXPECTED_TOKEN",
+  "stage": "parse",
+  "message": "[E_PARSE_UNEXPECTED_TOKEN] [2:1] Unexpected token: EOF",
+  "line": 2,
+  "column": 1,
+  "hint": "",
+  "repair-hint": "문자열, 괄호, 또는 블록이 닫히지 않았습니다. 다음 토큰을 예상하세요."
+}
+```
+
+### repair-hint 패턴
+
+| 에러 메시지 패턴 | repair-hint |
+|------------------|-------------|
+| `Expected RParen, got Symbol` | 닫는 괄호를 추가하세요: (_ expr) |
+| `Expected RParen, got EOF` | 닫는 괄호를 추가하세요: (defn name [args] body) |
+| `Expected operator` | 첫 요소는 함수명이어야 합니다: (+ 1 2) |
+| `Unexpected token: EOF` | 문자열, 괄호, 또는 블록이 닫히지 않았습니다. |
+| `Expected Symbol` | 맵 키는 문자열이거나 variable |
+| `Expected literal` | 문자열, 숫자, 또는 맵이 필요합니다 |
+
+### 직렬화 경로
+
+| 오류 타입 | 직렬화 방식 |
+|-----------|------------|
+| `ParserError` | `toJSON()` 메서드 |
+| `Error` (런타임) | `serializeError()` 헬퍼 |
+| 알 수 없는 오류 | `serializeError()` 헬퍼 |
+
+### 사용법
+
+```bash
+# JSON 에러 출력 모드
+FL_JSON=1 fl input.fl
+
+# 일반 모드 (기존 동작 유지)
+fl input.fl
+
+# AI CLI (Ollama 필요)
+fl ai-generate "더하기 함수"
+fl ai-debug '{"code":"E_PARSE_UNEXPECTED_TOKEN","message":"..."}'
+fl ai-explain code.fl
+```
+
+---
+
 ## [v12-alpha] — 2026-05-11 (Phase v12 Alpha: Breaking Changes 구현)
 
 ### v12 Breaking Changes (FL_V12=1 활성화 시)

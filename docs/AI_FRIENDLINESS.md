@@ -151,6 +151,44 @@ done
 # 결과가 동일한지 확인
 ```
 
+### Phase 5: AI 친화적 에러 출력 (FL_JSON)
+
+```bash
+# 파싱 오류를 JSON으로 받기
+printf '(println "ok"\n' | FL_JSON=1 fl
+
+# 출력 (stderr):
+# {"code":"E_PARSE_UNEXPECTED_TOKEN","stage":"parse","message":"...","line":2,"column":1,"hint":"","repair-hint":"문자열, 괄호, 또는 블록이 닫히지 않았습니다."}
+
+# 정상 실행 시 JSON 없음
+printf '(println "ok")\n' | FL_JSON=1 fl
+# 출력: ok
+```
+
+**FL_JSON=1 출력 형식**:
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `code` | string | 에러 코드 (`E_PARSE_UNEXPECTED_TOKEN`, `E_RUNTIME_ERROR` 등) |
+| `stage` | string | 에러 발생 단계 (`parse`, `runtime`, `unknown`) |
+| `message` | string | 전체 에러 메시지 |
+| `line` | number | 에러 발생 줄 번호 |
+| `column` | number | 에러 발생 컬럼 번호 |
+| `hint` | string | 기존 힌트 |
+| `repair-hint` | string | 복구 힌트 (한국어, repair-hint 패턴 매칭) |
+
+**AI 에이전트 활용**: JSON 출력을 파싱하여 자동으로 코드 수정 제안 생성 가능.
+
+### Phase 6: AI CLI 명령어 (provider 필요)
+
+```bash
+fl ai-generate "더하기 함수"       # 코드 생성
+fl ai-debug '{"code":"E_PARSE_UNEXPECTED_TOKEN"}'  # 에러 분석
+fl ai-explain code.fl              # 코드 설명
+```
+
+> ⚠️ AI CLI는 Ollama 또는 호환 provider가 설치되어야 동작합니다.
+
 ---
 
 ## 📚 AI 학습 자료
