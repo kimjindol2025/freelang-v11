@@ -208,7 +208,10 @@ export function createCollectionModule() {
     },
 
     // repeat n value -> [value]  (array of n copies of value)
-    "repeat": (n: number, value: any): any[] => Array(n).fill(value),
+    "repeat": (n: number | string, value: any): any[] | string =>
+      typeof n === "string" && typeof value === "number"
+        ? n.repeat(Math.max(0, value))
+        : Array(Math.max(0, Number(n))).fill(value),
 
     // arr_includes arr item -> boolean  (deep equality check)
     "arr_includes": (arr: any[], item: any): boolean => {
