@@ -13637,9 +13637,17228 @@ function evalPredict_PHASE144(op, args3) {
   if (op === "predict-forecast") {
     const data144ts = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
     let steps144 = 3;
-    for (let i = 1; i < a
-... 712149 bytes omitted ...
-     status: 200,
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const k = String(args3[i]).replace(/^:/, "");
+      if (k === "steps") steps144 = Number(args3[i + 1]);
+    }
+    const tsResult = globalPredictor.forecastTimeSeries(data144ts, steps144);
+    return /* @__PURE__ */ new Map([
+      ["predictions", tsResult.predictions.map((p) => /* @__PURE__ */ new Map([
+        ["value", p.value],
+        ["lower", p.lower],
+        ["upper", p.upper],
+        ["confidence", p.confidence],
+        ["method", p.method],
+        ["horizon", p.horizon ?? 1]
+      ]))],
+      ["trend", tsResult.trend],
+      ["seasonality", tsResult.seasonality ?? null],
+      ["accuracy", tsResult.accuracy ?? null]
+    ]);
+  }
+  if (op === "predict-ci") {
+    const samples144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    let conf144 = 0.95;
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const k = String(args3[i]).replace(/^:/, "");
+      if (k === "confidence") conf144 = Number(args3[i + 1]);
+    }
+    const ci = globalPredictor.confidenceInterval(samples144, conf144);
+    return /* @__PURE__ */ new Map([["lower", ci.lower], ["upper", ci.upper]]);
+  }
+  if (op === "predict-classify") {
+    const rawFeatures = args3[0];
+    const features144 = {};
+    if (rawFeatures instanceof Map) {
+      rawFeatures.forEach((v, k) => {
+        features144[String(k).replace(/^:/, "")] = Number(v);
+      });
+    } else if (typeof rawFeatures === "object" && rawFeatures !== null) {
+      Object.entries(rawFeatures).forEach(([k, v]) => {
+        features144[k.replace(/^:/, "")] = Number(v);
+      });
+    }
+    const rawTraining = Array.isArray(args3[1]) ? args3[1] : [];
+    const trainingData144 = rawTraining.map((item) => {
+      if (item instanceof Map) {
+        const rawF = item.get("features") ?? item.get(":features");
+        const label = String(item.get("label") ?? item.get(":label") ?? "unknown");
+        const feats = {};
+        if (rawF instanceof Map) {
+          rawF.forEach((v, k) => {
+            feats[String(k).replace(/^:/, "")] = Number(v);
+          });
+        }
+        return { features: feats, label };
+      }
+      return { features: {}, label: "unknown" };
+    });
+    const clf = globalPredictor.classify(features144, trainingData144);
+    return /* @__PURE__ */ new Map([
+      ["classes", clf.classes.map((c) => /* @__PURE__ */ new Map([["label", c.label], ["probability", c.probability]]))],
+      ["predicted", clf.predicted],
+      ["confidence", clf.confidence]
+    ]);
+  }
+  if (op === "predict-evaluate") {
+    const preds144 = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    const actuals144 = Array.isArray(args3[1]) ? args3[1].map(Number) : [];
+    const evalResult = globalPredictor.evaluate(preds144, actuals144);
+    return /* @__PURE__ */ new Map([
+      ["mae", evalResult.mae],
+      ["rmse", evalResult.rmse],
+      ["mape", evalResult.mape]
+    ]);
+  }
+  if (op === "predict-trend") {
+    const data144tr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+    return globalPredictor.detectTrend(data144tr);
+  }
+  return null;
+}
+function evalCuriosity(op, args3, callFn) {
+  if (op === "curiosity-score") {
+    const topic = String(args3[0] ?? "");
+    const knownFacts = Array.isArray(args3[1]) ? args3[1].map((f) => String(f)) : [];
+    return globalCuriosity.computeCuriosity(topic, knownFacts);
+  }
+  if (op === "curiosity-next") {
+    return globalCuriosity.selectNextTopic();
+  }
+  if (op === "curiosity-explore") {
+    const topic = String(args3[0] ?? "");
+    const fn = args3[1];
+    const explorerFunc = (t) => {
+      const result = callFn ? callFn(fn, [t]) : typeof fn === "function" ? fn(t) : null;
+      if (result instanceof Map) {
+        const facts = Array.isArray(result.get("facts")) ? result.get("facts").map(String) : [];
+        const questions = Array.isArray(result.get("questions")) ? result.get("questions").map(String) : [];
+        return { facts, questions };
+      }
+      return { facts: [], questions: [] };
+    };
+    const res = globalCuriosity.explore(topic, explorerFunc);
+    return /* @__PURE__ */ new Map([
+      ["topic", res.topic],
+      ["discovered", res.discovered],
+      ["newQuestions", res.newQuestions],
+      ["informationGain", res.informationGain],
+      ["surpriseLevel", res.surpriseLevel],
+      ["relatedTopics", res.relatedTopics]
+    ]);
+  }
+  if (op === "curiosity-gaps") {
+    const known = Array.isArray(args3[0]) ? args3[0].map((s) => String(s)) : [];
+    const all = Array.isArray(args3[1]) ? args3[1].map((s) => String(s)) : [];
+    const gaps = globalCuriosity.identifyGaps(known, all);
+    return gaps.map((g) => /* @__PURE__ */ new Map([
+      ["topic", g.topic],
+      ["unknownAspects", g.unknownAspects],
+      ["priority", g.priority],
+      ["explorationCost", g.explorationCost],
+      ["expectedGain", g.expectedGain]
+    ]));
+  }
+  if (op === "curiosity-questions") {
+    const topic = String(args3[0] ?? "");
+    const context = Array.isArray(args3[1]) ? args3[1].map((s) => String(s)) : [];
+    return globalCuriosity.generateQuestions(topic, context);
+  }
+  if (op === "curiosity-prioritize") {
+    const topics = Array.isArray(args3[0]) ? args3[0].map((s) => String(s)) : [];
+    return globalCuriosity.prioritize(topics);
+  }
+  if (op === "curiosity-analyze") {
+    const analysis = globalCuriosity.analyzeExplorationHistory();
+    return /* @__PURE__ */ new Map([
+      ["totalExplored", analysis.totalExplored],
+      ["avgInfoGain", analysis.avgInfoGain],
+      ["mostSurprising", analysis.mostSurprising],
+      ["recommendations", analysis.recommendations]
+    ]);
+  }
+  if (op === "curiosity-state") {
+    const st = globalCuriosity.getState();
+    return /* @__PURE__ */ new Map([
+      ["explored", Array.from(st.explored)],
+      ["frontier", st.frontier],
+      ["knowledgeGaps", st.knowledgeGaps.map((g) => /* @__PURE__ */ new Map([
+        ["topic", g.topic],
+        ["unknownAspects", g.unknownAspects],
+        ["priority", g.priority],
+        ["explorationCost", g.explorationCost],
+        ["expectedGain", g.expectedGain]
+      ]))],
+      ["curiosityScore", st.curiosityScore],
+      ["explorationHistory", st.explorationHistory.map((h) => /* @__PURE__ */ new Map([
+        ["topic", h.topic],
+        ["gain", h.gain],
+        ["timestamp", h.timestamp.toISOString()]
+      ]))]
+    ]);
+  }
+  if (op === "wisdom-add-exp") {
+    const kwargs = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kwargs[key] = args3[i + 1];
+    }
+    const exp = globalWisdom.addExperience({
+      situation: String(kwargs["situation"] ?? ""),
+      action: String(kwargs["action"] ?? ""),
+      outcome: String(kwargs["outcome"] ?? ""),
+      lesson: String(kwargs["lesson"] ?? ""),
+      success: kwargs["success"] === true || kwargs["success"] === "true",
+      importance: typeof kwargs["importance"] === "number" ? kwargs["importance"] : 0.5,
+      domain: String(kwargs["domain"] ?? "general")
+    });
+    return /* @__PURE__ */ new Map([
+      ["id", exp.id],
+      ["situation", exp.situation],
+      ["action", exp.action],
+      ["outcome", exp.outcome],
+      ["lesson", exp.lesson],
+      ["success", exp.success],
+      ["importance", exp.importance],
+      ["domain", exp.domain],
+      ["timestamp", exp.timestamp.toISOString()]
+    ]);
+  }
+  if (op === "wisdom-judge") {
+    const situation = String(args3[0] ?? "");
+    const judgment = globalWisdom.judge(situation);
+    return /* @__PURE__ */ new Map([
+      ["situation", judgment.situation],
+      ["recommendation", judgment.recommendation],
+      ["reasoning", judgment.reasoning],
+      ["relevantExperiences", judgment.relevantExperiences.map((e) => /* @__PURE__ */ new Map([
+        ["id", e.id],
+        ["situation", e.situation],
+        ["lesson", e.lesson],
+        ["success", e.success],
+        ["importance", e.importance],
+        ["domain", e.domain]
+      ]))],
+      ["applicableHeuristics", judgment.applicableHeuristics.map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount],
+        ["domain", h.domain]
+      ]))],
+      ["confidence", judgment.confidence],
+      ["caveats", judgment.caveats],
+      ["alternatives", judgment.alternatives]
+    ]);
+  }
+  if (op === "wisdom-heuristics") {
+    return globalWisdom.getHeuristics().map((h) => /* @__PURE__ */ new Map([
+      ["id", h.id],
+      ["rule", h.rule],
+      ["confidence", h.confidence],
+      ["successCount", h.successCount],
+      ["totalCount", h.totalCount],
+      ["domain", h.domain],
+      ["derivedFrom", h.derivedFrom]
+    ]));
+  }
+  if (op === "wisdom-extract") {
+    const heuristics = globalWisdom.extractHeuristics();
+    return heuristics.map((h) => /* @__PURE__ */ new Map([
+      ["id", h.id],
+      ["rule", h.rule],
+      ["confidence", h.confidence],
+      ["successCount", h.successCount],
+      ["totalCount", h.totalCount],
+      ["domain", h.domain],
+      ["derivedFrom", h.derivedFrom]
+    ]));
+  }
+  if (op === "wisdom-relevant") {
+    const situation = String(args3[0] ?? "");
+    const limit = typeof args3[1] === "number" ? args3[1] : 5;
+    return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
+      ["id", e.id],
+      ["situation", e.situation],
+      ["action", e.action],
+      ["outcome", e.outcome],
+      ["lesson", e.lesson],
+      ["success", e.success],
+      ["importance", e.importance],
+      ["domain", e.domain]
+    ]));
+  }
+  if (op === "wisdom-lessons") {
+    let domain;
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "domain") domain = String(args3[i + 1]);
+    }
+    return globalWisdom.getLessons(domain);
+  }
+  if (op === "wisdom-score") {
+    return globalWisdom.wisdomScore();
+  }
+  if (op === "wisdom-domain") {
+    const domain = String(args3[0] ?? "general");
+    const summary = globalWisdom.summarizeDomain(domain);
+    return /* @__PURE__ */ new Map([
+      ["topLessons", summary.topLessons],
+      ["bestHeuristics", summary.bestHeuristics.map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount]
+      ]))],
+      ["successRate", summary.successRate]
+    ]);
+  }
+  if (op === "wisdom-valid?") {
+    const expMap = args3[0];
+    if (!(expMap instanceof Map)) return false;
+    const exp = {
+      id: String(expMap.get("id") ?? ""),
+      situation: String(expMap.get("situation") ?? ""),
+      action: String(expMap.get("action") ?? ""),
+      outcome: String(expMap.get("outcome") ?? ""),
+      lesson: String(expMap.get("lesson") ?? ""),
+      success: expMap.get("success") === true,
+      importance: Number(expMap.get("importance") ?? 0.5),
+      timestamp: new Date(String(expMap.get("timestamp") ?? (/* @__PURE__ */ new Date()).toISOString())),
+      domain: String(expMap.get("domain") ?? "general")
+    };
+    return globalWisdom.isStillValid(exp);
+  }
+  if (op === "wisdom-similar") {
+    const situation = String(args3[0] ?? "");
+    return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
+      ["id", e.id],
+      ["situation", e.situation],
+      ["action", e.action],
+      ["outcome", e.outcome],
+      ["lesson", e.lesson],
+      ["success", e.success],
+      ["importance", e.importance],
+      ["domain", e.domain]
+    ]));
+  }
+  return null;
+}
+function evalCounterfactual(op, args3, callFn) {
+  if (op === "cf-scenario") {
+    const kw = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kw[key] = args3[i + 1];
+    }
+    const id = String(kw["id"] ?? `s-${Date.now()}`);
+    const name = String(kw["name"] ?? id);
+    let variables = {};
+    if (kw["vars"] instanceof Map) {
+      for (const [k, v] of kw["vars"]) variables[String(k).replace(/^:/, "")] = v;
+    } else if (kw["vars"] && typeof kw["vars"] === "object") {
+      variables = kw["vars"];
+    }
+    const outcome = kw["outcome"] ?? null;
+    const scenario = { id, name, variables, outcome };
+    globalCounterfactual.registerScenario(scenario);
+    return /* @__PURE__ */ new Map([
+      ["id", id],
+      ["name", name],
+      ["variables", new Map(Object.entries(variables))],
+      ["outcome", outcome]
+    ]);
+  }
+  if (op === "cf-what-if") {
+    let variables = {};
+    let change = {};
+    if (args3[0] instanceof Map) {
+      for (const [k, v] of args3[0]) variables[String(k).replace(/^:/, "")] = v;
+    }
+    if (args3[1] instanceof Map) {
+      for (const [k, v] of args3[1]) change[String(k).replace(/^:/, "")] = v;
+    }
+    const fn = args3[2];
+    const outcomeFunc = (vars) => callFn(fn, [new Map(Object.entries(vars))]);
+    const cf = globalCounterfactual.whatIf(variables, change, outcomeFunc);
+    return /* @__PURE__ */ new Map([
+      ["id", cf.id],
+      ["intervention", new Map(Object.entries(cf.intervention))],
+      ["counterfactualOutcome", cf.counterfactualOutcome],
+      ["delta", new Map(Object.entries(cf.delta))],
+      ["probability", cf.probability],
+      ["explanation", cf.explanation]
+    ]);
+  }
+  if (op === "cf-analyze") {
+    const scenarioId = String(args3[0] ?? "");
+    const interventionsList = [];
+    if (Array.isArray(args3[1])) {
+      for (const iv of args3[1]) {
+        const obj = {};
+        if (iv instanceof Map) {
+          for (const [k, v] of iv) obj[String(k).replace(/^:/, "")] = v;
+        }
+        interventionsList.push(obj);
+      }
+    }
+    const fn = args3[2];
+    const outcomeFunc = (vars) => callFn(fn, [new Map(Object.entries(vars))]);
+    const analysis = globalCounterfactual.analyze(scenarioId, interventionsList, outcomeFunc);
+    return /* @__PURE__ */ new Map([
+      ["original", /* @__PURE__ */ new Map([
+        ["id", analysis.original.id],
+        ["name", analysis.original.name],
+        ["outcome", analysis.original.outcome]
+      ])],
+      ["counterfactuals", analysis.counterfactuals.map((cf) => /* @__PURE__ */ new Map([
+        ["id", cf.id],
+        ["probability", cf.probability],
+        ["counterfactualOutcome", cf.counterfactualOutcome],
+        ["explanation", cf.explanation]
+      ]))],
+      ["mostLikelyAlternative", /* @__PURE__ */ new Map([
+        ["id", analysis.mostLikelyAlternative.id],
+        ["probability", analysis.mostLikelyAlternative.probability],
+        ["counterfactualOutcome", analysis.mostLikelyAlternative.counterfactualOutcome],
+        ["explanation", analysis.mostLikelyAlternative.explanation]
+      ])],
+      ["keyFactors", analysis.keyFactors],
+      ["sensitivity", new Map(Object.entries(analysis.sensitivity))]
+    ]);
+  }
+  if (op === "cf-minimal") {
+    const scenarioId = String(args3[0] ?? "");
+    const targetOutcome = args3[1];
+    const fn = args3[2];
+    const outcomeFunc = (vars) => callFn(fn, [new Map(Object.entries(vars))]);
+    const minimal = globalCounterfactual.findMinimalIntervention(scenarioId, targetOutcome, outcomeFunc);
+    if (minimal === null) return null;
+    return new Map(Object.entries(minimal));
+  }
+  if (op === "cf-sensitivity") {
+    let variables = {};
+    const rawVars = args3[0];
+    if (rawVars instanceof Map) {
+      for (const [k, v] of rawVars) variables[String(k).replace(/^:/, "")] = v;
+    } else if (rawVars && typeof rawVars === "object" && !Array.isArray(rawVars)) {
+      for (const [k, v] of Object.entries(rawVars)) variables[String(k).replace(/^:/, "")] = v;
+    }
+    const fn = args3[1];
+    const outcomeFunc = (vars) => {
+      try {
+        return Number(callFn(fn, [vars]));
+      } catch {
+        return 0;
+      }
+    };
+    const sens = globalCounterfactual.sensitivityAnalysis(variables, outcomeFunc);
+    return new Map(Object.entries(sens));
+  }
+  if (op === "cf-key-factors") {
+    const analysis = args3[0];
+    if (analysis instanceof Map) {
+      const factors = analysis.get("keyFactors");
+      if (Array.isArray(factors)) return factors;
+    }
+    return [];
+  }
+  if (op === "cf-best-alt") {
+    const analysis = args3[0];
+    if (analysis instanceof Map) {
+      return analysis.get("mostLikelyAlternative") ?? null;
+    }
+    return null;
+  }
+  if (op === "cf-explain") {
+    const cf = args3[0];
+    if (cf instanceof Map) {
+      return cf.get("explanation") ?? "";
+    }
+    return "";
+  }
+  if (op === "explain-decision") {
+    const decision = args3[0];
+    const rawFactors = args3[1];
+    const context = args3[2] !== void 0 ? String(args3[2]) : void 0;
+    const factors = {};
+    if (rawFactors instanceof Map) {
+      for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+    } else if (rawFactors && typeof rawFactors === "object") {
+      for (const [k, v] of Object.entries(rawFactors)) factors[String(k).replace(/^:/, "")] = Number(v);
+    }
+    const explanation = globalExplainer.explain(decision, factors, context);
+    return /* @__PURE__ */ new Map([
+      ["decision", explanation.decision],
+      ["reasoning", explanation.reasoning],
+      ["features", explanation.features.map((f) => /* @__PURE__ */ new Map([
+        ["feature", f.feature],
+        ["importance", f.importance],
+        ["direction", f.direction],
+        ["description", f.description]
+      ]))],
+      ["confidence", explanation.confidence],
+      ["alternatives", explanation.alternatives.map((a) => /* @__PURE__ */ new Map([
+        ["decision", a.decision],
+        ["reason", a.reason],
+        ["probability", a.probability]
+      ]))],
+      ["summary", explanation.summary],
+      ["audience", explanation.audience]
+    ]);
+  }
+  if (op === "explain-features") {
+    const toRecord145 = (v) => {
+      const result = {};
+      if (v instanceof Map) {
+        for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = Number(val);
+      } else if (v && typeof v === "object") {
+        for (const [k, val] of Object.entries(v)) result[String(k).replace(/^:/, "")] = Number(val);
+      }
+      return result;
+    };
+    const inputs145 = toRecord145(args3[0]);
+    const outputs145 = toRecord145(args3[1]);
+    const baseline145 = args3[2] !== void 0 ? toRecord145(args3[2]) : void 0;
+    const features145 = globalExplainer.featureImportance(inputs145, outputs145, baseline145);
+    return features145.map((f) => /* @__PURE__ */ new Map([
+      ["feature", f.feature],
+      ["importance", f.importance],
+      ["direction", f.direction],
+      ["description", f.description]
+    ]));
+  }
+  if (op === "explain-local") {
+    const rawInput145 = args3[0];
+    const output145 = args3[1];
+    const modelFn145 = args3[2];
+    const input145 = {};
+    if (rawInput145 instanceof Map) {
+      for (const [k, v] of rawInput145.entries()) input145[String(k).replace(/^:/, "")] = v;
+    } else if (rawInput145 && typeof rawInput145 === "object") {
+      for (const [k, v] of Object.entries(rawInput145)) input145[String(k).replace(/^:/, "")] = v;
+    }
+    const model145 = (inp) => {
+      if (modelFn145) {
+        try {
+          return callFn(modelFn145, [new Map(Object.entries(inp))]);
+        } catch {
+          return output145;
+        }
+      }
+      return output145;
+    };
+    const local145 = globalExplainer.localExplain(input145, output145, model145);
+    return /* @__PURE__ */ new Map([
+      ["input", new Map(Object.entries(local145.input))],
+      ["output", local145.output],
+      ["topFactors", local145.topFactors.map((f) => /* @__PURE__ */ new Map([
+        ["feature", f.feature],
+        ["importance", f.importance],
+        ["direction", f.direction],
+        ["description", f.description]
+      ]))],
+      ["counterfactual", local145.counterfactual],
+      ["confidence", local145.confidence]
+    ]);
+  }
+  if (op === "explain-natural") {
+    const rawExpl145 = args3[0];
+    let audience145 = "technical";
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "audience") audience145 = String(args3[i + 1]);
+    }
+    if (!(rawExpl145 instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
+    const featuresRaw145 = rawExpl145.get("features") ?? [];
+    const features145n = (Array.isArray(featuresRaw145) ? featuresRaw145 : []).map((f) => {
+      if (f instanceof Map) {
+        return {
+          feature: String(f.get("feature") ?? ""),
+          importance: Number(f.get("importance") ?? 0),
+          direction: String(f.get("direction") ?? "positive"),
+          description: String(f.get("description") ?? "")
+        };
+      }
+      return { feature: "", importance: 0, direction: "positive", description: "" };
+    });
+    const altsRaw145 = rawExpl145.get("alternatives") ?? [];
+    const alternatives145 = (Array.isArray(altsRaw145) ? altsRaw145 : []).map((a) => {
+      if (a instanceof Map) return { decision: a.get("decision"), reason: String(a.get("reason") ?? ""), probability: Number(a.get("probability") ?? 0) };
+      return { decision: null, reason: "", probability: 0 };
+    });
+    const explanation145n = {
+      decision: rawExpl145.get("decision"),
+      reasoning: rawExpl145.get("reasoning") ?? [],
+      features: features145n,
+      confidence: Number(rawExpl145.get("confidence") ?? 0.5),
+      alternatives: alternatives145,
+      summary: String(rawExpl145.get("summary") ?? ""),
+      audience: rawExpl145.get("audience") ?? "technical"
+    };
+    return globalExplainer.toNaturalLanguage(explanation145n, audience145);
+  }
+  if (op === "explain-contrast") {
+    const decision145c = args3[0];
+    const alternative145c = args3[1];
+    const rawFactors145c = args3[2];
+    const factors145c = {};
+    if (rawFactors145c instanceof Map) {
+      for (const [k, v] of rawFactors145c.entries()) factors145c[String(k).replace(/^:/, "")] = Number(v);
+    } else if (rawFactors145c && typeof rawFactors145c === "object") {
+      for (const [k, v] of Object.entries(rawFactors145c)) factors145c[String(k).replace(/^:/, "")] = Number(v);
+    }
+    return globalExplainer.contrastiveExplain(decision145c, alternative145c, factors145c);
+  }
+  if (op === "explain-rules") {
+    const rawExamples145 = args3[0];
+    const examples145 = [];
+    const toRecord145r = (v) => {
+      const result = {};
+      if (v instanceof Map) {
+        for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = val;
+      } else if (v && typeof v === "object") {
+        Object.assign(result, v);
+      }
+      return result;
+    };
+    if (Array.isArray(rawExamples145)) {
+      for (const ex of rawExamples145) {
+        if (ex instanceof Map) {
+          examples145.push({ input: toRecord145r(ex.get("input")), output: ex.get("output") });
+        } else if (ex && typeof ex === "object") {
+          examples145.push({ input: toRecord145r(ex.input), output: ex.output });
+        }
+      }
+    }
+    const rules145 = globalExplainer.extractRules(examples145);
+    return rules145.map((r) => /* @__PURE__ */ new Map([
+      ["condition", r.condition],
+      ["outcome", r.outcome],
+      ["support", r.support]
+    ]));
+  }
+  if (op === "explain-top-factors") {
+    const rawExpl145tf = args3[0];
+    let n145 = 3;
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "n") n145 = Number(args3[i + 1]);
+    }
+    let features145tf = [];
+    if (rawExpl145tf instanceof Map) features145tf = rawExpl145tf.get("features") ?? [];
+    if (!Array.isArray(features145tf)) features145tf = [];
+    return features145tf.slice(0, n145);
+  }
+  if (op === "explain-summary") {
+    const rawExpl145s = args3[0];
+    if (rawExpl145s instanceof Map) return String(rawExpl145s.get("summary") ?? "");
+    return "";
+  }
+  return null;
+}
+function evalWisdom(op, args3) {
+  if (op === "wisdom-add-exp") {
+    const kwargs = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      kwargs[key] = args3[i + 1];
+    }
+    const exp = globalWisdom.addExperience({
+      situation: String(kwargs["situation"] ?? ""),
+      action: String(kwargs["action"] ?? ""),
+      outcome: String(kwargs["outcome"] ?? ""),
+      lesson: String(kwargs["lesson"] ?? ""),
+      success: kwargs["success"] === true || kwargs["success"] === "true",
+      importance: typeof kwargs["importance"] === "number" ? kwargs["importance"] : 0.5,
+      domain: String(kwargs["domain"] ?? "general")
+    });
+    return /* @__PURE__ */ new Map([
+      ["id", exp.id],
+      ["situation", exp.situation],
+      ["action", exp.action],
+      ["outcome", exp.outcome],
+      ["lesson", exp.lesson],
+      ["success", exp.success],
+      ["importance", exp.importance],
+      ["domain", exp.domain],
+      ["timestamp", exp.timestamp.toISOString()]
+    ]);
+  }
+  if (op === "wisdom-judge") {
+    const situation = String(args3[0] ?? "");
+    const judgment = globalWisdom.judge(situation);
+    return /* @__PURE__ */ new Map([
+      ["situation", judgment.situation],
+      ["recommendation", judgment.recommendation],
+      ["reasoning", judgment.reasoning],
+      ["relevantExperiences", judgment.relevantExperiences.map((e) => /* @__PURE__ */ new Map([
+        ["id", e.id],
+        ["situation", e.situation],
+        ["lesson", e.lesson],
+        ["success", e.success],
+        ["importance", e.importance],
+        ["domain", e.domain]
+      ]))],
+      ["applicableHeuristics", judgment.applicableHeuristics.map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount],
+        ["domain", h.domain]
+      ]))],
+      ["confidence", judgment.confidence],
+      ["caveats", judgment.caveats],
+      ["alternatives", judgment.alternatives]
+    ]);
+  }
+  if (op === "wisdom-heuristics") {
+    return globalWisdom.getHeuristics().map((h) => /* @__PURE__ */ new Map([
+      ["id", h.id],
+      ["rule", h.rule],
+      ["confidence", h.confidence],
+      ["successCount", h.successCount],
+      ["totalCount", h.totalCount],
+      ["domain", h.domain],
+      ["derivedFrom", h.derivedFrom]
+    ]));
+  }
+  if (op === "wisdom-extract") {
+    const heuristics = globalWisdom.extractHeuristics();
+    return heuristics.map((h) => /* @__PURE__ */ new Map([
+      ["id", h.id],
+      ["rule", h.rule],
+      ["confidence", h.confidence],
+      ["successCount", h.successCount],
+      ["totalCount", h.totalCount],
+      ["domain", h.domain],
+      ["derivedFrom", h.derivedFrom]
+    ]));
+  }
+  if (op === "wisdom-relevant") {
+    const situation = String(args3[0] ?? "");
+    const limit = typeof args3[1] === "number" ? args3[1] : 5;
+    return globalWisdom.findRelevantExperiences(situation, limit).map((e) => /* @__PURE__ */ new Map([
+      ["id", e.id],
+      ["situation", e.situation],
+      ["action", e.action],
+      ["outcome", e.outcome],
+      ["lesson", e.lesson],
+      ["success", e.success],
+      ["importance", e.importance],
+      ["domain", e.domain]
+    ]));
+  }
+  if (op === "wisdom-lessons") {
+    let domain;
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "domain") domain = String(args3[i + 1]);
+    }
+    return globalWisdom.getLessons(domain);
+  }
+  if (op === "wisdom-score") {
+    return globalWisdom.wisdomScore();
+  }
+  if (op === "wisdom-domain") {
+    const domain = String(args3[0] ?? "general");
+    const summary = globalWisdom.summarizeDomain(domain);
+    return /* @__PURE__ */ new Map([
+      ["topLessons", summary.topLessons],
+      ["bestHeuristics", summary.bestHeuristics.map((h) => /* @__PURE__ */ new Map([
+        ["id", h.id],
+        ["rule", h.rule],
+        ["confidence", h.confidence],
+        ["successCount", h.successCount],
+        ["totalCount", h.totalCount]
+      ]))],
+      ["successRate", summary.successRate]
+    ]);
+  }
+  if (op === "wisdom-valid?") {
+    const expMap = args3[0];
+    if (!(expMap instanceof Map)) return false;
+    const exp = {
+      id: String(expMap.get("id") ?? ""),
+      situation: String(expMap.get("situation") ?? ""),
+      action: String(expMap.get("action") ?? ""),
+      outcome: String(expMap.get("outcome") ?? ""),
+      lesson: String(expMap.get("lesson") ?? ""),
+      success: expMap.get("success") === true,
+      importance: Number(expMap.get("importance") ?? 0.5),
+      timestamp: new Date(String(expMap.get("timestamp") ?? (/* @__PURE__ */ new Date()).toISOString())),
+      domain: String(expMap.get("domain") ?? "general")
+    };
+    return globalWisdom.isStillValid(exp);
+  }
+  if (op === "wisdom-similar") {
+    const situation = String(args3[0] ?? "");
+    return globalWisdom.findSimilarCases(situation).map((e) => /* @__PURE__ */ new Map([
+      ["id", e.id],
+      ["situation", e.situation],
+      ["action", e.action],
+      ["outcome", e.outcome],
+      ["lesson", e.lesson],
+      ["success", e.success],
+      ["importance", e.importance],
+      ["domain", e.domain]
+    ]));
+  }
+  return null;
+}
+function evalExplain_PHASE145(op, args3, callFnVal) {
+  if (op === "explain-decision") {
+    const decision = args3[0];
+    const rawFactors = args3[1];
+    const context = args3[2] !== void 0 ? String(args3[2]) : void 0;
+    const factors = {};
+    if (rawFactors instanceof Map) {
+      for (const [k, v] of rawFactors.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+    } else if (rawFactors && typeof rawFactors === "object") {
+      for (const [k, v] of Object.entries(rawFactors)) factors[String(k).replace(/^:/, "")] = Number(v);
+    }
+    const explanation = globalExplainer.explain(decision, factors, context);
+    return /* @__PURE__ */ new Map([
+      ["decision", explanation.decision],
+      ["reasoning", explanation.reasoning],
+      ["features", explanation.features.map((f) => /* @__PURE__ */ new Map([
+        ["feature", f.feature],
+        ["importance", f.importance],
+        ["direction", f.direction],
+        ["description", f.description]
+      ]))],
+      ["confidence", explanation.confidence],
+      ["alternatives", explanation.alternatives.map((a) => /* @__PURE__ */ new Map([
+        ["decision", a.decision],
+        ["reason", a.reason],
+        ["probability", a.probability]
+      ]))],
+      ["summary", explanation.summary],
+      ["audience", explanation.audience]
+    ]);
+  }
+  if (op === "explain-features") {
+    const toRecord = (v) => {
+      const result = {};
+      if (v instanceof Map) {
+        for (const [k, val] of v.entries()) result[String(k).replace(/^:/, "")] = Number(val);
+      } else if (v && typeof v === "object") {
+        for (const [k, val] of Object.entries(v)) result[String(k).replace(/^:/, "")] = Number(val);
+      }
+      return result;
+    };
+    const features = globalExplainer.featureImportance(toRecord(args3[0]), toRecord(args3[1]), args3[2] !== void 0 ? toRecord(args3[2]) : void 0);
+    return features.map((f) => /* @__PURE__ */ new Map([
+      ["feature", f.feature],
+      ["importance", f.importance],
+      ["direction", f.direction],
+      ["description", f.description]
+    ]));
+  }
+  if (op === "explain-local") {
+    const rawInput = args3[0];
+    const output = args3[1];
+    const modelFn = args3[2];
+    const input = {};
+    if (rawInput instanceof Map) {
+      for (const [k, v] of rawInput.entries()) input[String(k).replace(/^:/, "")] = v;
+    } else if (rawInput && typeof rawInput === "object") {
+      for (const [k, v] of Object.entries(rawInput)) input[String(k).replace(/^:/, "")] = v;
+    }
+    const model = (inp) => {
+      if (modelFn && callFnVal) {
+        try {
+          return callFnVal(modelFn, [new Map(Object.entries(inp))]);
+        } catch {
+          return output;
+        }
+      }
+      return output;
+    };
+    const local = globalExplainer.localExplain(input, output, model);
+    return /* @__PURE__ */ new Map([
+      ["input", new Map(Object.entries(local.input))],
+      ["output", local.output],
+      ["topFactors", local.topFactors.map((f) => /* @__PURE__ */ new Map([
+        ["feature", f.feature],
+        ["importance", f.importance],
+        ["direction", f.direction],
+        ["description", f.description]
+      ]))],
+      ["counterfactual", local.counterfactual],
+      ["confidence", local.confidence]
+    ]);
+  }
+  if (op === "explain-natural") {
+    const rawExpl = args3[0];
+    let audience = "technical";
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      const key = String(args3[i]).replace(/^:/, "");
+      if (key === "audience") audience = String(args3[i + 1]);
+    }
+    if (!(rawExpl instanceof Map)) return "\uC124\uBA85\uC744 \uBCC0\uD658\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4";
+    const featuresRaw = rawExpl.get("features") ?? [];
+    const features = (Array.isArray(featuresRaw) ? featuresRaw : []).map((f) => {
+      if (f instanceof Map) {
+        return {
+          feature: String(f.get("feature") ?? ""),
+          importance: Number(f.get("importance") ?? 0),
+          direction: String(f.get("direction") ?? "positive"),
+          description: String(f.get("description") ?? "")
+        };
+      }
+      return { feature: "", importance: 0, direction: "positive", description: "" };
+    });
+    const altsRaw = rawExpl.get("alternatives") ?? [];
+    const alternatives = (Array.isArray(altsRaw) ? altsRaw : []).map((a) => {
+      if (a instanceof Map) return { decision: a.get("decision"), reason: String(a.get("reason") ?? ""), probability: Number(a.get("probability") ?? 0) };
+      return { decision: null, reason: "", probability: 0 };
+    });
+    const explanation = {
+      decision: rawExpl.get("decision"),
+      reasoning: rawExpl.get("reasoning") ?? [],
+      features,
+      confidence: Number(rawExpl.get("confidence") ?? 0.5),
+      alternatives,
+      summary: String(rawExpl.get("summary") ?? ""),
+      audience: rawExpl.get("audience") ?? "technical"
+    };
+    return globalExplainer.toNaturalLanguage(explanation, audience);
+  }
+  if (op === "explain-contrast") {
+    const factors = {};
+    const rawF = args3[2];
+    if (rawF instanceof Map) {
+      for (const [k, v] of rawF.entries()) factors[String(k).replace(/^:/, "")] = Number(v);
+    } else if (rawF && typeof rawF === "object") {
+      for (const [k, v] of Object.entries(rawF)) factors[String(k).replace(/^:/, "")] = Number(v);
+    }
+    return globalExplainer.contrastiveExplain(args3[0], args3[1], factors);
+  }
+  if (op === "explain-rules") {
+    const examples = [];
+    const toRec = (v) => {
+      const r = {};
+      if (v instanceof Map) {
+        for (const [k, val] of v.entries()) r[String(k).replace(/^:/, "")] = val;
+      } else if (v && typeof v === "object") {
+        Object.assign(r, v);
+      }
+      return r;
+    };
+    if (Array.isArray(args3[0])) {
+      for (const ex of args3[0]) {
+        if (ex instanceof Map) examples.push({ input: toRec(ex.get("input")), output: ex.get("output") });
+        else if (ex && typeof ex === "object") examples.push({ input: toRec(ex.input), output: ex.output });
+      }
+    }
+    return globalExplainer.extractRules(examples).map((r) => /* @__PURE__ */ new Map([
+      ["condition", r.condition],
+      ["outcome", r.outcome],
+      ["support", r.support]
+    ]));
+  }
+  if (op === "explain-top-factors") {
+    let n = 3;
+    for (let i = 1; i < args3.length - 1; i += 2) {
+      if (String(args3[i]).replace(/^:/, "") === "n") n = Number(args3[i + 1]);
+    }
+    const rawExpl = args3[0];
+    let features = [];
+    if (rawExpl instanceof Map) features = rawExpl.get("features") ?? [];
+    if (!Array.isArray(features)) features = [];
+    return features.slice(0, n);
+  }
+  if (op === "explain-summary") {
+    const rawExpl = args3[0];
+    if (rawExpl instanceof Map) return String(rawExpl.get("summary") ?? "");
+    return "";
+  }
+  return null;
+}
+function evalWorldModel141(op, args3) {
+  if (op === "world-add-entity") {
+    const kw = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kw[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    }
+    const rawP = kw["props"] ?? kw["properties"] ?? {};
+    const props = rawP instanceof Map ? Object.fromEntries(rawP.entries()) : typeof rawP === "object" && rawP !== null ? rawP : {};
+    const e = globalWorldModel.addEntity({ id: String(kw["id"] ?? `entity-${Date.now()}`), type: String(kw["type"] ?? "unknown"), confidence: typeof kw["confidence"] === "number" ? kw["confidence"] : 1, properties: props });
+    return /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]);
+  }
+  if (op === "world-update-entity") {
+    const rawPu = args3[1] ?? {};
+    const propsu = rawPu instanceof Map ? Object.fromEntries(rawPu.entries()) : typeof rawPu === "object" && rawPu !== null ? rawPu : {};
+    const eu = globalWorldModel.updateEntity(String(args3[0] ?? ""), propsu);
+    if (!eu) return null;
+    return /* @__PURE__ */ new Map([["id", eu.id], ["type", eu.type], ["properties", new Map(Object.entries(eu.properties))], ["confidence", eu.confidence], ["lastUpdated", eu.lastUpdated.toISOString()]]);
+  }
+  if (op === "world-get-entity") {
+    const eg = globalWorldModel.getEntity(String(args3[0] ?? ""));
+    if (!eg) return null;
+    return /* @__PURE__ */ new Map([["id", eg.id], ["type", eg.type], ["properties", new Map(Object.entries(eg.properties))], ["confidence", eg.confidence], ["lastUpdated", eg.lastUpdated.toISOString()]]);
+  }
+  if (op === "world-remove-entity") {
+    return globalWorldModel.removeEntity(String(args3[0] ?? ""));
+  }
+  if (op === "world-add-relation") {
+    const kwr = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kwr[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    }
+    const rel = globalWorldModel.addRelation({ from: String(kwr["from"] ?? ""), to: String(kwr["to"] ?? ""), type: String(kwr["type"] ?? "related"), strength: typeof kwr["strength"] === "number" ? kwr["strength"] : 1, bidirectional: kwr["bidirectional"] === true });
+    return /* @__PURE__ */ new Map([["id", rel.id], ["from", rel.from], ["to", rel.to], ["type", rel.type], ["strength", rel.strength], ["bidirectional", rel.bidirectional]]);
+  }
+  if (op === "world-get-relations") {
+    return globalWorldModel.getRelations(String(args3[0] ?? "")).map((r) => /* @__PURE__ */ new Map([["id", r.id], ["from", r.from], ["to", r.to], ["type", r.type], ["strength", r.strength], ["bidirectional", r.bidirectional]]));
+  }
+  if (op === "world-find-path") {
+    return globalWorldModel.findPath(String(args3[0] ?? ""), String(args3[1] ?? ""));
+  }
+  if (op === "world-set-fact") {
+    globalWorldModel.setFact(String(args3[0] ?? ""), args3[1]);
+    return null;
+  }
+  if (op === "world-get-fact") {
+    return globalWorldModel.getFact(String(args3[0] ?? ""));
+  }
+  if (op === "world-add-rule") {
+    const kwrule = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kwrule[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    }
+    const rule = globalWorldModel.addRule({ condition: String(kwrule["condition"] ?? ""), consequence: String(kwrule["consequence"] ?? ""), confidence: typeof kwrule["confidence"] === "number" ? kwrule["confidence"] : 0.8 });
+    return /* @__PURE__ */ new Map([["id", rule.id], ["condition", rule.condition], ["consequence", rule.consequence], ["confidence", rule.confidence]]);
+  }
+  if (op === "world-apply-rules") {
+    return globalWorldModel.applyRules().map((u) => /* @__PURE__ */ new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]]));
+  }
+  if (op === "world-query") {
+    const kwq = {};
+    for (let i = 0; i < args3.length - 1; i += 2) {
+      kwq[String(args3[i]).replace(/^:/, "")] = args3[i + 1];
+    }
+    return globalWorldModel.query(kwq["type"] !== void 0 ? String(kwq["type"]) : void 0, kwq["min-confidence"] !== void 0 ? Number(kwq["min-confidence"]) : void 0).map((e) => /* @__PURE__ */ new Map([["id", e.id], ["type", e.type], ["properties", new Map(Object.entries(e.properties))], ["confidence", e.confidence], ["lastUpdated", e.lastUpdated.toISOString()]]));
+  }
+  if (op === "world-snapshot") {
+    const snap = globalWorldModel.snapshot();
+    return /* @__PURE__ */ new Map([["entityCount", snap.entities.size], ["relationCount", snap.relations.length], ["factCount", snap.facts.size], ["ruleCount", snap.rules.length], ["version", snap.version], ["timestamp", snap.timestamp.toISOString()]]);
+  }
+  if (op === "world-summarize") {
+    return globalWorldModel.summarize();
+  }
+  if (op === "world-history") {
+    return globalWorldModel.getHistory().map((u) => /* @__PURE__ */ new Map([["type", u.type], ["source", u.source], ["timestamp", u.timestamp.toISOString()]]));
+  }
+  return void 0;
+}
+var init_eval_builtins_ai = __esm({
+  "src/eval-builtins-ai.ts"() {
+    init_refactor_self();
+    init_align();
+    init_ethics_check();
+    init_curiosity();
+    init_wisdom();
+    init_causal();
+    init_explain();
+    init_world_model();
+    init_counterfactual();
+    init_predict();
+  }
+});
+
+// src/runtime-store.ts
+function newRunId() {
+  return `r-${++_runCounter}`;
+}
+function readStore(filePath) {
+  const p = path3.resolve(filePath);
+  if (!fs2.existsSync(p)) return { version: "1", runs: [] };
+  try {
+    return JSON.parse(fs2.readFileSync(p, "utf-8"));
+  } catch {
+    return { version: "1", runs: [] };
+  }
+}
+function writeStore(filePath, store) {
+  const p = path3.resolve(filePath);
+  const dir = path3.dirname(p);
+  if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
+  fs2.writeFileSync(p, JSON.stringify(store, null, 2), "utf-8");
+}
+function storeAppendRun(record, filePath = DEFAULT_PATH) {
+  const store = readStore(filePath);
+  store.runs.push(record);
+  if (store.runs.length > 200) store.runs.splice(0, store.runs.length - 200);
+  writeStore(filePath, store);
+}
+function storeLoadRuns(filePath = DEFAULT_PATH) {
+  return readStore(filePath).runs;
+}
+function storeClear(filePath = DEFAULT_PATH) {
+  const p = path3.resolve(filePath);
+  if (fs2.existsSync(p)) fs2.unlinkSync(p);
+}
+function storeGetDefaultPath() {
+  return DEFAULT_PATH;
+}
+var fs2, path3, DEFAULT_PATH, _runCounter;
+var init_runtime_store = __esm({
+  "src/runtime-store.ts"() {
+    fs2 = __toESM(require("fs"));
+    path3 = __toESM(require("path"));
+    DEFAULT_PATH = ".runtime-store.json";
+    _runCounter = 0;
+  }
+});
+
+// src/runtime-history.ts
+function computeHistory(filePath) {
+  const runs = storeLoadRuns(filePath);
+  if (runs.length === 0) {
+    return {
+      "total-runs": 0,
+      "avg-errors-per-run": 0,
+      "avg-trace-ms": null,
+      "budget-exceeded-runs": 0,
+      "panic-mode-runs": 0,
+      "most-frequent-issue": null,
+      "error-trend": "insufficient-data",
+      "repeated-violations": []
+    };
+  }
+  const errorCounts = runs.map((r) => {
+    const s = r.summary;
+    return (s["runtime-error-count"] ?? 0) + (s["assert-fail-count"] ?? 0);
+  });
+  const avgErrors = Math.round(errorCounts.reduce((a, b) => a + b, 0) / runs.length * 10) / 10;
+  const traceMsList = runs.map((r) => r.summary["avg-trace-ms"]).filter((v) => typeof v === "number");
+  const avgTraceMs = traceMsList.length ? Math.round(traceMsList.reduce((a, b) => a + b, 0) / traceMsList.length) : null;
+  const budgetRuns = runs.filter((r) => r.budgetExceeded).length;
+  const panicRuns = runs.filter((r) => r.mode === "panic").length;
+  const issueFreq = {};
+  for (const r of runs) {
+    for (const iss of r.issues ?? []) {
+      const cause = iss["likely-cause"] ?? "unknown";
+      if (cause !== "healthy") issueFreq[cause] = (issueFreq[cause] ?? 0) + 1;
+    }
+  }
+  const sortedIssues = Object.entries(issueFreq).sort((a, b) => b[1] - a[1]);
+  const mostFrequent = sortedIssues.length > 0 ? sortedIssues[0][0] : null;
+  let trend = "insufficient-data";
+  if (runs.length >= 6) {
+    const recent = errorCounts.slice(-3).reduce((a, b) => a + b, 0);
+    const prior = errorCounts.slice(-6, -3).reduce((a, b) => a + b, 0);
+    if (recent < prior - 1) trend = "improving";
+    else if (recent > prior + 1) trend = "degrading";
+    else trend = "stable";
+  } else if (runs.length >= 2) {
+    const half = Math.floor(runs.length / 2);
+    const recent = errorCounts.slice(-half).reduce((a, b) => a + b, 0);
+    const prior = errorCounts.slice(0, half).reduce((a, b) => a + b, 0);
+    trend = recent <= prior ? "stable" : "degrading";
+  }
+  const violMap = {};
+  for (const r of runs) {
+    const seen = /* @__PURE__ */ new Set();
+    for (const v of r.violations ?? []) {
+      const cn = v.contractName ?? "?";
+      if (!violMap[cn]) violMap[cn] = { total: 0, runs: 0 };
+      violMap[cn].total += v.count ?? 1;
+      if (!seen.has(cn)) {
+        violMap[cn].runs++;
+        seen.add(cn);
+      }
+    }
+  }
+  const repeatedViolations = Object.entries(violMap).filter(([, v]) => v.runs >= 2).sort((a, b) => b[1].total - a[1].total).map(([contractName, v]) => ({ contractName, totalCount: v.total, runs: v.runs }));
+  return {
+    "total-runs": runs.length,
+    "avg-errors-per-run": avgErrors,
+    "avg-trace-ms": avgTraceMs,
+    "budget-exceeded-runs": budgetRuns,
+    "panic-mode-runs": panicRuns,
+    "most-frequent-issue": mostFrequent,
+    "error-trend": trend,
+    "repeated-violations": repeatedViolations
+  };
+}
+function replayHistory(filePath) {
+  return storeLoadRuns(filePath).map((r) => {
+    const s = r.summary;
+    const errors = (s["runtime-error-count"] ?? 0) + (s["assert-fail-count"] ?? 0);
+    const issues = r.issues ?? [];
+    const topIssue = issues.length > 0 && issues[0]["likely-cause"] !== "healthy" ? issues[0]["likely-cause"] : null;
+    return {
+      runId: r.runId,
+      durationMs: r.durationMs,
+      errors,
+      mode: r.mode,
+      budgetExceeded: r.budgetExceeded,
+      topIssue
+    };
+  });
+}
+var init_runtime_history = __esm({
+  "src/runtime-history.ts"() {
+    init_runtime_store();
+  }
+});
+
+// src/runtime-reputation.ts
+function computeReputation(name, filePath) {
+  const runs = storeLoadRuns(filePath);
+  if (runs.length === 0) {
+    return { name, score: 1, totalViolations: 0, affectedRuns: 0, totalRuns: 0, verdict: "unknown" };
+  }
+  let totalViolations = 0;
+  let affectedRuns = 0;
+  for (const r of runs) {
+    let runViolations = 0;
+    for (const v of r.violations ?? []) {
+      if ((v.contractName ?? "") === name) {
+        runViolations += v.count ?? 1;
+      }
+    }
+    if (runViolations > 0) {
+      totalViolations += runViolations;
+      affectedRuns++;
+    }
+  }
+  const totalRuns = runs.length;
+  const runPenalty = affectedRuns / totalRuns;
+  const violPenalty = Math.min(totalViolations / (totalRuns * 10), 0.5);
+  const score = Math.max(0, Math.round((1 - runPenalty * 0.7 - violPenalty * 0.3) * 100) / 100);
+  let verdict;
+  if (totalRuns < 2) verdict = "unknown";
+  else if (score >= 0.9) verdict = "stable";
+  else if (score >= 0.6) verdict = "unstable";
+  else verdict = "risky";
+  return { name, score, totalViolations, affectedRuns, totalRuns, verdict };
+}
+function computeAllReputations(filePath) {
+  const runs = storeLoadRuns(filePath);
+  const names = /* @__PURE__ */ new Set();
+  for (const r of runs) {
+    for (const v of r.violations ?? []) {
+      if (v.contractName) names.add(v.contractName);
+    }
+  }
+  const contracts = [...names].map((n) => computeReputation(n, filePath)).sort((a, b) => a.score - b.score);
+  const worstContract = contracts.length > 0 && contracts[0].verdict !== "unknown" ? contracts[0].name : null;
+  return { contracts, worstContract };
+}
+var init_runtime_reputation = __esm({
+  "src/runtime-reputation.ts"() {
+    init_runtime_store();
+  }
+});
+
+// src/runtime-intelligence.ts
+function computeIntelligence(filePath) {
+  const history = computeHistory(filePath);
+  const reputation = computeAllReputations(filePath);
+  const recommendations = [];
+  if (history["error-trend"] === "degrading") {
+    recommendations.push("\uC5D0\uB7EC \uC99D\uAC00 \uCD94\uC138 \uAC10\uC9C0 \u2014 runtime-analyze \uC2E4\uD589 \uD6C4 \uADFC\uBCF8 \uC6D0\uC778 \uC218\uC815 \uAD8C\uC7A5");
+  }
+  if (history["budget-exceeded-runs"] > 0) {
+    const pct = Math.round(history["budget-exceeded-runs"] / Math.max(history["total-runs"], 1) * 100);
+    recommendations.push(`\uC608\uC0B0 \uCD08\uACFC \uBC1C\uC0DD ${pct}% \uC2E4\uD589 \u2014 max-ms/max-recursion \uC0C1\uD5A5 \uB610\uB294 \uC54C\uACE0\uB9AC\uC998 \uCD5C\uC801\uD654 \uD544\uC694`);
+  }
+  if (history["panic-mode-runs"] > 0) {
+    recommendations.push("panic \uBAA8\uB4DC \uC9C4\uC785 \uC774\uB825 \uC788\uC74C \u2014 auto:panic-cascade \uCEE8\uD2B8\uB799\uD2B8 \uC784\uACC4\uAC12 \uAC80\uD1A0");
+  }
+  if (reputation.worstContract) {
+    const worst = reputation.contracts[0];
+    recommendations.push(
+      `\uCEE8\uD2B8\uB799\uD2B8 '${worst.name}' \uC548\uC815\uC131 \uB0AE\uC74C (score=${worst.score}, ${worst.affectedRuns}/${worst.totalRuns} \uC2E4\uD589 \uC704\uBC18) \u2014 \uC870\uAC74 \uC644\uD654 \uB610\uB294 \uB85C\uC9C1 \uC218\uC815`
+    );
+  }
+  if (history["most-frequent-issue"] === "slow-operation") {
+    recommendations.push("\uBC18\uBCF5\uC801 \uB290\uB9B0 \uD2B8\uB808\uC774\uC2A4 \uAC10\uC9C0 \u2014 I/O \uBCD1\uBAA9 \uB610\uB294 \uCE90\uC2DC \uC804\uB7B5 \uC7AC\uAC80\uD1A0");
+  }
+  if (recommendations.length === 0 && history["total-runs"] > 0) {
+    recommendations.push("\uC774\uC0C1 \uD328\uD134 \uC5C6\uC74C \u2014 \uC2DC\uC2A4\uD15C \uC548\uC815\uC801");
+  }
+  if (history["total-runs"] === 0) {
+    recommendations.push("\uC800\uC7A5\uB41C \uC2E4\uD589 \uC774\uB825 \uC5C6\uC74C \u2014 (runtime-store-save) \uBA3C\uC800 \uC2E4\uD589");
+  }
+  let health = 100;
+  if (history["error-trend"] === "degrading") health -= 20;
+  if (history["error-trend"] === "stable" && history["avg-errors-per-run"] > 5) health -= 10;
+  const budgetPct = history["total-runs"] > 0 ? history["budget-exceeded-runs"] / history["total-runs"] : 0;
+  health -= Math.round(budgetPct * 30);
+  const panicPct = history["total-runs"] > 0 ? history["panic-mode-runs"] / history["total-runs"] : 0;
+  health -= Math.round(panicPct * 25);
+  if (reputation.worstContract && reputation.contracts[0].verdict === "risky") health -= 15;
+  health = Math.max(0, Math.min(100, health));
+  return { history, reputation, recommendations, "health-score": health };
+}
+var init_runtime_intelligence = __esm({
+  "src/runtime-intelligence.ts"() {
+    init_runtime_history();
+    init_runtime_reputation();
+  }
+});
+
+// src/_stdlib-signatures.json
+var require_stdlib_signatures = __commonJS({
+  "src/_stdlib-signatures.json"(exports2, module2) {
+    module2.exports = [{ module: "agent", name: "agent_create", params: "name", returns: "AgentState" }, { module: "agent", name: "agent_set", params: "agent key value", returns: "AgentState (immutable update)" }, { module: "agent", name: "agent_get", params: "agent key", returns: "any" }, { module: "agent", name: "agent_update", params: "agent updates", returns: "AgentState (merge multiple keys)" }, { module: "agent", name: "agent_steps", params: "agent", returns: "number" }, { module: "agent", name: "agent_status", params: "agent", returns: "string" }, { module: "agent", name: "agent_done", params: "agent", returns: "boolean" }, { module: "agent", name: "agent_add_tool", params: "agent toolName fn", returns: "AgentState" }, { module: "agent", name: "agent_call_tool", params: "agent toolName ...args", returns: "any" }, { module: "agent", name: "agent_tools", params: "agent", returns: "[string] (list registered tool names)" }, { module: "agent", name: "agent_push_history", params: "agent entry", returns: "AgentState" }, { module: "agent", name: "agent_history", params: "agent", returns: "[AgentHistoryEntry]" }, { module: "agent", name: "agent_history_last", params: "agent n", returns: "[AgentHistoryEntry] (last n entries)" }, { module: "agent", name: "agent_history_type", params: "agent type", returns: "[AgentHistoryEntry] (filter by type)" }, { module: "agent", name: "plan_create", params: "steps", returns: "Plan" }, { module: "agent", name: "plan_next", params: "plan", returns: "string | null (current step or null if done)" }, { module: "agent", name: "plan_advance", params: "plan result", returns: "Plan (mark current step done, move to next)" }, { module: "agent", name: "plan_done", params: "plan", returns: "boolean" }, { module: "agent", name: "plan_progress", params: "plan", returns: "number (0.0 - 1.0)" }, { module: "agent", name: "plan_results", params: "plan", returns: "{step: result}" }, { module: "agent", name: "observe", params: "key value context", returns: "context (accumulate observations)" }, { module: "agent", name: "summarize", params: "context", returns: "string (human/AI readable summary of context)" }, { module: "agent", name: "context_create", params: "", returns: "{} (empty context)" }, { module: "agent", name: "context_merge", params: "ctx1 ctx2", returns: "context" }, { module: "ai-workflow", name: "ai-stream", params: "prompt onChunk [model]", returns: "null  (\uCF5C\uBC31\uC73C\uB85C \uCCAD\uD06C \uC804\uB2EC)" }, { module: "ai-workflow", name: "ollama", params: "prompt [model]", returns: "string  (\uB85C\uCEEC LLM \uC9C1\uC811 \uD638\uCD9C)" }, { module: "ai-workflow", name: "ollama-models", params: "", returns: "[string]  (\uC124\uCE58\uB41C \uBAA8\uB378 \uBAA9\uB85D)" }, { module: "ai-workflow", name: "ai-render", params: "template vars", returns: "string" }, { module: "binary-0b", name: "buf-u8", params: "n", returns: "string (base64 of one byte)" }, { module: "binary-0b", name: "buf-concat", params: "list", returns: "string (base64 of concatenated byte buffers)" }, { module: "binary-0b", name: "buf-len", params: "b64", returns: "number (byte count)" }, { module: "binary-0b", name: "buf-read-u8", params: "b64 offset", returns: "number (uint8 at byte offset)" }, { module: "binary-0b", name: "buf-slice", params: "b64 offset len", returns: "string (sub-buffer as base64)" }, { module: "binary-0b", name: "utf8-encode", params: "value", returns: "string (base64 UTF-8 bytes)" }, { module: "binary-0b", name: "utf8-decode-strict", params: "bytes", returns: "string (strict UTF-8)" }, { module: "binary-0b", name: "utf8-byte-length", params: "value", returns: "number (UTF-8 byte count)" }, { module: "binary-0b", name: "utf8-string-length", params: "value", returns: "number (Unicode codepoint count)" }, { module: "binary", name: "buf_u32be", params: "n", returns: "string (base64 of 4-byte big-endian uint32)" }, { module: "binary", name: "buf_u8", params: "n", returns: "string (base64 of 1 byte)" }, { module: "binary", name: "buf_str", params: "s", returns: "string (base64 of UTF-8 encoded string)" }, { module: "binary", name: "buf_concat", params: "list", returns: "string (base64 of concatenated byte buffers)" }, { module: "binary", name: "buf_len", params: "b64", returns: "number (byte count)" }, { module: "binary", name: "buf_read_u32be", params: "b64 offset", returns: "number (big-endian uint32 at byte offset)" }, { module: "binary", name: "buf_read_u8", params: "b64 offset", returns: "number (uint8 at byte offset)" }, { module: "binary", name: "buf_read_str", params: "b64 offset len", returns: "string (UTF-8 string from byte range)" }, { module: "binary", name: "buf_crc32", params: "b64", returns: "number (IEEE 802.3 CRC32 of all bytes)" }, { module: "binary", name: "buf_slice", params: "b64 offset len", returns: "string (sub-buffer as base64)" }, { module: "binary", name: "buf_from_bytes", params: "b64", returns: "string (alias: identity, for clarity in code)" }, { module: "binary", name: "buf_f64le", params: "n", returns: "string (base64 of 8-byte float64 little-endian)" }, { module: "binary", name: "buf_read_f64le", params: "b64 offset", returns: "number (float64 LE at byte offset)" }, { module: "binary", name: "buf_u32le", params: "n", returns: "string (base64 of 4-byte uint32 little-endian)" }, { module: "binary", name: "buf_read_u32le", params: "b64 offset", returns: "number (uint32 LE at byte offset)" }, { module: "bits", name: "bit_and", params: "a b", returns: "number (bitwise AND: a & b)" }, { module: "bits", name: "bit_or", params: "a b", returns: "number (bitwise OR: a | b)" }, { module: "bits", name: "bit_xor", params: "a b", returns: "number (bitwise XOR: a ^ b)" }, { module: "bits", name: "bit_not", params: "a", returns: "number (bitwise NOT: ~a)" }, { module: "bits", name: "bit_shl", params: "a n", returns: "number (shift left: a << n)" }, { module: "bits", name: "bit_shr", params: "a n", returns: "number (unsigned right shift: a >>> n)" }, { module: "bits", name: "bit_sar", params: "a n", returns: "number (arithmetic right shift: a >> n)" }, { module: "bits", name: "bit_popcount", params: "a", returns: "number (count set bits)" }, { module: "bits", name: "bit_test", params: "a n", returns: "boolean (test bit at position n)" }, { module: "bits", name: "bit_set", params: "a n", returns: "number (set bit at position n)" }, { module: "bits", name: "bit_clear", params: "a n", returns: "number (clear bit at position n)" }, { module: "bits", name: "bit_rotate_left", params: "a n", returns: "number (rotate left: (a << n) | (a >>> (32-n)))" }, { module: "bits", name: "bit_rotate_right", params: "a n", returns: "number (rotate right: (a >>> n) | (a << (32-n)))" }, { module: "browser", name: "dom_select", params: "selector", returns: "Element | null" }, { module: "browser", name: "dom_select_all", params: "selector", returns: "[Element]" }, { module: "browser", name: "dom_by_id", params: "id", returns: "Element | null" }, { module: "browser", name: "dom_text", params: "el", returns: "string" }, { module: "browser", name: "dom_html", params: "el", returns: "string" }, { module: "browser", name: "dom_attr", params: "el attr", returns: "string" }, { module: "browser", name: "dom_val", params: "el", returns: "string  (input value)" }, { module: "browser", name: "dom_set_text", params: "el text", returns: "null" }, { module: "browser", name: "dom_set_html", params: "el html", returns: "null" }, { module: "browser", name: "dom_set_attr", params: "el attr value", returns: "null" }, { module: "browser", name: "dom_set_val", params: "el value", returns: "null  (input)" }, { module: "browser", name: "dom_set_style", params: "el prop value", returns: "null" }, { module: "browser", name: "dom_add_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_remove_class", params: "el cls", returns: "null" }, { module: "browser", name: "dom_toggle_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_has_class", params: "el cls", returns: "boolean" }, { module: "browser", name: "dom_create", params: "tag", returns: "Element" }, { module: "browser", name: "dom_append", params: "parent child", returns: "null" }, { module: "browser", name: "dom_prepend", params: "parent child", returns: "null" }, { module: "browser", name: "dom_remove", params: "el", returns: "null" }, { module: "browser", name: "dom_show", params: "el", returns: "null" }, { module: "browser", name: "dom_hide", params: "el", returns: "null" }, { module: "browser", name: "dom_toggle", params: "el", returns: "null" }, { module: "browser", name: "event_on", params: "el event handlerName", returns: "null  (FL \uD568\uC218\uBA85\uC73C\uB85C \uB4F1\uB85D)" }, { module: "browser", name: "event_off", params: "el event handlerName", returns: "null" }, { module: "browser", name: "event_target", params: "e", returns: "Element" }, { module: "browser", name: "event_val", params: "e", returns: "string  (input \uC774\uBCA4\uD2B8\uC5D0\uC11C \uAC12 \uCD94\uCD9C)" }, { module: "browser", name: "event_prevent", params: "e", returns: "null" }, { module: "browser", name: "event_stop", params: "e", returns: "null" }, { module: "browser", name: "fetch_get", params: "url", returns: "{ok, status, data}  (\uB3D9\uAE30 \uBD88\uAC00 \u2192 Promise \uBC18\uD658)" }, { module: "browser", name: "fetch_post", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_put", params: "url body", returns: "{ok, status, data}" }, { module: "browser", name: "fetch_delete", params: "url", returns: "{ok, status, data}" }, { module: "browser", name: "storage_set", params: "key value", returns: "null" }, { module: "browser", name: "storage_get", params: "key", returns: "string | null" }, { module: "browser", name: "storage_remove", params: "key", returns: "null" }, { module: "browser", name: "storage_clear", params: "", returns: "null" }, { module: "browser", name: "browser_url", params: "", returns: "string" }, { module: "browser", name: "browser_path", params: "", returns: "string" }, { module: "browser", name: "browser_go", params: "url", returns: "null" }, { module: "browser", name: "browser_push", params: "url", returns: "null  (history API)" }, { module: "browser", name: "browser_reload", params: "", returns: "null" }, { module: "browser", name: "browser_alert", params: "msg", returns: "null" }, { module: "browser", name: "browser_confirm", params: "msg", returns: "boolean" }, { module: "browser", name: "browser_title", params: "", returns: "string" }, { module: "browser", name: "browser_set_title", params: "title", returns: "null" }, { module: "browser", name: "wcrypto_random_hex", params: "n", returns: "string  (n \uBC14\uC774\uD2B8 hex)" }, { module: "browser", name: "wcrypto_sha256", params: "str", returns: "Promise<string>" }, { module: "browser", name: "browser_timeout", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_interval", params: "ms handlerName", returns: "id" }, { module: "browser", name: "browser_clear_timer", params: "id", returns: "null" }, { module: "capture-error", name: "capture_error_args", params: "fn args context?", returns: "{ok, result, error?}" }, { module: "capture-error", name: "error_log", params: "", returns: "[{message, name, stack, timestamp, context?}, ...]" }, { module: "capture-error", name: "error_log_clear", params: "", returns: "count cleared" }, { module: "capture-error", name: "error_log_last", params: "n?", returns: "last n errors (default 10)" }, { module: "capture-error", name: "error_count", params: "", returns: "number of captured errors" }, { module: "capture-error", name: "make_error", params: "message name? code?", returns: "plain object" }, { module: "capture-error", name: "error_message", params: "err", returns: "string" }, { module: "capture-error", name: "error_stack", params: "err", returns: "[string]" }, { module: "capture-error", name: "retry", params: "fn attempts delay_ms?", returns: "{ok, result, attempts_used, error?}" }, { module: "collection", name: "arr_flatten", params: "arr", returns: "[any]  (flatten one level deep)" }, { module: "collection", name: "arr_flatten_deep", params: "arr", returns: "[any]  (flatten all levels)" }, { module: "collection", name: "arr_zip", params: "arr1 arr2", returns: "[[a,b]]  (zip two arrays into pairs)" }, { module: "collection", name: "arr_unique", params: "arr", returns: "[any]  (deduplicate, preserves order)" }, { module: "collection", name: "arr_chunk", params: "arr size", returns: "[[any]]  (split into chunks of size)" }, { module: "collection", name: "arr_take", params: "arr n", returns: "[any]  (first n elements)" }, { module: "collection", name: "arr_drop", params: "arr n", returns: "[any]  (all but first n elements)" }, { module: "collection", name: "arr_sum", params: "arr", returns: "number" }, { module: "collection", name: "arr_avg", params: "arr", returns: "number" }, { module: "collection", name: "arr_min", params: "arr", returns: "number" }, { module: "collection", name: "arr_max", params: "arr", returns: "number" }, { module: "collection", name: "arr_group_by", params: "arr key", returns: "{key: [items]}  (group objects by a key)" }, { module: "collection", name: "arr_sort_by", params: "arr key", returns: "[any]  (sort objects by a key, ascending)" }, { module: "collection", name: "arr_sort_by_desc", params: "arr key", returns: "[any]  (descending)" }, { module: "collection", name: "frequencies", params: "arr", returns: "{value: count}  (count occurrences of each value)" }, { module: "collection", name: "arr_count_by", params: "arr key", returns: "{key: count}  (count by key value)" }, { module: "collection", name: "arr_pluck", params: "arr key", returns: "[any]  (extract field from each object)" }, { module: "collection", name: "arr_index_by", params: "arr key", returns: "{key: item}  (index objects by unique key)" }, { module: "collection", name: "retry", params: "n fn", returns: "any  (call fn(), retry up to n times on error)" }, { module: "collection", name: "retry_silent", params: "n fn", returns: "any|null  (retry n times, return null on final failure)" }, { module: "collection", name: "memoize", params: "fn", returns: "fn  (return memoized version of fn, keyed by JSON args)" }, { module: "collection", name: "once", params: "fn", returns: "fn  (return version of fn that only executes once)" }, { module: "collection", name: "tap", params: "value fn", returns: "value  (call fn(value) for side effects, return value unchanged)" }, { module: "collection", name: "range", params: "start end step", returns: "[number]  (stepped)" }, { module: "collection", name: "range_step", params: "start end step", returns: "[number]" }, { module: "collection", name: "repeat", params: "n value", returns: "[value]  (array of n copies of value)" }, { module: "collection", name: "arr_includes", params: "arr item", returns: "boolean  (deep equality check)" }, { module: "collection", name: "arr_index_of", params: "arr item", returns: "number  (-1 if not found)" }, { module: "collection", name: "arr_remove", params: "arr item", returns: "[any]  (remove first occurrence)" }, { module: "cron", name: "cron_validate", params: "expr", returns: "bool" }, { module: "cron", name: "cron_match", params: "expr ts_ms", returns: "bool  (\uD574\uB2F9 \uC2DC\uAC01\uC774 cron \uC2DD\uACFC \uC77C\uCE58\uD558\uB294\uC9C0)" }, { module: "cron", name: "cron_next_match", params: "expr from_ms", returns: "ms  (from \uC774\uD6C4 \uB2E4\uC74C \uC77C\uCE58 \uC2DC\uAC01, \uCD5C\uB300 1\uB144)" }, { module: "crypto-rsa", name: "crypto_rsa_generate", params: "bits", returns: "map (publicKey/privateKey PEM)" }, { module: "crypto-rsa", name: "crypto_rsa_sign", params: "private_pem data", returns: "string (base64url \uC11C\uBA85)" }, { module: "crypto-rsa", name: "crypto_rsa_verify", params: "public_pem data signature_b64url", returns: "boolean" }, { module: "crypto-rsa", name: "pkce_s256", params: "verifier", returns: "string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))" }, { module: "crypto-rsa", name: "crypto_rsa_public_to_jwk", params: "public_pem kid", returns: "map (kty/n/e/kid/alg/use)" }, { module: "crypto", name: "sha256", params: "str", returns: "string (hex digest)" }, { module: "crypto", name: "sha256_short", params: "str", returns: "string (first 8 chars, useful as short ID)" }, { module: "crypto", name: "md5", params: "str", returns: "string (hex digest, for checksums only)" }, { module: "crypto", name: "sha1", params: "str", returns: "string" }, { module: "crypto", name: "hmac_sha256", params: "key msg", returns: "string (hex digest)" }, { module: "crypto", name: "hash_eq", params: "hash1 hash2", returns: "boolean (timing-safe compare)" }, { module: "crypto", name: "base64_encode", params: "str", returns: "string" }, { module: "crypto", name: "base64_decode", params: "str", returns: "string" }, { module: "crypto", name: "base64url_encode", params: "str", returns: "string (URL-safe, no padding)" }, { module: "crypto", name: "base64url_decode", params: "str", returns: "string (URL-safe Base64 \u2192 UTF-8)" }, { module: "crypto", name: "hex_encode", params: "str", returns: "string" }, { module: "crypto", name: "hex_decode", params: "hex", returns: "string" }, { module: "crypto", name: "random_bytes", params: "n", returns: "string (hex, n bytes of randomness)" }, { module: "crypto", name: "random_int", params: "min max", returns: "number (inclusive)" }, { module: "crypto", name: "random_float", params: "", returns: "number (0.0 - 1.0)" }, { module: "crypto", name: "uuid_v4", params: "", returns: "string (random UUID)" }, { module: "crypto", name: "uuid_short", params: "", returns: "string (8-char short ID from random bytes)" }, { module: "crypto", name: "uuid_from_str", params: "str", returns: "string (deterministic ID from string content)" }, { module: "crypto", name: "is_uuid", params: "str", returns: "boolean" }, { module: "crypto", name: "regex_match", params: "str pattern", returns: "boolean" }, { module: "crypto", name: "regex_match_i", params: "str pattern", returns: "boolean (case insensitive)" }, { module: "crypto", name: "regex_find", params: "str pattern", returns: "string|null (first match)" }, { module: "crypto", name: "regex_find_all", params: "str pattern", returns: "[string] (all non-overlapping matches)" }, { module: "crypto", name: "regex_replace", params: "str pattern replacement", returns: "string" }, { module: "crypto", name: "regex_replace_first", params: "str pattern replacement", returns: "string (only first match)" }, { module: "crypto", name: "regex_extract", params: "str pattern", returns: "[string] (capture groups of first match)" }, { module: "crypto", name: "regex_extract_all", params: "str pattern", returns: "[[string]] (all matches with groups)" }, { module: "crypto", name: "regex_split", params: "str pattern", returns: "[string]" }, { module: "crypto", name: "regex_count", params: "str pattern", returns: "number (count of matches)" }, { module: "crypto", name: "extract_json", params: "str", returns: "any|null  (extract first JSON object/array from text)" }, { module: "crypto", name: "extract_code", params: "str lang", returns: "string|null  (extract code block from markdown)" }, { module: "crypto", name: "extract_emails", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_urls", params: "str", returns: "[string]" }, { module: "crypto", name: "extract_numbers", params: "str", returns: "[number]" }, { module: "crypto", name: "is_email", params: "str", returns: "boolean" }, { module: "crypto", name: "is_url", params: "str", returns: "boolean" }, { module: "data", name: "json_get", params: "obj path", returns: 'any  (dot-path access: "user.name" or "items.0")' }, { module: "data", name: "json_set", params: "obj path value", returns: "object (immutable update, returns new obj)" }, { module: "data", name: "json_merge", params: "obj1 obj2", returns: "object (shallow merge, obj2 wins on conflict)" }, { module: "data", name: "json_deep_merge", params: "obj1 obj2", returns: "object (deep recursive merge)" }, { module: "data", name: "json_keys", params: "obj", returns: "[string] (get keys of object)" }, { module: "data", name: "json_vals", params: "obj", returns: "[any] (get values of object)" }, { module: "data", name: "map-entries", params: "m", returns: "[[k,v],...] (introspection primitive \u2014 JS Map/plain object \uBAA8\uB450 \uC5F4\uAC70)" }, { module: "data", name: "map_entries", params: "m", returns: "[[k,v],...] (alias for map-entries)" }, { module: "data", name: "json_parse", params: "str", returns: "object (parse JSON string to object)" }, { module: "data", name: "json_str", params: "obj", returns: "string (serialize to JSON string, handles Maps)" }, { module: "data", name: "json_stringify", params: "obj", returns: "string (alias for json_str)" }, { module: "data", name: "json_pretty", params: "obj", returns: "string (pretty-print JSON, handles Maps)" }, { module: "data", name: "json_has", params: "obj key", returns: "boolean (check if key exists)" }, { module: "data", name: "json_del", params: "obj key", returns: "object (delete key, returns new obj)" }, { module: "data", name: "csv_parse", params: "str", returns: "[[string]] (parse CSV string to rows)" }, { module: "data", name: "csv_write", params: "rows", returns: "string (serialize rows to CSV string)" }, { module: "data", name: "csv_header", params: "rows", returns: "[string] (get first row as header)" }, { module: "data", name: "csv_to_objects", params: "rows", returns: "[{header: value}] (rows to named objects)" }, { module: "data", name: "csv-parse", params: "text [delimiter]", returns: "[[string]] (quoted fields \uC644\uC804 \uC9C0\uC6D0)" }, { module: "data", name: "csv-parse-map", params: "text [delimiter]", returns: "[{header: val}] (\uD5E4\uB354 \uD3EC\uD568 \uD30C\uC2F1)" }, { module: "data", name: "csv-stringify", params: "rows [delimiter]", returns: "string" }, { module: "data", name: "str_template", params: "template vars", returns: "string  ({key} \u2192 value substitution)" }, { module: "data", name: "str_lines", params: "str", returns: "[string] (split into lines)" }, { module: "data", name: "str_join_lines", params: "lines", returns: "string" }, { module: "data", name: "str_trim", params: "str", returns: "string" }, { module: "data", name: "str_words", params: "str", returns: "[string] (split by whitespace)" }, { module: "data", name: "str_count", params: "str sub", returns: "number (count occurrences of sub in str)" }, { module: "data", name: "number_format", params: "num decimals", returns: 'string  (1234567 0 -> "1,234,567")' }, { module: "data", name: "to_fixed", params: "num decimals", returns: 'string  (3.14159 2 -> "3.14")' }, { module: "data", name: "format_currency", params: "num code", returns: 'string  (1234567 "KRW" -> "\u20A91,234,567")' }, { module: "data", name: "empty?", params: "x", returns: "boolean (\uBC30\uC5F4/\uBB38\uC790\uC5F4/\uAC1D\uCCB4/nil \uBAA8\uB450 \uC9C0\uC6D0)" }, { module: "data", name: "array-empty?", params: "x", returns: "boolean (\uBC30\uC5F4\uB9CC \uD655\uC778)" }, { module: "data", name: "str_replace_in", params: "s old new", returns: "string (replaceAll, \uC778\uC790 \uC21C\uC11C: s \uBA3C\uC800)" }, { module: "db", name: "db_get", params: "collection id", returns: "data or null" }, { module: "db", name: "db_all", params: "collection", returns: "array" }, { module: "db", name: "db_put", params: "collection id data", returns: "saved data" }, { module: "db", name: "db_delete", params: "collection id", returns: "boolean" }, { module: "db", name: "db_project", params: "name", returns: "project data or null  (kimdb shorthand)" }, { module: "db", name: "db_projects", params: "", returns: "project list" }, { module: "db", name: "db_query", params: "dbPath sql params", returns: "rows (JSON array)" }, { module: "db", name: "db_exec", params: "dbPath sql [params]", returns: '""' }, { module: "db", name: "db_insert", params: "dbPath table data", returns: "true" }, { module: "db", name: "db_count", params: "dbPath table", returns: "number" }, { module: "db", name: "db_tables", params: "dbPath", returns: "string[]" }, { module: "db", name: "db_create", params: "dbPath sql", returns: "true" }, { module: "db", name: "db_close", params: "dbPath", returns: "true" }, { module: "distributed", name: "distributed_execute", params: "dtask", returns: "DistributedResult" }, { module: "distributed", name: "distributed_task_create", params: "items worker_count", returns: "DistributedTask" }, { module: "distributed", name: "distributed_task_set_fn", params: "dtask fn", returns: "DistributedTask (set task function)" }, { module: "error", name: "error_message", params: "err", returns: "string (get error message)" }, { module: "error", name: "error_type", params: "err", returns: "string (get error type/name)" }, { module: "error", name: "is_error", params: "value", returns: "boolean (check if value is an error)" }, { module: "error", name: "create_error", params: "message", returns: "error (create an error object)" }, { module: "error", name: "create_typed_error", params: "type message", returns: "error (create a typed error)" }, { module: "error", name: "error_stack", params: "err", returns: "string (get error stack trace)" }, { module: "error", name: "with_fallback", params: "try_fn fallback_fn", returns: "any (execute try_fn, fallback on error)" }, { module: "fd", name: "fd_open", params: "path mode", returns: "number (fd, mode: r/w/a)" }, { module: "fd", name: "fd_write", params: "fd data", returns: "boolean (write data to file descriptor)" }, { module: "fd", name: "fd_fsync", params: "fd", returns: "boolean (flush file descriptor to disk)" }, { module: "fd", name: "fd_close", params: "fd", returns: "boolean (close file descriptor)" }, { module: "fd", name: "fd_read", params: "fd bytes", returns: "string (read bytes from file descriptor)" }, { module: "fd", name: "fd_seek", params: "fd offset whence", returns: "number (whence: 0/1/2)" }, { module: "fd", name: "fd_flush", params: "", returns: "boolean (flush all open fds)" }, { module: "feed", name: "rss_feed", params: "meta items", returns: "<?xml ... <rss>...</rss>" }, { module: "feed", name: "atom_feed", params: "meta items", returns: "<?xml ... <feed>...</feed>" }, { module: "feed", name: "sitemap_xml", params: "baseUrl routes", returns: "<?xml ... <urlset>..." }, { module: "feed", name: "robots_txt", params: "options", returns: '"User-agent: * ..."' }, { module: "feed", name: "jsonld_article", params: "article", returns: '<script type="application/ld+json">...</script>' }, { module: "feed", name: "jsonld_breadcrumb", params: "items", returns: "schema.org BreadcrumbList" }, { module: "feed", name: "jsonld_organization", params: "org", returns: "schema.org Organization" }, { module: "file", name: "file_read", params: "filePath", returns: "string (read file content)" }, { module: "file", name: "file_write", params: "filePath content", returns: "boolean (write content to file)" }, { module: "file", name: "file_exists", params: "filePath", returns: "boolean (check if file exists)" }, { module: "file", name: "file_delete", params: "filePath", returns: "boolean (delete file)" }, { module: "file", name: "file_append", params: "filePath content", returns: "boolean (append content to file)" }, { module: "file", name: "file_copy", params: "src dest", returns: "boolean (copy file)" }, { module: "file", name: "dir_create", params: "dirPath", returns: "boolean (create directory)" }, { module: "file", name: "dir_list", params: "dirPath", returns: "[string] (list directory contents)" }, { module: "file", name: "dir_delete", params: "dirPath", returns: "boolean (delete directory - must be empty)" }, { module: "file", name: "file_size", params: "filePath", returns: "number (get file size in bytes)" }, { module: "file", name: "file_is_file", params: "filePath", returns: "boolean (check if path is a file)" }, { module: "file", name: "file_is_dir", params: "filePath", returns: "boolean (check if path is a directory)" }, { module: "file", name: "file_mtime", params: "filePath", returns: "number (get modification time as timestamp)" }, { module: "file", name: "file_ctime", params: "filePath", returns: "number (get creation time as timestamp)" }, { module: "file", name: "file_read_or", params: "filePath defaultVal", returns: "string | any (\uD30C\uC77C \uC5C6\uAC70\uB098 \uC624\uB958 \uC2DC \uAE30\uBCF8\uAC12 \uBC18\uD658)" }, { module: "http-macro", name: "http_get_json", params: "url headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_post_json", params: "url body headers?", returns: "{ok, status, body}" }, { module: "http-macro", name: "http_ok?", params: "result", returns: "boolean" }, { module: "http-macro", name: "http_body", params: "result", returns: "parsed body or null" }, { module: "http-macro", name: "http_status", params: "result", returns: "number" }, { module: "http-server", name: "server_get", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_post", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_put", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_patch", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_delete", params: "path handlerName", returns: "null" }, { module: "http-server", name: "server_static", params: "dir [urlPrefix]", returns: 'null  \uC815\uC801 \uD30C\uC77C \uC11C\uBE59 (server-static "public" "/")' }, { module: "http-server", name: "server_stop", params: "", returns: "null" }, { module: "http-server", name: "server_text", params: "text", returns: "response object" }, { module: "http-server", name: "server_status", params: "code body", returns: "response object" }, { module: "http-server", name: "server_html_cookie", params: "cookie html", returns: "response (Set-Cookie \uD5E4\uB354 \uD3EC\uD568 HTML \uC751\uB2F5)" }, { module: "http-server", name: "server_csp_nonce", params: "", returns: "string (\uD604\uC7AC \uC694\uCCAD\uC758 CSP nonce \u2014 <script nonce=...> \uB4F1\uC5D0 \uC0AC\uC6A9)" }, { module: "http-server", name: "server_set_cookie", params: "name value opts", returns: "cookie string (HttpOnly+Secure+SameSite \uC790\uB3D9)" }, { module: "http-server", name: "server_redirect", params: "url", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8)" }, { module: "http-server", name: "server_redirect_cookie", params: "url cookie", returns: "response (302 \uB9AC\uB2E4\uC774\uB809\uD2B8 + Set-Cookie)" }, { module: "http-server", name: "server_header", params: "response key value", returns: "response (\uD5E4\uB354 \uCD94\uAC00)" }, { module: "http-server", name: "server_options", params: "response", returns: "204 No Content (CORS preflight \uC751\uB2F5)" }, { module: "http-server", name: "server_req_cookie", params: "req name", returns: "string | null (\uCFE0\uD0A4 \uAC12 \uC77D\uAE30)" }, { module: "http-server", name: "server_wait_respond", params: "promise", returns: "response object (\uBE44\uB3D9\uAE30 \uC751\uB2F5 \uB300\uAE30)" }, { module: "http-server", name: "server_req_query", params: "req [key]", returns: "object or string" }, { module: "http-server", name: "server_req_files", params: "req", returns: "array of multipart files" }, { module: "http-server", name: "server_req_fields", params: "req", returns: "map of multipart text fields" }, { module: "http-server", name: "server_req_header", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_headers", params: "req", returns: "object (\uC804\uCCB4 \uD5E4\uB354 \uB9F5)" }, { module: "http-server", name: "server_req_param", params: "req name", returns: "string" }, { module: "http-server", name: "server_req_params", params: "req", returns: "object  (all URL params as an object)" }, { module: "http-server", name: "server_req_method", params: "req", returns: "string" }, { module: "http-server", name: "server_req_path", params: "req", returns: "string" }, { module: "http-server", name: "server_req_id", params: "", returns: "string | null (\uD604\uC7AC \uC694\uCCAD ID)" }, { module: "http-server", name: "server_hold_response", params: "reqId", returns: "null (\uC751\uB2F5 \uBCF4\uB958)" }, { module: "http-server", name: "server_send_held", params: "reqId status body", returns: "boolean (\uBCF4\uB958\uB41C \uC751\uB2F5 \uC804\uC1A1)" }, { module: "http-server", name: "server_on_upgrade", params: "fnName", returns: "null (WS upgrade \uD578\uB4E4\uB7EC \uB4F1\uB85D)" }, { module: "http-server", name: "server_on_ws_message", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uBA54\uC2DC\uC9C0 \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "server_on_ws_close", params: "fnName", returns: "null (\uD074\uB77C\uC774\uC5B8\uD2B8 WS \uC885\uB8CC \uD578\uB4E4\uB7EC)" }, { module: "http-server", name: "ws_send_to_client", params: "sessionId data [isBinary]", returns: "boolean" }, { module: "http-server", name: "ws_close_client", params: "sessionId [code]", returns: "null" }, { module: "http-server", name: "server_req_session_id", params: "req", returns: "string | null" }, { module: "http", name: "http_get", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_form", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer", params: "url token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_get_bearer_json", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch", params: "url body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_patch_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_delete", params: "url", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_delete_json", params: "url", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_head", params: "url", returns: '{:status 200 :body ""}' }, { module: "http", name: "http_get_key", params: "url api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_key", params: "url body api-key", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_status", params: "url", returns: "number (\uC0C1\uD0DC\uCF54\uB4DC\uB9CC)" }, { module: "http", name: "http_json", params: "url", returns: "{:status 200 :data {...} :error nil}" }, { module: "http", name: "http_with_timeout", params: "url timeout", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_post_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_put_json", params: "url data", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_request", params: "method url headers body", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_req_status", params: "method url headers body", returns: "number" }, { module: "http", name: "http_get_json", params: "url headers", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_get_json_bearer", params: "url token", returns: "{:status 200 :data {...}}" }, { module: "http", name: "http_post_bearer", params: "url body token", returns: '{:status 200 :body "..."}' }, { module: "http", name: "http_retry_post", params: "url body token retries", returns: '{:status 200 :body "..."}' }, { module: "http", name: "is_http_success", params: "status", returns: "boolean" }, { module: "http", name: "is_http_redirect", params: "status", returns: "boolean" }, { module: "http", name: "is_http_error", params: "status", returns: "boolean" }, { module: "http", name: "http-post-data", params: "url data", returns: "parsed JSON data | nil  (#12 \uD574\uACB0)" }, { module: "mail", name: "mail_outbox_write", params: "dir to subject body", returns: "string (\uD30C\uC77C \uACBD\uB85C)" }, { module: "mail", name: "mail_outbox_list", params: "dir", returns: "array (JSON \uBC30\uC5F4, \uD050\uB41C \uBA54\uC2DC\uC9C0)" }, { module: "mail", name: "mail_outbox_count", params: "dir", returns: "number" }, { module: "markdown", name: "markdown_to_html", params: "md", returns: "html string" }, { module: "markdown", name: "markdown_frontmatter", params: "md", returns: '{ fm: {...}, body: "..." }' }, { module: "markdown", name: "markdown_render_full", params: "md", returns: "{ fm, html }" }, { module: "matrix", name: "matrix_mul", params: "A B", returns: "[[number]]  (matrix multiplication)" }, { module: "matrix", name: "matrix_transpose", params: "A", returns: "[[number]]  (transpose matrix)" }, { module: "matrix", name: "vector_dot", params: "u v", returns: "number  (dot product)" }, { module: "matrix", name: "vector_add", params: "u v", returns: "[number]  (vector addition)" }, { module: "matrix", name: "vector_sub", params: "u v", returns: "[number]  (vector subtraction)" }, { module: "matrix", name: "vector_scale", params: "v s", returns: "[number]  (scalar multiplication)" }, { module: "matrix", name: "vector_norm", params: "v", returns: "number  (Euclidean norm / L2 norm)" }, { module: "matrix", name: "matrix_zeros", params: "rows cols", returns: "[[number]]  (create zero matrix)" }, { module: "matrix", name: "vector_zeros", params: "n", returns: "[number]  (create zero vector)" }, { module: "optional", name: "require_optional", params: "modName", returns: "true/false (\uC124\uCE58 \uC5EC\uBD80)" }, { module: "optional", name: "optional_call", params: "modName fnPath args", returns: "result or throws" }, { module: "optional", name: "optional_has?", params: "modName", returns: "boolean" }, { module: "optional", name: "optional_version", params: "modName", returns: "string or nil" }, { module: "perf", name: "profile_fn", params: "fn count", returns: "PerfResult" }, { module: "perf", name: "trace_expr", params: "fn label", returns: "TraceResult" }, { module: "perf", name: "perf_stats", params: "", returns: "PerfStats" }, { module: "perf", name: "now_ms", params: "", returns: "number" }, { module: "perf", name: "elapsed_ms", params: "start", returns: "number" }, { module: "perf", name: "bench", params: "fn iterations", returns: "{ms, ops_per_sec}" }, { module: "perf", name: "time_fn", params: "fn args...", returns: "{result, ms}" }, { module: "process", name: "shell_exec_stdout", params: "cmd cwd?", returns: "string | null (stdout\uB9CC \uBC18\uD658, \uC2E4\uD328 \uC2DC null)" }, { module: "queue-helpers", name: "queue_db_init", params: "db_path", returns: "bool  (WAL \uBAA8\uB4DC + busy_timeout \uD65C\uC131\uD654)" }, { module: "resource", name: "res_cpu_load", params: "", returns: "[1m, 5m, 15m]" }, { module: "resource", name: "res_cpu_count", params: "", returns: "number" }, { module: "resource", name: "res_cpu_model", params: "", returns: "string" }, { module: "resource", name: "res_cpu_pct", params: "", returns: "number (1-min loadavg based, avoids busy wait)" }, { module: "resource", name: "res_mem", params: "", returns: "{total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}" }, { module: "resource", name: "res_mem_pct", params: "", returns: "number (used %)" }, { module: "resource", name: "res_disk", params: "", returns: "DiskInfo[]" }, { module: "resource", name: "res_disk_usage", params: "path", returns: "{total_gb, used_gb, avail_gb, use_pct}" }, { module: "resource", name: "res_procs", params: "", returns: "ProcessInfo[]  (top 20 by CPU)" }, { module: "resource", name: "res_find_proc", params: "name", returns: "ProcessInfo[]  (search by name substring)" }, { module: "resource", name: "res_proc_exists", params: "name", returns: "boolean" }, { module: "resource", name: "res_proc_pid", params: "name", returns: "number | null" }, { module: "resource", name: "res_proc_count", params: "name", returns: "number  (how many instances running)" }, { module: "resource", name: "res_ports", params: "", returns: "PortInfo[]  (all listening ports)" }, { module: "resource", name: "res_port_used", params: "port", returns: "boolean" }, { module: "resource", name: "res_port_info", params: "port", returns: "PortInfo | null" }, { module: "resource", name: "res_find_free_port", params: "start end", returns: "number | null  (first free port in range)" }, { module: "resource", name: "res_net", params: "", returns: "NetInterface[]" }, { module: "resource", name: "res_hostname", params: "", returns: "string" }, { module: "resource", name: "res_uptime_s", params: "", returns: "number  (system uptime in seconds)" }, { module: "resource", name: "res_pm2_list", params: "", returns: "ServiceInfo[]" }, { module: "resource", name: "res_pm2_find", params: "name", returns: "ServiceInfo | null" }, { module: "resource", name: "res_systemd_status", params: "name", returns: "ServiceInfo" }, { module: "resource", name: "res_kimdb_project", params: "name", returns: "Record | null  (query local kimdb)" }, { module: "resource", name: "res_kimdb_projects", params: "", returns: "Record[]  (all projects)" }, { module: "resource", name: "res_kimdb_health", params: "", returns: "boolean" }, { module: "resource", name: "res_snapshot", params: "", returns: "ResourceSnapshot  (complete server state, ~1s)" }, { module: "resource", name: "res_snapshot_report", params: "snapshot", returns: "string  (human/AI readable)" }, { module: "resource", name: "res_health_check", params: "", returns: "{ok, warnings, errors}" }, { module: "rest-crud", name: "route_info", params: "basePath", returns: "{base, param_name, supported_ops: [...]}" }, { module: "rest-crud", name: "path_param", params: "req paramName", returns: "string or nil" }, { module: "rest-crud", name: "rest_response", params: "status body", returns: "Map" }, { module: "rest-crud", name: "rest_ok", params: "body", returns: "Map (200)" }, { module: "rest-crud", name: "rest_created", params: "body", returns: "Map (201)" }, { module: "rest-crud", name: "rest_not_found", params: "msg", returns: "Map (404)" }, { module: "rest-crud", name: "rest_error", params: "status msg", returns: "Map" }, { module: "shell", name: "shell", params: "cmd", returns: "string (run command, return stdout)" }, { module: "shell", name: "shell_status", params: "cmd", returns: "number (run command, return exit code)" }, { module: "shell", name: "shell_ok", params: "cmd", returns: "boolean (returns true if exit code is 0)" }, { module: "shell", name: "shell_pipe", params: "cmd1 cmd2", returns: "string (pipe output of cmd1 into cmd2)" }, { module: "shell", name: "shell_capture", params: "cmd", returns: "{stdout, stderr, code} (capture all output)" }, { module: "shell", name: "shell_exists", params: "program", returns: "boolean (check if a program is in PATH)" }, { module: "shell", name: "shell_safe", params: "program args", returns: "string (\uC778\uC790 \uBC30\uC5F4 \uBC29\uC2DD \u2014 \uC0AC\uC6A9\uC790 \uC785\uB825 \uC548\uC804 \uC2E4\uD589, sh -c \uBBF8\uC0AC\uC6A9)" }, { module: "shell", name: "shell_env", params: "varname", returns: "string | null (\uD658\uACBD\uBCC0\uC218 \uC5C6\uC73C\uBA74 null)" }, { module: "shell", name: "shell_cwd", params: "", returns: "string (current working directory)" }, { module: "time", name: "now", params: "", returns: "string (ISO 8601; use now_ms for numeric timestamps)" }, { module: "time", name: "now_ms", params: "", returns: "number (ms since epoch, always returns number)" }, { module: "time", name: "now_iso", params: "", returns: "string (ISO 8601)" }, { module: "time", name: "now_unix", params: "", returns: "number (seconds since epoch)" }, { module: "time", name: "time_diff", params: "t1 t2", returns: "number (ms, positive if t2 > t1)" }, { module: "time", name: "time_since", params: "ts", returns: "number (ms elapsed since ts)" }, { module: "time", name: "time_ago", params: "ts", returns: 'string (human-readable: "3s ago", "2m ago", "1h ago")' }, { module: "time", name: "date_parts", params: "ts", returns: "{year,month,day,hour,min,sec,ms,weekday}" }, { module: "time", name: "date_add", params: "ts unit n", returns: 'number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")' }, { module: "time", name: "date_parse", params: "str", returns: 'number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)' }, { module: "time", name: "sleep_ms", params: "ms", returns: "void  (synchronous spin-wait, short durations only)" }, { module: "time", name: "timer_start", params: "label", returns: "Timer" }, { module: "time", name: "timer_lap", params: "timer label", returns: "Timer (record a lap time)" }, { module: "time", name: "timer_elapsed", params: "timer", returns: "number (ms since start)" }, { module: "time", name: "timer_stop", params: "timer", returns: "{label, total_ms, laps}" }, { module: "time", name: "log_create", params: "name level", returns: "Logger  (level = minimum level to record)" }, { module: "time", name: "log_entry", params: "logger level msg data?", returns: "Logger" }, { module: "time", name: "log_info", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_warn", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_error", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_debug", params: "logger msg", returns: "Logger" }, { module: "time", name: "log_filter", params: "logger level", returns: "[LogEntry]  (entries at or above level)" }, { module: "time", name: "log_count", params: "logger level", returns: "number" }, { module: "time", name: "log_last", params: "logger n", returns: "[LogEntry]" }, { module: "time", name: "log_dump", params: "logger", returns: "void  (print all entries to stdout)" }, { module: "time", name: "metrics_create", params: "name", returns: "Metrics" }, { module: "time", name: "metrics_record", params: "metrics key value", returns: "Metrics" }, { module: "time", name: "metrics_inc", params: "metrics key", returns: "Metrics  (increment counter by 1)" }, { module: "time", name: "metrics_inc_by", params: "metrics key n", returns: "Metrics" }, { module: "time", name: "metrics_count", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_avg", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_min", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_max", params: "metrics key", returns: "number" }, { module: "time", name: "metrics_p95", params: "metrics key", returns: "number  (95th percentile)" }, { module: "time", name: "metrics_summary", params: "metrics", returns: "{key: {count, avg, min, max}}" }, { module: "timer", name: "set_interval", params: "fn ms", returns: "number (fn: function name string, ms: interval)" }, { module: "timer", name: "clear_interval", params: "timerId", returns: "boolean (stop periodic timer)" }, { module: "timer", name: "set_timeout", params: "fn ms", returns: "number (fn: function name string, ms: delay)" }, { module: "timer", name: "clear_timeout", params: "timerId", returns: "boolean (cancel one-time timer)" }, { module: "timer", name: "timer_count", params: "", returns: "number (returns count of active timers)" }, { module: "timer", name: "timer_clear_all", params: "", returns: "boolean (clear all active timers)" }, { module: "totp", name: "totp_secret_generate", params: "bytes", returns: "string (base32, default 20 bytes = 160 bits = 32 chars)" }, { module: "totp", name: "totp_now", params: "secret_b32", returns: "string (\uD604\uC7AC \uC2DC\uAC01\uC758 6\uC790\uB9AC \uCF54\uB4DC, \uB514\uBC84\uADF8\xB7\uB4F1\uB85D\uC6A9)" }, { module: "totp", name: "totp_uri", params: "label issuer secret_b32", returns: "string (otpauth://totp/... QR \uCF54\uB4DC \uD45C\uC900)" }, { module: "verify", name: "check_parens", params: "code", returns: "VerifyResult" }, { module: "verify", name: "verify_code", params: "code", returns: "{valid, error_count, first_error}" }, { module: "verify", name: "fix_parens", params: "code", returns: "\uC790\uB3D9 \uC218\uC815\uB41C \uCF54\uB4DC (or original if already valid)" }, { module: "verify", name: "count_parens", params: "code", returns: "{open, close, balanced}" }, { module: "webauthn", name: "webauthn_challenge", params: "bytes", returns: "base64url string (32 bytes)" }, { module: "workflow", name: "workflow_create", params: "name steps", returns: "Workflow object" }, { module: "workflow", name: "workflow_step", params: "name fn options", returns: "WorkflowStep  (helper for defining steps)" }, { module: "workflow", name: "step-with-error", params: "step handler-fn", returns: "WorkflowStep (add error handler)" }, { module: "workflow", name: "step-with-fallback", params: "step value-or-fn", returns: "WorkflowStep (add fallback)" }, { module: "workflow", name: "step-with-timeout", params: "step ms", returns: "WorkflowStep (add timeout)" }, { module: "workflow", name: "step-when", params: "step condition-fn", returns: "WorkflowStep (add conditional)" }, { module: "workflow", name: "workflow_ok", params: "result", returns: "boolean" }, { module: "workflow", name: "workflow_get", params: "result key", returns: "any  (get value from result context)" }, { module: "workflow", name: "workflow_summary", params: "result", returns: "string  (human/AI readable summary)" }, { module: "workflow", name: "task_create", params: "goal", returns: "Task" }, { module: "workflow", name: "task_add_subtask", params: "task name", returns: "task" }, { module: "workflow", name: "task_complete_subtask", params: "task name result", returns: "task" }, { module: "workflow", name: "task_finish", params: "task result", returns: "task" }, { module: "workflow", name: "task_progress", params: "task", returns: "number (0.0-1.0)" }, { module: "workflow", name: "report_create", params: "title", returns: "Report" }, { module: "workflow", name: "report_add", params: "report section_name data", returns: "Report" }, { module: "workflow", name: "report_render", params: "report", returns: "string  (formatted text report)" }];
+  }
+});
+
+// src/eval-builtins.ts
+var eval_builtins_exports = {};
+__export(eval_builtins_exports, {
+  evalBuiltin: () => evalBuiltin
+});
+function flDeepEq(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!flDeepEq(a[i], b[i])) return false;
+    return true;
+  }
+  if (typeof a === "object" && typeof b === "object" && !Array.isArray(a) && !Array.isArray(b)) {
+    const ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    for (const k of ka) if (!flDeepEq(a[k], b[k])) return false;
+    return true;
+  }
+  return false;
+}
+function flTypeOf(v) {
+  if (v === null || v === void 0) return "nil";
+  if (Array.isArray(v)) return "array";
+  if (v instanceof Map) return "map";
+  if (typeof v === "object" && (v.kind === "function-value" || v.kind === "closure" || v.kind === "builtin-fn")) return "function";
+  if (typeof v === "object") return "map";
+  return typeof v;
+}
+function flEnvGet(env, name) {
+  let e = env;
+  while (e !== null && e !== void 0) {
+    const vars = e.vars;
+    if (Array.isArray(vars)) {
+      for (let i = 0; i < vars.length; i++) {
+        const pair = vars[i];
+        if (Array.isArray(pair) && pair[0] === name) return pair[1];
+      }
+    }
+    e = e.parent;
+  }
+  return null;
+}
+function flEnvBind(env, name, val) {
+  return { vars: [[name, val], ...env.vars || []], parent: env.parent };
+}
+function flBlockItems(block) {
+  if (!block) return [];
+  if (block.kind === "block" && block.type === "Array") {
+    if (block.fields instanceof Map) return block.fields.get("items") ?? [];
+    if (block.fields && Array.isArray(block.fields.items)) return block.fields.items;
+    return block.items ?? [];
+  }
+  if (Array.isArray(block.items)) return block.items;
+  if (Array.isArray(block)) return block;
+  return [];
+}
+function flGetParamNames(paramsNode) {
+  const items = flBlockItems(paramsNode);
+  const names = [];
+  for (const p of items) {
+    if (p.kind === "literal" && p.value === "&") break;
+    if (p.kind === "variable") names.push(p.name);
+    else if (p.kind === "literal") names.push(String(p.value));
+  }
+  return names;
+}
+function flExecOpNative(op, vals) {
+  const v0 = vals[0], v1 = vals[1], v2 = vals[2];
+  switch (normalizedOp) {
+    case "+": {
+      const badIdx = vals.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? \uAC12\uC778\uC9C0 \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12\uC744 \uC0AC\uC6A9\uD558\uC138\uC694)` : `(str-to-num \uB4F1\uC73C\uB85C \uBCC0\uD658\uD558\uC138\uC694)`;
+        throw new Error(`[E_TYPE_MISMATCH] +: \uC778\uC790 ${badIdx + 1}\uBC88\uC5D0 ${actual} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${hint}`);
+      }
+      return vals.reduce((a, b) => a + b, 0);
+    }
+    case "-": {
+      const badIdx = vals.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)` : `(str-to-num \uBCC0\uD658 \uD655\uC778)`;
+        throw new Error(`[E_TYPE_MISMATCH] -: \uC778\uC790 ${badIdx + 1}\uBC88\uC5D0 ${actual} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${hint}`);
+      }
+      return vals.length === 1 ? -v0 : vals.reduce((a, b) => a - b);
+    }
+    case "*": {
+      const badIdx = vals.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)` : `(str-to-num \uBCC0\uD658 \uD655\uC778)`;
+        throw new Error(`[E_TYPE_MISMATCH] *: \uC778\uC790 ${badIdx + 1}\uBC88\uC5D0 ${actual} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${hint}`);
+      }
+      return vals.reduce((a, b) => a * b, 1);
+    }
+    case "/": {
+      const badIdx = vals.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (badIdx >= 0) {
+        const actual = flTypeOf(vals[badIdx]);
+        const hint = actual === "nil" ? `(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)` : `(str-to-num \uBCC0\uD658 \uD655\uC778)`;
+        throw new Error(`[E_TYPE_MISMATCH] /: \uC778\uC790 ${badIdx + 1}\uBC88\uC5D0 ${actual} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${hint}`);
+      }
+      return vals.length === 1 ? 1 / v0 : vals.reduce((a, b) => a / b);
+    }
+    case "%":
+      return v0 % v1;
+    case "=": {
+      const n0 = v0 === null || v0 === void 0;
+      const n1 = v1 === null || v1 === void 0;
+      if (n0 && n1) return true;
+      if (n0 || n1) return false;
+      return v0 === v1;
+    }
+    case "!=":
+    case "not=":
+      return v0 !== v1;
+    case "<":
+      return v0 < v1;
+    case ">":
+      return v0 > v1;
+    case "<=":
+      return v0 <= v1;
+    case ">=":
+      return v0 >= v1;
+    case "not":
+      return !v0;
+    case "nil?":
+    case "null?":
+      return v0 === null || v0 === void 0;
+    case "empty?": {
+      if (v0 === null || v0 === void 0) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
+    case "has-key?": {
+      if (v0 === null || v0 === void 0 || typeof v0 !== "object" || Array.isArray(v0)) return false;
+      const k = typeof v1 === "string" && v1.startsWith(":") ? v1.slice(1) : v1;
+      return Object.prototype.hasOwnProperty.call(v0, k);
+    }
+    case "nil-or-empty?":
+      return v0 === null || v0 === void 0 || v0 && v0.length === 0;
+    case "true?":
+      return v0 === true;
+    case "false?":
+      return v0 === false;
+    case "and":
+      return !!(v0 && v1);
+    case "or": {
+      const flFalsy = (v) => v === null || v === void 0 || v === false;
+      if (!flFalsy(v0)) return v0;
+      if (!flFalsy(v1)) return v1;
+      return v1;
+    }
+    case "length":
+      return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
+    case "get": {
+      if ((v0 === null || v0 === void 0) && process.env.FL_STRICT === "1") {
+        throw new FLRuntimeError(
+          ErrorCodes.TYPE_NIL,
+          `(get nil ${typeof v1 === "string" ? '"' + v1 + '"' : String(v1)}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
+          { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
+        );
+      }
+      let k = v1;
+      if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
+      const _def = v2 !== void 0 ? v2 : null;
+      if (Array.isArray(v0)) return v0[k] !== void 0 ? v0[k] : _def;
+      if (v0 instanceof Map) return v0.has(String(k).replace(/^:/, "")) ? v0.get(String(k).replace(/^:/, "")) : _def;
+      if (v0 !== null && typeof v0 === "object") {
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (v0[normalized] !== void 0) return v0[normalized];
+        if (typeof k === "string" && v0[k] !== void 0) return v0[k];
+        return _def;
+      }
+      return _def;
+    }
+    case "get-in": {
+      if (!Array.isArray(v1)) throw new Error(`get-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const defaultVal = v2 !== void 0 ? v2 : null;
+      let cur = v0;
+      for (const k of v1) {
+        if (cur === null || cur === void 0) return defaultVal;
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : k;
+        if (Array.isArray(cur)) cur = cur[key] !== void 0 ? cur[key] : null;
+        else if (cur !== null && typeof cur === "object") cur = cur[key] !== void 0 ? cur[key] : null;
+        else return defaultVal;
+      }
+      return cur !== void 0 ? cur : defaultVal;
+    }
+    case "append":
+      return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
+    case "slice":
+      return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
+    case "str":
+    case "concat":
+      return vals.map((v) => {
+        if (v === null || v === void 0) return "null";
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+        const isPlainObj = typeof v === "object" && !Array.isArray(v) && !(v instanceof Map) && v?.kind !== "function-value" && v?.kind !== "closure";
+        if (Array.isArray(v) || isPlainObj) {
+          try {
+            return JSON.stringify(v);
+          } catch {
+            return toDisplay(v);
+          }
+        }
+        return toDisplay(v);
+      }).join("");
+    case "str-to-num": {
+      const n = parseFloat(String(v0));
+      return isNaN(n) ? null : n;
+    }
+    case "num-to-str":
+      return String(v0 ?? "");
+    case "replace":
+      return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
+    case "type-of": {
+      if (v0 === null || v0 === void 0) return "nil";
+      if (Array.isArray(v0)) return "array";
+      if (v0 instanceof Map || typeof v0 === "object" && v0 !== null && !Array.isArray(v0) && typeof v0 !== "function") return "map";
+      if (typeof v0 === "function" || v0?.kind === "function-value" || v0?.kind === "closure" || v0?.kind === "builtin-fn") return "function";
+      return typeof v0;
+    }
+    case "print":
+      process.stdout.write(vals.map((v) => toDisplay(v)).join(""));
+      return null;
+    case "println":
+      process.stdout.write(vals.map((v) => v === null ? "null" : String(v)).join(" ") + "\n");
+      return null;
+    case "substring":
+      return typeof v0 === "string" ? v0.slice(Number(v1), v2 !== void 0 ? Number(v2) : void 0) : "";
+    case "char-at":
+      return typeof v0 === "string" ? v0[Number(v1)] ?? "" : "";
+    case "index-of":
+      return typeof v0 === "string" && typeof v1 === "string" ? v0.indexOf(v1) : -1;
+    case "split":
+      return typeof v0 === "string" ? v0.split(String(v1 ?? "")) : [];
+    case "trim":
+      return typeof v0 === "string" ? v0.trim() : "";
+    case "upper-case":
+      return typeof v0 === "string" ? v0.toUpperCase() : v0;
+    case "lower-case":
+      return typeof v0 === "string" ? v0.toLowerCase() : v0;
+    case "strlen":
+      return typeof v0 === "string" ? v0.length : 0;
+    case "includes?":
+    case "includes-item":
+      return typeof v0 === "string" ? v0.includes(String(v1)) : Array.isArray(v0) ? v0.includes(v1) : false;
+    case "starts-with?":
+      return typeof v0 === "string" ? v0.startsWith(String(v1)) : false;
+    case "ends-with?":
+      return typeof v0 === "string" ? v0.endsWith(String(v1)) : false;
+    case "empty?": {
+      if (v0 === null || v0 === void 0) return true;
+      if (typeof v0 === "string") return v0.length === 0;
+      if (Array.isArray(v0)) return v0.length === 0;
+      if (typeof v0 === "object") return Object.keys(v0).length === 0;
+      return false;
+    }
+    case "first":
+      return Array.isArray(v0) ? v0[0] !== void 0 ? v0[0] : null : null;
+    case "second":
+      return Array.isArray(v0) ? v0[1] !== void 0 ? v0[1] : null : null;
+    case "last":
+      return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : null;
+    case "rest":
+      return Array.isArray(v0) ? v0.slice(1) : [];
+    case "nth":
+      return Array.isArray(v0) && args[1] !== void 0 ? v0[Number(args[1])] !== void 0 ? v0[Number(args[1])] : null : null;
+    case "not=":
+      return args[0] !== args[1];
+    // Phase C: nil-safe wrapper들 — default 값 반환 (Phase A의 E_TYPE_NIL 회피)
+    case "get-or": {
+      let k = v1;
+      if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
+      if (v0 === null || v0 === void 0) return v2 !== void 0 ? v2 : null;
+      if (Array.isArray(v0)) return v0[k] !== void 0 ? v0[k] : v2 !== void 0 ? v2 : null;
+      if (v0 instanceof Map) {
+        const r = v0.get(String(k).replace(/^:/, ""));
+        return r === void 0 ? v2 !== void 0 ? v2 : null : r;
+      }
+      if (typeof v0 === "object") {
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (v0[normalized] !== void 0) return v0[normalized];
+        if (typeof k === "string" && v0[k] !== void 0) return v0[k];
+        return v2 !== void 0 ? v2 : null;
+      }
+      return v2 !== void 0 ? v2 : null;
+    }
+    case "first-or":
+    case "first_or":
+      return Array.isArray(v0) && v0.length > 0 && v0[0] !== void 0 ? v0[0] : v1 !== void 0 ? v1 : null;
+    case "last-or":
+    case "last_or":
+      return Array.isArray(v0) && v0.length > 0 ? v0[v0.length - 1] : v1 !== void 0 ? v1 : null;
+    case "cons":
+      return [v0, ...Array.isArray(v1) ? v1 : [v1]];
+    case "reverse":
+      return Array.isArray(v0) ? [...v0].reverse() : [];
+    case "sort":
+      return Array.isArray(v0) ? [...v0].sort((a, b) => typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b))) : v0;
+    case "keys":
+      return v0 instanceof Map ? Array.from(v0.keys()) : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.keys(v0) : [];
+    case "values":
+      return v0 instanceof Map ? Array.from(v0.values()) : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.values(v0) : [];
+    case "map-entries":
+    case "map_entries":
+      return v0 instanceof Map ? [...v0.entries()] : v0 && typeof v0 === "object" && !Array.isArray(v0) ? Object.entries(v0) : [];
+    case "floor":
+      return Math.floor(v0);
+    case "ceil":
+      return Math.ceil(v0);
+    case "round":
+      return Math.round(v0);
+    case "math-abs":
+    case "math_abs":
+    case "abs":
+      return Math.abs(v0);
+    case "max":
+      return Math.max(...vals.filter((v) => typeof v === "number"));
+    case "min":
+      return Math.min(...vals.filter((v) => typeof v === "number"));
+    case "pow":
+      return Math.pow(v0, v1);
+    case "math-sqrt":
+    case "math_sqrt":
+    case "sqrt":
+      return Math.sqrt(v0);
+    case "mod":
+      return v0 % v1;
+    case "closure?":
+      return v0 !== null && v0 !== void 0 && typeof v0 === "object" && v0.kind === "closure";
+    case "block-items":
+      return flBlockItems(v0);
+    case "read-file":
+      try {
+        return require("fs").readFileSync(String(v0), "utf-8");
+      } catch {
+        return null;
+      }
+    case "write-file":
+      try {
+        require("fs").writeFileSync(String(v0), String(v1 ?? ""));
+        return true;
+      } catch {
+        return false;
+      }
+    case "file-exists?":
+      try {
+        return require("fs").existsSync(String(v0));
+      } catch {
+        return false;
+      }
+    // ── 셀프 호스팅 native builtins (native fl-interp 내부에서 호출 가능) ──
+    case "fl-interp":
+      return flInterpNative(v0, v1);
+    case "lex":
+      try {
+        return lex(String(v0 ?? ""));
+      } catch {
+        return [];
+      }
+    case "parse":
+      try {
+        return parse(Array.isArray(v0) ? v0 : []);
+      } catch {
+        return [];
+      }
+    case "fl-parse":
+      try {
+        return parse(lex(String(v0 ?? "")));
+      } catch {
+        return [];
+      }
+    case "fl-fix-env": {
+      const fenv = v0;
+      if (!fenv || !Array.isArray(fenv.vars)) return fenv;
+      for (const pair of fenv.vars) {
+        if (Array.isArray(pair) && pair[1] && typeof pair[1] === "object" && pair[1].kind === "closure")
+          pair[1]["closure-env"] = fenv;
+      }
+      return fenv;
+    }
+    case "fl-env-get":
+      return flEnvGet(v0, String(v1 ?? ""));
+    case "fl-exec-op":
+      return flExecOpNative(String(v0 ?? ""), Array.isArray(v1) ? v1 : []);
+    case "fl-special-op?": {
+      const sop = String(v0 ?? "");
+      const specials = ["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"];
+      return specials.includes(sop) ? sop : null;
+    }
+    // ── Phase L1: 모듈 시스템 + 파일 I/O ──
+    case "load": {
+      const filePath = String(v0 ?? "");
+      const fs21 = require("fs");
+      const path19 = require("path");
+      try {
+        const currentFile = interp.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.resolve(baseDir, filePath);
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
+        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+        const tokens = lex2(src, resolvedPath);
+        const ast = parse3(tokens);
+        if (interp.callStack) {
+          interp.callStack.push({ fn: `(load "${filePath}")`, line: expr.line });
+        }
+        try {
+          for (const node of ast) {
+            interp.eval(node);
+          }
+        } finally {
+          if (interp.callStack) {
+            interp.callStack.pop();
+          }
+        }
+        return null;
+      } catch (e) {
+        throw new Error(`load failed: '${filePath}': ${e.message}`);
+      }
+    }
+    case "file-mkdir":
+    case "file_mkdir": {
+      const dirPath = String(v0 ?? "");
+      const fs21 = require("fs");
+      try {
+        fs21.mkdirSync(dirPath, { recursive: true });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    case "file-append":
+    case "file_append": {
+      const filePath = String(v0 ?? "");
+      const content = String(v1 ?? "");
+      const fs21 = require("fs");
+      try {
+        fs21.appendFileSync(filePath, content);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    case "http-get":
+    case "http_get": {
+      const url2 = String(v0 ?? "");
+      try {
+        const { execSync: execSync2 } = require("child_process");
+        const { writeFileSync: writeFileSync14, unlinkSync: unlinkSync5 } = require("fs");
+        const { randomUUID: randomUUID5 } = require("crypto");
+        const tmpFile = `/tmp/fl-http-${randomUUID5()}.js`;
+        const nodeScript = `process.env.FL_URL=${JSON.stringify(url2)};
+const u=require('url').parse(process.env.FL_URL);
+const mod=u.protocol==='https:'?require('https'):require('http');
+const chunks=[];
+const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'/',method:'GET'},res=>{
+  res.on('data',d=>chunks.push(d));
+  res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString()}))});
+});
+req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
+req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
+req.end();`;
+        writeFileSync14(tmpFile, nodeScript, "utf-8");
+        const result = execSync2(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15e3 });
+        try {
+          unlinkSync5(tmpFile);
+        } catch {
+        }
+        const parsed = JSON.parse(result);
+        return { status: parsed.s || 0, body: parsed.b || "", headers: {} };
+      } catch (e) {
+        return { status: 0, body: "", headers: {}, error: e.message };
+      }
+    }
+    // atom: 변경 가능한 참조 컨테이너 (전역 상태 관리용)
+    case "atom": {
+      const ref = { value: v0 !== void 0 ? v0 : null };
+      return ref;
+    }
+    case "deref": {
+      if (v0 && typeof v0 === "object" && "value" in v0) return v0.value;
+      return v0;
+    }
+    case "reset!": {
+      if (v0 && typeof v0 === "object" && "value" in v0) {
+        v0.value = v1;
+        return v1;
+      }
+      return v1;
+    }
+    case "swap!": {
+      if (v0 && typeof v0 === "object" && "value" in v0 && v1) {
+        const extraArgs = args.slice(2);
+        const newVal = flApplyNative(v1, [v0.value, ...extraArgs]);
+        v0.value = newVal;
+        return newVal;
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+function flApplyNative(closure, vals) {
+  if (!closure || closure.kind !== "closure") return null;
+  const params = closure.params || [];
+  const closureEnv = closure["closure-env"] ?? { vars: [], parent: null };
+  let callEnv = { vars: [], parent: closureEnv };
+  for (let i = 0; i < params.length; i++) {
+    callEnv = flEnvBind(callEnv, params[i], i < vals.length ? vals[i] : null);
+  }
+  const body = closure.body || [];
+  let result = null;
+  for (const node of body) {
+    result = flInterpNative(node, callEnv);
+  }
+  return result;
+}
+function flInterpNative(node, env) {
+  if (node === null || node === void 0) return null;
+  const kind = node.kind;
+  if (kind === "literal") return node.value;
+  if (kind === "variable") return flEnvGet(env, node.name);
+  if (kind === "array") {
+    const items = node.items || [];
+    return items.map((item) => flInterpNative(item, env));
+  }
+  if (kind === "block") {
+    if (node.type === "Array") {
+      const items = flBlockItems(node);
+      return items.map((item) => flInterpNative(item, env));
+    }
+    if (node.type === "Map") {
+      const result = {};
+      if (node.fields instanceof Map) {
+        for (const [key, valNode] of node.fields) {
+          result[key] = flInterpNative(valNode, env);
+        }
+      }
+      return result;
+    }
+    if (node.type === "FUNC") {
+      const fields = node.fields;
+      let paramsNode = null, bodyNode = null;
+      if (fields instanceof Map) {
+        paramsNode = fields.get("params");
+        bodyNode = fields.get("body");
+      } else if (fields) {
+        paramsNode = fields.params;
+        bodyNode = fields.body;
+      }
+      const names = flGetParamNames(paramsNode);
+      return { kind: "closure", params: names, body: [bodyNode], "closure-env": env };
+    }
+    return null;
+  }
+  if (kind === "sexpr") {
+    return flInterpSexpr(node.op, node.args || [], env);
+  }
+  return null;
+}
+function flInterpSexpr(op, rawArgs, env) {
+  if (typeof op !== "string") {
+    const fn = flInterpNative(op, env);
+    const vals = rawArgs.map((a) => flInterpNative(a, env));
+    return fn && fn.kind === "closure" ? flApplyNative(fn, vals) : null;
+  }
+  if (!FL_SPECIAL_FORMS.has(op)) {
+    const vals = rawArgs.map((a) => flInterpNative(a, env));
+    const fn = flEnvGet(env, op);
+    if (fn && fn.kind === "closure") return flApplyNative(fn, vals);
+    return flExecOpNative(op, vals);
+  }
+  switch (normalizedOp) {
+    case "if": {
+      const cond = flInterpNative(rawArgs[0], env);
+      if (cond) return flInterpNative(rawArgs[1], env);
+      return rawArgs.length >= 3 ? flInterpNative(rawArgs[2], env) : null;
+    }
+    case "let": {
+      const pairs = flBlockItems(rawArgs[0]);
+      let newEnv = env;
+      for (const pair of pairs) {
+        const pairItems = flBlockItems(pair);
+        if (pairItems.length < 2) continue;
+        const nameNode = pairItems[0];
+        const name = nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? "");
+        const val = flInterpNative(pairItems[1], newEnv);
+        newEnv = flEnvBind(newEnv, name, val);
+      }
+      let result = null;
+      for (let i = 1; i < rawArgs.length; i++) result = flInterpNative(rawArgs[i], newEnv);
+      return result;
+    }
+    case "fn": {
+      const names = flGetParamNames(rawArgs[0]);
+      return { kind: "closure", params: names, body: rawArgs.slice(1), "closure-env": env };
+    }
+    case "do":
+    case "begin": {
+      let result = null;
+      for (const node of rawArgs) result = flInterpNative(node, env);
+      return result;
+    }
+    case "and": {
+      for (const arg of rawArgs) {
+        if (!flInterpNative(arg, env)) return false;
+      }
+      return true;
+    }
+    case "or": {
+      const flFalsy2 = (v) => v === null || v === void 0 || v === false;
+      let lastVal2 = null;
+      for (const arg of rawArgs) {
+        lastVal2 = flInterpNative(arg, env);
+        if (!flFalsy2(lastVal2)) return lastVal2;
+      }
+      return lastVal2;
+    }
+    case "not":
+      return !flInterpNative(rawArgs[0], env);
+    case "null?": {
+      const v = flInterpNative(rawArgs[0], env);
+      return v === null || v === void 0;
+    }
+    case "call": {
+      const fnRaw = flInterpNative(rawArgs[0], env);
+      const fn = fnRaw && fnRaw.kind === "closure" ? fnRaw : typeof fnRaw === "string" ? flEnvGet(env, fnRaw) : null;
+      if (!fn || fn.kind !== "closure") return null;
+      let vals;
+      if (rawArgs.length === 2) {
+        const a = flInterpNative(rawArgs[1], env);
+        vals = Array.isArray(a) ? a : [a];
+      } else {
+        vals = rawArgs.slice(1).map((a) => flInterpNative(a, env));
+      }
+      return flApplyNative(fn, vals);
+    }
+    case "match": {
+      const subject = flInterpNative(rawArgs[0], env);
+      for (let i = 1; i < rawArgs.length; i++) {
+        const clause = rawArgs[i];
+        const patOp = clause.op;
+        const resultExpr = (clause.args || [])[0];
+        let matched = false;
+        if (patOp === "_") matched = true;
+        else if (patOp === "null") matched = subject === null || subject === void 0;
+        else if (patOp === "true") matched = subject === true;
+        else if (patOp === "false") matched = subject === false;
+        else {
+          const n = parseFloat(patOp);
+          matched = subject === patOp || !isNaN(n) && subject === n;
+        }
+        if (matched) return flInterpNative(resultExpr, env);
+      }
+      return null;
+    }
+    case "export":
+      return null;
+    case "define":
+    case "set!": {
+      if (rawArgs.length >= 2) {
+        const nameNode = rawArgs[0];
+        const name = nameNode.kind === "variable" ? nameNode.name : String(nameNode.value ?? "");
+        const val = flInterpNative(rawArgs[1], env);
+        if (env && Array.isArray(env.vars)) env.vars.unshift([name, val]);
+        return val;
+      }
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+function makeCacheHandle(maxSize) {
+  return { kind: "cache", maxSize, map: /* @__PURE__ */ new Map(), hits: 0, misses: 0 };
+}
+function cacheEvict(ch) {
+  if (ch.map.size >= ch.maxSize) {
+    const firstKey = ch.map.keys().next().value;
+    if (firstKey !== void 0) ch.map.delete(firstKey);
+  }
+}
+function __ensureIoWorker() {
+  if (globalThis.__ioWorker) return;
+  const { Worker: IoWorker } = require("worker_threads");
+  const ctrlBuf = new SharedArrayBuffer(IO_CTRL_SIZE);
+  const dataBuf2 = new SharedArrayBuffer(IO_DATA_SIZE);
+  const ctrl = new Int32Array(ctrlBuf);
+  Atomics.store(ctrl, IO_SLOT_WRITE, 0);
+  Atomics.store(ctrl, IO_SLOT_READ, 0);
+  Atomics.store(ctrl, IO_SLOT_NOTIFY, 0);
+  const worker = new IoWorker(_ioWorkerCode, {
+    eval: true,
+    workerData: { ctrlBuf, dataBuf: dataBuf2 }
+  });
+  worker.on("error", (e) => {
+    process.stderr.write(`[IO Worker] error: ${e.message}
+`);
+    globalThis.__ioWorker = null;
+  });
+  worker.unref();
+  globalThis.__ioWorker = worker;
+  globalThis.__ioCtrlBuf = ctrlBuf;
+  globalThis.__ioDataBuf = dataBuf2;
+}
+function evalBuiltin(interp2, op, args3, expr2) {
+  const normalizedOp2 = op.replace(/_/g, "-");
+  enforceCall(normalizedOp2, expr2 ? { file: expr2.file ?? "", line: expr2.line ?? 0, col: expr2.col ?? 0 } : void 0);
+  if (normalizedOp2 !== op && op !== "server_start" && !process.env.FL_NO_DEPRECATION_WARN) {
+    console.warn(`\u26A0\uFE0F  [FreeLang v11.5.1] ${op}\uC740 deprecated\uC785\uB2C8\uB2E4. ${normalizedOp2}\uC744 \uC0AC\uC6A9\uD558\uC138\uC694.`);
+  }
+  const ev = (node) => interp2.eval(node);
+  const callFn = (fn, a) => interp2.callFunction(fn, a);
+  const callUser = (name, a) => interp2.callUserFunction(name, a);
+  const callFnVal = (fn, a) => {
+    if (typeof fn === "string") {
+      try {
+        return interp2.callUserFunction(fn, a);
+      } catch (e) {
+        if (e?.message?.includes("\uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4") || e?.message?.includes("not found") || e?.message?.includes("Function not found")) {
+          return evalBuiltin(interp2, fn, a, expr2);
+        }
+        throw e;
+      }
+    }
+    if (fn?.kind === "builtin-fn") return evalBuiltin(interp2, fn.name, a, expr2);
+    if (fn?.kind === "function-value" || fn?.kind === "async-function-value") return interp2.callFunctionValue(fn, a);
+    if (typeof fn?.body === "function") return fn.body(...a);
+    if (fn?.params !== void 0 && fn?.body !== void 0) return interp2.callUserFunction(fn.name ?? fn.id, a);
+    if (typeof fn === "function") return fn(...a);
+    return interp2.callFunctionValue(fn, a);
+  };
+  const toDisplay2 = (val) => interp2.toDisplayString(val);
+  switch (normalizedOp2) {
+    // atom: 변경 가능한 참조 컨테이너
+    case "atom": {
+      return { value: args3[0] !== void 0 ? args3[0] : null };
+    }
+    case "deref": {
+      const ref = args3[0];
+      if (ref && typeof ref === "object" && "value" in ref) return ref.value;
+      return ref;
+    }
+    case "reset!": {
+      const ref = args3[0];
+      if (ref && typeof ref === "object" && "value" in ref) {
+        ref.value = args3[1];
+        return args3[1];
+      }
+      return args3[1];
+    }
+    case "swap!": {
+      const ref = args3[0];
+      const fn = args3[1];
+      const extra = args3.slice(2);
+      if (ref && typeof ref === "object" && "value" in ref && fn) {
+        const newVal = callFnVal(fn, [ref.value, ...extra]);
+        ref.value = newVal;
+        return newVal;
+      }
+      return null;
+    }
+    // Phase L1: Module system
+    case "load": {
+      const filePath = String(args3[0] ?? "");
+      const nsPrefix = args3[1] != null ? String(args3[1]) : null;
+      const fs21 = require("fs");
+      const path19 = require("path");
+      try {
+        const currentFile = interp2.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.resolve(baseDir, filePath);
+        const isWatchMode = process.argv.includes("--watch") || process.argv.includes("-w") || process.argv.includes("watch");
+        if (!MODULE_CACHE_DISABLED && !isWatchMode && !nsPrefix) {
+          if (!interp2.__loadCache) interp2.__loadCache = /* @__PURE__ */ new Set();
+          if (interp2.__loadCache.has(resolvedPath)) return null;
+          interp2.__loadCache.add(resolvedPath);
+        }
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
+        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+        const tokens = lex2(src, resolvedPath);
+        const ast = parse3(tokens);
+        const ctx = interp2.context;
+        const fnsBefore = nsPrefix && ctx?.functions instanceof Map ? new Set(ctx.functions.keys()) : /* @__PURE__ */ new Set();
+        interp2.interpret(ast);
+        if (nsPrefix && ctx?.functions instanceof Map) {
+          const toAlias = [];
+          for (const [name, def] of ctx.functions.entries()) {
+            if (!fnsBefore.has(name)) toAlias.push([`${nsPrefix}/${name}`, def]);
+          }
+          for (const [aliasName, def] of toAlias) ctx.functions.set(aliasName, def);
+        }
+        return null;
+      } catch (e) {
+        throw new Error(`load failed: '${filePath}': ${e.message}`);
+      }
+    }
+    // ── v12 Hot Reload ─────────────────────────────────────────────────────────
+    case "fl-reload": {
+      const frFilePath = String(args3[0] ?? "");
+      const frFs = require("fs");
+      const frPath = require("path");
+      try {
+        const frResolved = frPath.resolve(process.cwd(), frFilePath);
+        if (interp2.__loadCache) interp2.__loadCache.delete(frResolved);
+        const frSrc = frFs.readFileSync(frResolved, "utf-8");
+        const { lex: frLex } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: frParse } = (init_parser(), __toCommonJS(parser_exports));
+        const frTokens = frLex(frSrc, frResolved);
+        const frAst = frParse(frTokens);
+        const frSavedPath = interp2.currentFilePath;
+        interp2.currentFilePath = frResolved;
+        const frVars = interp2.context.variables;
+        if (!interp2.__hotReloadGlobalMap) {
+          interp2.__hotReloadGlobalMap = frVars.stack ? frVars.stack[0] : null;
+        }
+        const frGlobal = interp2.__hotReloadGlobalMap;
+        const frSavedStack = frVars.saveStack ? frVars.saveStack() : null;
+        try {
+          if (frGlobal && frVars.restoreStack) frVars.restoreStack([frGlobal]);
+          interp2.interpret(frAst);
+        } finally {
+          if (frSavedStack && frVars.restoreStack) {
+            frVars.restoreStack([frGlobal, ...frSavedStack.slice(1)]);
+          }
+          interp2.currentFilePath = frSavedPath;
+        }
+        return null;
+      } catch (e) {
+        throw new Error(`[fl-reload] '${frFilePath}': ${e.message}`);
+      }
+    }
+    case "fl-watch": {
+      const fwPath = String(args3[0] ?? "");
+      const fwCb = args3[1];
+      const fwOpts = args3[2];
+      const fwDebounce = fwOpts && typeof fwOpts === "object" ? fwOpts[":debounce"] ?? fwOpts["debounce"] ?? 300 : 300;
+      const fwFs = require("fs");
+      const fwPathMod = require("path");
+      const fwResolved = fwPathMod.resolve(process.cwd(), fwPath);
+      let fwLastMtime = 0;
+      let fwLastSize = -1;
+      try {
+        const st = fwFs.statSync(fwResolved);
+        fwLastMtime = st.mtimeMs;
+        fwLastSize = st.size;
+      } catch (_e) {
+      }
+      let fwDebTimer = null;
+      const fwInterval = setInterval(() => {
+        try {
+          const st = fwFs.statSync(fwResolved);
+          if (st.mtimeMs !== fwLastMtime || st.size !== fwLastSize) {
+            fwLastMtime = st.mtimeMs;
+            fwLastSize = st.size;
+            if (fwDebTimer) clearTimeout(fwDebTimer);
+            fwDebTimer = setTimeout(() => {
+              fwDebTimer = null;
+              try {
+                callFnVal(fwCb, [fwResolved]);
+              } catch (e) {
+                process.stderr.write(`\x1B[33m[fl-watch]\x1B[0m ${e.message}
+`);
+              }
+            }, fwDebounce);
+          }
+        } catch (_e) {
+        }
+      }, 500);
+      fwInterval.unref?.();
+      return null;
+    }
+    // Phase Step3: require function (module system)
+    case "cli-args": {
+      const args4 = process.argv.slice(2);
+      if (args4[0] === "run" || args4[0] === "debug") {
+        return args4.slice(2);
+      }
+      return args4;
+    }
+    case "shell-exec": {
+      const { execSync: execSync2 } = require("child_process");
+      const cmd2 = String(args3[0] ?? "");
+      try {
+        return execSync2(cmd2, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+      } catch (e) {
+        return null;
+      }
+    }
+    case "shell-exec-result": {
+      const { spawnSync: spawnSync7 } = require("child_process");
+      const cmd2 = String(args3[0] ?? "");
+      const res = spawnSync7("sh", ["-c", cmd2], { encoding: "utf-8" });
+      return {
+        stdout: res.stdout ?? "",
+        stderr: res.stderr ?? "",
+        exit: res.status ?? -1,
+        ok: (res.status ?? -1) === 0
+      };
+    }
+    case "require": {
+      const modulePath = String(args3[0] ?? "");
+      const fs21 = require("fs");
+      const path19 = require("path");
+      try {
+        let filePath = modulePath;
+        if (!filePath.endsWith(".fl") && !filePath.endsWith(".js")) {
+          filePath = filePath + ".fl";
+        }
+        const currentFile = interp2.currentFilePath;
+        const baseDir = currentFile && !path19.isAbsolute(filePath) ? path19.dirname(currentFile) : process.cwd();
+        const resolvedPath = path19.isAbsolute(filePath) ? filePath : path19.resolve(baseDir, filePath);
+        if (MODULE_CACHE.has(resolvedPath)) {
+          return MODULE_CACHE.get(resolvedPath);
+        }
+        const src = fs21.readFileSync(resolvedPath, "utf-8");
+        const { lex: lex2 } = (init_lexer(), __toCommonJS(lexer_exports));
+        const { parse: parse3 } = (init_parser(), __toCommonJS(parser_exports));
+        const tokens = lex2(src, resolvedPath);
+        const ast = parse3(tokens);
+        const result = interp2.interpret(ast);
+        MODULE_CACHE.set(resolvedPath, result);
+        return result;
+      } catch (e) {
+        throw new Error(`require failed: '${modulePath}': ${e.message}`);
+      }
+    }
+    // Phase TCP: TCP Socket Support (synchronous via spawnSync)
+    case "net-sendrecv": {
+      const host = String(args3[0] ?? "localhost");
+      const port = Number(args3[1] ?? 27017);
+      const hexData = String(args3[2] ?? "");
+      const timeout = Number(args3[3] ?? 1e4);
+      const { spawnSync: spawnSync7 } = require("child_process");
+      const inlineScript = `
+const net = require('net');
+const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+const { host, port, data, timeout } = req;
+const buf = Buffer.from(data, 'hex');
+const sock = net.createConnection({ host, port });
+let chunks = [];
+let done = false;
+
+sock.on('connect', () => { sock.write(buf); });
+
+// Frame by messageLength: MongoDB Wire Protocol messages start with 4-byte length (little-endian)
+sock.on('data', c => {
+  chunks.push(c);
+  if (!done && chunks.length > 0) {
+    const total = Buffer.concat(chunks);
+    if (total.length >= 4) {
+      const msgLen = total.readInt32LE(0);
+      if (total.length >= msgLen) {
+        done = true;
+        sock.destroy();
+        process.stdout.write(total.slice(0, msgLen).toString('hex'));
+        process.exit(0);
+      }
+    }
+  }
+});
+
+sock.on('end', () => {
+  if (!done && chunks.length > 0) {
+    process.stdout.write(Buffer.concat(chunks).toString('hex'));
+  }
+  process.exit(0);
+});
+
+sock.on('error', (e) => { process.exit(1); });
+
+sock.setTimeout(timeout, () => {
+  if (!done) {
+    sock.destroy();
+    if (chunks.length > 0) {
+      process.stdout.write(Buffer.concat(chunks).toString('hex'));
+    }
+    process.exit(0);
+  }
+});
+`;
+      const reqJson = JSON.stringify({ host, port, data: hexData, timeout });
+      try {
+        const r = spawnSync7(
+          process.execPath,
+          ["-e", inlineScript],
+          { input: reqJson, timeout: timeout + 1e3, encoding: "utf-8" }
+        );
+        if (r.error || r.status !== 0) return null;
+        const out = (r.stdout ?? "").trim();
+        return out.length > 0 ? out : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    case "net-connect": {
+      const host = String(args3[0] ?? "localhost");
+      const port = Number(args3[1] ?? 27017);
+      const timeout = Number(args3[2] ?? 5e3);
+      const { spawnSync: spawnSync7 } = require("child_process");
+      const inlineScript = `
+const net = require('net');
+const req = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+const sock = net.createConnection({ host: req.host, port: req.port });
+sock.on('connect', () => { sock.destroy(); process.stdout.write('ok'); process.exit(0); });
+sock.on('error', () => { process.exit(1); });
+sock.setTimeout(req.timeout, () => { sock.destroy(); process.exit(1); });
+`;
+      try {
+        const r = spawnSync7(
+          process.execPath,
+          ["-e", inlineScript],
+          { input: JSON.stringify({ host, port, timeout }), timeout: timeout + 500, encoding: "utf-8" }
+        );
+        if (r.error || r.status !== 0) return null;
+        return `${host}:${port}`;
+      } catch (e) {
+        return null;
+      }
+    }
+    // net-sendrecv-pool: persistent TCP connection pool via Worker Thread
+    // args: host port hexData timeout
+    // Returns hex response or null
+    case "net-sendrecv-pool": {
+      const host = String(args3[0] ?? "localhost");
+      const port = Number(args3[1] ?? 27017);
+      const hexData = String(args3[2] ?? "");
+      const timeout = Number(args3[3] ?? 1e4);
+      if (!globalThis.__netPoolWorker) {
+        const { Worker: NetWorker } = require("worker_threads");
+        const netCtrlBuf = new SharedArrayBuffer(4);
+        const netDataBuf = new SharedArrayBuffer(8 * 1024 * 1024);
+        Atomics.store(new Int32Array(netCtrlBuf), 0, 0);
+        const netWorkerCode = `
+const { workerData } = require('worker_threads');
+const net = require('net');
+const control = new Int32Array(workerData.controlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const sockets = new Map(); // key=host:port, value=socket
+
+function getSocket(host, port) {
+  const key = host + ':' + port;
+  if (sockets.has(key)) {
+    const s = sockets.get(key);
+    if (!s.destroyed && s.writable) return Promise.resolve(s);
+    sockets.delete(key);
+  }
+  return new Promise((resolve, reject) => {
+    const sock = net.createConnection({ host, port });
+    sock.on('connect', () => {
+      sockets.set(key, sock);
+      resolve(sock);
+    });
+    sock.on('error', reject);
+    sock.on('close', () => sockets.delete(key));
+    setTimeout(() => reject(new Error('connect timeout')), 5000);
+  });
+}
+
+function sendRecv(host, port, hexPayload, timeout) {
+  return new Promise(async (resolve, reject) => {
+    let sock;
+    try { sock = await getSocket(host, port); } catch(e) { return reject(e); }
+    const buf = Buffer.from(hexPayload, 'hex');
+    let chunks = [];
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) { done = true; resolve(null); }
+    }, timeout);
+    const onData = (chunk) => {
+      chunks.push(chunk);
+      const total = Buffer.concat(chunks);
+      if (total.length >= 4) {
+        const msgLen = total.readInt32LE(0);
+        if (total.length >= msgLen) {
+          done = true;
+          clearTimeout(timer);
+          sock.removeListener('data', onData);
+          resolve(total.slice(0, msgLen).toString('hex'));
+        }
+      }
+    };
+    sock.on('data', onData);
+    sock.write(buf);
+  });
+}
+
+async function loop() {
+  while (true) {
+    Atomics.wait(control, 0, 0);
+    const flag = Atomics.load(control, 0);
+    if (flag === -1) break;
+    const reqLen = data.readInt32LE(0);
+    const reqStr = data.toString('utf8', 4, 4 + reqLen);
+    let resp;
+    try {
+      const req = JSON.parse(reqStr);
+      const hexResp = await sendRecv(req.host, req.port, req.data, req.timeout || 10000);
+      resp = { ok: true, data: hexResp };
+    } catch(e) {
+      resp = { ok: false, error: e.message };
+    }
+    const respStr = JSON.stringify(resp);
+    data.writeInt32LE(respStr.length, 0);
+    data.write(respStr, 4, 'utf8');
+    Atomics.store(control, 0, 2);
+    Atomics.notify(control, 0);
+    Atomics.wait(control, 0, 2); // wait for main thread to acknowledge
+  }
+}
+loop().catch(e => {
+  Atomics.store(control, 0, -2);
+  Atomics.notify(control, 0);
+});
+`;
+        const netWorker = new NetWorker(netWorkerCode, {
+          eval: true,
+          workerData: { controlBuf: netCtrlBuf, dataBuf: netDataBuf }
+        });
+        netWorker.on("error", (e) => {
+          globalThis.__netPoolWorker = null;
+        });
+        globalThis.__netPoolWorker = netWorker;
+        globalThis.__netPoolCtrlBuf = netCtrlBuf;
+        globalThis.__netPoolDataBuf = netDataBuf;
+      }
+      const netCtrl = new Int32Array(globalThis.__netPoolCtrlBuf);
+      const netData = Buffer.from(globalThis.__netPoolDataBuf);
+      const reqStr = JSON.stringify({ host, port, data: hexData, timeout });
+      netData.writeInt32LE(reqStr.length, 0);
+      netData.write(reqStr, 4, "utf8");
+      Atomics.store(netCtrl, 0, 1);
+      Atomics.notify(netCtrl, 0);
+      const waitResult = Atomics.wait(netCtrl, 0, 1, timeout + 2e3);
+      if (waitResult === "timed-out") return null;
+      const respLen = netData.readInt32LE(0);
+      const resp = JSON.parse(netData.toString("utf8", 4, 4 + respLen));
+      Atomics.store(netCtrl, 0, 0);
+      if (!resp.ok) return null;
+      return resp.data;
+    }
+    // rpc-client-call: 바이너리 RPC 클라이언트 (Worker Thread + Pending Map)
+    // 헤더 9B: [Type 1B][Req_ID 2B LE][Func_ID 2B LE][Length 4B LE]
+    // args: host port fn_id args_json timeout?
+    case "rpc-client-call":
+    case "rpc_client_call": {
+      const _rHost = String(args3[0] ?? "localhost");
+      const _rPort = Number(args3[1] ?? 30390);
+      const _rFnId = Number(args3[2] ?? 0);
+      const _rArgs = typeof args3[3] === "string" ? args3[3] : JSON.stringify(args3[3] ?? null);
+      const _rTimeout = Number(args3[4] ?? 1e4);
+      if (!globalThis.__rpcClientWorker) {
+        const { Worker: RpcWorker } = require("worker_threads");
+        const rpcCtrlBuf = new SharedArrayBuffer(4);
+        const rpcDataBuf = new SharedArrayBuffer(8 * 1024 * 1024);
+        Atomics.store(new Int32Array(rpcCtrlBuf), 0, 0);
+        const rpcWorkerCode = `
+const { workerData } = require('worker_threads');
+const net = require('net');
+const control = new Int32Array(workerData.controlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const HEADER = 9;
+const T_REQ = 0x01, T_RES = 0x02;
+const MAX_PKT = 10 * 1024 * 1024;
+const conns = new Map(); // key \u2192 {socket, buf, pending}
+
+function encodeReq(req_id, fn_id, payload) {
+  const pb = Buffer.from(payload, 'utf8');
+  const h = Buffer.allocUnsafe(HEADER);
+  h[0] = T_REQ;
+  h.writeUInt16LE(req_id, 1);
+  h.writeUInt16LE(fn_id, 3);
+  h.writeUInt32LE(pb.length, 5);
+  return Buffer.concat([h, pb]);
+}
+
+function getConn(host, port) {
+  const key = host + ':' + port;
+  if (conns.has(key)) {
+    const c = conns.get(key);
+    if (!c.socket.destroyed && c.socket.writable) return Promise.resolve(c);
+    conns.delete(key);
+  }
+  return new Promise((resolve, reject) => {
+    const c = { socket: null, buf: Buffer.alloc(0), pending: new Map() };
+    c.socket = net.createConnection({ host, port });
+    c.socket.on('connect', () => { conns.set(key, c); resolve(c); });
+    c.socket.on('data', chunk => {
+      c.buf = Buffer.concat([c.buf, chunk]);
+      while (c.buf.length >= HEADER) {
+        const plen = c.buf.readUInt32LE(5);
+        if (plen > MAX_PKT) { c.socket.destroy(); conns.delete(key); return; }
+        if (c.buf.length < HEADER + plen) break;
+        const type = c.buf[0];
+        const rid  = c.buf.readUInt16LE(1);
+        const pay  = c.buf.slice(HEADER, HEADER + plen).toString('utf8');
+        c.buf = c.buf.slice(HEADER + plen);
+        if (type === T_RES && c.pending.has(rid)) {
+          const cb = c.pending.get(rid); c.pending.delete(rid); cb(pay);
+        }
+      }
+    });
+    c.socket.on('error', e => { reject(e); conns.delete(key); });
+    c.socket.on('close', () => conns.delete(key));
+    setTimeout(() => reject(new Error('connect timeout')), 5000);
+  });
+}
+
+function sendRpc(host, port, fn_id, req_id, argsJson, timeout) {
+  return new Promise(async (resolve, reject) => {
+    let c; try { c = await getConn(host, port); } catch(e) { return reject(e); }
+    const frame = encodeReq(req_id, fn_id, argsJson);
+    const timer = setTimeout(() => { c.pending.delete(req_id); reject(new Error('rpc timeout')); }, timeout);
+    c.pending.set(req_id, result => { clearTimeout(timer); resolve(result); });
+    c.socket.write(frame);
+  });
+}
+
+async function loop() {
+  let seq = 0;
+  while (true) {
+    Atomics.wait(control, 0, 0);
+    const flag = Atomics.load(control, 0);
+    if (flag === -1) break;
+    const rlen = data.readInt32LE(0);
+    const rstr = data.toString('utf8', 4, 4 + rlen);
+    let resp;
+    try {
+      const req = JSON.parse(rstr);
+      seq = (seq + 1) & 0xFFFF;
+      const rawResult = await sendRpc(req.host, req.port, req.fn_id, seq, req.args, req.timeout || 10000);
+      let result; try { result = JSON.parse(rawResult); } catch { result = rawResult; }
+      resp = { ok: true, result };
+    } catch(e) { resp = { ok: false, error: e.message }; }
+    const rs = JSON.stringify(resp);
+    data.writeInt32LE(rs.length, 0); data.write(rs, 4, 'utf8');
+    Atomics.store(control, 0, 2); Atomics.notify(control, 0);
+    Atomics.wait(control, 0, 2);
+  }
+}
+loop().catch(() => { Atomics.store(control, 0, -2); Atomics.notify(control, 0); });
+`;
+        const rpcWorker = new RpcWorker(rpcWorkerCode, {
+          eval: true,
+          workerData: { controlBuf: rpcCtrlBuf, dataBuf: rpcDataBuf }
+        });
+        rpcWorker.on("error", () => {
+          globalThis.__rpcClientWorker = null;
+        });
+        globalThis.__rpcClientWorker = rpcWorker;
+        globalThis.__rpcClientCtrlBuf = rpcCtrlBuf;
+        globalThis.__rpcClientDataBuf = rpcDataBuf;
+      }
+      const _rc = new Int32Array(globalThis.__rpcClientCtrlBuf);
+      const _rd = Buffer.from(globalThis.__rpcClientDataBuf);
+      const _rReqStr = JSON.stringify({ host: _rHost, port: _rPort, fn_id: _rFnId, args: _rArgs, timeout: _rTimeout });
+      _rd.writeInt32LE(_rReqStr.length, 0);
+      _rd.write(_rReqStr, 4, "utf8");
+      Atomics.store(_rc, 0, 1);
+      Atomics.notify(_rc, 0);
+      const _rWait = Atomics.wait(_rc, 0, 1, _rTimeout + 2e3);
+      if (_rWait === "timed-out") return null;
+      const _rRespLen = _rd.readInt32LE(0);
+      const _rResp = JSON.parse(_rd.toString("utf8", 4, 4 + _rRespLen));
+      Atomics.store(_rc, 0, 0);
+      if (!_rResp.ok) throw new Error(_rResp.error ?? "rpc error");
+      return _rResp.result;
+    }
+    // ── Capability Registry ────────────────────────────────────────────
+    // globalThis.__flCapRegistry: { [name]: { enabled: boolean, builtins: string[] } }
+    // self-host/bootstrap 동일 registry 사용. capability 단위로 enable/disable.
+    // Note: helpers are inlined per-case to avoid switch-jump TDZ issues.
+    // (capability-list) → ["tcp" "file" "http" "db" "process" ...]
+    case "capability-list": {
+      if (!globalThis.__flCapRegistry) globalThis.__flCapRegistry = { tcp: { enabled: true, builtins: ["tcp-server-start", "tcp-server-stop", "tcp-send", "tcp-server-running?", "fl-event-tick", "fl-event-drain", "fl-event-queue-size", "fl-error-drain", "fl-error-queue-size"] }, file: { enabled: true, builtins: ["file-read", "file-write", "file-append", "file-append-line", "file-exists?", "file-delete", "file-mkdir", "dir-list", "dir-exists?"] }, http: { enabled: true, builtins: ["http-get", "server-start", "server-html", "server-json", "server-status", "server-redirect", "server-file", "server-html-cookie", "server-set-cookie"] }, db: { enabled: true, builtins: ["db-query", "db-exec", "db-transaction"] }, process: { enabled: true, builtins: ["fl-env-get", "sleep", "now-ms", "uuid"] } };
+      return Object.keys(globalThis.__flCapRegistry);
+    }
+    // (capability-enabled? name) → true | false
+    case "capability-enabled?": {
+      if (!globalThis.__flCapRegistry) globalThis.__flCapRegistry = { tcp: { enabled: true, builtins: [] }, file: { enabled: true, builtins: [] }, http: { enabled: true, builtins: [] }, db: { enabled: true, builtins: [] }, process: { enabled: true, builtins: [] } };
+      const _capName = String(args3[0] ?? "");
+      return !!globalThis.__flCapRegistry[_capName]?.enabled;
+    }
+    // (capability-builtins name) → ["builtin1" ...]
+    case "capability-builtins": {
+      if (!globalThis.__flCapRegistry) return [];
+      const _capName = String(args3[0] ?? "");
+      return globalThis.__flCapRegistry[_capName]?.builtins ?? [];
+    }
+    // (capability-disable name) → "ok" | "not-found"
+    case "capability-disable": {
+      if (!globalThis.__flCapRegistry) return "not-found";
+      const _capName = String(args3[0] ?? "");
+      const _reg = globalThis.__flCapRegistry;
+      if (!_reg[_capName]) return "not-found";
+      _reg[_capName].enabled = false;
+      return "ok";
+    }
+    // (capability-enable name) → "ok" | "not-found"
+    case "capability-enable": {
+      if (!globalThis.__flCapRegistry) return "not-found";
+      const _capName = String(args3[0] ?? "");
+      const _reg = globalThis.__flCapRegistry;
+      if (!_reg[_capName]) return "not-found";
+      _reg[_capName].enabled = true;
+      return "ok";
+    }
+    // (capability-register name builtins) → "ok"
+    case "capability-register": {
+      if (!globalThis.__flCapRegistry) globalThis.__flCapRegistry = {};
+      const _capName = String(args3[0] ?? "");
+      const _builtins = Array.isArray(args3[1]) ? args3[1].map(String) : [];
+      globalThis.__flCapRegistry[_capName] = { enabled: true, builtins: _builtins };
+      return "ok";
+    }
+    // ── Event Queue + IO Error Queue (reactor model) ──────────────────
+    // IO layer enqueues; VM tick drains. Evaluator never entered from IO thread.
+    // event: { handler: string, args: any[], sock: any | null }
+    // io-error: ["io-err" severity source message] — nonfatal handler errors
+    // (fl-event-tick) → number (events processed: 0 or 1)
+    case "fl-event-tick": {
+      const _capReg1 = globalThis.__flCapRegistry;
+      if (_capReg1) {
+        for (const [_n, _c] of Object.entries(_capReg1)) {
+          if (_c.builtins.includes("fl-event-tick") && !_c.enabled) return `[capability-denied ${_n}]`;
+        }
+      }
+      const _q1 = globalThis.__flEventQueue ?? [];
+      if (_q1.length === 0) return 0;
+      const _ev1 = _q1.shift();
+      if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+      try {
+        const _r1 = interp2.callUserFunction(_ev1.handler, _ev1.args);
+        const _o1 = _r1 != null ? String(_r1) : "";
+        if (_o1 && _ev1.sock && !_ev1.sock.destroyed) try {
+          _ev1.sock.write(_o1.endsWith("\n") ? _o1 : _o1 + "\n");
+        } catch (we) {
+          globalThis.__flErrorQueue.push(["io-err", "recoverable", "write", we.message]);
+        }
+      } catch (e) {
+        const isFatal = e.message?.includes("Maximum call stack") || e.message?.includes("out of memory");
+        globalThis.__flErrorQueue.push(["io-err", isFatal ? "fatal" : "recoverable", "handler", e.message]);
+        if (_ev1.sock && !_ev1.sock.destroyed) try {
+          _ev1.sock.write(`ERR ${e.message}
+`);
+        } catch {
+        }
+      }
+      return 1;
+    }
+    // (fl-event-drain) → number (total events processed)
+    case "fl-event-drain": {
+      const _capReg2 = globalThis.__flCapRegistry;
+      if (_capReg2) {
+        for (const [_n, _c] of Object.entries(_capReg2)) {
+          if (_c.builtins.includes("fl-event-drain") && !_c.enabled) return `[capability-denied ${_n}]`;
+        }
+      }
+      const _q2 = globalThis.__flEventQueue ?? [];
+      if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+      let _cnt = 0;
+      while (_q2.length > 0) {
+        const _ev2 = _q2.shift();
+        _cnt++;
+        try {
+          const _r2 = interp2.callUserFunction(_ev2.handler, _ev2.args);
+          const _o2 = _r2 != null ? String(_r2) : "";
+          if (_o2 && _ev2.sock && !_ev2.sock.destroyed) try {
+            _ev2.sock.write(_o2.endsWith("\n") ? _o2 : _o2 + "\n");
+          } catch (we) {
+            globalThis.__flErrorQueue.push(["io-err", "recoverable", "write", we.message]);
+          }
+        } catch (e) {
+          const isFatal = e.message?.includes("Maximum call stack") || e.message?.includes("out of memory");
+          globalThis.__flErrorQueue.push(["io-err", isFatal ? "fatal" : "recoverable", "handler", e.message]);
+          if (_ev2.sock && !_ev2.sock.destroyed) try {
+            _ev2.sock.write(`ERR ${e.message}
+`);
+          } catch {
+          }
+        }
+      }
+      return _cnt;
+    }
+    // (fl-event-queue-size) → number
+    case "fl-event-queue-size": {
+      return (globalThis.__flEventQueue ?? []).length;
+    }
+    // (fl-error-drain) → [["io-err" severity source msg] ...]  clears error queue
+    case "fl-error-drain": {
+      const eq = globalThis.__flErrorQueue ?? [];
+      globalThis.__flErrorQueue = [];
+      return eq;
+    }
+    // (fl-error-queue-size) → number
+    case "fl-error-queue-size": {
+      return (globalThis.__flErrorQueue ?? []).length;
+    }
+    // (fl-error-fatal?) → true if any fatal error in queue
+    case "fl-error-fatal?": {
+      const eq = globalThis.__flErrorQueue ?? [];
+      return eq.some((e) => Array.isArray(e) && e[1] === "fatal");
+    }
+    // (fl-error-severity err) → "fatal" | "recoverable"
+    // err: ["io-err" severity source msg]
+    case "fl-error-severity": {
+      const e = args3[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[1]) : null;
+    }
+    // (fl-error-source err) → "queue-overflow" | "handler" | "write"
+    case "fl-error-source": {
+      const e = args3[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[2]) : null;
+    }
+    // (fl-error-message err) → message string
+    case "fl-error-message": {
+      const e = args3[0];
+      return Array.isArray(e) && e[0] === "io-err" ? String(e[3]) : null;
+    }
+    // (fl-error-filter severity) → errors matching severity, clears them from queue
+    // severity: "fatal" | "recoverable" | "all"
+    case "fl-error-filter": {
+      const sev = String(args3[0] ?? "all");
+      const eq = globalThis.__flErrorQueue ?? [];
+      if (sev === "all") {
+        globalThis.__flErrorQueue = [];
+        return eq;
+      }
+      const matched = eq.filter((e) => Array.isArray(e) && e[1] === sev);
+      globalThis.__flErrorQueue = eq.filter((e) => !(Array.isArray(e) && e[1] === sev));
+      return matched;
+    }
+    // (fl-queue-cap) → current cap
+    // (fl-queue-cap n) → set cap to n, return old cap
+    case "fl-queue-cap": {
+      const prev = globalThis.__flQueueCap ?? 1e4;
+      if (args3[0] != null) {
+        const n = Number(args3[0]);
+        if (n > 0) globalThis.__flQueueCap = n;
+      }
+      return prev;
+    }
+    // ── TCP Server (FL-Cache / raw TCP daemon) ────────────────────────
+    // registry: { [port]: { server, sockets: Set, stopped: boolean } }
+    // IO data → __flEventQueue (never calls evaluator directly)
+    // (tcp-server-start port handler-name) → "ok" | "already-running" | "[capability-denied tcp]"
+    case "tcp-server-start": {
+      const _capReg3 = globalThis.__flCapRegistry;
+      if (_capReg3) {
+        for (const [_n, _c] of Object.entries(_capReg3)) {
+          if (_c.builtins.includes("tcp-server-start") && !_c.enabled) return `[capability-denied ${_n}]`;
+        }
+      }
+      const port = Number(args3[0] ?? 30390);
+      const handlerName = String(args3[1] ?? "");
+      const reg = globalThis.__tcpServers ?? {};
+      if (!globalThis.__tcpServers) globalThis.__tcpServers = reg;
+      if (reg[port] && !reg[port].stopped) return "already-running";
+      if (!globalThis.__flEventQueue) globalThis.__flEventQueue = [];
+      const net2 = require("net");
+      const entry = { server: null, sockets: /* @__PURE__ */ new Set(), stopped: false };
+      reg[port] = entry;
+      let connSeq = 0;
+      entry.server = net2.createServer((sock) => {
+        if (entry.stopped) {
+          sock.destroy();
+          return;
+        }
+        const connId = `conn_${++connSeq}`;
+        entry.sockets.add(sock);
+        sock.setEncoding("utf8");
+        let buf = "";
+        sock.on("data", (chunk) => {
+          if (entry.stopped) {
+            sock.destroy();
+            return;
+          }
+          buf += chunk;
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            const _q = globalThis.__flEventQueue;
+            const _cap = globalThis.__flQueueCap ?? 1e4;
+            if (_q.length >= _cap) {
+              if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+              globalThis.__flErrorQueue.push(["io-err", "fatal", "queue-overflow", `queue full (cap=${_cap}), dropping event from ${connId}`]);
+              if (sock && !sock.destroyed) try {
+                sock.write(`ERR queue-overflow
+`);
+              } catch {
+              }
+            } else {
+              _q.push({ handler: handlerName, args: [connId, trimmed], sock });
+            }
+          }
+        });
+        sock.on("close", () => entry.sockets.delete(sock));
+        sock.on("error", () => {
+          entry.sockets.delete(sock);
+          sock.destroy();
+        });
+      });
+      entry.server.listen(port, "0.0.0.0");
+      entry.server.on("error", () => {
+        entry.stopped = true;
+        delete reg[port];
+      });
+      return "ok";
+    }
+    // (tcp-server-stop port) → "ok" | "not-running"
+    case "tcp-server-stop": {
+      const port = Number(args3[0] ?? 30390);
+      const reg = globalThis.__tcpServers ?? {};
+      const entry = reg[port];
+      if (!entry || entry.stopped) return "not-running";
+      entry.stopped = true;
+      for (const sock of entry.sockets) {
+        try {
+          sock.destroy();
+        } catch {
+        }
+      }
+      entry.sockets.clear();
+      entry.server.close();
+      delete reg[port];
+      return "ok";
+    }
+    // (tcp-send host port line) → response-string | nil
+    // 단순 line 기반 요청-응답 (한 줄 송신 → 한 줄 수신)
+    case "tcp-send": {
+      const host = String(args3[0] ?? "localhost");
+      const port = Number(args3[1] ?? 30390);
+      const line = String(args3[2] ?? "");
+      const timeout = Number(args3[3] ?? 3e3);
+      const { spawnSync: spawnSync7 } = require("child_process");
+      const script = `
+const net = require('net');
+const r = JSON.parse(require('fs').readFileSync(0,'utf8'));
+const sock = net.createConnection({host:r.host,port:r.port});
+let resp='',done=false;
+sock.setEncoding('utf8');
+sock.on('connect',()=>sock.write(r.line+(r.line.endsWith('\\n')?'':'\\n')));
+sock.on('data',c=>{resp+=c;if(resp.includes('\\n')&&!done){done=true;sock.destroy();process.stdout.write(resp.trim());process.exit(0);}});
+sock.on('error',()=>process.exit(1));
+sock.setTimeout(r.timeout,()=>{if(!done){sock.destroy();if(resp)process.stdout.write(resp.trim());process.exit(resp?0:1);}});
+`;
+      try {
+        const r = spawnSync7(process.execPath, ["-e", script], {
+          input: JSON.stringify({ host, port, line, timeout }),
+          timeout: timeout + 500,
+          encoding: "utf-8"
+        });
+        if (r.error || r.status !== 0) return null;
+        const out = (r.stdout ?? "").trim();
+        return out.length ? out : null;
+      } catch {
+        return null;
+      }
+    }
+    // (tcp-server-running? port) → true | false
+    case "tcp-server-running?": {
+      const port = Number(args3[0] ?? 30390);
+      const entry = globalThis.__tcpServers?.[port];
+      return !!(entry && !entry.stopped);
+    }
+    // (tcp-server-raw port "handler") → "ok"
+    // raw chunk TCP 서버. 핸들러 호출 규약 (항상 3 인자):
+    //   handler("connect", connId, "")       — 신규 연결
+    //   handler("data",    connId, chunk)    — raw 데이터 수신 (binary encoding)
+    //   handler("close",   connId, "")       — 연결 종료
+    case "tcp-server-raw": {
+      const _rrCapReg = globalThis.__flCapRegistry;
+      if (_rrCapReg) {
+        for (const [_n, _c] of Object.entries(_rrCapReg)) {
+          if (_c.builtins.includes("tcp-server-raw") && !_c.enabled) return `[capability-denied ${_n}]`;
+        }
+      }
+      const _rrPort = Number(args3[0] ?? 30390);
+      const _rrHandler = String(args3[1] ?? "");
+      const _rrReg = globalThis.__tcpServers ?? {};
+      if (!globalThis.__tcpServers) globalThis.__tcpServers = _rrReg;
+      if (_rrReg[_rrPort] && !_rrReg[_rrPort].stopped) return "already-running";
+      if (!globalThis.__flEventQueue) globalThis.__flEventQueue = [];
+      if (!globalThis.__flConnSocks) globalThis.__flConnSocks = {};
+      const _rrNet = require("net");
+      const _rrEntry = { server: null, sockets: /* @__PURE__ */ new Set(), stopped: false };
+      _rrReg[_rrPort] = _rrEntry;
+      let _rrSeq = 0;
+      _rrEntry.server = _rrNet.createServer((sock) => {
+        if (_rrEntry.stopped) {
+          sock.destroy();
+          return;
+        }
+        const _rrConnId = `conn_${++_rrSeq}`;
+        _rrEntry.sockets.add(sock);
+        globalThis.__flConnSocks[_rrConnId] = sock;
+        const _rrEnq = (evArgs) => {
+          try {
+            callFnVal(_rrHandler, evArgs);
+          } catch (e) {
+            if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+            globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e.message ?? e)]);
+          }
+        };
+        _rrEnq(["connect", _rrConnId, ""]);
+        sock.on("data", (chunk) => {
+          if (_rrEntry.stopped) return;
+          _rrEnq(["data", _rrConnId, chunk.toString("binary")]);
+        });
+        const _rrOnEnd = () => {
+          _rrEntry.sockets.delete(sock);
+          delete globalThis.__flConnSocks[_rrConnId];
+          _rrEnq(["close", _rrConnId, ""]);
+        };
+        sock.on("close", _rrOnEnd);
+        sock.on("error", _rrOnEnd);
+      });
+      _rrEntry.server.listen(_rrPort, "0.0.0.0");
+      _rrEntry.server.on("error", () => {
+        _rrEntry.stopped = true;
+        delete _rrReg[_rrPort];
+      });
+      return "ok";
+    }
+    // (tcp-outbound host port "handler") → upstream-id (즉시 반환, 연결은 비동기)
+    // __ensureIoWorker() 기반 (YIELD-SEMANTICS.fds INV-3, INV-4 준수).
+    //   handler("connect", upstreamId, "")         — 연결 성공
+    //   handler("data",    upstreamId, hexChunk)    — 응답 수신 (hex string)
+    //   handler("close",   upstreamId, "")          — 종료
+    //   handler("error",   upstreamId, message)     — 연결 실패
+    case "tcp-outbound": {
+      const _obHost = String(args3[0] ?? "localhost");
+      const _obPort = Number(args3[1] ?? 80);
+      const _obHandler = String(args3[2] ?? "");
+      __ensureIoWorker();
+      if (!globalThis.__ioUpstreams) {
+        globalThis.__ioUpstreams = /* @__PURE__ */ new Set();
+        globalThis.__ioUpstreamSeq = 0;
+      }
+      const _upId = `upstream_${++globalThis.__ioUpstreamSeq}`;
+      globalThis.__ioUpstreams.add(_upId);
+      globalThis.__ioWorker.postMessage({ cmd: "tcp-outbound", id: _upId, host: _obHost, port: _obPort, handler: _obHandler });
+      return _upId;
+    }
+    // (tcp-write conn-id data) → "ok" | "error" | "not-found"
+    // IO Worker 아웃바운드(__ioUpstreams), 인바운드(__flConnSocks), 구형(__flUpstreams)
+    case "tcp-write": {
+      const _twId = String(args3[0] ?? "");
+      const _twData = String(args3[1] ?? "");
+      if (globalThis.__ioUpstreams?.has(_twId)) {
+        globalThis.__ioWorker?.postMessage({ cmd: "tcp-write", id: _twId, hex: Buffer.from(_twData, "binary").toString("hex") });
+        return "ok";
+      }
+      const _twSock = globalThis.__flConnSocks?.[_twId] ?? globalThis.__flUpstreams?.[_twId];
+      if (!_twSock || _twSock.destroyed) return "not-found";
+      try {
+        _twSock.write(Buffer.from(_twData, "binary"));
+        return "ok";
+      } catch (e) {
+        if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+        globalThis.__flErrorQueue.push(["io-err", "recoverable", "write", `${_twId}: ${String(e.message)}`]);
+        return "error";
+      }
+    }
+    // (tcp-drop conn-id) → "ok" | "not-found"
+    case "tcp-drop": {
+      const _tdId = String(args3[0] ?? "");
+      if (globalThis.__ioUpstreams?.has(_tdId)) {
+        globalThis.__ioUpstreams.delete(_tdId);
+        globalThis.__ioWorker?.postMessage({ cmd: "tcp-drop", id: _tdId });
+        return "ok";
+      }
+      const _tdIn = globalThis.__flConnSocks?.[_tdId];
+      if (_tdIn) {
+        try {
+          _tdIn.destroy();
+        } catch {
+        }
+        delete globalThis.__flConnSocks[_tdId];
+        return "ok";
+      }
+      const _tdOut = globalThis.__flUpstreams?.[_tdId];
+      if (_tdOut) {
+        try {
+          _tdOut.destroy();
+        } catch {
+        }
+        delete globalThis.__flUpstreams[_tdId];
+        return "ok";
+      }
+      return "not-found";
+    }
+    // (fl-set-interval ms "handler-name") → interval-id
+    // Node.js setInterval로 주기적으로 FL 핸들러 호출. 이벤트 루프 비블로킹.
+    case "fl-set-interval": {
+      const _siMs = Math.max(1, Number(args3[0] ?? 1e3));
+      const _siHandler = String(args3[1] ?? "");
+      if (!globalThis.__flIntervals) globalThis.__flIntervals = {};
+      if (!globalThis.__flIntervalSeq) globalThis.__flIntervalSeq = 0;
+      const _siId = `interval_${++globalThis.__flIntervalSeq}`;
+      const _siHandle = setInterval(() => {
+        try {
+          if (_siHandler) callFnVal(_siHandler, []);
+        } catch (e) {
+          if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+          globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e.message ?? e)]);
+        }
+      }, _siMs);
+      globalThis.__flIntervals[_siId] = _siHandle;
+      return _siId;
+    }
+    // (fl-clear-interval interval-id) → "ok" | "not-found"
+    case "fl-clear-interval": {
+      const _ciId = String(args3[0] ?? "");
+      const _ciHandle = globalThis.__flIntervals?.[_ciId];
+      if (!_ciHandle) return "not-found";
+      clearInterval(_ciHandle);
+      delete globalThis.__flIntervals[_ciId];
+      return "ok";
+    }
+    // ── fl-yield — Scheduler Tick (YIELD-SEMANTICS.fds Scheduler Tick Model) ──
+    // SAB ctrl layout (YIELD-SPEC 4-slot):
+    //   ctrl[0]=writePos, ctrl[1]=readPos, ctrl[2]=notify(Atomics.wait), ctrl[3]=reserved
+    // Tick sequence: Atomics.wait(ctrl,2,0,ms) → drain readPos~writePos → callFnVal
+    // (fl-yield [timeout-ms]) → number (처리된 이벤트 수)
+    case "fl-yield": {
+      const _fyMs = Math.max(0, Number(args3[0] ?? 1));
+      if (!globalThis.__ioWorker) return 0;
+      const _fyCtrl = new Int32Array(globalThis.__ioCtrlBuf);
+      const _fyBuf = Buffer.from(globalThis.__ioDataBuf);
+      Atomics.wait(_fyCtrl, IO_SLOT_NOTIFY, 0, _fyMs);
+      Atomics.store(_fyCtrl, IO_SLOT_NOTIFY, 0);
+      const _fyEvents = [];
+      let _fyRp = Atomics.load(_fyCtrl, IO_SLOT_READ);
+      const _fyWp = Atomics.load(_fyCtrl, IO_SLOT_WRITE);
+      while (_fyRp !== _fyWp) {
+        const _fyLen = _fyBuf.readUInt32LE(_fyRp);
+        if (_fyLen === 4294967295) {
+          _fyRp = 0;
+          continue;
+        }
+        if (_fyLen === 0 || _fyRp + 4 + _fyLen > IO_DATA_SIZE) break;
+        try {
+          _fyEvents.push(JSON.parse(_fyBuf.toString("utf8", _fyRp + 4, _fyRp + 4 + _fyLen)));
+        } catch {
+        }
+        _fyRp += 4 + _fyLen;
+        if (_fyRp >= IO_DATA_SIZE) _fyRp = 0;
+      }
+      Atomics.store(_fyCtrl, IO_SLOT_READ, _fyRp);
+      let _fyCnt = 0;
+      for (const _fyEv of _fyEvents) {
+        const _fyEvType = _fyEv.ev;
+        const _fyHandler = _fyEv.handler;
+        if (!_fyHandler) continue;
+        const _fyData = _fyEvType === "data" ? Buffer.from(_fyEv.hex ?? "", "hex").toString("binary") : _fyEv.msg ?? "";
+        try {
+          callFnVal(_fyHandler, [_fyEvType, _fyEv.id, _fyData]);
+          _fyCnt++;
+        } catch (e) {
+          if (!globalThis.__flErrorQueue) globalThis.__flErrorQueue = [];
+          globalThis.__flErrorQueue.push(["io-err", "recoverable", "handler", String(e.message ?? e)]);
+        }
+      }
+      return _fyCnt;
+    }
+    // Arithmetic
+    case "+": {
+      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (bi >= 0) {
+        const t = flTypeOf(args3[bi]);
+        const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
+        throw new Error(`[E_TYPE_MISMATCH] +: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
+      }
+      return args3.reduce((a, b) => a + b, 0);
+    }
+    case "-": {
+      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (bi >= 0) {
+        const t = flTypeOf(args3[bi]);
+        const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
+        throw new Error(`[E_TYPE_MISMATCH] -: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
+      }
+      return args3.length === 1 ? -args3[0] : args3.reduce((a, b) => a - b);
+    }
+    case "*": {
+      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (bi >= 0) {
+        const t = flTypeOf(args3[bi]);
+        const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
+        throw new Error(`[E_TYPE_MISMATCH] *: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
+      }
+      return args3.reduce((a, b) => a * b, 1);
+    }
+    case "/": {
+      const bi = args3.findIndex((v) => v === null || v === void 0 || typeof v !== "number");
+      if (bi >= 0) {
+        const t = flTypeOf(args3[bi]);
+        const h = t === "nil" ? "(nil? \uD655\uC778 \uD6C4 \uAE30\uBCF8\uAC12 \uC0AC\uC6A9)" : "(str-to-num \uBCC0\uD658 \uD655\uC778)";
+        throw new Error(`[E_TYPE_MISMATCH] /: \uC778\uC790 ${bi + 1}\uBC88\uC5D0 ${t} \uC804\uB2EC\uB428 \u2014 number \uD544\uC694 ${h}`);
+      }
+      return args3.length === 1 ? 1 / args3[0] : args3.reduce((a, b) => a / b);
+    }
+    case "%":
+      return args3[0] % args3[1];
+    // Comparison
+    case "=":
+      return flDeepEq(args3[0], args3[1]);
+    case "<":
+      return args3[0] < args3[1];
+    case ">":
+      return args3[0] > args3[1];
+    case "<=":
+      return args3[0] <= args3[1];
+    case ">=":
+      return args3[0] >= args3[1];
+    case "!=":
+    case "not=":
+      return args3[0] !== args3[1];
+    // Logical (evaluated versions — unevaluated short-circuit is in eval-special-forms.ts)
+    case "and":
+      return args3.every((a) => a);
+    case "or": {
+      const flFalsy3 = (v) => v === null || v === void 0 || v === false;
+      for (const a of args3) {
+        if (!flFalsy3(a)) return a;
+      }
+      return args3.length > 0 ? args3[args3.length - 1] : null;
+    }
+    case "not":
+      return !args3[0];
+    // Output
+    case "print":
+      process.stdout.write(args3.map((a) => toDisplay2(a)).join(" "));
+      return null;
+    case "println":
+    case "echo":
+      process.stdout.write(args3.map((a) => toDisplay2(a)).join(" ") + "\n");
+      return null;
+    case "tap":
+    case "dbg": {
+      const label = args3.length > 1 ? String(args3[0]) + " " : "";
+      const val = args3.length > 1 ? args3[1] : args3[0];
+      process.stderr.write("[tap] " + label + toDisplay2(val) + "\n");
+      return val;
+    }
+    case "debug": {
+      const hasLabel = args3.length > 1;
+      const debugLabel = hasLabel ? String(args3[0]) : "";
+      const debugVal = hasLabel ? args3[1] : args3[0];
+      const debugPrefix = debugLabel ? `[DEBUG ${debugLabel}]` : "[DEBUG]";
+      process.stderr.write(`${debugPrefix} ${toDisplay2(debugVal)}
+`);
+      recordEvent({
+        type: "debug",
+        timestamp: Date.now(),
+        file: interp2.currentFilePath,
+        line: expr2.line ?? interp2.currentLine,
+        label: debugLabel || void 0,
+        value: debugVal
+      });
+      return debugVal;
+    }
+    case "runtime-events": {
+      if (args3.length === 0) return getEvents();
+      const reOpts = {};
+      for (let i = 0; i + 1 < args3.length; i += 2) {
+        const k = String(args3[i]).replace(/^:/, "");
+        reOpts[k] = args3[i + 1];
+      }
+      let reEvs = getEvents();
+      if (reOpts.type !== void 0) {
+        const t = String(reOpts.type).replace(/^:/, "");
+        reEvs = reEvs.filter((e) => e.type === t);
+      }
+      if (reOpts.label !== void 0) {
+        const l = String(reOpts.label);
+        reEvs = reEvs.filter((e) => e.label === l);
+      }
+      if (reOpts.last !== void 0) {
+        const n = Number(reOpts.last);
+        if (!isNaN(n) && n > 0) reEvs = reEvs.slice(-n);
+      }
+      if (reOpts.severity !== void 0) {
+        const sevRank = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
+        const minR = sevRank[String(reOpts.severity).replace(/^:/, "")] ?? 0;
+        reEvs = reEvs.filter((e) => (sevRank[e.severity ?? "info"] ?? 0) >= minR);
+      }
+      return reEvs;
+    }
+    case "clear-runtime-events":
+      clearEvents();
+      return null;
+    case "runtime-summary": {
+      const rsEvs = getEvents();
+      const rsTrace = rsEvs.filter((e) => e.type === "trace");
+      const rsTms = rsTrace.map((e) => e.elapsedMs ?? 0);
+      const rsAvg = rsTms.length ? Math.round(rsTms.reduce((a, b) => a + b, 0) / rsTms.length) : null;
+      const rsMax = rsTms.length ? Math.max(...rsTms) : null;
+      const rsSevCounts = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rsEvs) rsSevCounts[e.severity ?? "info"] = (rsSevCounts[e.severity ?? "info"] ?? 0) + 1;
+      const rsCollapsed = rsEvs.filter((e) => e.collapsed).length;
+      const result = {
+        "event-count": rsEvs.length,
+        "debug-count": rsEvs.filter((e) => e.type === "debug").length,
+        "trace-count": rsTrace.length,
+        "assert-fail-count": rsEvs.filter((e) => e.type === "assert-fail").length,
+        "runtime-error-count": rsEvs.filter((e) => e.type === "runtime-error").length,
+        "severity-counts": rsSevCounts,
+        "collapsed-count": rsCollapsed
+      };
+      if (rsAvg !== null) result["avg-trace-ms"] = rsAvg;
+      if (rsMax !== null) result["max-trace-ms"] = rsMax;
+      return result;
+    }
+    case "runtime-analyze": {
+      const raEvs = getEvents();
+      const issues = [];
+      const nilErrors = raEvs.filter(
+        (e) => e.type === "runtime-error" && (e.message?.includes("nil") || e.message?.includes("null") || e.message?.includes("Cannot read") || e.errorKind?.includes("nil"))
+      );
+      if (nilErrors.length >= 2) {
+        issues.push({
+          "likely-cause": "nil-instability",
+          "confidence": Math.min(0.5 + nilErrors.length * 0.15, 0.99),
+          "message": `Repeated nil-access detected (${nilErrors.length}\uD68C)`,
+          "suggestion": "(nil? x) \uD655\uC778 \uB610\uB294 assert \uCD94\uAC00",
+          "evidence-count": nilErrors.length
+        });
+      }
+      const slowTraces = raEvs.filter((e) => e.type === "trace" && (e.elapsedMs ?? 0) > 100);
+      if (slowTraces.length > 0) {
+        const maxMs = Math.max(...slowTraces.map((e) => e.elapsedMs ?? 0));
+        issues.push({
+          "likely-cause": "slow-operation",
+          "confidence": 0.85,
+          "message": `Trace latency high (max: ${maxMs}ms, count: ${slowTraces.length})`,
+          "hotspot": slowTraces.reduce((a, e) => (e.elapsedMs ?? 0) > (a.elapsedMs ?? 0) ? e : a).expr ?? "?",
+          "suggestion": "I/O \uBCD1\uBAA9 \uD655\uC778 \uB610\uB294 \uCE90\uC2DC \uC801\uC6A9"
+        });
+      }
+      const assertFails = raEvs.filter((e) => e.type === "assert-fail");
+      if (assertFails.length >= 3) {
+        issues.push({
+          "likely-cause": "assertion-storm",
+          "confidence": 0.9,
+          "message": `Multiple assertion failures (${assertFails.length}\uD68C)`,
+          "suggestion": "\uB370\uC774\uD130 \uD750\uB984 \uAC80\uD1A0 \uD544\uC694",
+          "evidence-count": assertFails.length
+        });
+      }
+      const runtimeErrors = raEvs.filter((e) => e.type === "runtime-error");
+      if (runtimeErrors.length >= 5) {
+        issues.push({
+          "likely-cause": "error-spike",
+          "confidence": Math.min(0.6 + runtimeErrors.length * 0.05, 0.99),
+          "message": `High runtime-error rate (${runtimeErrors.length}\uD68C)`,
+          "suggestion": "\uC5D0\uB7EC \uC6D0\uC778 \uD074\uB7EC\uC2A4\uD130\uB9C1 \uD6C4 \uADFC\uBCF8 \uC218\uC815 \uD544\uC694",
+          "evidence-count": runtimeErrors.length
+        });
+      }
+      if (issues.length === 0) {
+        return [{ "likely-cause": "healthy", "confidence": 1, "message": "\uC774\uC0C1 \uD328\uD134 \uC5C6\uC74C" }];
+      }
+      return issues;
+    }
+    case "save-runtime-events": {
+      const savePath = String(args3[0]);
+      const saveFs = require("fs");
+      saveFs.writeFileSync(savePath, JSON.stringify(getEvents(), null, 2), "utf-8");
+      return savePath;
+    }
+    case "load-runtime-events": {
+      const loadPath = String(args3[0]);
+      const loadFs = require("fs");
+      const loaded = JSON.parse(loadFs.readFileSync(loadPath, "utf-8"));
+      clearEvents();
+      for (const ev2 of loaded) recordEvent(ev2);
+      return loaded.length;
+    }
+    case "runtime-diff": {
+      const rdA = Array.isArray(args3[0]) ? args3[0] : [];
+      const rdB = Array.isArray(args3[1]) ? args3[1] : [];
+      const rdSum = (evs) => {
+        const tms = evs.filter((e) => e.type === "trace").map((e) => e.elapsedMs ?? 0);
+        return {
+          total: evs.length,
+          errors: evs.filter((e) => e.type === "runtime-error").length,
+          fails: evs.filter((e) => e.type === "assert-fail").length,
+          avgMs: tms.length ? Math.round(tms.reduce((a, b) => a + b, 0) / tms.length) : 0
+        };
+      };
+      const sA = rdSum(rdA);
+      const sB = rdSum(rdB);
+      return {
+        "improvement": sB.errors < sA.errors,
+        "runtime-error-delta": sB.errors - sA.errors,
+        "assert-fail-delta": sB.fails - sA.fails,
+        "trace-ms-delta": sB.avgMs - sA.avgMs,
+        "event-count-delta": sB.total - sA.total,
+        "summary-a": { "runtime-errors": sA.errors, "avg-trace-ms": sA.avgMs },
+        "summary-b": { "runtime-errors": sB.errors, "avg-trace-ms": sB.avgMs }
+      };
+    }
+    case "runtime-health": {
+      const rhEvs = getEvents();
+      const total = rhEvs.length || 1;
+      const errorCount = rhEvs.filter((e) => e.type === "runtime-error").length;
+      const failCount = rhEvs.filter((e) => e.type === "assert-fail").length;
+      const violations = rhEvs.filter((e) => e.type === "contract-violation");
+      const traceCount = rhEvs.filter((e) => e.type === "trace").length;
+      const collapseCount = rhEvs.filter((e) => e.collapsed).length;
+      let score = 1;
+      score -= (errorCount + failCount) / total * 0.4;
+      score -= violations.length / Math.max(total, 10) * 0.3;
+      if (traceCount > 100) score -= Math.min(0.2, (traceCount - 100) / 500);
+      if (collapseCount > 5) score -= Math.min(0.1, (collapseCount - 5) / 100);
+      score = Math.round(Math.max(0, Math.min(1, score)) * 100) / 100;
+      const recentBurstCount = violations.filter((e) => {
+        return Date.now() - e.timestamp < 1e4;
+      }).length;
+      autoTransitionMode(score, recentBurstCount);
+      const status = score >= 0.9 ? "healthy" : score >= 0.7 ? "degraded" : score >= 0.5 ? "warning" : "critical";
+      const warnCount = rhEvs.filter((e) => e.severity === "warn").length;
+      const errCount = rhEvs.filter((e) => e.severity === "error" || e.severity === "fatal").length;
+      return {
+        "score": score,
+        "status": status,
+        "mode": getRuntimeMode(),
+        "warnings": warnCount,
+        "errors": errCount,
+        "recent-contract-violations": violations.slice(-5).map((e) => ({
+          "contract": e.contractName,
+          "message": e.message,
+          "severity": e.severity
+        }))
+      };
+    }
+    // ── Phase 10: Persistent Runtime Memory ───────────────────────────────
+    case "runtime-store-save": {
+      const rstPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      const rstEvs = getEvents();
+      const rstSummaryEvs = rstEvs.filter((e) => e.type === "trace");
+      const rstMs = rstSummaryEvs.map((e) => e.elapsedMs ?? 0);
+      const rstSev = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      for (const e of rstEvs) rstSev[e.severity ?? "info"] = (rstSev[e.severity ?? "info"] ?? 0) + 1;
+      const rstSummary = {
+        "event-count": rstEvs.length,
+        "trace-count": rstSummaryEvs.length,
+        "runtime-error-count": rstEvs.filter((e) => e.type === "runtime-error").length,
+        "assert-fail-count": rstEvs.filter((e) => e.type === "assert-fail").length,
+        "severity-counts": rstSev,
+        "avg-trace-ms": rstMs.length ? Math.round(rstMs.reduce((a, b) => a + b, 0) / rstMs.length) : null,
+        "max-trace-ms": rstMs.length ? Math.max(...rstMs) : null
+      };
+      const rstViolations = [];
+      const rstViolMap = {};
+      for (const e of rstEvs) {
+        if (e.type === "contract-violation" && e.contractName) {
+          rstViolMap[e.contractName] = (rstViolMap[e.contractName] ?? 0) + 1;
+        }
+      }
+      for (const [cn, cnt] of Object.entries(rstViolMap)) rstViolations.push({ contractName: cn, count: cnt });
+      const rstNow = Date.now();
+      storeAppendRun({
+        runId: newRunId(),
+        startMs: rstEvs.length > 0 ? rstEvs[0].timestamp : rstNow,
+        endMs: rstNow,
+        durationMs: rstEvs.length > 0 ? rstNow - rstEvs[0].timestamp : 0,
+        summary: rstSummary,
+        issues: [],
+        violations: rstViolations,
+        mode: getRuntimeMode(),
+        budgetExceeded: rstEvs.some((e) => e.type === "budget-exceeded")
+      }, rstPath);
+      return rstPath;
+    }
+    case "runtime-store-load": {
+      const rslPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return storeLoadRuns(rslPath);
+    }
+    case "runtime-store-clear": {
+      const rscPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      storeClear(rscPath);
+      return true;
+    }
+    case "runtime-replay-history": {
+      const rrhPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return replayHistory(rrhPath);
+    }
+    case "runtime-history": {
+      const rhisPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return computeHistory(rhisPath);
+    }
+    case "runtime-reputation": {
+      const rrepName = String(args3[0] ?? "").replace(/^:/, "");
+      const rrepPath = args3[1] != null ? String(args3[1]) : storeGetDefaultPath();
+      if (!rrepName) return computeAllReputations(rrepPath);
+      return computeReputation(rrepName, rrepPath);
+    }
+    case "runtime-intelligence": {
+      const riPath = args3[0] != null ? String(args3[0]) : storeGetDefaultPath();
+      return computeIntelligence(riPath);
+    }
+    // ──────────────────────────────────────────────────────────────────────
+    case "runtime-mode": {
+      return getRuntimeMode();
+    }
+    case "set-runtime-mode": {
+      const modeArg = String(args3[0]).replace(/^:/, "");
+      const validModes = ["normal", "degraded", "protected", "panic"];
+      if (!validModes.includes(modeArg)) {
+        throw new Error(`set-runtime-mode: invalid mode "${modeArg}". Use :normal/:degraded/:protected/:panic`);
+      }
+      const prevMode = getRuntimeMode();
+      setRuntimeMode(modeArg);
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime mode: ${prevMode} \u2192 ${modeArg}`,
+        label: modeArg
+      });
+      return modeArg;
+    }
+    case "runtime-policy": {
+      const policy = getRuntimePolicy();
+      policy["active-contracts"] = getContracts().length;
+      return policy;
+    }
+    case "runtime-recover":
+    case "recover-runtime": {
+      const modeBeforeRecover = getRuntimeMode();
+      recoverRuntime();
+      resetBudget();
+      resetContexts();
+      resetWatchdog();
+      recordEvent({
+        type: "mode-change",
+        timestamp: Date.now(),
+        message: `runtime recovered: ${modeBeforeRecover} \u2192 normal`,
+        label: "normal"
+      });
+      return "normal";
+    }
+    case "runtime-resources": {
+      const rrEvs = getEvents();
+      const now = Date.now();
+      const recentEvs = rrEvs.filter((e) => now - e.timestamp < 1e3);
+      const stallAlert = checkStall(rrEvs.length);
+      if (stallAlert) {
+        recordEvent({
+          type: "watchdog-alert",
+          timestamp: now,
+          message: `Watchdog: ${stallAlert.kind} (elapsed=${stallAlert.elapsedMs}ms)`,
+          label: stallAlert.kind,
+          value: stallAlert
+        });
+      }
+      return {
+        "active-contexts": getActiveContexts().length,
+        "event-buffer-size": rrEvs.length,
+        "trace-rate": recentEvs.filter((e) => e.type === "trace").length,
+        "watchdog-alerts": getWatchdogAlerts(),
+        "budget-violations": getBudgetViolationCount(),
+        "runtime-mode": getRuntimeMode()
+      };
+    }
+    case "runtime-contexts": {
+      return getActiveContexts().map((c) => ({
+        "id": c.id,
+        "start-ms": c.startMs,
+        "elapsed-ms": c.elapsedMs
+      }));
+    }
+    case "abort-current-runtime":
+    case "abort-runtime-context": {
+      const ctxId = args3[0] != null ? String(args3[0]) : getCurrentContextId();
+      if (ctxId) {
+        abortContext(ctxId);
+        recordEvent({
+          type: "context-aborted",
+          timestamp: Date.now(),
+          message: `Context aborted: ${ctxId}`,
+          label: ctxId,
+          value: { "context-id": ctxId }
+        });
+      }
+      return ctxId ?? null;
+    }
+    case "runtime-watchdog-alerts": {
+      return getRecentAlerts().map((a) => ({
+        "kind": a.kind,
+        "elapsed-ms": a.elapsedMs,
+        "event-count": a.eventCount
+      }));
+    }
+    case "runtime-timeline": {
+      const tlEvs = getEvents();
+      const SEV_CHAR = { debug: ".", info: "\xB7", warn: "\u26A0", error: "\u2716", fatal: "\u2726" };
+      return tlEvs.map((e) => {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => n.toString().padStart(2, "0")).join(":") + "." + d.getMilliseconds().toString().padStart(3, "0");
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 60);
+        return {
+          "time": hms,
+          "type": e.type,
+          "severity": e.severity,
+          "event-id": e.eventId,
+          "trace-id": e.traceId ?? null,
+          "summary": summary,
+          "collapsed": e.collapsed ?? false,
+          "count": e.count ?? 1
+        };
+      });
+    }
+    case "print-runtime-timeline": {
+      const ptEvs = getEvents();
+      const SEV_CHAR2 = { debug: ".", info: "\xB7", warn: "\u26A0", error: "\u2716", fatal: "\u2726" };
+      const lines = [];
+      for (const e of ptEvs) {
+        const d = new Date(e.timestamp);
+        const hms = [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => n.toString().padStart(2, "0")).join(":");
+        const sev = SEV_CHAR2[e.severity ?? "info"] ?? "\xB7";
+        const summary = String(e.expr ?? e.label ?? e.message ?? e.contractName ?? "").slice(0, 50);
+        const col = e.collapsed ? ` \xD7${e.count}` : "";
+        lines.push(`${hms} ${sev} ${e.type.padEnd(20)} ${summary}${col}`);
+      }
+      process.stderr.write(lines.join("\n") + (lines.length ? "\n" : ""));
+      return null;
+    }
+    case "list-contracts": {
+      return getContracts().map((c) => ({
+        "name": c.name,
+        "event-type": c.eventType,
+        "threshold": c.threshold,
+        "window-ms": c.windowMs,
+        "action": c.action,
+        ...c.errorKind ? { "error-kind": c.errorKind } : {}
+      }));
+    }
+    case "clear-contracts":
+      clearContracts();
+      return null;
+    case "runtime-snapshot": {
+      const snEvs = getEvents();
+      const snSevCounts = { debug: 0, info: 0, warn: 0, error: 0, fatal: 0 };
+      const snTraceIds = /* @__PURE__ */ new Set();
+      const snRecentErrors = [];
+      for (const e of snEvs) {
+        const s = e.severity ?? "info";
+        snSevCounts[s] = (snSevCounts[s] ?? 0) + 1;
+        if (e.traceId) snTraceIds.add(e.traceId);
+        if (s === "error" || s === "fatal") {
+          snRecentErrors.push({ type: e.type, message: e.message, expr: e.expr, line: e.line });
+        }
+      }
+      return {
+        "event-count": snEvs.length,
+        "severity-counts": snSevCounts,
+        "active-trace-ids": [...snTraceIds].slice(-10),
+        "recent-errors": snRecentErrors.slice(-5),
+        "active-filter": getRuntimeFilter()
+      };
+    }
+    case "set-runtime-filter": {
+      const sfSev = String(args3[0]).replace(/^:/, "");
+      if (!["debug", "info", "warn", "error", "fatal"].includes(sfSev)) {
+        throw new Error(`set-runtime-filter: invalid severity "${sfSev}". Use :debug/:info/:warn/:error/:fatal`);
+      }
+      setRuntimeFilter(sfSev);
+      return sfSev;
+    }
+    case "clear-runtime-filter":
+      clearRuntimeFilter();
+      return null;
+    case "runtime-replay-check": {
+      const rrEvFile = String(args3[0]);
+      const rrSrcFile = String(args3[1]);
+      const rrFs = require("fs");
+      const refEvs = JSON.parse(rrFs.readFileSync(rrEvFile, "utf-8"));
+      const rrSrc = rrFs.readFileSync(rrSrcFile, "utf-8");
+      const savedEvs = getEvents();
+      clearEvents();
+      try {
+        const rrToks = lex(rrSrc);
+        const rrAst = parse(rrToks);
+        interp2.interpret(rrAst);
+      } catch {
+      }
+      const newEvs = getEvents();
+      clearEvents();
+      for (const ev2 of savedEvs) recordEvent(ev2);
+      const toKey = (e) => `${e.type}|${e.expr ?? ""}|${e.severity}`;
+      const refKeys = refEvs.map(toKey);
+      const newKeys = newEvs.map(toKey);
+      const total = Math.max(refKeys.length, newKeys.length);
+      let matches = 0;
+      const diffs = [];
+      for (let i = 0; i < Math.min(refKeys.length, newKeys.length); i++) {
+        if (refKeys[i] === newKeys[i]) {
+          matches++;
+        } else if (diffs.length < 10) {
+          diffs.push({
+            index: i,
+            ref: { type: refEvs[i].type, expr: refEvs[i].expr },
+            actual: { type: newEvs[i]?.type, expr: newEvs[i]?.expr }
+          });
+        }
+      }
+      return {
+        "match-rate": total > 0 ? Math.round(matches / total * 100) / 100 : 1,
+        "diff-count": diffs.length + Math.abs(refEvs.length - newEvs.length),
+        "ref-event-count": refEvs.length,
+        "new-event-count": newEvs.length,
+        "nondeterministic-events": diffs
+      };
+    }
+    case "assert": {
+      const assertCond = args3[0];
+      const assertMsg = args3.length > 1 ? String(args3[1]) : void 0;
+      if (!assertCond) {
+        let assertExpr = "?";
+        try {
+          assertExpr = interp2.context.macroExpander.astToString(expr2.args[0]);
+        } catch {
+        }
+        const assertLine = expr2.line ?? interp2.currentLine;
+        const assertFile = interp2.currentFilePath ?? "<unknown>";
+        const assertDetail = assertMsg ? `
+  msg:   ${assertMsg}` : "";
+        recordEvent({
+          type: "assert-fail",
+          timestamp: Date.now(),
+          file: assertFile,
+          line: assertLine,
+          expr: assertExpr,
+          message: assertMsg,
+          value: assertCond
+        });
+        throw new FLRuntimeError(
+          ErrorCodes.RUNTIME,
+          `AssertionError:
+  expr:  ${assertExpr}
+  value: ${toDisplay2(assertCond)}${assertDetail}`,
+          { expected: "truthy", got: String(assertCond) },
+          assertFile,
+          assertLine,
+          0
+        );
+      }
+      return true;
+    }
+    case "print-err":
+      process.stderr.write(args3.map((a) => toDisplay2(a)).join(" ") + "\n");
+      return null;
+    case "str":
+      return args3.map((a) => {
+        if (a === null || a === void 0) return "null";
+        if (typeof a === "string" || typeof a === "number" || typeof a === "boolean") return String(a);
+        const isPlainObj = typeof a === "object" && !Array.isArray(a) && !(a instanceof Map) && a?.kind !== "function-value" && a?.kind !== "closure";
+        if (Array.isArray(a) || isPlainObj) {
+          try {
+            return JSON.stringify(a);
+          } catch {
+            return toDisplay2(a);
+          }
+        }
+        return toDisplay2(a);
+      }).join("");
+    case "repr":
+      return JSON.stringify(args3[0], null, 2);
+    case "inspect": {
+      const inspected = toDisplay2(args3[0]);
+      console.log(inspected);
+      return args3[0];
+    }
+    // String basic
+    case "concat":
+      if (!Array.isArray(args3[0])) return args3.join("");
+      if (!Array.isArray(args3[1])) return args3[0] || [];
+      return args3[0].concat(args3[1]);
+    case "upper":
+      return args3[0]?.toString().toUpperCase();
+    case "lower":
+      return args3[0]?.toString().toLowerCase();
+    case "length":
+    case "count":
+      return Array.isArray(args3[0]) ? args3[0].length : typeof args3[0] === "string" ? args3[0].length : args3[0] !== null && typeof args3[0] === "object" ? Object.keys(args3[0]).length : 0;
+    // Phase MongoDB: to-hex (number → 2-digit hex string)
+    case "to-hex": {
+      const n = Math.floor(Number(args3[0])) & 255;
+      return n.toString(16).padStart(2, "0");
+    }
+    // Phase MongoDB: bson-encode-native (FreeLang map → BSON hex)
+    case "bson-encode-native": {
+      const int32ToHex = (n) => {
+        const b0 = n & 255;
+        const b1 = n >> 8 & 255;
+        const b2 = n >> 16 & 255;
+        const b3 = n >> 24 & 255;
+        return b0.toString(16).padStart(2, "0") + b1.toString(16).padStart(2, "0") + b2.toString(16).padStart(2, "0") + b3.toString(16).padStart(2, "0");
+      };
+      const int64ToHex = (n) => {
+        const lo = n >>> 0;
+        const hi = Math.floor(n / 4294967296) >>> 0;
+        return int32ToHex(lo) + int32ToHex(hi);
+      };
+      const float64ToHex = (n) => {
+        const buf = Buffer.allocUnsafe(8);
+        buf.writeDoubleLE(n, 0);
+        return buf.toString("hex");
+      };
+      const stringToHex = (s) => {
+        let hex = "";
+        for (let i = 0; i < s.length; i++) {
+          hex += s.charCodeAt(i).toString(16).padStart(2, "0");
+        }
+        return hex;
+      };
+      const encodeDoc = (d) => {
+        if (!d || typeof d !== "object") return int32ToHex(5) + "00";
+        let elements = "";
+        const entries = Array.isArray(d) ? d.map((v, i) => [String(i), v]) : Object.entries(d);
+        for (const [key, val] of entries) {
+          const k = stringToHex(key) + "00";
+          if (Array.isArray(val)) {
+            const subdoc = encodeDoc(val);
+            elements += "04" + k + subdoc;
+          } else if (val !== null && typeof val === "object" && !Array.isArray(val)) {
+            const subdoc = encodeDoc(val);
+            elements += "03" + k + subdoc;
+          } else if (typeof val === "number" && Number.isInteger(val) && val >= -2147483648 && val <= 2147483647) {
+            elements += "10" + k + int32ToHex(val);
+          } else if (typeof val === "number") {
+            elements += "01" + k + float64ToHex(val);
+          } else if (typeof val === "string") {
+            const strBytes = Buffer.from(val, "utf-8");
+            const len = strBytes.length + 1;
+            elements += "02" + k + int32ToHex(len) + strBytes.toString("hex") + "00";
+          } else if (typeof val === "boolean") {
+            elements += "08" + k + (val ? "01" : "00");
+          } else if (val === null || val === void 0) {
+            elements += "0a" + k;
+          }
+        }
+        const size = 4 + elements.length / 2 + 1;
+        return int32ToHex(size) + elements + "00";
+      };
+      const doc = args3[0];
+      if (!doc || typeof doc !== "object") return "0c000000107069696e6700010000000000";
+      return encodeDoc(doc);
+    }
+    // Phase MongoDB: bson-decode-native (BSON hex → FreeLang map/array)
+    case "bson-decode-native": {
+      const hex = String(args3[0] || "");
+      if (hex.length < 8) return {};
+      const buf = Buffer.from(hex, "hex");
+      const decodeDoc = (buf2, startOffset) => {
+        if (startOffset + 4 > buf2.length) return [{}, startOffset];
+        const docSize = buf2.readInt32LE(startOffset);
+        const endOffset = startOffset + docSize;
+        const result2 = {};
+        let offset = startOffset + 4;
+        while (offset < endOffset - 1 && buf2[offset] !== 0) {
+          const elemType = buf2[offset];
+          offset++;
+          let nameEnd = offset;
+          while (nameEnd < buf2.length && buf2[nameEnd] !== 0) nameEnd++;
+          const fieldName = buf2.toString("utf-8", offset, nameEnd);
+          offset = nameEnd + 1;
+          if (elemType === 1) {
+            result2[fieldName] = buf2.readDoubleLE(offset);
+            offset += 8;
+          } else if (elemType === 2) {
+            const strLen = buf2.readInt32LE(offset);
+            offset += 4;
+            result2[fieldName] = buf2.toString("utf-8", offset, offset + strLen - 1);
+            offset += strLen;
+          } else if (elemType === 3) {
+            const [subdoc, newOffset] = decodeDoc(buf2, offset);
+            result2[fieldName] = subdoc;
+            offset = newOffset;
+          } else if (elemType === 4) {
+            const [subdoc, newOffset] = decodeDoc(buf2, offset);
+            result2[fieldName] = Object.values(subdoc);
+            offset = newOffset;
+          } else if (elemType === 7) {
+            result2[fieldName] = buf2.toString("hex", offset, offset + 12);
+            offset += 12;
+          } else if (elemType === 8) {
+            result2[fieldName] = buf2[offset] !== 0;
+            offset++;
+          } else if (elemType === 9) {
+            result2[fieldName] = buf2.readBigInt64LE(offset);
+            offset += 8;
+          } else if (elemType === 10) {
+            result2[fieldName] = null;
+          } else if (elemType === 16) {
+            result2[fieldName] = buf2.readInt32LE(offset);
+            offset += 4;
+          } else if (elemType === 18) {
+            result2[fieldName] = Number(buf2.readBigInt64LE(offset));
+            offset += 8;
+          } else {
+            break;
+          }
+        }
+        return [result2, endOffset];
+      };
+      const [result] = decodeDoc(buf, 0);
+      return result;
+    }
+    // P3 (2026-04-25): 작은 함수형 stdlib — AI가 자연스럽게 짜는 패턴
+    case "identity":
+      return args3[0];
+    case "comp": {
+      const fns = args3.filter((a) => a != null);
+      return (...callArgs) => {
+        if (fns.length === 0) return callArgs[0];
+        let result = callFnVal(fns[fns.length - 1], callArgs);
+        for (let i = fns.length - 2; i >= 0; i--) result = callFnVal(fns[i], [result]);
+        return result;
+      };
+    }
+    case "juxt": {
+      const fns = args3.filter((a) => a != null);
+      return (...callArgs) => fns.map((fn) => callFnVal(fn, callArgs));
+    }
+    case "constantly": {
+      const v = args3[0];
+      return (..._callArgs) => v;
+    }
+    case "complement": {
+      const pred = args3[0];
+      const callOne = (fn, callArgs) => {
+        if (typeof fn === "function") return fn(...callArgs);
+        if (fn?.kind === "function-value") return callFnVal(fn, callArgs);
+        return null;
+      };
+      return (...callArgs) => !callOne(pred, callArgs);
+    }
+    // Array/Collection
+    case "list":
+      return args3;
+    case "first":
+      return Array.isArray(args3[0]) ? args3[0][0] !== void 0 ? args3[0][0] : null : null;
+    case "second":
+      return Array.isArray(args3[0]) ? args3[0][1] !== void 0 ? args3[0][1] : null : null;
+    case "nth":
+      return Array.isArray(args3[0]) ? args3[0][Number(args3[1])] !== void 0 ? args3[0][Number(args3[1])] : null : null;
+    case "rest":
+      return Array.isArray(args3[0]) ? args3[0].slice(1) : [];
+    // Phase 후속: 메인 dispatch에 alias 추가 (line 140 dispatch만 있던 함수들 통합)
+    case "keys": {
+      const kObj = args3[0];
+      if (kObj instanceof Map) return Array.from(kObj.keys());
+      return kObj && typeof kObj === "object" && !Array.isArray(kObj) ? Object.keys(kObj) : [];
+    }
+    case "length-or-zero":
+    case "length_or_zero": {
+      const v = args3[0];
+      if (v === null || v === void 0) return 0;
+      if (typeof v === "string") return v.length;
+      if (Array.isArray(v)) return v.length;
+      if (v instanceof Map) return v.size;
+      if (typeof v === "object") return Object.keys(v).length;
+      return 0;
+    }
+    case "vals":
+    case "values": {
+      const vObj = args3[0];
+      if (vObj instanceof Map) return Array.from(vObj.values());
+      return vObj && typeof vObj === "object" && !Array.isArray(vObj) ? Object.values(vObj) : [];
+    }
+    case "upper-case":
+      return typeof args3[0] === "string" ? args3[0].toUpperCase() : args3[0];
+    case "lower-case":
+    case "lowercase":
+    case "lower":
+      return typeof args3[0] === "string" ? args3[0].toLowerCase() : args3[0];
+    case "trim":
+      return typeof args3[0] === "string" ? args3[0].trim() : "";
+    case "starts-with?":
+    case "str-starts-with?":
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
+    case "ends-with?":
+    case "str-ends-with?":
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
+    case "char-at":
+    case "str-char-at":
+      return typeof args3[0] === "string" ? args3[0][Number(args3[1])] ?? "" : "";
+    case "math-pow":
+      return Math.pow(Number(args3[0]), Number(args3[1]));
+    case "append":
+      if (Array.isArray(args3[0]) && args3.length === 2 && Array.isArray(args3[1])) {
+        return [...args3[0], ...args3[1]];
+      }
+      return [...args3[0] || [], ...args3.slice(1)];
+    case "reverse":
+      if (Array.isArray(args3[0])) return [...args3[0]].reverse();
+      return [];
+    case "map": {
+      if (Array.isArray(args3[0]) && args3[0].length > 0) {
+        const second = args3[1];
+        if (second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure")) {
+          throw new Error(`map \uC778\uC790 \uC21C\uC11C \uC624\uB958: (map fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (map arr fn)`);
+        }
+      }
+      const mapFn = args3[0];
+      if (args3[1] === null || args3[1] === void 0) return [];
+      const mapArr = Array.isArray(args3[1]) ? args3[1] : [];
+      return mapArr.map((item) => callFnVal(mapFn, [item]));
+    }
+    // Phase 7: Async functions
+    case "set-timeout": {
+      if (expr2.args.length < 2) throw new Error(`set-timeout requires callback and delay`);
+      const callback = ev(expr2.args[0]);
+      const delay = ev(expr2.args[1]);
+      return new FreeLangPromise((resolve10, reject) => {
+        setTimeout(() => {
+          try {
+            if (typeof callback === "function") {
+              resolve10(callback());
+            } else if (callback.kind === "function-value") {
+              resolve10(callFnVal(callback, []));
+            } else {
+              reject(new Error("set-timeout callback must be a function"));
+            }
+          } catch (e) {
+            reject(e);
+          }
+        }, delay);
+      });
+    }
+    case "promise": {
+      if (expr2.args.length < 1) throw new Error(`promise requires executor function`);
+      const executor = ev(expr2.args[0]);
+      if (executor.kind === "function-value") {
+        return new FreeLangPromise((resolve10, reject) => {
+          try {
+            const resolveWrapper = { kind: "builtin-function", fn: (a) => resolve10(a[0]) };
+            const rejectWrapper = {
+              kind: "builtin-function",
+              fn: (a) => reject(a[0] instanceof Error ? a[0] : new Error(String(a[0])))
+            };
+            callFnVal(executor, [resolveWrapper, rejectWrapper]);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      } else {
+        throw new Error("promise executor must be a function");
+      }
+    }
+    case "fn": {
+      let params = [];
+      const paramNode = expr2.args[0];
+      if (paramNode && typeof paramNode === "object" && "kind" in paramNode && paramNode.kind === "literal" && Array.isArray(paramNode.value)) {
+        params = paramNode.value.map((p) => {
+          if (p && typeof p === "object" && "kind" in p && p.kind === "variable") return p.name;
+          throw new Error(`fn parameter must be a variable`);
+        });
+      } else if (paramNode && typeof paramNode === "object" && "kind" in paramNode && paramNode.kind === "variable") {
+        params = [paramNode.name];
+      } else if (Array.isArray(paramNode)) {
+        params = paramNode.map((p) => typeof p === "string" ? p : String(p));
+      } else {
+        throw new Error(`fn expects parameter array`);
+      }
+      return {
+        kind: "function-value",
+        params,
+        body: expr2.args[1],
+        capturedEnv: interp2.context.variables.snapshot()
+      };
+    }
+    case "reduce": {
+      if (Array.isArray(args3[0]) && args3[0].length > 0) {
+        const third = args3[2];
+        if (third && (typeof third === "function" || third?.kind === "function-value" || third?.kind === "closure")) {
+          throw new Error(`reduce \uC778\uC790 \uC21C\uC11C \uC624\uB958: (reduce fn init arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (reduce arr init fn)`);
+        }
+      }
+      const reduceFn = args3[0];
+      let accumulator;
+      let arr;
+      if (args3.length <= 2 || args3[2] === void 0) {
+        const coll = Array.isArray(args3[1]) ? args3[1] : [];
+        if (coll.length === 0) return null;
+        accumulator = coll[0];
+        arr = coll.slice(1);
+      } else {
+        accumulator = args3[1];
+        arr = args3[2] ?? [];
+      }
+      if (isLazySeq(arr)) {
+        const REDUCE_LAZY_LIMIT = 1e5;
+        let cur = arr;
+        let count = 0;
+        while (cur && count < REDUCE_LAZY_LIMIT) {
+          accumulator = callFn(reduceFn, [accumulator, lazyHead(cur)]);
+          cur = lazyTail(cur);
+          count++;
+        }
+        if (count >= REDUCE_LAZY_LIMIT) {
+          throw new Error(`reduce: lazy seq\uAC00 ${REDUCE_LAZY_LIMIT}\uC744 \uCD08\uACFC (\uBB34\uD55C \uC2DC\uD000\uC2A4 \uAC00\uB2A5\uC131, take\uB97C \uBA3C\uC800 \uC0AC\uC6A9\uD558\uC138\uC694)`);
+        }
+        return accumulator;
+      }
+      if (!Array.isArray(arr)) throw new Error(`reduce: \uBC30\uC5F4 \uC778\uC790\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uD0C0\uC785: ${typeof arr})`);
+      for (const item of arr) {
+        accumulator = callFn(reduceFn, [accumulator, item]);
+      }
+      return accumulator;
+    }
+    // HTTP responses
+    case "json-response":
+      if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) return args3[0];
+      if (Array.isArray(args3[0])) {
+        const obj = {};
+        for (let i = 0; i < args3[0].length; i += 2) {
+          let key = args3[0][i];
+          const value = args3[0][i + 1];
+          if (typeof key === "string" && key.startsWith(":")) key = key.substring(1);
+          if (typeof key === "string") obj[key] = value;
+        }
+        return obj;
+      }
+      return args3[0];
+    case "html-response":
+      return { html: args3[0] };
+    // XSS 방어
+    case "html-escape": {
+      const s = String(args3[0] ?? "");
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+    }
+    case "js-escape": {
+      const s = String(args3[0] ?? "");
+      return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\x00/g, "\\0");
+    }
+    case "h": {
+      const VOID_TAGS = /* @__PURE__ */ new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"]);
+      const escAttr = (v) => String(v).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+      const escText = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const tag = String(args3[0] ?? "div").toLowerCase();
+      let attrs = {};
+      let childStart = 1;
+      if (args3[1] !== null && args3[1] !== void 0 && typeof args3[1] === "object" && !Array.isArray(args3[1])) {
+        attrs = args3[1];
+        childStart = 2;
+      }
+      const attrStr = Object.entries(attrs).filter(([, v]) => v !== null && v !== void 0 && v !== false).map(([k, v]) => {
+        if (v === true) return ` ${k}`;
+        return ` ${k}="${escAttr(String(v))}"`;
+      }).join("");
+      if (VOID_TAGS.has(tag)) return `<${tag}${attrStr}>`;
+      const children = args3.slice(childStart).flat().filter((c) => c !== null && c !== void 0 && c !== false).map((c) => {
+        if (typeof c === "string") return c;
+        if (typeof c === "number" || typeof c === "boolean") return escText(String(c));
+        return String(c ?? "");
+      }).join("");
+      return `<${tag}${attrStr}>${children}</${tag}>`;
+    }
+    case "cx": {
+      return args3.flat().filter((c) => c !== null && c !== void 0 && c !== false && c !== "").map((c) => String(c).trim()).filter((c) => c.length > 0).join(" ");
+    }
+    case "for-html": {
+      if (!Array.isArray(args3[0])) return "";
+      return args3[0].map((item) => {
+        const result = callFnVal(args3[1], [item]);
+        return result !== null && result !== void 0 ? String(result) : "";
+      }).join("");
+    }
+    case "for-html-indexed": {
+      if (!Array.isArray(args3[0])) return "";
+      return args3[0].map((item, i) => {
+        const result = callFnVal(args3[1], [item, i]);
+        return result !== null && result !== void 0 ? String(result) : "";
+      }).join("");
+    }
+    // Time
+    case "now":
+      return (/* @__PURE__ */ new Date()).toISOString();
+    case "server-uptime":
+      return Date.now() - interp2.context.startTime;
+    // String/Character Operations
+    case "char-at":
+      return typeof args3[0] === "string" && typeof args3[1] === "number" ? args3[0][Math.floor(args3[1])] || "" : "";
+    case "char-code":
+      if (typeof args3[0] === "string" && args3[0].length > 0) return args3[0].charCodeAt(0);
+      throw new Error(`char-code expects non-empty string`);
+    case "char-from-code":
+      return String.fromCharCode(Math.floor(Number(args3[0]) & 255));
+    case "substring":
+      return typeof args3[0] === "string" ? args3[0].substring(Math.floor(args3[1] || 0), Math.floor(args3[2] || args3[0].length)) : "";
+    case "is-whitespace?":
+      return /^\s$/.test(String(args3[0]));
+    case "is-digit?":
+      return /^\d$/.test(String(args3[0]));
+    case "is-symbol?":
+      return /^[a-zA-Z_\-][a-zA-Z0-9_\-?!]*$/.test(String(args3[0]));
+    case "split":
+      return typeof args3[0] === "string" ? args3[0].split(String(args3[1] ?? "")) : [];
+    case "error":
+      throw new Error(String(args3[0]));
+    case "nil?":
+    case "null?":
+      return args3[0] === null || args3[0] === void 0;
+    case "empty?": {
+      const v = args3[0];
+      if (v === null || v === void 0) return true;
+      if (typeof v === "string") return v.length === 0;
+      if (Array.isArray(v)) return v.length === 0;
+      if (typeof v === "object") return Object.keys(v).length === 0;
+      return false;
+    }
+    case "not-empty?": {
+      const v = args3[0];
+      if (v === null || v === void 0) return false;
+      if (typeof v === "string") return v.length > 0;
+      if (Array.isArray(v)) return v.length > 0;
+      if (typeof v === "object") return Object.keys(v).length > 0;
+      return true;
+    }
+    case "has-key?": {
+      const obj = args3[0], key = args3[1];
+      if (obj === null || obj === void 0 || typeof obj !== "object" || Array.isArray(obj)) return false;
+      const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key ?? "");
+      return Object.prototype.hasOwnProperty.call(obj, k);
+    }
+    case "nil-or-empty?":
+      return args3[0] === null || args3[0] === void 0 || args3[0] && args3[0].length === 0;
+    case "zero?":
+      return args3[0] === 0;
+    case "pos?":
+      return typeof args3[0] === "number" && args3[0] > 0;
+    case "neg?":
+      return typeof args3[0] === "number" && args3[0] < 0;
+    case "even?":
+      return typeof args3[0] === "number" && args3[0] % 2 === 0;
+    case "odd?":
+      return typeof args3[0] === "number" && args3[0] % 2 !== 0;
+    case "some?":
+    case "not-nil?":
+      return args3[0] !== null && args3[0] !== void 0;
+    case "positive?":
+      return typeof args3[0] === "number" && args3[0] > 0;
+    case "negative?":
+      return typeof args3[0] === "number" && args3[0] < 0;
+    case "int?":
+      return typeof args3[0] === "number" && Number.isInteger(args3[0]);
+    case "float?":
+      return typeof args3[0] === "number" && !Number.isInteger(args3[0]);
+    case "nan?":
+      return typeof args3[0] === "number" && isNaN(args3[0]);
+    case "dir-exists?": {
+      try {
+        return require("fs").statSync(String(args3[0])).isDirectory();
+      } catch {
+        return false;
+      }
+    }
+    case "string?":
+      return typeof args3[0] === "string";
+    case "number?":
+      return typeof args3[0] === "number";
+    case "boolean?":
+    case "bool?":
+      return typeof args3[0] === "boolean";
+    case "list?":
+    case "array?":
+      return Array.isArray(args3[0]);
+    case "function?":
+    case "fn?": {
+      const fv = args3[0];
+      return typeof fv === "function" || fv !== null && typeof fv === "object" && (fv.kind === "function-value" || fv.kind === "closure" || fv.kind === "async-function-value" || fv.kind === "builtin-fn");
+    }
+    case "map?":
+      return args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]);
+    case "vector?":
+    case "array?":
+    case "list?":
+      return Array.isArray(args3[0]);
+    case "integer?":
+      return typeof args3[0] === "number" && Number.isInteger(args3[0]);
+    case "float?":
+      return typeof args3[0] === "number" && !Number.isInteger(args3[0]);
+    case "num-to-str":
+      return String(args3[0]);
+    case "str-to-num": {
+      const _n = parseFloat(String(args3[0]));
+      return isNaN(_n) ? null : _n;
+    }
+    case "map-set":
+      if (typeof args3[0] === "object" && args3[0] !== null && !Array.isArray(args3[0])) {
+        const k = typeof args3[1] === "string" && args3[1].startsWith(":") ? args3[1].slice(1) : String(args3[1]);
+        return { ...args3[0], [k]: args3[2] };
+      }
+      return args3[0];
+    case "slice":
+      if (Array.isArray(args3[0])) return args3[0].slice(args3[1], args3[2]);
+      if (typeof args3[0] === "string") return args3[0].slice(args3[1], args3[2]);
+      return [];
+    case "str-split": {
+      if (typeof args3[0] !== "string" || typeof args3[1] !== "string") return [];
+      const parts = args3[0].split(args3[1]);
+      if (args3[2] !== void 0) {
+        const lim = Number(args3[2]);
+        if (lim > 0 && parts.length > lim) {
+          return [...parts.slice(0, lim - 1), parts.slice(lim - 1).join(args3[1])];
+        }
+      }
+      return parts;
+    }
+    case "join":
+    case "str-join":
+      if (Array.isArray(args3[0])) return args3[0].join(args3[1] !== void 0 ? String(args3[1]) : "");
+      if (typeof args3[0] === "string" && Array.isArray(args3[1])) return args3[1].join(args3[0]);
+      return Array.isArray(args3[0]) ? args3[0].join("") : "";
+    case "str-format":
+    case "format": {
+      const fmt = String(args3[0] ?? "");
+      const fmtArgs = args3.length === 2 && Array.isArray(args3[1]) ? args3[1] : args3.slice(1);
+      let i = 0;
+      return fmt.replace(/%([+\-0 ]*)(\d*)\.?(\d*)([sdifoexX%])/g, (_m, flags, width, prec, t) => {
+        if (t === "%") return "%";
+        const v = fmtArgs[i++];
+        const w = width ? parseInt(width) : 0;
+        const hasPlus = flags.includes("+");
+        const hasZero = flags.includes("0");
+        const hasLeft = flags.includes("-");
+        const pad = (s, positive) => {
+          if (w <= s.length) return s;
+          if (hasLeft) return s.padEnd(w, " ");
+          if (hasZero) {
+            const sign = s[0] === "+" || s[0] === "-" ? s[0] : "";
+            return sign + (sign ? s.slice(1) : s).padStart(w - sign.length, "0");
+          }
+          return s.padStart(w, " ");
+        };
+        if (t === "d" || t === "i") {
+          const n = Math.trunc(Number(v));
+          let s = String(Math.abs(n));
+          if (n < 0) s = "-" + s;
+          else if (hasPlus) s = "+" + s;
+          return pad(s, n >= 0);
+        }
+        if (t === "f") {
+          const precision = prec !== "" ? parseInt(prec) : 6;
+          const n = Number(v);
+          let s = Math.abs(n).toFixed(precision);
+          if (n < 0) s = "-" + s;
+          else if (hasPlus) s = "+" + s;
+          return pad(s, n >= 0);
+        }
+        if (t === "e" || t === "E") {
+          const precision = prec !== "" ? parseInt(prec) : 6;
+          let s = Number(v).toExponential(precision);
+          if (t === "E") s = s.toUpperCase();
+          return w > s.length ? hasLeft ? s.padEnd(w) : s.padStart(w) : s;
+        }
+        if (t === "s") {
+          let s = v === null || v === void 0 ? "null" : String(v);
+          if (w > s.length) s = hasLeft ? s.padEnd(w, " ") : s.padStart(w, " ");
+          return s;
+        }
+        if (t === "o") return JSON.stringify(v);
+        if (t === "x") return Math.trunc(Number(v)).toString(16);
+        if (t === "X") return Math.trunc(Number(v)).toString(16).toUpperCase();
+        return String(v);
+      });
+    }
+    case "str-blank?":
+      return args3[0] === null || args3[0] === void 0 || typeof args3[0] === "string" && args3[0].trim() === "";
+    case "trim":
+    case "string_trim":
+    case "str_trim":
+      return typeof args3[0] === "string" ? args3[0].trim() : "";
+    case "uppercase":
+      return typeof args3[0] === "string" ? args3[0].toUpperCase() : "";
+    case "lowercase":
+      return typeof args3[0] === "string" ? args3[0].toLowerCase() : "";
+    case "contains?":
+      if (typeof args3[0] === "string" && typeof args3[1] === "string") return args3[0].includes(args3[1]);
+      if (Array.isArray(args3[0])) return args3[0].includes(args3[1]);
+      if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
+        let ck = args3[1];
+        if (ck !== null && typeof ck === "object" && ck.kind === "keyword") ck = ck.name;
+        const ckNorm = typeof ck === "string" && ck.startsWith(":") ? ck.slice(1) : String(ck);
+        return Object.prototype.hasOwnProperty.call(args3[0], ckNorm) || Object.prototype.hasOwnProperty.call(args3[0], ":" + ckNorm);
+      }
+      return false;
+    case "starts-with?":
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
+    case "index-of":
+      if (Array.isArray(args3[0])) return args3[0].indexOf(args3[1]);
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].indexOf(args3[1]) : -1;
+    case "replace":
+      return typeof args3[0] === "string" && typeof args3[1] === "string" && typeof args3[2] === "string" ? args3[0].split(args3[1]).join(args3[2]) : "";
+    case "repeat": {
+      if (typeof args3[0] === "number") return Array(args3[0]).fill(args3[1] !== void 0 ? args3[1] : null);
+      if (typeof args3[0] === "string" && typeof args3[1] === "number") return args3[0].repeat(args3[1]);
+      return [];
+    }
+    // Array Operations
+    case "filter": {
+      if (Array.isArray(args3[0]) && args3[0].length > 0) {
+        const second = args3[1];
+        if (second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure")) {
+          throw new Error(`filter \uC778\uC790 \uC21C\uC11C \uC624\uB958: (filter fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (filter arr fn)`);
+        }
+      }
+      const filterFn = args3[0];
+      const coll = args3[1];
+      if (coll === null || coll === void 0) return [];
+      if (!Array.isArray(coll)) return [];
+      if (filterFn === null || filterFn === void 0) return coll;
+      return coll.filter((item) => callFnVal(filterFn, [item]));
+    }
+    case "find": {
+      if (!Array.isArray(args3[0])) return -1;
+      const findTarget = args3[1];
+      if (typeof findTarget === "function") return args3[0].find(findTarget) ?? null;
+      if (findTarget && (findTarget.kind === "function-value" || findTarget.kind === "closure")) {
+        return args3[0].find((item) => callFnVal(findTarget, [item])) ?? null;
+      }
+      return args3[0].indexOf(findTarget);
+    }
+    case "last":
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
+    case "butlast":
+      return Array.isArray(args3[0]) && args3[0].length > 1 ? args3[0].slice(0, -1) : [];
+    // Phase C: nil-safe wrapper들
+    case "first-or":
+    case "first_or":
+      return Array.isArray(args3[0]) && args3[0].length > 0 && args3[0][0] !== void 0 ? args3[0][0] : args3[1] !== void 0 ? args3[1] : null;
+    case "last-or":
+    case "last_or":
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : args3[1] !== void 0 ? args3[1] : null;
+    // ── apply: (apply fn args-array) ─────────────────────────────────
+    case "apply": {
+      const apFn = args3[0], apArr = Array.isArray(args3[args3.length - 1]) ? args3[args3.length - 1] : [];
+      const extraArgs = args3.slice(1, args3.length - 1);
+      const allArgs = [...extraArgs, ...apArr];
+      if (typeof apFn === "string") return evalBuiltin(interp2, apFn, allArgs, expr2);
+      return callFnVal(apFn, allArgs);
+    }
+    // ── sum / product / average ───────────────────────────────────────
+    case "sum": {
+      const arr = Array.isArray(args3[0]) ? args3[0] : args3;
+      return arr.reduce((a, b) => a + Number(b), 0);
+    }
+    case "product": {
+      const arr = Array.isArray(args3[0]) ? args3[0] : args3;
+      return arr.reduce((a, b) => a * Number(b), 1);
+    }
+    case "average": {
+      const arr = Array.isArray(args3[0]) ? args3[0] : args3;
+      if (arr.length === 0) return null;
+      return arr.reduce((a, b) => a + Number(b), 0) / arr.length;
+    }
+    // ── update: (update map key fn) ──────────────────────────────────
+    case "update": {
+      const uMap = args3[0], uKey0 = args3[1], uFn = args3[2];
+      let uKey = uKey0;
+      if (uKey && typeof uKey === "object" && uKey.kind === "keyword") uKey = uKey.name;
+      else if (typeof uKey === "string" && uKey.startsWith(":")) uKey = uKey.slice(1);
+      const cur = uMap && typeof uMap === "object" ? uMap[uKey] ?? null : null;
+      const next = callFnVal(uFn, [cur, ...args3.slice(3)]);
+      return { ...uMap, [uKey]: next };
+    }
+    // ── partition: (partition n arr) ─────────────────────────────────
+    case "partition": {
+      const n = Number(args3[0]), parr = Array.isArray(args3[1]) ? args3[1] : [];
+      const out = [];
+      for (let i = 0; i < parr.length; i += n) out.push(parr.slice(i, i + n));
+      return out;
+    }
+    // ── interpose: (interpose sep arr) ───────────────────────────────
+    case "interpose": {
+      const sep2 = args3[0], iarr = Array.isArray(args3[1]) ? args3[1] : [];
+      if (iarr.length === 0) return [];
+      const result = [iarr[0]];
+      for (let i = 1; i < iarr.length; i++) {
+        result.push(sep2);
+        result.push(iarr[i]);
+      }
+      return result;
+    }
+    // ── keep: (keep fn arr) → non-nil results ────────────────────────
+    case "keep": {
+      const kfn = args3[0], karr = Array.isArray(args3[1]) ? args3[1] : [];
+      return karr.map((x) => callFnVal(kfn, [x])).filter((v) => v !== null && v !== void 0);
+    }
+    // ── mapcat: (mapcat fn arr) → map + flatten 1 level ──────────────
+    case "mapcat": {
+      const mcfn = args3[0], mcarr = Array.isArray(args3[1]) ? args3[1] : [];
+      return mcarr.flatMap((x) => {
+        const r = callFnVal(mcfn, [x]);
+        return Array.isArray(r) ? r : [r];
+      });
+    }
+    // ── count-if: (count-if fn arr) ──────────────────────────────────
+    case "count-if": {
+      const cifn = args3[0], ciarr = Array.isArray(args3[1]) ? args3[1] : [];
+      return ciarr.filter((x) => callFnVal(cifn, [x])).length;
+    }
+    case "find-first": {
+      const fffn = args3[0], ffarr = Array.isArray(args3[1]) ? args3[1] : [];
+      const found = ffarr.find((x) => callFnVal(fffn, [x]));
+      return found !== void 0 ? found : null;
+    }
+    // ── max-by / min-by: (max-by fn arr) ─────────────────────────────
+    case "max-by": {
+      const mbfn = args3[0], mbarr = Array.isArray(args3[1]) ? args3[1] : [];
+      if (mbarr.length === 0) return null;
+      const mbIsField = typeof mbfn === "string" && mbarr[0] !== null && typeof mbarr[0] === "object";
+      const mbKey = mbIsField ? (x) => x !== null && typeof x === "object" ? x[mbfn] : null : (x) => callFnVal(mbfn, [x]);
+      return mbarr.reduce((best, x) => mbKey(x) > mbKey(best) ? x : best);
+    }
+    case "min-by": {
+      const mnbfn = args3[0], mnbarr = Array.isArray(args3[1]) ? args3[1] : [];
+      if (mnbarr.length === 0) return null;
+      const mnbIsField = typeof mnbfn === "string" && mnbarr[0] !== null && typeof mnbarr[0] === "object";
+      const mnbKey = mnbIsField ? (x) => x !== null && typeof x === "object" ? x[mnbfn] : null : (x) => callFnVal(mnbfn, [x]);
+      return mnbarr.reduce((best, x) => mnbKey(x) < mnbKey(best) ? x : best);
+    }
+    // ── max-of / min-of: (max-of arr) ────────────────────────────────
+    case "max-of": {
+      const moarr = Array.isArray(args3[0]) ? args3[0] : args3;
+      return moarr.length === 0 ? null : Math.max(...moarr.map(Number));
+    }
+    case "min-of": {
+      const minarr = Array.isArray(args3[0]) ? args3[0] : args3;
+      return minarr.length === 0 ? null : Math.min(...minarr.map(Number));
+    }
+    case "get-in": {
+      if (!Array.isArray(args3[1])) throw new Error(`get-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const giDefault = args3[2] !== void 0 ? args3[2] : null;
+      let cur = args3[0];
+      for (const k of args3[1]) {
+        if (cur === null || cur === void 0) return giDefault;
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : k;
+        if (Array.isArray(cur)) cur = cur[key] !== void 0 ? cur[key] : void 0;
+        else if (cur !== null && typeof cur === "object") cur = cur[key] !== void 0 ? cur[key] : void 0;
+        else return giDefault;
+      }
+      return cur !== void 0 ? cur : giDefault;
+    }
+    case "get-or": {
+      const def = args3[2] !== void 0 ? args3[2] : null;
+      let k = args3[1];
+      if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
+      if (args3[0] === null || args3[0] === void 0) return def;
+      if (Array.isArray(args3[0])) {
+        const idx = typeof k === "number" ? k : Number(k);
+        return Number.isFinite(idx) && args3[0][idx] !== void 0 ? args3[0][idx] : def;
+      }
+      if (args3[0] instanceof Map) {
+        const r = args3[0].get(String(k).replace(/^:/, ""));
+        return r === void 0 ? def : r;
+      }
+      if (typeof args3[0] === "object") {
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (args3[0][normalized] !== void 0) return args3[0][normalized];
+        if (typeof k === "string" && args3[0][k] !== void 0) return args3[0][k];
+        return def;
+      }
+      return def;
+    }
+    case "get": {
+      if ((args3[0] === null || args3[0] === void 0) && process.env.FL_STRICT === "1") {
+        throw new FLRuntimeError(
+          ErrorCodes.TYPE_NIL,
+          `(get nil ${typeof args3[1] === "string" ? '"' + args3[1] + '"' : String(args3[1])}) \u2014 cannot access key on nil. Use (get-or coll key default).`,
+          { fn: "get", arg: 0, expected: "non-nil", got: "nil" }
+        );
+      }
+      if (args3[0] !== null && args3[0] !== void 0 && typeof args3[0] !== "object" && typeof args3[0] !== "string" && !Array.isArray(args3[0])) {
+        const hint = `[E_TYPE_MISMATCH] get: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map, array, string\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args3[0]})
+  \uC62C\uBC14\uB978 \uD615\uC2DD: (get map key) \uB610\uB294 (get arr index)
+  \uC608: (get {:name "kim"} "name") \u2192 "kim"`;
+        if (process.env.FL_V12 === "1") throw new Error(hint);
+        console.warn(`\u26A0\uFE0F  [FreeLang] ${hint}`);
+      }
+      let k = args3[1];
+      if (k !== null && typeof k === "object" && k.kind === "keyword") k = k.name;
+      const _getDef = args3.length >= 3 ? args3[2] : null;
+      if (Array.isArray(args3[0])) return typeof k === "number" ? args3[0][k] ?? _getDef : _getDef;
+      if (typeof args3[0] === "string") return typeof k === "number" ? args3[0][k] ?? _getDef : _getDef;
+      if (args3[0] instanceof Map) return args3[0].has(String(k).replace(/^:/, "")) ? args3[0].get(String(k).replace(/^:/, "")) : _getDef;
+      if (args3[0] !== null && typeof args3[0] === "object") {
+        const normalized = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (args3[0][normalized] !== void 0) return args3[0][normalized];
+        if (typeof k === "string" && args3[0][k] !== void 0) return args3[0][k];
+        return _getDef;
+      }
+      return _getDef;
+    }
+    case "safe-get":
+    case "safe_get": {
+      let sgKey = args3[1];
+      if (sgKey !== null && typeof sgKey === "object" && sgKey.kind === "keyword") sgKey = sgKey.name;
+      const sgHasDefault = args3.length >= 3;
+      const sgDefault = sgHasDefault ? args3[2] : void 0;
+      let sgVal = null;
+      if (args3[0] instanceof Map) {
+        const sgK = String(sgKey).replace(/^:/, "");
+        sgVal = args3[0].has(sgK) ? args3[0].get(sgK) : null;
+      } else if (args3[0] !== null && typeof args3[0] === "object") {
+        const sgK = typeof sgKey === "string" && sgKey.startsWith(":") ? sgKey.slice(1) : String(sgKey);
+        sgVal = args3[0][sgK] !== void 0 ? args3[0][sgK] : args3[0][String(sgKey)] !== void 0 ? args3[0][String(sgKey)] : null;
+      } else if (Array.isArray(args3[0])) {
+        sgVal = typeof sgKey === "number" ? args3[0][sgKey] ?? null : null;
+      }
+      if (sgVal === null || sgVal === void 0) {
+        if (sgHasDefault) return sgDefault;
+        throw new Error(`safe-get: key '${sgKey}' is nil \u2014 use (safe-get map key default) for optional fields`);
+      }
+      return sgVal;
+    }
+    case "block-items":
+      if (args3[0] && typeof args3[0] === "object" && args3[0].kind === "block" && args3[0].type === "Array") {
+        return args3[0].fields instanceof Map ? args3[0].fields.get("items") ?? [] : [];
+      }
+      if (Array.isArray(args3[0])) return args3[0];
+      return [];
+    case "fl-env-get": {
+      let flenv = args3[0];
+      const fname = String(args3[1]);
+      while (flenv !== null && flenv !== void 0) {
+        const vars = flenv.vars;
+        if (Array.isArray(vars)) {
+          for (let i = 0; i < vars.length; i++) {
+            const pair = vars[i];
+            if (Array.isArray(pair) && pair[0] === fname) return pair[1];
+          }
+        }
+        flenv = flenv.parent;
+      }
+      return null;
+    }
+    case "fl-special-op?": {
+      const sop = String(args3[0]);
+      const specials = ["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"];
+      return specials.includes(sop) ? sop : null;
+    }
+    case "fl-exec-op": {
+      const op2 = String(args3[0]);
+      const vals = Array.isArray(args3[1]) ? args3[1] : [];
+      const v0 = vals[0], v1 = vals[1], v2 = vals[2];
+      switch (normalizedOp2) {
+        case "+":
+          return vals.reduce((a, b) => a + b, 0);
+        case "-":
+          return vals.length === 1 ? -v0 : vals.reduce((a, b) => a - b);
+        case "*":
+          return vals.reduce((a, b) => a * b, 1);
+        case "/":
+          return vals.length === 1 ? 1 / v0 : vals.reduce((a, b) => a / b);
+        case "%":
+          return typeof v0 === "number" && typeof v1 === "number" ? v0 % v1 : null;
+        case "=":
+          return v0 === v1;
+        case "!=":
+          return v0 !== v1;
+        case "<":
+          return v0 < v1;
+        case ">":
+          return v0 > v1;
+        case "<=":
+          return v0 <= v1;
+        case ">=":
+          return v0 >= v1;
+        case "concat":
+          return vals.reduce((a, b) => a + String(b ?? ""), "");
+        case "length":
+          return Array.isArray(v0) ? v0.length : typeof v0 === "string" ? v0.length : 0;
+        case "get":
+          if (Array.isArray(v0)) return typeof v1 === "number" ? v0[v1] ?? null : null;
+          if (typeof v0 === "string") return typeof v1 === "number" ? v0[v1] ?? null : null;
+          if (v0 instanceof Map) return v0.get(String(v1).replace(/^:/, "")) ?? null;
+          if (v0 !== null && typeof v0 === "object") return v0[String(v1).replace(/^:/, "")] ?? v0[v1] ?? null;
+          return null;
+        case "append":
+          return Array.isArray(v0) && Array.isArray(v1) ? [...v0, ...v1] : Array.isArray(v0) ? [...v0, v1] : [v0, v1];
+        case "slice":
+          return Array.isArray(v0) ? v0.slice(v1, v2) : typeof v0 === "string" ? v0.slice(v1, v2) : [];
+        case "num-to-str":
+          return String(v0 ?? "");
+        case "str-to-num": {
+          const _n2 = parseFloat(String(v0));
+          return isNaN(_n2) ? null : _n2;
+        }
+        case "replace":
+          return typeof v0 === "string" ? v0.split(String(v1)).join(String(v2)) : v0;
+        case "str-join":
+          return Array.isArray(v0) ? v0.join(String(v1 ?? "")) : String(v0 ?? "");
+        case "null?":
+          return v0 === null || v0 === void 0;
+        case "array?":
+          return Array.isArray(v0);
+        case "string?":
+          return typeof v0 === "string";
+        case "number?":
+          return typeof v0 === "number";
+        case "read-file":
+          try {
+            return require("fs").readFileSync(String(v0), "utf-8");
+          } catch {
+            return null;
+          }
+        case "write-file":
+          try {
+            require("fs").writeFileSync(String(v0), String(v1 ?? ""));
+            return true;
+          } catch {
+            return false;
+          }
+        case "file-exists?":
+          try {
+            return require("fs").existsSync(String(v0));
+          } catch {
+            return false;
+          }
+        case "file-append":
+          try {
+            require("fs").appendFileSync(String(v0), String(v1 ?? ""));
+            return true;
+          } catch {
+            return false;
+          }
+        case "file-append-line":
+          try {
+            require("fs").appendFileSync(String(v0), String(v1 ?? "") + "\n");
+            return true;
+          } catch {
+            return false;
+          }
+        case "dir-list":
+          try {
+            return require("fs").readdirSync(String(v0));
+          } catch {
+            return [];
+          }
+        default:
+          return null;
+      }
+    }
+    // ── 네이티브 FL 인터프리터 ─────────────────────────────────────
+    // fl-interp: FL AST 노드를 native TS로 직접 평가 (스택오버플로우 방지)
+    // fl-fix-env: 로드된 FL env의 모든 closure-env를 final env로 업데이트 (재귀 지원)
+    case "fl-interp":
+      return flInterpNative(args3[0], args3[1]);
+    case "lex":
+      try {
+        return lex(String(args3[0] ?? ""));
+      } catch {
+        return [];
+      }
+    case "parse":
+      try {
+        return parse(Array.isArray(args3[0]) ? args3[0] : []);
+      } catch {
+        return [];
+      }
+    case "fl-parse": {
+      try {
+        return parse(lex(String(args3[0] ?? "")));
+      } catch {
+        return [];
+      }
+    }
+    case "fl-fix-env": {
+      const finalEnv = args3[0];
+      if (!finalEnv || !Array.isArray(finalEnv.vars)) return finalEnv;
+      for (const pair of finalEnv.vars) {
+        if (Array.isArray(pair) && pair[1] && typeof pair[1] === "object" && pair[1].kind === "closure") {
+          pair[1]["closure-env"] = finalEnv;
+        }
+      }
+      return finalEnv;
+    }
+    case "hash-map": {
+      const hm = {};
+      for (let i = 0; i + 1 < args3.length; i += 2) {
+        const k = typeof args3[i] === "string" && args3[i].startsWith(":") ? args3[i].slice(1) : String(args3[i]);
+        hm[k] = args3[i + 1];
+      }
+      return hm;
+    }
+    case "assoc": {
+      if (args3[0] !== null && (typeof args3[0] !== "object" || Array.isArray(args3[0]))) {
+        throw new Error(`[E_TYPE_MISMATCH] assoc: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args3[0]})
+  \uC62C\uBC14\uB978 \uD615\uC2DD: (assoc map key val)
+  \uC608: (assoc {:a 1} "b" 2) \u2192 {:a 1 :b 2}`);
+      }
+      let base = args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0]) ? { ...args3[0] } : {};
+      for (let i = 1; i + 1 < args3.length; i += 2) {
+        const rawK = args3[i];
+        const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
+        base[k] = args3[i + 1];
+      }
+      return base;
+    }
+    case "assoc-in": {
+      let aiSet = function(obj, keys, val) {
+        const k = typeof keys[0] === "string" && keys[0].startsWith(":") ? keys[0].slice(1) : String(keys[0]);
+        const base = obj !== null && typeof obj === "object" && !Array.isArray(obj) ? { ...obj } : {};
+        base[k] = keys.length === 1 ? val : aiSet(base[k], keys.slice(1), val);
+        return base;
+      };
+      if (!Array.isArray(args3[1]) || args3[1].length === 0) throw new Error(`assoc-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const aiKeys = args3[1];
+      const aiVal = args3[2];
+      return aiSet(args3[0], aiKeys, aiVal);
+    }
+    case "update-in": {
+      let uiUpdate = function(obj, keys) {
+        const k = typeof keys[0] === "string" && keys[0].startsWith(":") ? keys[0].slice(1) : String(keys[0]);
+        const base = obj !== null && typeof obj === "object" && !Array.isArray(obj) ? { ...obj } : {};
+        if (keys.length === 1) {
+          const cur = base[k] !== void 0 ? base[k] : null;
+          const uiCallArgs = [cur, ...uiExtraArgs];
+          base[k] = typeof uiFn === "string" ? evalBuiltin(interp2, uiFn, uiCallArgs, expr2) : callFnVal(uiFn, uiCallArgs);
+        } else {
+          base[k] = uiUpdate(base[k], keys.slice(1));
+        }
+        return base;
+      };
+      if (!Array.isArray(args3[1]) || args3[1].length === 0) throw new Error(`update-in: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBE44\uC5B4\uC788\uC9C0 \uC54A\uC740 \uD0A4 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const uiKeys = args3[1];
+      const uiFn = args3[2];
+      const uiExtraArgs = args3.slice(3);
+      return uiUpdate(args3[0], uiKeys);
+    }
+    case "dissoc": {
+      if (args3[0] !== null && args3[0] !== void 0 && (typeof args3[0] !== "object" || Array.isArray(args3[0]))) {
+        throw new Error(`[E_TYPE_MISMATCH] dissoc: \uCCAB \uBC88\uC9F8 \uC778\uC790\uB294 map\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4 (\uBC1B\uC740 \uAC12: ${typeof args3[0]})
+  \uC62C\uBC14\uB978 \uD615\uC2DD: (dissoc map key)
+  \uC608: (dissoc {:a 1 :b 2} "a") \u2192 {:b 2}`);
+      }
+      if (args3[0] !== null && typeof args3[0] === "object" && !Array.isArray(args3[0])) {
+        let result = { ...args3[0] };
+        for (let ki = 1; ki < args3.length; ki++) {
+          const rawK = args3[ki];
+          const k = typeof rawK === "string" && rawK.startsWith(":") ? rawK.slice(1) : String(rawK);
+          delete result[k];
+        }
+        return result;
+      }
+      return args3[0] ?? {};
+    }
+    case "obj-keys":
+    case "obj_keys": {
+      if (!args3[0] || typeof args3[0] !== "object" || Array.isArray(args3[0])) return [];
+      return Object.keys(args3[0]);
+    }
+    case "obj-values":
+    case "obj_values": {
+      if (!args3[0] || typeof args3[0] !== "object" || Array.isArray(args3[0])) return [];
+      return Object.values(args3[0]);
+    }
+    case "obj-entries":
+    case "obj_entries": {
+      if (!args3[0] || typeof args3[0] !== "object" || Array.isArray(args3[0])) return [];
+      return Object.entries(args3[0]);
+    }
+    case "obj-merge":
+    case "obj_merge":
+    case "merge": {
+      if (args3.length === 0) return {};
+      return Object.assign({}, ...args3.filter((a) => a && typeof a === "object" && !Array.isArray(a)));
+    }
+    case "merge-with": {
+      const fn = args3[0];
+      const maps = args3.slice(1).filter((a) => a && typeof a === "object" && !Array.isArray(a));
+      if (maps.length === 0) return {};
+      const result = { ...maps[0] };
+      for (let mi = 1; mi < maps.length; mi++) {
+        for (const [k, v] of Object.entries(maps[mi])) {
+          result[k] = k in result ? callFnVal(fn, [result[k], v]) : v;
+        }
+      }
+      return result;
+    }
+    case "into": {
+      const target = args3[0];
+      const coll = args3[1];
+      if (Array.isArray(target)) {
+        return Array.isArray(coll) ? [...target, ...coll] : target;
+      }
+      if (target && typeof target === "object" && !Array.isArray(target)) {
+        if (Array.isArray(coll)) {
+          const res = { ...target };
+          for (const item of coll) {
+            if (Array.isArray(item) && item.length === 2) res[String(item[0])] = item[1];
+            else if (item && typeof item === "object") Object.assign(res, item);
+          }
+          return res;
+        }
+        return target;
+      }
+      return coll ?? target;
+    }
+    case "obj-pick":
+    case "obj_pick":
+    case "pick": {
+      if (!args3[0] || !Array.isArray(args3[1])) return {};
+      const m = args3[0];
+      return args3[1].reduce((acc, k) => {
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (key in m) acc[key] = m[key];
+        return acc;
+      }, {});
+    }
+    case "obj-omit":
+    case "obj_omit":
+    case "omit": {
+      if (!args3[0]) return {};
+      if (!Array.isArray(args3[1])) return { ...args3[0] };
+      const result = { ...args3[0] };
+      for (const k of args3[1]) {
+        const key = typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        delete result[key];
+      }
+      return result;
+    }
+    case "select-keys": {
+      if (!args3[0] || !Array.isArray(args3[1])) return {};
+      const result = {};
+      for (const k of args3[1]) {
+        const key = k && typeof k === "object" && k.kind === "keyword" ? k.name : typeof k === "string" && k.startsWith(":") ? k.slice(1) : String(k);
+        if (args3[0][key] !== void 0) result[key] = args3[0][key];
+      }
+      return result;
+    }
+    case "rename-keys": {
+      if (!args3[0] || !args3[1]) return { ...args3[0] };
+      const result = { ...args3[0] };
+      for (const [oldK, newK] of Object.entries(args3[1])) {
+        const ok2 = typeof oldK === "string" && oldK.startsWith(":") ? oldK.slice(1) : oldK;
+        const nk = newK && typeof newK === "object" && newK.kind === "keyword" ? newK.name : typeof newK === "string" && newK.startsWith(":") ? newK.slice(1) : String(newK);
+        if (result[ok2] !== void 0) {
+          result[nk] = result[ok2];
+          delete result[ok2];
+        }
+      }
+      return result;
+    }
+    case "str-index-of":
+    case "str-index_of": {
+      if (typeof args3[0] !== "string") return -1;
+      return args3[0].indexOf(String(args3[1] ?? ""), args3[2] !== void 0 ? Number(args3[2]) : 0);
+    }
+    case "str-replace-all":
+    case "str-replace":
+      return typeof args3[0] === "string" ? args3[0].split(String(args3[1] ?? "")).join(String(args3[2] ?? "")) : "";
+    // 정식 str-* 이름 (alias)
+    case "str-to-upper":
+    case "str-upper":
+      return typeof args3[0] === "string" ? args3[0].toUpperCase() : args3[0] ?? "";
+    case "str-to-lower":
+    case "str-lower":
+      return typeof args3[0] === "string" ? args3[0].toLowerCase() : args3[0] ?? "";
+    case "str-trim":
+      return typeof args3[0] === "string" ? args3[0].trim() : args3[0] === null || args3[0] === void 0 ? null : "";
+    case "str-trim-left":
+      return typeof args3[0] === "string" ? args3[0].trimStart() : args3[0] ?? "";
+    case "str-trim-right":
+      return typeof args3[0] === "string" ? args3[0].trimEnd() : args3[0] ?? "";
+    case "str-starts-with":
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].startsWith(args3[1]) : false;
+    case "str-ends-with":
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].endsWith(args3[1]) : false;
+    case "str-includes":
+    case "str-contains":
+      return typeof args3[0] === "string" && typeof args3[1] === "string" ? args3[0].includes(args3[1]) : false;
+    // 신규 문자열 함수
+    case "str-repeat":
+      return typeof args3[0] === "string" ? args3[0].repeat(Math.max(0, Number(args3[1] ?? 0))) : "";
+    case "str-pad-left": {
+      if (typeof args3[0] !== "string") return String(args3[0] ?? "");
+      const padLen = Number(args3[1] ?? 0);
+      const padCh = typeof args3[2] === "string" ? args3[2] : " ";
+      return args3[0].padStart(padLen, padCh);
+    }
+    case "str-pad-right": {
+      if (typeof args3[0] !== "string") return String(args3[0] ?? "");
+      const padLen = Number(args3[1] ?? 0);
+      const padCh = typeof args3[2] === "string" ? args3[2] : " ";
+      return args3[0].padEnd(padLen, padCh);
+    }
+    case "str-lines":
+      return typeof args3[0] === "string" ? args3[0].split("\n") : [];
+    case "str-reverse":
+      return typeof args3[0] === "string" ? args3[0].split("").reverse().join("") : "";
+    // 맵 변환 유틸리티
+    case "map-vals": {
+      const fn = args3[0];
+      const m = args3[1];
+      if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+      const out = {};
+      for (const [k, v] of Object.entries(m)) out[k] = callFnVal(fn, [v]);
+      return out;
+    }
+    case "map-keys": {
+      const fn = args3[0];
+      const m = args3[1];
+      if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+      const out = {};
+      for (const [k, v] of Object.entries(m)) out[String(callFnVal(fn, [k]))] = v;
+      return out;
+    }
+    case "filter-vals": {
+      const fn = args3[0];
+      const m = args3[1];
+      if (!m || typeof m !== "object" || Array.isArray(m)) return {};
+      const out = {};
+      for (const [k, v] of Object.entries(m)) if (callFnVal(fn, [v])) out[k] = v;
+      return out;
+    }
+    case "flatten": {
+      if (!Array.isArray(args3[0])) return [];
+      const flattenDeep = (arr) => arr.reduce((acc, val) => acc.concat(Array.isArray(val) ? flattenDeep(val) : val), []);
+      return flattenDeep(args3[0]);
+    }
+    case "flatten-1":
+    case "flat-1": {
+      if (!Array.isArray(args3[0])) return [];
+      return args3[0].reduce((acc, val) => acc.concat(Array.isArray(val) ? val : [val]), []);
+    }
+    case "conj": {
+      const coll = args3[0];
+      const vals = args3.slice(1);
+      if (Array.isArray(coll)) return [...coll, ...vals];
+      if (coll !== null && typeof coll === "object" && !Array.isArray(coll)) {
+        let result = { ...coll };
+        for (const v of vals) {
+          if (v && typeof v === "object" && !Array.isArray(v)) Object.assign(result, v);
+          else if (Array.isArray(v) && v.length === 2) result[String(v[0])] = v[1];
+        }
+        return result;
+      }
+      return vals;
+    }
+    case "partition-by": {
+      const fn = args3[0];
+      const coll = args3[1];
+      if (!Array.isArray(coll) || coll.length === 0) return [];
+      const result = [];
+      let group = [coll[0]];
+      let lastKey = callFnVal(fn, [coll[0]]);
+      for (let i = 1; i < coll.length; i++) {
+        const key = callFnVal(fn, [coll[i]]);
+        if (key === lastKey) {
+          group.push(coll[i]);
+        } else {
+          result.push(group);
+          group = [coll[i]];
+          lastKey = key;
+        }
+      }
+      result.push(group);
+      return result;
+    }
+    case "every?":
+    case "every": {
+      if (args3[1] === null || args3[1] === void 0) return true;
+      if (!Array.isArray(args3[1])) throw new Error(`every?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      return args3[1].every((item) => callFnVal(args3[0], [item]));
+    }
+    case "any?":
+    case "any": {
+      if (args3[1] === null || args3[1] === void 0) return null;
+      if (!Array.isArray(args3[1])) throw new Error(`any?: \uB450 \uBC88\uC9F8 \uC778\uC790\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4`);
+      const found = args3[1].find((item) => callFnVal(args3[0], [item]));
+      return found !== void 0 ? found : null;
+    }
+    case "none?": {
+      if (!Array.isArray(args3[1])) return true;
+      return args3[1].every((item) => !callFnVal(args3[0], [item]));
+    }
+    case "none":
+      if (args3.length === 0) return { tag: "None", value: null, kind: "Option" };
+      if (Array.isArray(args3[1])) return args3[1].every((item) => !callFnVal(args3[0], [item]));
+      return { tag: "None", value: null, kind: "Option" };
+    case "unique":
+    case "distinct":
+      return Array.isArray(args3[0]) ? [...new Set(args3[0])] : [];
+    case "sort":
+      if (!Array.isArray(args3[0])) return [];
+      return [...args3[0]].sort((a, b) => {
+        if (typeof a === "number" && typeof b === "number") return a - b;
+        return String(a).localeCompare(String(b));
+      });
+    case "sort-by":
+    case "sort_by": {
+      if (Array.isArray(args3[0]) && args3[0].length > 0) {
+        const second = args3[1];
+        const firstElemIsFunc = typeof args3[0][0] === "function" || args3[0][0]?.kind === "function-value" || args3[0][0]?.kind === "closure";
+        const secondIsFunc = second && (typeof second === "function" || second?.kind === "function-value" || second?.kind === "closure");
+        if (secondIsFunc && !firstElemIsFunc) {
+          throw new Error(
+            `sort-by \uC778\uC790 \uC21C\uC11C \uC624\uB958: (sort-by fn arr) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (sort-by arr fn)`
+          );
+        }
+      }
+      if (!Array.isArray(args3[1])) return [];
+      const keyFn = args3[0];
+      const sbArr = args3[1];
+      const sbIsField = typeof keyFn === "string" && sbArr.length > 0 && sbArr[0] !== null && typeof sbArr[0] === "object";
+      const sbExtract = sbIsField ? (x) => x !== null && typeof x === "object" ? x[keyFn] : null : (x) => callFnVal(keyFn, [x]);
+      return [...sbArr].sort((a, b) => {
+        const ka = sbExtract(a);
+        const kb = sbExtract(b);
+        if (typeof ka === "number" && typeof kb === "number") return ka - kb;
+        return String(ka).localeCompare(String(kb));
+      });
+    }
+    case "group-by":
+    case "group_by": {
+      if (!Array.isArray(args3[1])) return {};
+      const gbFn = args3[0];
+      const gbArr = args3[1];
+      const gbIsField = typeof gbFn === "string";
+      const gbExtract = gbIsField ? (x) => x !== null && typeof x === "object" ? String(x[gbFn] ?? x[":" + gbFn] ?? "null") : "null" : (x) => String(callFnVal(gbFn, [x]) ?? "null");
+      const gbResult = {};
+      for (const item of gbArr) {
+        const k = gbExtract(item);
+        if (!gbResult[k]) gbResult[k] = [];
+        gbResult[k].push(item);
+      }
+      return gbResult;
+    }
+    case "zip": {
+      const a = Array.isArray(args3[0]) ? args3[0] : [];
+      const b = Array.isArray(args3[1]) ? args3[1] : [];
+      const len = Math.min(a.length, b.length);
+      return Array.from({ length: len }, (_, i) => [a[i], b[i]]);
+    }
+    case "zip-with": {
+      const fn = args3[0];
+      const a = Array.isArray(args3[1]) ? args3[1] : [];
+      const b = Array.isArray(args3[2]) ? args3[2] : [];
+      const len = Math.min(a.length, b.length);
+      const callFn2 = interp2?.callFunctionValue?.bind(interp2);
+      if (!callFn2) return [];
+      return Array.from({ length: len }, (_, i) => callFn2(fn, [a[i], b[i]]));
+    }
+    // ── cache-* (LRU + TTL) ──────────────────────────────────────────────────
+    case "cache-create": {
+      const maxSize = typeof args3[0] === "number" ? Math.max(1, args3[0]) : 100;
+      return makeCacheHandle(maxSize);
+    }
+    case "cache-set": {
+      const isHandle = args3[0] && args3[0].kind === "cache";
+      const ch = isHandle ? args3[0] : _globalCache;
+      const key = String(isHandle ? args3[1] : args3[0]);
+      const val = isHandle ? args3[2] : args3[1];
+      const rawTtl = isHandle ? args3[3] : args3[2];
+      const ttlMs = typeof rawTtl === "number" ? isHandle ? rawTtl : rawTtl * 1e3 : null;
+      if (ch.map.has(key)) ch.map.delete(key);
+      else cacheEvict(ch);
+      ch.map.set(key, { value: val, expires: ttlMs !== null ? Date.now() + ttlMs : null });
+      return true;
+    }
+    case "cache-get": {
+      const isHandle = args3[0] && args3[0].kind === "cache";
+      const ch = isHandle ? args3[0] : _globalCache;
+      const key = String(isHandle ? args3[1] : args3[0]);
+      const entry = ch.map.get(key);
+      if (!entry) {
+        ch.misses++;
+        return null;
+      }
+      if (entry.expires !== null && Date.now() > entry.expires) {
+        ch.map.delete(key);
+        ch.misses++;
+        return null;
+      }
+      ch.map.delete(key);
+      ch.map.set(key, entry);
+      ch.hits++;
+      return entry.value;
+    }
+    case "cache-has": {
+      const isHandle = args3[0] && args3[0].kind === "cache";
+      const ch = isHandle ? args3[0] : _globalCache;
+      const key = String(isHandle ? args3[1] : args3[0]);
+      const entry = ch.map.get(key);
+      if (!entry) return false;
+      if (entry.expires !== null && Date.now() > entry.expires) {
+        ch.map.delete(key);
+        return false;
+      }
+      return true;
+    }
+    case "cache-del": {
+      const isHandle = args3[0] && args3[0].kind === "cache";
+      const ch = isHandle ? args3[0] : _globalCache;
+      const key = String(isHandle ? args3[1] : args3[0]);
+      return ch.map.delete(key);
+    }
+    case "cache-clear": {
+      const isHandle = args3[0] && args3[0].kind === "cache";
+      const ch = isHandle ? args3[0] : _globalCache;
+      ch.map.clear();
+      ch.hits = 0;
+      ch.misses = 0;
+      return true;
+    }
+    case "cache-stats": {
+      const isHandle = args3[0] && args3[0].kind === "cache";
+      const ch = isHandle ? args3[0] : _globalCache;
+      const total = ch.hits + ch.misses;
+      return { size: ch.map.size, hits: ch.hits, misses: ch.misses, "hit-rate": total > 0 ? ch.hits / total : 0 };
+    }
+    // ────────────────────────────────────────────────────────────────────────
+    case "uuid":
+    case "uuid4": {
+      const { randomUUID: randomUUID5 } = require("crypto");
+      return randomUUID5();
+    }
+    case "sleep": {
+      const ms = Math.max(0, Number(args3[0] ?? 0));
+      const buf = new SharedArrayBuffer(4);
+      Atomics.wait(new Int32Array(buf), 0, 0, ms);
+      return null;
+    }
+    case "fl-async-sleep": {
+      const ms = Math.max(0, Number(args3[0] ?? 0));
+      return new Promise((resolve10) => setTimeout(resolve10, ms));
+    }
+    case "push":
+      if (!Array.isArray(args3[0])) return [args3[1]];
+      return [...args3[0], args3[1]];
+    case "pop":
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][args3[0].length - 1] : null;
+    case "shift":
+      return Array.isArray(args3[0]) && args3[0].length > 0 ? args3[0][0] : null;
+    case "unshift":
+      if (!Array.isArray(args3[0])) return [args3[1]];
+      return [args3[1], ...args3[0]];
+    // Type/Utility
+    case "typeof":
+      return typeof args3[0];
+    case "type-of": {
+      const v = args3[0];
+      if (v === null || v === void 0) return "nil";
+      if (Array.isArray(v)) return "array";
+      if (typeof v === "function" || v?.kind === "function-value" || v?.kind === "closure" || v?.kind === "builtin-fn") return "function";
+      if (typeof v === "object") return "map";
+      return typeof v;
+    }
+    // ── 벡터 유사도 (pgvector 대체) ──────────────────────────────
+    case "vec-dot":
+    case "dot-product": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) sum += (a[i] ?? 0) * (b[i] ?? 0);
+      return sum;
+    }
+    case "vec-norm":
+    case "vec-magnitude": {
+      const v = args3[0];
+      if (!Array.isArray(v)) return 0;
+      return Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+    }
+    case "cosine-sim":
+    case "cosine_sim": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let dot = 0, na = 0, nb = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        dot += (a[i] ?? 0) * (b[i] ?? 0);
+        na += (a[i] ?? 0) ** 2;
+        nb += (b[i] ?? 0) ** 2;
+      }
+      const denom = Math.sqrt(na) * Math.sqrt(nb);
+      return denom === 0 ? 0 : dot / denom;
+    }
+    case "euclidean-dist":
+    case "vec-dist": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+      let sum = 0;
+      for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        const d = (a[i] ?? 0) - (b[i] ?? 0);
+        sum += d * d;
+      }
+      return Math.sqrt(sum);
+    }
+    case "vec-add": {
+      const a = args3[0], b = args3[1];
+      if (!Array.isArray(a) || !Array.isArray(b)) return [];
+      return Array.from({ length: Math.min(a.length, b.length) }, (_, i) => (a[i] ?? 0) + (b[i] ?? 0));
+    }
+    case "vec-scale": {
+      const v = args3[0], s = Number(args3[1] ?? 1);
+      if (!Array.isArray(v)) return [];
+      return v.map((x) => x * s);
+    }
+    case "vec-normalize": {
+      const v = args3[0];
+      if (!Array.isArray(v)) return [];
+      const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0));
+      return norm === 0 ? v : v.map((x) => x / norm);
+    }
+    case "vec-top-k": {
+      const query = args3[0];
+      const vectors = args3[1];
+      const k = Number(args3[2] ?? 5);
+      if (!Array.isArray(query) || !Array.isArray(vectors)) return [];
+      const scored = vectors.map((item, idx) => {
+        const vec = Array.isArray(item) ? item : item?.vector ?? item?.embedding ?? [];
+        let dot = 0, na = 0, nb = 0;
+        for (let i = 0; i < Math.min(query.length, vec.length); i++) {
+          dot += (query[i] ?? 0) * (vec[i] ?? 0);
+          na += (query[i] ?? 0) ** 2;
+          nb += (vec[i] ?? 0) ** 2;
+        }
+        const denom = Math.sqrt(na) * Math.sqrt(nb);
+        return { score: denom === 0 ? 0 : dot / denom, index: idx, data: item };
+      });
+      return scored.sort((a, b) => b.score - a.score).slice(0, k);
+    }
+    case "assert-type": {
+      const val = args3[0];
+      const typeStr = String(args3[1]);
+      let actualType = typeof val;
+      if (Array.isArray(val)) actualType = "array";
+      else if (val === null) actualType = "null";
+      else if (val instanceof Map) actualType = "map";
+      if (actualType !== typeStr) {
+        throw new Error(`Type assertion failed: expected '${typeStr}', got '${actualType}' (value: ${JSON.stringify(val)})`);
+      }
+      return val;
+    }
+    case "num":
+      return Number(args3[0]);
+    case "bool":
+      return Boolean(args3[0]);
+    // Math Functions
+    case "math-abs":
+    case "math_abs":
+    case "abs":
+      return Math.abs(args3[0]);
+    case "min":
+      return Math.min(...args3.filter((v) => typeof v === "number"));
+    case "max":
+      return Math.max(...args3.filter((v) => typeof v === "number"));
+    case "floor":
+      return Math.floor(args3[0]);
+    case "ceil":
+      return Math.ceil(args3[0]);
+    case "round":
+      return Math.round(args3[0]);
+    case "quot":
+      return Math.trunc(Number(args3[0]) / Number(args3[1]));
+    case "rem":
+      return Number(args3[0]) - Math.trunc(Number(args3[0]) / Number(args3[1])) * Number(args3[1]);
+    case "int":
+      return Math.trunc(Number(args3[0]));
+    case "sorted?": {
+      const arr = args3[0];
+      if (!Array.isArray(arr) || arr.length <= 1) return true;
+      for (let i = 1; i < arr.length; i++) {
+        if (arr[i] < arr[i - 1]) return false;
+      }
+      return true;
+    }
+    case "math-sqrt":
+    case "math_sqrt":
+    case "sqrt":
+      return Math.sqrt(args3[0]);
+    case "pow":
+      return Math.pow(args3[0], args3[1]);
+    case "log":
+      return Math.log(args3[0]);
+    case "exp":
+      return Math.exp(args3[0]);
+    case "sin":
+      return Math.sin(args3[0]);
+    case "cos":
+      return Math.cos(args3[0]);
+    case "tan":
+      return Math.tan(args3[0]);
+    case "random":
+    case "rand":
+      return Math.random();
+    case "rand-int": {
+      if (args3.length >= 2) return Math.floor(Math.random() * (Number(args3[1]) - Number(args3[0]))) + Number(args3[0]);
+      return Math.floor(Math.random() * Number(args3[0]));
+    }
+    case "clamp":
+      return Math.max(args3[1], Math.min(args3[2], args3[0]));
+    // Monad Operations — Phase 96: Result 타입으로 업그레이드 (_tag 기반)
+    case "ok":
+      return ok(args3[0]);
+    case "err": {
+      if (args3.length >= 2) {
+        const code96 = String(args3[0] ?? "ERR");
+        const message96 = String(args3[1] ?? "");
+        const category96 = args3[2];
+        return err(code96, message96, category96 ? { category: category96 } : void 0);
+      }
+      return err("ERR", String(args3[0] ?? ""));
+    }
+    case "some":
+      if (typeof args3[0] === "function" || args3[0] && (args3[0].kind === "function-value" || args3[0].kind === "closure")) {
+        const someFn = args3[0], someArr = Array.isArray(args3[1]) ? args3[1] : [];
+        if (typeof someFn === "function") return someArr.some(someFn);
+        return someArr.some((item) => callFnVal(someFn, [item]));
+      }
+      return { tag: "Some", value: args3[0], kind: "Option" };
+    case "every?": {
+      const evFn = args3[0], evArr = Array.isArray(args3[1]) ? args3[1] : [];
+      if (typeof evFn === "function") return evArr.every(evFn);
+      return evArr.every((item) => callFnVal(evFn, [item]));
+    }
+    case "any?": {
+      const anyFn = args3[0], anyArr = Array.isArray(args3[1]) ? args3[1] : [];
+      if (typeof anyFn === "function") return anyArr.some(anyFn);
+      return anyArr.some((item) => callFnVal(anyFn, [item]));
+    }
+    case "none":
+      return { tag: "None", value: null, kind: "Option" };
+    case "pure":
+      return { tag: "Pure", value: args3[0], kind: "Monad" };
+    case "left":
+      return { tag: "Left", value: args3[0], kind: "Either" };
+    case "right":
+      return { tag: "Right", value: args3[0], kind: "Either" };
+    case "failure": {
+      const errors = Array.isArray(args3[0]) ? args3[0] : [args3[0]];
+      return { tag: "Failure", value: errors, kind: "Validation" };
+    }
+    case "success":
+      return { tag: "Success", value: args3[0], kind: "Validation" };
+    case "tell":
+      return { kind: "Writer", value: null, log: String(args3[0]) };
+    case "return-writer":
+    case "pure-writer":
+      return { kind: "Writer", value: args3[0], log: "" };
+    case "bind": {
+      if (expr2.args.length < 2) throw new Error(`bind requires monad and transform function`);
+      const monad = ev(expr2.args[0]);
+      const transformFn = ev(expr2.args[1]);
+      if (monad.kind === "Result") {
+        return monad.tag === "Ok" ? callFn(transformFn, [monad.value]) : monad;
+      }
+      if (monad.kind === "Option") {
+        return monad.tag === "Some" ? callFn(transformFn, [monad.value]) : monad;
+      }
+      if (Array.isArray(monad)) {
+        let result = [];
+        for (const item of monad) {
+          const transformed = callFn(transformFn, [item]);
+          if (Array.isArray(transformed)) result = result.concat(transformed);
+          else result.push(transformed);
+        }
+        return result;
+      }
+      if (monad.kind === "Either") {
+        return monad.tag === "Right" ? callFn(transformFn, [monad.value]) : monad;
+      }
+      if (monad.kind === "Validation") {
+        if (monad.tag === "Success") {
+          const result = callFn(transformFn, [monad.value]);
+          if (result.kind === "Validation" && result.tag === "Failure") return result;
+          return result;
+        }
+        return monad;
+      }
+      if (monad.kind === "Writer") {
+        const result = callFn(transformFn, [monad.value]);
+        if (result.kind === "Writer") {
+          return { kind: "Writer", value: result.value, log: monad.log + result.log };
+        }
+        return result;
+      }
+      throw new Error(`bind: unsupported monad type`);
+    }
+    // ── Phase 69: Lazy Sequences ──────────────────────────────────────────
+    // (lazy-seq head-thunk tail-thunk) — 직접 생성 (드물게 사용)
+    case "lazy-seq": {
+      const hVal = args3[0];
+      const tVal = args3.length > 1 ? args3[1] : null;
+      return lazySeq(() => hVal, () => isLazySeq(tVal) ? tVal : null);
+    }
+    // (iterate f init) — 무한 시퀀스: init, f(init), f(f(init)), ...
+    case "iterate": {
+      const fn = args3[0];
+      const initVal = args3[1];
+      const applyFn = (v) => callFn(fn, [v]);
+      const makeIter = (cur) => lazySeq(() => cur, () => makeIter(applyFn(cur)));
+      return makeIter(initVal);
+    }
+    // (range n) → lazy [0..n-1], (range start end) → lazy [start..end-1]
+    case "range": {
+      if (args3.length === 0) return rangeSeq(0);
+      const start = args3.length === 1 ? 0 : Number(args3[0]);
+      const end = args3.length === 1 ? Number(args3[0]) : Number(args3[1]);
+      const step = args3.length >= 3 ? Number(args3[2]) : 1;
+      const out = [];
+      if (step > 0) for (let i = start; i < end; i += step) out.push(i);
+      else if (step < 0) for (let i = start; i > end; i += step) out.push(i);
+      return out;
+    }
+    // (take n seq) — lazy or array에서 n개 꺼냄
+    case "take": {
+      if (Array.isArray(args3[0]) && typeof args3[1] === "number") {
+        throw new Error(`take \uC778\uC790 \uC21C\uC11C \uC624\uB958: (take n coll) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (take coll n)`);
+      }
+      const n = args3[0];
+      const seq = args3[1];
+      return take(n, isLazySeq(seq) ? seq : Array.isArray(seq) ? seq : null);
+    }
+    // (drop n seq) — lazy seq에서 n개 버리고 나머지 반환
+    case "drop": {
+      if (Array.isArray(args3[0]) && typeof args3[1] === "number") {
+        throw new Error(`drop \uC778\uC790 \uC21C\uC11C \uC624\uB958: (drop n coll) \uD615\uC2DD\uC774 \uC62C\uBC14\uB985\uB2C8\uB2E4. \uD604\uC7AC \uC785\uB825: (drop coll n)`);
+      }
+      const n = args3[0];
+      const seq = args3[1];
+      if (Array.isArray(seq)) return seq.slice(n);
+      return drop(n, isLazySeq(seq) ? seq : null);
+    }
+    // (filter-lazy pred seq) — 레이지 필터
+    case "filter-lazy": {
+      const pred = args3[0];
+      const seq = args3[1];
+      const applyPred = (v) => Boolean(callFn(pred, [v]));
+      const doFilter = (s) => {
+        if (!s) return null;
+        let cur = s;
+        while (cur && !applyPred(lazyHead(cur))) cur = lazyTail(cur);
+        if (!cur) return null;
+        const h = lazyHead(cur);
+        const t = lazyTail(cur);
+        return lazySeq(() => h, () => doFilter(t));
+      };
+      return doFilter(isLazySeq(seq) ? seq : null);
+    }
+    // (map-lazy f seq) — 레이지 맵 (단항)
+    case "map-lazy": {
+      const f2 = args3[0];
+      const seq2 = args3[1];
+      const doMap = (s) => {
+        if (!s) return null;
+        const h = lazyHead(s);
+        return lazySeq(() => callFn(f2, [h]), () => doMap(lazyTail(s)));
+      };
+      return doMap(isLazySeq(seq2) ? seq2 : null);
+    }
+    // (take-while pred seq) — pred가 true인 동안만 꺼냄 (배열 반환)
+    case "take-while": {
+      const pred = args3[0];
+      const seq = args3[1];
+      if (Array.isArray(seq)) {
+        const result = [];
+        for (const v of seq) {
+          if (!callFn(pred, [v])) break;
+          result.push(v);
+        }
+        return result;
+      }
+      const doTakeWhile = (s) => {
+        const result = [];
+        let cur = s;
+        while (cur) {
+          const h = lazyHead(cur);
+          if (!callFn(pred, [h])) break;
+          result.push(h);
+          cur = lazyTail(cur);
+        }
+        return result;
+      };
+      return doTakeWhile(isLazySeq(seq) ? seq : null);
+    }
+    case "drop-while": {
+      const pred = args3[0];
+      const seq = args3[1];
+      if (!Array.isArray(seq)) return [];
+      let i = 0;
+      while (i < seq.length && callFnVal(pred, [seq[i]])) i++;
+      return seq.slice(i);
+    }
+    case "map-indexed": {
+      const fn = args3[0];
+      const seq = args3[1];
+      if (!Array.isArray(seq)) return [];
+      return seq.map((v, i) => callFnVal(fn, [i, v]));
+    }
+    case "reduce-kv": {
+      const fn = args3[0];
+      const init = args3[1];
+      const m = args3[2];
+      if (m === null || m === void 0 || typeof m !== "object" || Array.isArray(m)) return init;
+      let acc = init;
+      for (const [k, v] of Object.entries(m)) {
+        acc = callFnVal(fn, [acc, k, v]);
+      }
+      return acc;
+    }
+    // (lazy-head seq) / (lazy-tail seq) — 직접 접근
+    case "lazy-head": {
+      return isLazySeq(args3[0]) ? lazyHead(args3[0]) : null;
+    }
+    case "lazy-tail": {
+      return isLazySeq(args3[0]) ? lazyTail(args3[0]) : null;
+    }
+    // (lazy? v) — 레이지 시퀀스 여부 확인
+    case "lazy?": {
+      return isLazySeq(args3[0]);
+    }
+    // ── Phase 95: Context Window 관리 함수 ─────────────────────────────
+    // (ctx-new max-tokens?) → ContextManager
+    case "ctx-new": {
+      const maxTokens = typeof args3[0] === "number" ? args3[0] : 4096;
+      return new ContextManager(maxTokens);
+    }
+    // (ctx-add ctx content :priority p :tags [...] :tokens n) → id
+    case "ctx-add": {
+      const ctx = args3[0];
+      const content = args3[1];
+      const opts = {};
+      for (let i = 2; i < expr2.args.length - 1; i++) {
+        const raw = expr2.args[i];
+        if (raw.kind === "keyword") {
+          const kw = raw.name;
+          const val = args3[i];
+          if (kw === "priority") opts.priority = Number(val);
+          else if (kw === "tags") opts.tags = Array.isArray(val) ? val : [String(val)];
+          else if (kw === "tokens") opts.tokens = Number(val);
+        }
+      }
+      return ctx.add(content, opts);
+    }
+    // (ctx-get ctx id) → ContextEntry | undefined
+    case "ctx-get": {
+      const ctx = args3[0];
+      return ctx.get(String(args3[1])) ?? null;
+    }
+    // (ctx-remove ctx id) → void
+    case "ctx-remove": {
+      const ctx = args3[0];
+      ctx.remove(String(args3[1]));
+      return null;
+    }
+    // (ctx-trim ctx) → removed entries
+    case "ctx-trim": {
+      const ctx = args3[0];
+      return ctx.trim();
+    }
+    // (ctx-stats ctx) → {used, max, percent, count}
+    case "ctx-stats": {
+      const ctx = args3[0];
+      return ctx.stats();
+    }
+    // (ctx-has-room? ctx tokens) → bool
+    case "ctx-has-room?": {
+      const ctx = args3[0];
+      return ctx.hasRoom(Number(args3[1]));
+    }
+    // (ctx-all ctx) / (ctx-all ctx tag) → entries
+    case "ctx-all": {
+      const ctx = args3[0];
+      const tag = args3.length > 1 ? String(args3[1]) : void 0;
+      return ctx.getAll(tag);
+    }
+    // ── Phase 96: Result 타입 추가 함수 ─────────────────────────────────────
+    // (ok? result) → bool
+    case "ok?":
+      return isOk(args3[0]);
+    // (err? result) → bool
+    case "err?":
+      return isErr(args3[0]);
+    // (unwrap result) → value or throw
+    case "unwrap":
+      return unwrap(args3[0]);
+    // (unwrap-or result default) → value
+    case "unwrap-or":
+      return unwrapOr(args3[0], args3[1]);
+    // (map-ok result fn) → Result
+    case "map-ok": {
+      const r = args3[0];
+      const fn = args3[1];
+      return mapOk(r, (v) => callFn(fn, [v]));
+    }
+    // (map-err result fn) → Result
+    case "map-err": {
+      const r = args3[0];
+      const fn = args3[1];
+      return mapErr(r, (e) => callFn(fn, [e]));
+    }
+    // (flat-map result fn) → Result
+    case "flat-map": {
+      const fmFn = args3[0], fmArr = args3[1];
+      if (Array.isArray(fmArr)) {
+        const results = [];
+        for (const item of fmArr) {
+          const r = callFnVal(fmFn, [item]);
+          if (Array.isArray(r)) results.push(...r);
+          else if (r !== null && r !== void 0) results.push(r);
+        }
+        return results;
+      }
+      return flatMap(fmArr, (v) => callFn(fmFn, [v]));
+    }
+    // (recover result fn) → value (Ok값 또는 fn(err) 반환)
+    case "recover": {
+      const r = args3[0];
+      const fn = args3[1];
+      return recover(r, (e) => callFn(fn, [e]));
+    }
+    // (result-explain err) → 한국어 설명 문자열
+    case "result-explain": {
+      const e = args3[0];
+      if (!isErr(e)) return "(Ok \uAC12 \u2014 \uC5D0\uB7EC \uC5C6\uC74C)";
+      return defaultErrorSystem.explain(e);
+    }
+    // (result-classify err-obj) → Err 구조체
+    case "result-classify": {
+      const raw = args3[0];
+      if (raw instanceof Error) return defaultErrorSystem.classify(raw);
+      if (typeof raw === "string") return defaultErrorSystem.classify(new Error(raw));
+      return raw;
+    }
+    // Phase 101: Memory System
+    // (mem-remember "key" value) — 장기 저장
+    case "mem-remember": {
+      const key = String(args3[0]);
+      const value = args3[1];
+      globalMemory.remember(key, value, { scope: "long-term", ttl: "forever" });
+      return null;
+    }
+    // (mem-remember-short "key" value ttl-ms) — 단기 저장
+    case "mem-remember-short": {
+      const key = String(args3[0]);
+      const value = args3[1];
+      const ttl = typeof args3[2] === "number" ? args3[2] : 6e4;
+      globalMemory.remember(key, value, { scope: "short-term", ttl });
+      return null;
+    }
+    // (mem-recall "key") / (mem-recall "key" fallback) — 조회
+    case "mem-recall": {
+      const key = String(args3[0]);
+      const fallback = args3.length > 1 ? args3[1] : null;
+      return globalMemory.recall(key, fallback);
+    }
+    // (mem-forget "key") — 삭제
+    case "mem-forget": {
+      const key = String(args3[0]);
+      return globalMemory.forget(key);
+    }
+    // (mem-episode "id" "what") / (mem-episode "id" "what" context outcome)
+    case "mem-episode": {
+      const id = String(args3[0]);
+      const what = String(args3[1]);
+      const context = args3[2] ?? {};
+      const outcome = args3[3];
+      return globalMemory.recordEpisode(id, what, context, outcome);
+    }
+    // (mem-search-episodes "query") — 에피소드 검색
+    case "mem-search-episodes": {
+      const query = String(args3[0]);
+      return globalMemory.searchEpisodes(query);
+    }
+    // (mem-working-set value) — 작업 메모리 저장
+    case "mem-working-set": {
+      globalMemory.setWorking(args3[0]);
+      return null;
+    }
+    // (mem-working-get) — 작업 메모리 조회
+    case "mem-working-get": {
+      return globalMemory.getWorking();
+    }
+    // (mem-working-clear) — 작업 메모리 초기화
+    case "mem-working-clear": {
+      globalMemory.clearWorking();
+      return null;
+    }
+    // (mem-keys) / (mem-keys "scope") — 모든 키 목록
+    case "mem-keys": {
+      const scope = args3.length > 0 ? String(args3[0]) : void 0;
+      return globalMemory.keys(scope);
+    }
+    // (mem-stats) — 통계
+    case "mem-stats": {
+      return globalMemory.stats();
+    }
+    // (mem-purge) — 만료 정리
+    case "mem-purge": {
+      return globalMemory.purgeExpired();
+    }
+    // (mem-search-tag "tag") — 태그 검색
+    case "mem-search-tag": {
+      const tag = String(args3[0]);
+      return globalMemory.searchByTag(tag);
+    }
+    // Phase 97: (use-tool "toolname" {key val ...}) — 도구 사용
+    case "use-tool": {
+      const toolName = String(args3[0]);
+      const toolArgs = args3[1] && typeof args3[1] === "object" && !Array.isArray(args3[1]) ? args3[1] : {};
+      const result = globalToolRegistry.executeSync(toolName, toolArgs);
+      if (!result.success) throw new Error(result.error || `Tool failed: ${toolName}`);
+      return result.output;
+    }
+    // Phase 97: (list-tools) — 등록된 도구 목록
+    case "list-tools": {
+      return globalToolRegistry.listAll().map((t) => t.name);
+    }
+    // Phase 102: RAG 내장 함수
+    // (rag-add "id" "content") — 문서 추가
+    case "rag-add": {
+      const id = String(args3[0]);
+      const content = String(args3[1]);
+      const metadata = args3[2] && typeof args3[2] === "object" ? args3[2] : void 0;
+      globalRAG.add({ id, content, metadata });
+      return true;
+    }
+    // (rag-retrieve "query" topK) — 검색 → 리스트
+    case "rag-retrieve": {
+      const query = String(args3[0]);
+      const topK = typeof args3[1] === "number" ? args3[1] : 3;
+      const results = globalRAG.retrieve(query, topK);
+      return results.map((d) => ({ id: d.id, content: d.content, score: d.score ?? 0 }));
+    }
+    // (rag-query "query") — 검색 + 기본 augment → 문자열
+    case "rag-query": {
+      const query = String(args3[0]);
+      const topK = typeof args3[1] === "number" ? args3[1] : 3;
+      const result = globalRAG.query(query, { topK });
+      return result.augmented;
+    }
+    // (rag-size) — 문서 수
+    case "rag-size": {
+      return globalRAG.size();
+    }
+    // (rag-remove "id") — 문서 삭제
+    case "rag-remove": {
+      const id = String(args3[0]);
+      return globalRAG.remove(id);
+    }
+    // Phase 103: 멀티 에이전트 통신
+    // (agent-spawn "id" handler-fn) → AgentHandle
+    case "agent-spawn": {
+      const agentId = String(args3[0]);
+      const handlerFn = args3[1];
+      const handler = (msg, bus) => {
+        return callFn(handlerFn, [msg, bus]);
+      };
+      return globalBus.spawn(agentId, handler);
+    }
+    // (agent-send "from" "to" content) → AgentMessage
+    case "agent-send": {
+      const from = String(args3[0]);
+      const to = String(args3[1]);
+      const content = args3[2];
+      return globalBus.send(from, to, content);
+    }
+    // (agent-broadcast "from" content) → AgentMessage[]
+    case "agent-broadcast": {
+      const from = String(args3[0]);
+      const content = args3[1];
+      return globalBus.broadcast(from, content);
+    }
+    // (agent-recv "id") → AgentMessage | null
+    case "agent-recv": {
+      const agentId = String(args3[0]);
+      return globalBus.recv(agentId);
+    }
+    // (agent-process "id") → any[]
+    case "agent-process": {
+      const agentId = String(args3[0]);
+      return globalBus.process(agentId);
+    }
+    // (agent-list) → string[]
+    case "agent-list": {
+      return globalBus.list();
+    }
+    // (agent-history) → AgentMessage[]
+    case "agent-history": {
+      return globalBus.history();
+    }
+    // (agent-inbox-size "id") → number
+    case "agent-inbox-size": {
+      const agentId = String(args3[0]);
+      return globalBus.inboxSize(agentId);
+    }
+    // Phase 104: TRY-REASON
+    // (try-reason [[strategy fn] ...]) → 첫 성공 값
+    case "try-reason": {
+      const attemptsList = args3[0];
+      if (!Array.isArray(attemptsList)) {
+        throw new Error("try-reason: attempts must be a list");
+      }
+      const attempts = attemptsList.map((item) => {
+        if (Array.isArray(item) && item.length === 2) {
+          const [strategy, fn] = item;
+          return [String(strategy), () => {
+            if (typeof fn === "function") return fn();
+            if (fn && fn.kind === "function-value") return callFn(fn, []);
+            return fn;
+          }];
+        }
+        throw new Error("try-reason: each attempt must be [strategy fn]");
+      });
+      return tryReasonBuiltin(attempts);
+    }
+    // Phase 106: Quality Loop 내장 함수
+    // (quality-check output threshold?) → score (0.0~1.0)
+    case "quality-check": {
+      const output = args3[0];
+      const threshold = args3.length > 1 ? Number(args3[1]) : 0.7;
+      const result = evaluateQuality(output, defaultCriteria, threshold);
+      return result.score;
+    }
+    // (quality-passed? output threshold?) → boolean
+    case "quality-passed?": {
+      const output = args3[0];
+      const threshold = args3.length > 1 ? Number(args3[1]) : 0.7;
+      const result = evaluateQuality(output, defaultCriteria, threshold);
+      return result.passed;
+    }
+    // (quality-feedback output) → string[]
+    case "quality-feedback": {
+      const output = args3[0];
+      const result = evaluateQuality(output, defaultCriteria, 0.7);
+      return result.feedback;
+    }
+    // Phase 105: Streaming Output
+    // (stream-create) → stream-id 문자열
+    case "stream-create": {
+      const { id } = createStream();
+      return id;
+    }
+    // (stream-write "id" "chunk") — 청크 쓰기
+    case "stream-write": {
+      const streamId = String(args3[0]);
+      const content = String(args3[1] ?? "");
+      const s105a = getStream(streamId);
+      if (!s105a) throw new Error(`stream-write: stream not found: ${streamId}`);
+      s105a.write(content);
+      return null;
+    }
+    // (stream-end "id") — 스트림 종료
+    case "stream-end": {
+      const streamId = String(args3[0]);
+      const s105b = getStream(streamId);
+      if (!s105b) throw new Error(`stream-end: stream not found: ${streamId}`);
+      s105b.end();
+      return null;
+    }
+    // (stream-collect "id") → 수집된 문자열 (Promise or string)
+    case "stream-collect": {
+      const streamId = String(args3[0]);
+      const s105c = getStream(streamId);
+      if (!s105c) throw new Error(`stream-collect: stream not found: ${streamId}`);
+      return s105c.collect();
+    }
+    // (stream-done? "id") → boolean
+    case "stream-done?": {
+      const streamId = String(args3[0]);
+      const s105d = getStream(streamId);
+      if (!s105d) return true;
+      return s105d.isDone();
+    }
+    // (stream-chunks "id") → StreamChunk[]
+    case "stream-chunks": {
+      const streamId = String(args3[0]);
+      const s105e = getStream(streamId);
+      if (!s105e) throw new Error(`stream-chunks: stream not found: ${streamId}`);
+      return s105e.getChunks();
+    }
+    // (stream-chunk-count "id") → number
+    case "stream-chunk-count": {
+      const streamId = String(args3[0]);
+      const s105f = getStream(streamId);
+      if (!s105f) throw new Error(`stream-chunk-count: stream not found: ${streamId}`);
+      return s105f.chunkCount();
+    }
+    // (stream-text "id" "text") — 텍스트를 단어 단위로 자동 스트리밍
+    case "stream-text": {
+      const streamId = String(args3[0]);
+      const text = String(args3[1] ?? "");
+      const s105g = getStream(streamId);
+      if (!s105g) throw new Error(`stream-text: stream not found: ${streamId}`);
+      return streamText(s105g, text, 0);
+    }
+    // (stream-delete "id") → boolean
+    case "stream-delete": {
+      const streamId = String(args3[0]);
+      return deleteStream(streamId);
+    }
+    // (try-with-fallback fn fallback) → fn() 실패 시 fallback
+    case "try-with-fallback": {
+      const fn = args3[0];
+      const fallback = args3[1];
+      const wrappedFn = () => {
+        if (typeof fn === "function") return fn();
+        if (fn && fn.kind === "function-value") return callFn(fn, []);
+        return fn;
+      };
+      return tryWithFallback(wrappedFn, fallback);
+    }
+    // Phase 107: FL 자기 교육 시스템 내장 함수
+    // (fl-learn "concept") → 레슨 마크다운 문자열
+    case "fl-learn": {
+      const concept = String(args3[0] ?? "");
+      return globalTutor.lessonMarkdown(concept);
+    }
+    // (fl-examples "tag") → 태그별 예제 리스트 (JSON 문자열)
+    case "fl-examples": {
+      const tag = String(args3[0] ?? "");
+      const examples = globalTutor.findByTag(tag);
+      return examples.map((e) => `${e.concept}: ${e.description}`).join("\n");
+    }
+    // (fl-example-count) → 총 예제 수
+    case "fl-example-count": {
+      return globalTutor.size();
+    }
+    // (fl-concepts) → 개념 목록 (공백 구분 문자열)
+    case "fl-concepts": {
+      return globalTutor.concepts().join(" ");
+    }
+    // Phase 108: AI 추론 시각화 디버거 내장 함수
+    // (trace-create "label") → trace-id 문자열
+    case "trace-create": {
+      const label = String(args3[0] ?? "trace");
+      const { id } = createTrace(label);
+      return id;
+    }
+    // (trace-add id "type" "label") → null
+    // (trace-add id "type" "label" value) → null
+    case "trace-add": {
+      const traceId2 = String(args3[0] ?? "");
+      const nodeType = String(args3[1] ?? "thought");
+      const nodeLabel = String(args3[2] ?? "");
+      const nodeValue = args3.length >= 4 ? args3[3] : void 0;
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return null;
+      trace2.add(nodeType, nodeLabel, nodeValue);
+      return null;
+    }
+    // (trace-enter id "type" "label") → null
+    case "trace-enter": {
+      const traceId2 = String(args3[0] ?? "");
+      const nodeType = String(args3[1] ?? "thought");
+      const nodeLabel = String(args3[2] ?? "");
+      const nodeValue = args3.length >= 4 ? args3[3] : void 0;
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return null;
+      trace2.enter(nodeType, nodeLabel, nodeValue);
+      return null;
+    }
+    // (trace-exit id) → null
+    // (trace-exit id result) → null
+    case "trace-exit": {
+      const traceId2 = String(args3[0] ?? "");
+      const result = args3.length >= 2 ? args3[1] : void 0;
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return null;
+      trace2.exit(result);
+      return null;
+    }
+    // (trace-markdown id) → 마크다운 문자열
+    case "trace-markdown": {
+      const traceId2 = String(args3[0] ?? "");
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return "";
+      return trace2.toMarkdown();
+    }
+    // (trace-tree id) → 텍스트 트리 문자열
+    case "trace-tree": {
+      const traceId2 = String(args3[0] ?? "");
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return "";
+      return trace2.toTree();
+    }
+    // (trace-node-count id) → 노드 수 (숫자)
+    case "trace-node-count": {
+      const traceId2 = String(args3[0] ?? "");
+      const trace2 = getTrace(traceId2);
+      if (!trace2) return 0;
+      return trace2.nodeCount();
+    }
+    // Phase 109: FL → 최적 프롬프트 컴파일러 내장 함수
+    // (prompt-compile "blockType" "instruction") → 프롬프트 문자열
+    case "prompt-compile": {
+      const blockType = String(args3[0] ?? "COT");
+      const instruction = String(args3[1] ?? "");
+      const section = globalCompiler.compileBlock(blockType, {});
+      const sections = section ? [section] : [{ name: "default", content: "", priority: 0.5 }];
+      const result = globalCompiler.compile(sections, instruction);
+      return result.prompt;
+    }
+    // (prompt-tokens "text") → 추정 토큰 수 (숫자)
+    case "prompt-tokens": {
+      const text = String(args3[0] ?? "");
+      return Math.ceil(text.length / 4);
+    }
+    // (prompt-target "claude"|"gpt"|"generic") → 타겟 설정 후 현재 타겟 반환
+    case "prompt-target": {
+      const target = String(args3[0] ?? "claude");
+      globalCompiler.setTarget(target);
+      return target;
+    }
+    // (prompt-from-code "fl-code" "instruction") → FL 코드에서 자동 컴파일된 프롬프트
+    case "prompt-from-code": {
+      const flCode = String(args3[0] ?? "");
+      const instruction = String(args3[1] ?? "");
+      const result = globalCompiler.compileFromCode(flCode, instruction);
+      return result.prompt;
+    }
+    // Phase 110: External AI SDK 내장 함수
+    // (sdk-version) → "9.0.0"
+    case "sdk-version": {
+      return sdk.version;
+    }
+    // (sdk-features) → 피처 리스트 (배열)
+    case "sdk-features": {
+      return [...sdk.features];
+    }
+    // (sdk-supports "feature") → boolean
+    case "sdk-supports": {
+      const feature = String(args3[0] ?? "");
+      return sdk.supports(feature);
+    }
+    // (sdk-snippet "concept") → 코드 문자열
+    case "sdk-snippet": {
+      const concept = String(args3[0] ?? "");
+      return sdk.snippet(concept);
+    }
+    // (sdk-validate "code") → boolean
+    case "sdk-validate": {
+      const code = String(args3[0] ?? "");
+      const result = sdk.validate(code);
+      return result.valid;
+    }
+    // ── Phase 112: maybe-chain 확률 자동 전파 ────────────────────────────
+    // (maybe-map $m fn) → maybe(same-confidence, fn(value))
+    case "maybe-map": {
+      const [m, fn] = args3;
+      return maybeMap(m, (v) => callFnVal(fn, [v]));
+    }
+    // (maybe-bind $m fn) → fn(value) 결과 maybe와 확률 곱
+    case "maybe-bind": {
+      const [m, fn] = args3;
+      return maybeBind(m, (v) => callFnVal(fn, [v]));
+    }
+    // (maybe-chain maybe-list fn) → 확률 곱 + 값 합성
+    case "maybe-chain": {
+      const [maybes, fn] = args3;
+      const list = Array.isArray(maybes) ? maybes : [maybes];
+      return maybeChain(list, (...vals) => callFnVal(fn, vals));
+    }
+    // (maybe-filter $m pred) → 조건 불만족 시 none
+    case "maybe-filter": {
+      const [m, pred] = args3;
+      return maybeFilter(m, (v) => callFnVal(pred, [v]));
+    }
+    // (maybe-combine $a $b fn) → 두 maybe 결합 (확률 곱)
+    case "maybe-combine": {
+      const [a, b, fn] = args3;
+      return maybeCombine(a, b, (x, y) => callFnVal(fn, [x, y]));
+    }
+    // (maybe-select maybe-list) → 최고 신뢰도 선택
+    case "maybe-select": {
+      const list = Array.isArray(args3[0]) ? args3[0] : args3;
+      return maybeSelect(list);
+    }
+    // Function call (default)
+    default: {
+      if (interp2.context.functions.has(op)) {
+        return callUser(op, args3);
+      }
+      const bracketMatch = op.match(/^([\w\-]+)\[([^\]]+)\]$/);
+      if (bracketMatch && interp2.context.functions.has(bracketMatch[1])) {
+        return callUser(op, args3);
+      }
+      if (interp2.context.variables.has(op)) {
+        const fn = interp2.context.variables.get(op);
+        if (fn.kind === "builtin-function") {
+          return fn.fn(args3.map((arg) => ev(arg)));
+        } else if (typeof fn === "function" || fn.kind === "function-value") {
+          return callFn(fn, args3);
+        }
+      }
+      if (op === "hypothesis") {
+        const [claim, testFn, evalFn] = args3;
+        const config = {
+          claim: String(claim),
+          test: (attempt) => {
+            if (typeof testFn === "function") return testFn(attempt);
+            if (testFn?.kind === "function-value") return callFn(testFn, [attempt]);
+            return null;
+          },
+          evaluate: (evidence) => {
+            if (typeof evalFn === "function") return evalFn(evidence);
+            if (evalFn?.kind === "function-value") return callFn(evalFn, [evidence]);
+            return 0;
+          }
+        };
+        const result = globalTester.test(config);
+        return result.verdict;
+      }
+      if (op === "hypothesis-confidence") {
+        const [claim, testFn, evalFn] = args3;
+        const config = {
+          claim: String(claim),
+          test: (attempt) => {
+            if (typeof testFn === "function") return testFn(attempt);
+            if (testFn?.kind === "function-value") return callFn(testFn, [attempt]);
+            return null;
+          },
+          evaluate: (evidence) => {
+            if (typeof evalFn === "function") return evalFn(evidence);
+            if (evalFn?.kind === "function-value") return callFn(evalFn, [evidence]);
+            return 0;
+          }
+        };
+        const result = globalTester.test(config);
+        return result.confidence;
+      }
+      if (op === "hypothesis-compete") {
+        const hypoList = args3[0];
+        if (!Array.isArray(hypoList) || hypoList.length === 0) return null;
+        const configs = hypoList.map((h) => {
+          const [claim, testFn, evalFn] = Array.isArray(h) ? h : [h, () => null, () => 0];
+          return {
+            claim: String(claim),
+            test: (attempt) => {
+              if (typeof testFn === "function") return testFn(attempt);
+              if (testFn?.kind === "function-value") return callFn(testFn, [attempt]);
+              return null;
+            },
+            evaluate: (evidence) => {
+              if (typeof evalFn === "function") return evalFn(evidence);
+              if (evalFn?.kind === "function-value") return callFn(evalFn, [evidence]);
+              return 0;
+            }
+          };
+        });
+        const winner = globalTester.compete(configs);
+        return winner.claim;
+      }
+      if (op === "debate") {
+        const [proposition, proFn, conFn] = args3;
+        const result = globalDebater.debate({
+          proposition: String(proposition),
+          pro: (round, conArgs) => {
+            if (typeof proFn === "function") return proFn(round, conArgs);
+            if (proFn?.kind === "function-value") return callFn(proFn, [round, conArgs]);
+            return { side: "pro", point: String(proFn), strength: 0.5 };
+          },
+          con: (round, proArgs) => {
+            if (typeof conFn === "function") return conFn(round, proArgs);
+            if (conFn?.kind === "function-value") return callFn(conFn, [round, proArgs]);
+            return { side: "con", point: String(conFn), strength: 0.5 };
+          }
+        });
+        return result.winner;
+      }
+      if (op === "debate-score") {
+        const [proposition, proFn, conFn] = args3;
+        const result = globalDebater.debate({
+          proposition: String(proposition),
+          pro: (round, conArgs) => {
+            if (typeof proFn === "function") return proFn(round, conArgs);
+            if (proFn?.kind === "function-value") return callFn(proFn, [round, conArgs]);
+            return { side: "pro", point: String(proFn), strength: 0.5 };
+          },
+          con: (round, proArgs) => {
+            if (typeof conFn === "function") return conFn(round, proArgs);
+            if (conFn?.kind === "function-value") return callFn(conFn, [round, proArgs]);
+            return { side: "con", point: String(conFn), strength: 0.5 };
+          }
+        });
+        return { pro: result.proScore, con: result.conScore };
+      }
+      if (op === "debate-conclusion") {
+        const [proposition, proFn, conFn] = args3;
+        const result = globalDebater.debate({
+          proposition: String(proposition),
+          pro: (round, conArgs) => {
+            if (typeof proFn === "function") return proFn(round, conArgs);
+            if (proFn?.kind === "function-value") return callFn(proFn, [round, conArgs]);
+            return { side: "pro", point: String(proFn), strength: 0.5 };
+          },
+          con: (round, proArgs) => {
+            if (typeof conFn === "function") return conFn(round, proArgs);
+            if (conFn?.kind === "function-value") return callFn(conFn, [round, proArgs]);
+            return { side: "con", point: String(conFn), strength: 0.5 };
+          }
+        });
+        return result.conclusion;
+      }
+      if (op === "cp-save") {
+        const [name, state] = args3;
+        globalCheckpoint.save(String(name), state);
+        return null;
+      }
+      if (op === "cp-restore") {
+        const [name] = args3;
+        return globalCheckpoint.restore(String(name));
+      }
+      if (op === "cp-branch") {
+        const [name, state, fn] = args3;
+        const result = globalCheckpoint.branch(String(name), state, (s) => {
+          if (typeof fn === "function") return fn(s);
+          if (typeof fn === "string") return callUser(fn, [s]);
+          if (fn?.kind === "function-value" || fn?.kind === "async-function-value") {
+            return callFnVal(fn, [s]);
+          }
+          if (fn?.params && fn?.body) return callFnVal({ kind: "function-value", ...fn }, [s]);
+          throw new Error(`cp-branch: fn must be callable, got ${typeof fn} ${fn?.kind ?? ""}`);
+        });
+        if (result.success) return result.result;
+        return result.restored;
+      }
+      if (op === "cp-drop") {
+        const [name] = args3;
+        return globalCheckpoint.drop(String(name));
+      }
+      if (op === "cp-list") {
+        return globalCheckpoint.list();
+      }
+      if (op === "cp-versions") {
+        const [name] = args3;
+        return globalCheckpoint.versions(String(name));
+      }
+      if (op === "meta-reason") {
+        const problem = String(args3[0] ?? "");
+        const result = globalMetaReasoner.analyze(problem);
+        return result.selected;
+      }
+      if (op === "meta-reason-scores") {
+        const problem = String(args3[0] ?? "");
+        const result = globalMetaReasoner.analyze(problem);
+        const scoreMap = {};
+        for (const s of result.scores) {
+          scoreMap[s.strategy] = s.score;
+        }
+        return scoreMap;
+      }
+      if (op === "meta-reason-rationale") {
+        const problem = String(args3[0] ?? "");
+        const result = globalMetaReasoner.analyze(problem);
+        return result.rationale;
+      }
+      if (op === "belief-set") {
+        const [claim, confidence] = args3;
+        globalBeliefs.set(String(claim), Number(confidence));
+        return null;
+      }
+      if (op === "belief-get") {
+        const [claim] = args3;
+        return globalBeliefs.get(String(claim));
+      }
+      if (op === "belief-update") {
+        const [claim, evidence] = args3;
+        return globalBeliefs.update(String(claim), Number(evidence));
+      }
+      if (op === "belief-negate") {
+        const [claim] = args3;
+        return globalBeliefs.negate(String(claim));
+      }
+      if (op === "belief-list") {
+        return globalBeliefs.list();
+      }
+      if (op === "belief-certain") {
+        const threshold = args3.length > 0 ? Number(args3[0]) : 0.8;
+        return globalBeliefs.certain(threshold);
+      }
+      if (op === "belief-strongest") {
+        const b = globalBeliefs.strongest();
+        return b ? b.claim : null;
+      }
+      if (op === "belief-forget") {
+        const [claim] = args3;
+        return globalBeliefs.forget(String(claim));
+      }
+      if (op === "belief-size") {
+        return globalBeliefs.size();
+      }
+      if (op === "analogy-store") {
+        const [desc, solution, tagsRaw] = args3;
+        const tags = Array.isArray(tagsRaw) ? tagsRaw.map(String) : [];
+        const p = globalAnalogy.store(String(desc), solution, tags);
+        return p.id;
+      }
+      if (op === "analogy-find") {
+        const [problem, topK] = args3;
+        const results = globalAnalogy.find(String(problem), topK != null ? Number(topK) : 3);
+        return results.map((p) => p.description);
+      }
+      if (op === "analogy-best") {
+        const [problem] = args3;
+        const p = globalAnalogy.best(String(problem));
+        return p ? p.solution : null;
+      }
+      if (op === "analogy-by-tag") {
+        const [tag] = args3;
+        const results = globalAnalogy.byTag(String(tag));
+        return results.map((p) => p.description);
+      }
+      if (op === "analogy-popular") {
+        const [n] = args3;
+        const results = globalAnalogy.popular(n != null ? Number(n) : 3);
+        return results.map((p) => p.description);
+      }
+      if (op === "analogy-size") {
+        return globalAnalogy.size();
+      }
+      if (op === "analogy-all") {
+        return globalAnalogy.all().map((p) => p.description);
+      }
+      if (op === "critique") {
+        const [output] = args3;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.approved;
+      }
+      if (op === "critique-points") {
+        const [output] = args3;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.points.map((p) => p.description);
+      }
+      if (op === "critique-risk") {
+        const [output] = args3;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.overallRisk;
+      }
+      if (op === "critique-summary") {
+        const [output] = args3;
+        const result = globalCritique.run(output, { finders: defaultFinders });
+        return result.summary;
+      }
+      if (op === "compose-reason") {
+        const [stepsList, input] = args3;
+        if (!Array.isArray(stepsList)) return input;
+        const steps = stepsList.map((s) => {
+          if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
+          const [name, fn, condition] = s;
+          const step = {
+            name: String(name),
+            fn: typeof fn === "function" ? fn : (x) => x
+          };
+          if (typeof condition === "function") step.condition = condition;
+          return step;
+        });
+        const result = globalComposer.compose(steps, input);
+        return result.output;
+      }
+      if (op === "compose-history") {
+        const [stepsList, input] = args3;
+        if (!Array.isArray(stepsList)) return [];
+        const steps = stepsList.map((s) => {
+          if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
+          const [name, fn, condition] = s;
+          const step = {
+            name: String(name),
+            fn: typeof fn === "function" ? fn : (x) => x
+          };
+          if (typeof condition === "function") step.condition = condition;
+          return step;
+        });
+        const result = globalComposer.compose(steps, input);
+        return result.history.map((h) => h.name);
+      }
+      if (op === "compose-steps") {
+        const [stepsList, input] = args3;
+        if (!Array.isArray(stepsList)) return 0;
+        const steps = stepsList.map((s) => {
+          if (!Array.isArray(s)) return { name: String(s), fn: (x) => x };
+          const [name, fn, condition] = s;
+          const step = {
+            name: String(name),
+            fn: typeof fn === "function" ? fn : (x) => x
+          };
+          if (typeof condition === "function") step.condition = condition;
+          return step;
+        });
+        const result = globalComposer.compose(steps, input);
+        return result.steps;
+      }
+      if (op === "cognition-solve") {
+        const [problem, solverFn] = args3;
+        const result = globalCognition.solve(String(problem), (strategy, prob) => {
+          if (typeof solverFn === "function") return solverFn(strategy, prob);
+          if (solverFn?.kind === "function-value") return callFn(solverFn, [strategy, prob]);
+          return solverFn;
+        });
+        return /* @__PURE__ */ new Map([
+          ["strategy", result.strategy],
+          ["output", result.output],
+          ["approved", result.approved],
+          ["risk", result.risk]
+        ]);
+      }
+      if (op === "cognition-stats") {
+        const s = globalCognition.stats();
+        return /* @__PURE__ */ new Map([
+          ["beliefs", s.beliefs],
+          ["analogies", s.analogies],
+          ["checkpoints", s.checkpoints]
+        ]);
+      }
+      if (op === "cognition-meta") {
+        const [problem] = args3;
+        const result = globalCognition.meta.analyze(String(problem));
+        return result.selected;
+      }
+      if (op === "cognition-believe") {
+        const [claim, confidence] = args3;
+        globalCognition.beliefs.set(String(claim), Number(confidence));
+        return null;
+      }
+      if (op === "cognition-recall") {
+        const [pattern] = args3;
+        const p = globalCognition.analogies.best(String(pattern));
+        return p ? p.solution : null;
+      }
+      {
+        let parseVotes = function(raw) {
+          if (!Array.isArray(raw)) return [];
+          return raw.map((item) => {
+            if (Array.isArray(item)) {
+              return { agentId: String(item[0]), answer: item[1], confidence: Number(item[2]) };
+            }
+            return item;
+          });
+        };
+        if (op === "consensus-majority") {
+          const votes = parseVotes(args3[0]);
+          const result = globalConsensus.majority(votes);
+          return result.answer;
+        }
+        if (op === "consensus-weighted") {
+          const votes = parseVotes(args3[0]);
+          const result = globalConsensus.weighted(votes);
+          return result.answer;
+        }
+        if (op === "consensus-threshold") {
+          const votes = parseVotes(args3[0]);
+          const threshold = args3[1] !== void 0 ? Number(args3[1]) : 0.7;
+          const result = globalConsensus.threshold(votes, threshold);
+          return result ? result.answer : null;
+        }
+        if (op === "consensus-agreement") {
+          const votes = parseVotes(args3[0]);
+          return globalConsensus.agreement(votes);
+        }
+      }
+      {
+        let parseBallots = function(raw) {
+          if (!Array.isArray(raw)) return [];
+          return raw.map((item) => {
+            if (Array.isArray(item)) {
+              const voterId = String(item[0]);
+              const choices = Array.isArray(item[1]) ? item[1].map(String) : [];
+              const scores = item[2] && typeof item[2] === "object" && !Array.isArray(item[2]) ? item[2] : void 0;
+              return { voterId, choices, scores };
+            }
+            return item;
+          });
+        }, parseCandidates = function(raw) {
+          if (Array.isArray(raw)) return raw.map(String);
+          return [];
+        };
+        if (op === "vote-plurality") {
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
+          const result = globalVoting.plurality(ballots, candidates);
+          return result.winner;
+        }
+        if (op === "vote-approval") {
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
+          const result = globalVoting.approval(ballots, candidates);
+          return result.winner;
+        }
+        if (op === "vote-score") {
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
+          const result = globalVoting.score(ballots, candidates);
+          return result.winner;
+        }
+        if (op === "vote-tally") {
+          const ballots = parseBallots(args3[0]);
+          const candidates = parseCandidates(args3[1]);
+          const t = globalVoting.tally(ballots, candidates);
+          return new Map(Object.entries(t));
+        }
+      }
+      if (op === "negotiate") {
+        const [raw] = args3;
+        if (!Array.isArray(raw)) return false;
+        const positions = raw.map((p) => {
+          if (Array.isArray(p)) {
+            return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
+          }
+          return p;
+        });
+        const result = globalNegotiator.negotiate(positions);
+        return result.agreed;
+      }
+      if (op === "negotiate-value") {
+        const [raw] = args3;
+        if (!Array.isArray(raw)) return null;
+        const positions = raw.map((p) => {
+          if (Array.isArray(p)) {
+            return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
+          }
+          return p;
+        });
+        const result = globalNegotiator.negotiate(positions);
+        return result.agreed ? result.value ?? null : null;
+      }
+      if (op === "negotiate-rounds") {
+        const [raw] = args3;
+        if (!Array.isArray(raw)) return 0;
+        const positions = raw.map((p) => {
+          if (Array.isArray(p)) {
+            return { agentId: String(p[0]), offer: Number(p[1]), minAccept: Number(p[2]), maxOffer: Number(p[3]), flexibility: Number(p[4]) };
+          }
+          return p;
+        });
+        const result = globalNegotiator.negotiate(positions);
+        return result.rounds.length;
+      }
+      if (op === "swarm-optimize") {
+        const [fnArg, nArg, iterArg] = args3;
+        const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
+        const result = globalSwarm.optimize({
+          objective,
+          particles: nArg !== void 0 ? Number(nArg) : 10,
+          iterations: iterArg !== void 0 ? Number(iterArg) : 50
+        });
+        return result.bestPosition;
+      }
+      if (op === "swarm-best-score") {
+        const [fnArg, nArg, iterArg] = args3;
+        const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
+        const result = globalSwarm.optimize({
+          objective,
+          particles: nArg !== void 0 ? Number(nArg) : 10,
+          iterations: iterArg !== void 0 ? Number(iterArg) : 50
+        });
+        return result.bestScore;
+      }
+      if (op === "swarm-converged?") {
+        const [fnArg] = args3;
+        const objective = typeof fnArg === "function" ? fnArg : (x) => callFnVal(fnArg, [x]);
+        const result = globalSwarm.optimize({ objective });
+        return result.converged;
+      }
+      if (op === "compete-register") {
+        const [id, solveFn] = args3;
+        const competitor = {
+          id: String(id),
+          solve: (problem) => callFn(solveFn, [problem])
+        };
+        globalCompetition.register(competitor);
+        return null;
+      }
+      if (op === "compete") {
+        const [problem, evalFn] = args3;
+        const evaluate = (output) => Number(callFn(evalFn, [output]));
+        const result = globalCompetition.run(problem, evaluate);
+        return result.winner?.agentId ?? null;
+      }
+      if (op === "compete-score") {
+        const [problem, evalFn] = args3;
+        const evaluate = (output) => Number(callFn(evalFn, [output]));
+        const result = globalCompetition.run(problem, evaluate);
+        return result.winner?.score ?? null;
+      }
+      if (op === "compete-all") {
+        const [problem, evalFn] = args3;
+        const evaluate = (output) => Number(callFn(evalFn, [output]));
+        const result = globalCompetition.run(problem, evaluate);
+        return result.allResults.map((r) => [r.agentId, r.score, r.rank]);
+      }
+      if (op === "compete-list") {
+        return globalCompetition.list();
+      }
+      if (op === "peer-review-add") {
+        const [idArg, fnArg] = args3;
+        const reviewerId = String(idArg);
+        const reviewer = {
+          id: reviewerId,
+          review: (output) => {
+            const raw = callFnVal(fnArg, [output]);
+            if (raw && typeof raw === "object") {
+              return {
+                reviewerId,
+                aspect: String(raw.aspect ?? "quality"),
+                score: Number(raw.score ?? 0.5),
+                comment: String(raw.comment ?? ""),
+                suggestion: raw.suggestion !== void 0 ? String(raw.suggestion) : void 0
+              };
+            }
+            return { reviewerId, aspect: "quality", score: 0.5, comment: String(raw ?? "") };
+          }
+        };
+        globalPeerReview.addReviewer(reviewer);
+        return null;
+      }
+      if (op === "peer-review") {
+        const [targetId, output] = args3;
+        const result = globalPeerReview.review(String(targetId), output);
+        return result.approved;
+      }
+      if (op === "peer-review-score") {
+        const [targetId, output] = args3;
+        const result = globalPeerReview.review(String(targetId), output);
+        return result.averageScore;
+      }
+      if (op === "peer-review-comments") {
+        const [targetId, output] = args3;
+        const result = globalPeerReview.review(String(targetId), output);
+        return result.comments;
+      }
+      if (op === "peer-review-list") {
+        return globalPeerReview.list();
+      }
+      if (op === "chain-agents") {
+        const [rawAgents, input] = args3;
+        if (!Array.isArray(rawAgents)) return input;
+        const agents = rawAgents.map((a) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
+          if (Array.isArray(a)) {
+            const [id, tf, vf] = a;
+            return {
+              id: String(id),
+              transform: (inp) => callFn(tf, [inp]),
+              validate: vf ? (out) => Boolean(callFn(vf, [out])) : void 0
+            };
+          }
+          return { id: String(a), transform: (x) => x };
+        });
+        const chain = AgentChain.from(agents);
+        const result = chain.run(input);
+        return result.finalOutput;
+      }
+      if (op === "chain-links") {
+        const [rawAgents, input] = args3;
+        if (!Array.isArray(rawAgents)) return [];
+        const agents = rawAgents.map((a) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
+          if (Array.isArray(a)) {
+            const [id, tf, vf] = a;
+            return {
+              id: String(id),
+              transform: (inp) => callFn(tf, [inp]),
+              validate: vf ? (out) => Boolean(callFn(vf, [out])) : void 0
+            };
+          }
+          return { id: String(a), transform: (x) => x };
+        });
+        const chain = AgentChain.from(agents);
+        const result = chain.run(input);
+        return result.links.filter((l) => !l.skipped).map((l) => l.agentId);
+      }
+      if (op === "chain-steps") {
+        const [rawAgents, input] = args3;
+        if (!Array.isArray(rawAgents)) return 0;
+        const agents = rawAgents.map((a) => {
+          if (typeof a === "object" && a !== null && typeof a.transform === "function") return a;
+          if (Array.isArray(a)) {
+            const [id, tf, vf] = a;
+            return {
+              id: String(id),
+              transform: (inp) => callFn(tf, [inp]),
+              validate: vf ? (out) => Boolean(callFn(vf, [out])) : void 0
+            };
+          }
+          return { id: String(a), transform: (x) => x };
+        });
+        const chain = AgentChain.from(agents);
+        const result = chain.run(input);
+        return result.stepsCompleted;
+      }
+      if (op === "orchestrate-run") {
+        const [rawTasks] = args3;
+        if (!Array.isArray(rawTasks)) return {};
+        const tasks = rawTasks.map((t) => {
+          if (Array.isArray(t)) {
+            return { id: String(t[0]), input: t[1] ?? null, dependsOn: Array.isArray(t[2]) ? t[2].map(String) : void 0 };
+          }
+          return { id: String(t.id ?? "task"), input: t.input ?? null, dependsOn: t.dependsOn };
+        });
+        return globalOrchestrator.run(tasks).outputs;
+      }
+      if (op === "orchestrate-order") {
+        const [rawTasks] = args3;
+        if (!Array.isArray(rawTasks)) return [];
+        const tasks = rawTasks.map((t) => {
+          if (Array.isArray(t)) {
+            return { id: String(t[0]), input: t[1] ?? null, dependsOn: Array.isArray(t[2]) ? t[2].map(String) : void 0 };
+          }
+          return { id: String(t.id ?? "task"), input: t.input ?? null, dependsOn: t.dependsOn };
+        });
+        return globalOrchestrator.getOrder(tasks);
+      }
+      if (op === "hub-route") {
+        const [taskType, problem] = args3;
+        const result = globalHub.route(String(taskType), problem, []);
+        return result.result;
+      }
+      if (op === "hub-stats") {
+        return globalHub.stats();
+      }
+      if (op === "hub-systems") {
+        return globalHub.systems();
+      }
+      if (op === "hub-task-types") {
+        return globalHub.taskTypes();
+      }
+      if (op === "delegate-register") {
+        const [id, caps, fn] = args3;
+        const capabilities = Array.isArray(caps) ? caps.map(String) : [];
+        const agent = {
+          id: String(id),
+          capabilities,
+          execute: (task) => {
+            if (typeof fn === "function") return fn(task);
+            if (fn?.kind === "function-value") return callFn(fn, [task]);
+            return fn;
+          }
+        };
+        globalDelegation.register(agent);
+        return String(id);
+      }
+      if (op === "delegate") {
+        const [desc, input, capability] = args3;
+        const task = {
+          id: `task-${Date.now()}`,
+          description: String(desc),
+          input,
+          requiredCapability: capability != null ? String(capability) : void 0
+        };
+        const result = globalDelegation.delegate(task);
+        return /* @__PURE__ */ new Map([
+          ["taskId", result.taskId],
+          ["agentId", result.agentId],
+          ["output", result.output],
+          ["success", result.success],
+          ["duration", result.duration]
+        ]);
+      }
+      if (op === "delegate-all") {
+        const [taskList] = args3;
+        const tasks = Array.isArray(taskList) ? taskList.map((t, i) => ({
+          id: t instanceof Map ? String(t.get("id") ?? `task-${i}`) : `task-${i}`,
+          description: t instanceof Map ? String(t.get("description") ?? "") : String(t),
+          input: t instanceof Map ? t.get("input") : t,
+          requiredCapability: t instanceof Map && t.has("requiredCapability") ? String(t.get("requiredCapability")) : void 0
+        })) : [];
+        const result = globalDelegation.delegateAll(tasks);
+        return /* @__PURE__ */ new Map([
+          ["results", result.results.map((r) => /* @__PURE__ */ new Map([
+            ["taskId", r.taskId],
+            ["agentId", r.agentId],
+            ["output", r.output],
+            ["success", r.success],
+            ["duration", r.duration]
+          ]))],
+          ["successful", result.successful],
+          ["failed", result.failed],
+          ["totalDuration", result.totalDuration]
+        ]);
+      }
+      if (op === "delegate-list") {
+        return globalDelegation.list();
+      }
+      if (op === "crossover-single") {
+        const [a, b] = args3;
+        const arrA = Array.isArray(a) ? a : [a];
+        const arrB = Array.isArray(b) ? b : [b];
+        const result = globalCrossover.singlePoint(arrA, arrB);
+        return /* @__PURE__ */ new Map([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["crossoverPoint", result.crossoverPoint],
+          ["type", result.type]
+        ]);
+      }
+      if (op === "crossover-two") {
+        const [a, b] = args3;
+        const arrA = Array.isArray(a) ? a : [a];
+        const arrB = Array.isArray(b) ? b : [b];
+        const result = globalCrossover.twoPoint(arrA, arrB);
+        return /* @__PURE__ */ new Map([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["crossoverPoints", result.crossoverPoints],
+          ["type", result.type]
+        ]);
+      }
+      if (op === "crossover-uniform") {
+        const [a, b] = args3;
+        const arrA = Array.isArray(a) ? a : [a];
+        const arrB = Array.isArray(b) ? b : [b];
+        const result = globalCrossover.uniform(arrA, arrB);
+        return /* @__PURE__ */ new Map([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["type", result.type]
+        ]);
+      }
+      if (op === "crossover-arithmetic") {
+        let alpha;
+        let cleanArgs = [...args3];
+        const alphaIdx = cleanArgs.findIndex((v) => v === "alpha" || v === ":alpha");
+        if (alphaIdx !== -1) {
+          alpha = Number(cleanArgs[alphaIdx + 1]);
+          cleanArgs.splice(alphaIdx, 2);
+        }
+        const [a, b] = cleanArgs;
+        const arrA = Array.isArray(a) ? a.map(Number) : [Number(a)];
+        const arrB = Array.isArray(b) ? b.map(Number) : [Number(b)];
+        const result = globalCrossover.arithmetic(arrA, arrB, alpha);
+        return /* @__PURE__ */ new Map([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["type", result.type]
+        ]);
+      }
+      if (op === "crossover-strings") {
+        const [a, b] = args3;
+        const result = globalCrossover.crossoverStrings(String(a), String(b));
+        return /* @__PURE__ */ new Map([
+          ["parent1", result.parent1],
+          ["parent2", result.parent2],
+          ["child1", result.child1],
+          ["child2", result.child2],
+          ["crossoverPoint", result.crossoverPoint],
+          ["type", result.type]
+        ]);
+      }
+      if (op === "crossover-objects") {
+        const [a, b] = args3;
+        const objA = a instanceof Map ? Object.fromEntries(a.entries()) : typeof a === "object" && a !== null ? a : {};
+        const objB = b instanceof Map ? Object.fromEntries(b.entries()) : typeof b === "object" && b !== null ? b : {};
+        const result = globalCrossover.crossoverObjects(objA, objB);
+        const toMap = (o) => new Map(Object.entries(o));
+        return /* @__PURE__ */ new Map([
+          ["parent1", toMap(result.parent1)],
+          ["parent2", toMap(result.parent2)],
+          ["child1", toMap(result.child1)],
+          ["child2", toMap(result.child2)],
+          ["type", result.type]
+        ]);
+      }
+      if (op === "crossover-children") {
+        const [result] = args3;
+        if (result instanceof Map) {
+          return [result.get("child1"), result.get("child2")];
+        }
+        return [];
+      }
+      if (op === "blend") {
+        let alpha = 0.5;
+        let cleanArgs = [...args3];
+        const alphaIdx = cleanArgs.findIndex((v) => v === "alpha" || v === ":alpha");
+        if (alphaIdx !== -1) {
+          alpha = Number(cleanArgs[alphaIdx + 1]);
+          cleanArgs.splice(alphaIdx, 2);
+        }
+        const [a, b] = cleanArgs;
+        if (Array.isArray(a) && Array.isArray(b)) {
+          const result = globalCrossover.arithmetic(a.map(Number), b.map(Number), alpha);
+          return result.child1;
+        }
+        if (typeof a === "number" && typeof b === "number") {
+          return alpha * a + (1 - alpha) * b;
+        }
+        return a;
+      }
+      if (op === "export") return null;
+      if (op === "call" && args3.length >= 1) {
+        const fnRef = ev(args3[0]);
+        const callArgs = args3.slice(1);
+        if (typeof fnRef === "string") return callUser(fnRef, callArgs);
+        if (typeof fnRef === "function" || fnRef?.kind === "function-value") return callFn(fnRef, callArgs);
+        return null;
+      }
+      if (op === "evolve-numbers") {
+        const target = Array.isArray(args3[0]) ? args3[0].map(Number) : [0];
+        let popSize = 20;
+        let maxGens = 50;
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]);
+          if (key === ":pop") popSize = Number(args3[i + 1]);
+          if (key === ":gens") maxGens = Number(args3[i + 1]);
+        }
+        const result = evolveNumbers(target, popSize, maxGens);
+        return /* @__PURE__ */ new Map([
+          ["best", /* @__PURE__ */ new Map([
+            ["genome", result.best.genome],
+            ["fitness", result.best.fitness],
+            ["generation", result.best.generation],
+            ["id", result.best.id]
+          ])],
+          ["generations", result.generations],
+          ["converged", result.converged],
+          ["history", result.history.map((h) => /* @__PURE__ */ new Map([
+            ["gen", h.gen],
+            ["bestFitness", h.bestFitness],
+            ["avgFitness", h.avgFitness]
+          ]))]
+        ]);
+      }
+      if (op === "evolve-strings") {
+        const target = String(args3[0] ?? "");
+        let popSize = 30;
+        let maxGens = 100;
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]);
+          if (key === ":pop") popSize = Number(args3[i + 1]);
+          if (key === ":gens") maxGens = Number(args3[i + 1]);
+        }
+        const result = evolveStrings(target, popSize, maxGens);
+        return /* @__PURE__ */ new Map([
+          ["best", /* @__PURE__ */ new Map([
+            ["genome", result.best.genome],
+            ["fitness", result.best.fitness],
+            ["generation", result.best.generation],
+            ["id", result.best.id]
+          ])],
+          ["generations", result.generations],
+          ["converged", result.converged],
+          ["history", result.history.map((h) => /* @__PURE__ */ new Map([
+            ["gen", h.gen],
+            ["bestFitness", h.bestFitness],
+            ["avgFitness", h.avgFitness]
+          ]))]
+        ]);
+      }
+      if (op === "evolve-config") {
+        let popSize = 20;
+        let maxGens = 50;
+        let mutationRate = 0.1;
+        let eliteRatio = 0.1;
+        let fitnessGoal = null;
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]);
+          if (key === ":pop") popSize = Number(args3[i + 1]);
+          if (key === ":gens") maxGens = Number(args3[i + 1]);
+          if (key === ":mutation") mutationRate = Number(args3[i + 1]);
+          if (key === ":elite") eliteRatio = Number(args3[i + 1]);
+          if (key === ":goal") fitnessGoal = Number(args3[i + 1]);
+        }
+        return /* @__PURE__ */ new Map([
+          ["populationSize", popSize],
+          ["maxGenerations", maxGens],
+          ["mutationRate", mutationRate],
+          ["eliteRatio", eliteRatio],
+          ["fitnessGoal", fitnessGoal]
+        ]);
+      }
+      if (op === "evolve-step") {
+        const engine = args3[0];
+        if (engine instanceof EvolutionEngine) {
+          const stepResult = engine.step();
+          return /* @__PURE__ */ new Map([
+            ["bestFitness", stepResult.bestFitness],
+            ["avgFitness", stepResult.avgFitness]
+          ]);
+        }
+        return null;
+      }
+      if (op === "evolve-best") {
+        const engine = args3[0];
+        if (engine instanceof EvolutionEngine) {
+          const best = engine.getBest();
+          if (!best) return null;
+          return /* @__PURE__ */ new Map([
+            ["genome", best.genome],
+            ["fitness", best.fitness],
+            ["generation", best.generation],
+            ["id", best.id]
+          ]);
+        }
+        return null;
+      }
+      if (op === "evolve-population") {
+        const engine = args3[0];
+        if (engine instanceof EvolutionEngine) {
+          return engine.getPopulation().map((ind) => /* @__PURE__ */ new Map([
+            ["genome", ind.genome],
+            ["fitness", ind.fitness],
+            ["generation", ind.generation],
+            ["id", ind.id]
+          ]));
+        }
+        return [];
+      }
+      if (op === "evolve-run") {
+        const engine = args3[0];
+        if (engine instanceof EvolutionEngine) {
+          const result = engine.run();
+          return /* @__PURE__ */ new Map([
+            ["best", /* @__PURE__ */ new Map([
+              ["genome", result.best.genome],
+              ["fitness", result.best.fitness],
+              ["generation", result.best.generation],
+              ["id", result.best.id]
+            ])],
+            ["generations", result.generations],
+            ["converged", result.converged],
+            ["history", result.history.map((h) => /* @__PURE__ */ new Map([
+              ["gen", h.gen],
+              ["bestFitness", h.bestFitness],
+              ["avgFitness", h.avgFitness]
+            ]))]
+          ]);
+        }
+        return null;
+      }
+      if (op === "evolve-history") {
+        const arg = args3[0];
+        if (arg instanceof EvolutionEngine) {
+          return arg.getHistory().map((h) => /* @__PURE__ */ new Map([
+            ["gen", h.gen],
+            ["bestFitness", h.bestFitness],
+            ["avgFitness", h.avgFitness]
+          ]));
+        }
+        if (arg instanceof Map) {
+          const history = arg.get("history");
+          if (Array.isArray(history)) return history;
+        }
+        return [];
+      }
+      if (op === "mutate-config") {
+        const config = {};
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v);
+        }
+        return /* @__PURE__ */ new Map([
+          ["rate", config.rate ?? 0.1],
+          ["strength", config.strength ?? 0.1],
+          ["type", config.type ?? "random"]
+        ]);
+      }
+      if (op === "mutate-numbers") {
+        const arr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+        const config = {};
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v);
+        }
+        const m = new Mutator(config);
+        const r = m.mutateNumbers(arr);
+        return /* @__PURE__ */ new Map([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-string") {
+        const s = String(args3[0] ?? "");
+        const config = {};
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v);
+        }
+        const m = new Mutator(config);
+        const r = m.mutateString(s);
+        return /* @__PURE__ */ new Map([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-object") {
+        const raw = args3[0];
+        const obj = raw instanceof Map ? Object.fromEntries(raw.entries()) : typeof raw === "object" && raw !== null ? raw : {};
+        const config = {};
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "rate") config.rate = Number(v);
+          else if (k === "strength") config.strength = Number(v);
+          else if (k === "type") config.type = String(v);
+        }
+        const m = new Mutator(config);
+        const r = m.mutateObject(obj);
+        const toMap = (o) => new Map(Object.entries(o));
+        return /* @__PURE__ */ new Map([
+          ["original", toMap(r.original)],
+          ["mutated", toMap(r.mutated)],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-swap") {
+        const arr = Array.isArray(args3[0]) ? args3[0] : [];
+        const config = { type: "swap", rate: 0.3 };
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "rate") config.rate = Number(v);
+        }
+        const m = new Mutator(config);
+        const r = m.swapMutation(arr);
+        return /* @__PURE__ */ new Map([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-flip") {
+        const arr = Array.isArray(args3[0]) ? args3[0].map(Number) : [];
+        const config = { type: "flip" };
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "rate") config.rate = Number(v);
+        }
+        const m = new Mutator(config);
+        const r = m.flipMutation(arr);
+        return /* @__PURE__ */ new Map([
+          ["original", r.original],
+          ["mutated", r.mutated],
+          ["mutations", r.mutations],
+          ["mutationType", r.mutationType]
+        ]);
+      }
+      if (op === "mutate-select") {
+        const rawList = Array.isArray(args3[0]) ? args3[0] : [];
+        let n = 1;
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "n") n = Number(v);
+        }
+        const candidates = rawList.map((item) => {
+          if (item instanceof Map) {
+            return { value: item.get("value"), fitness: Number(item.get("fitness") ?? 0) };
+          }
+          if (typeof item === "object" && item !== null && "value" in item && "fitness" in item) {
+            return { value: item.value, fitness: Number(item.fitness ?? 0) };
+          }
+          return { value: item, fitness: 0 };
+        });
+        return globalMutator.select(candidates, n);
+      }
+      if (op === "mutation-count") {
+        const r = args3[0];
+        if (r instanceof Map) return r.get("mutations") ?? 0;
+        return 0;
+      }
+      if (op === "generation-run") {
+        const [popArg, fitnessFnArg, nextGenFnArg, ...rest] = args3;
+        const population = Array.isArray(popArg) ? popArg : [];
+        const maxGen = rest.length >= 2 && rest[0] === "max" ? Number(rest[1]) : 50;
+        const fitnessFunc = (item) => {
+          if (typeof fitnessFnArg === "function") return Number(fitnessFnArg(item));
+          if (fitnessFnArg?.kind === "function-value") return Number(callFn(fitnessFnArg, [item]));
+          if (typeof fitnessFnArg === "string") return Number(callUser(fitnessFnArg, [item]));
+          return 0;
+        };
+        const nextGenFunc = (pop, fits) => {
+          if (typeof nextGenFnArg === "function") return nextGenFnArg(pop, fits) ?? pop;
+          if (nextGenFnArg?.kind === "function-value") return callFn(nextGenFnArg, [pop, fits]) ?? pop;
+          if (typeof nextGenFnArg === "string") return callUser(nextGenFnArg, [pop, fits]) ?? pop;
+          const paired = pop.map((item, i) => ({ item, fit: fits[i] }));
+          paired.sort((a, b) => b.fit - a.fit);
+          const half = Math.max(1, Math.floor(paired.length / 2));
+          const elites = paired.slice(0, half).map((p) => p.item);
+          const result = [...elites];
+          while (result.length < pop.length) result.push(elites[result.length % half]);
+          return result;
+        };
+        const loop = new GenerationLoop({ maxGenerations: maxGen });
+        const genResult = loop.run(population, fitnessFunc, nextGenFunc);
+        return /* @__PURE__ */ new Map([
+          ["best", genResult.best],
+          ["bestFitness", genResult.bestFitness],
+          ["totalGenerations", genResult.totalGenerations],
+          ["history", genResult.history.map((s) => /* @__PURE__ */ new Map([
+            ["generation", s.generation],
+            ["best", s.best],
+            ["worst", s.worst],
+            ["average", s.average],
+            ["diversity", s.diversity],
+            ["elites", s.elites],
+            ["improved", s.improved]
+          ]))],
+          ["terminationReason", genResult.terminationReason],
+          ["improvementRatio", genResult.improvementRatio]
+        ]);
+      }
+      if (op === "generation-stats") {
+        const [arg] = args3;
+        if (arg instanceof Map) {
+          const history = arg.get("history");
+          return Array.isArray(history) ? history : [];
+        }
+        return [];
+      }
+      if (op === "generation-best") {
+        const [arg] = args3;
+        if (arg instanceof Map) return arg.get("best") ?? null;
+        return null;
+      }
+      if (op === "generation-history") {
+        const [arg] = args3;
+        if (arg instanceof Map) {
+          const history = arg.get("history");
+          return Array.isArray(history) ? history : [];
+        }
+        return [];
+      }
+      if (op === "generation-converged") {
+        const [arg] = args3;
+        if (arg instanceof GenerationLoop) return arg.hasConverged();
+        if (arg instanceof Map) {
+          const history = arg.get("history") ?? [];
+          if (history.length < 5) return false;
+          const recent = history.slice(-5);
+          const firstBest = recent[0] instanceof Map ? recent[0].get("best") : recent[0]?.best;
+          return recent.every((s) => {
+            const b = s instanceof Map ? s.get("best") : s?.best;
+            return Math.abs(b - firstBest) < 1e-9;
+          });
+        }
+        return false;
+      }
+      if (op === "generation-diversity") {
+        const [arr] = args3;
+        const fitnesses = Array.isArray(arr) ? arr.map(Number) : [];
+        const tmpLoop = new GenerationLoop({ maxGenerations: 1 });
+        return tmpLoop.calculateDiversity(fitnesses);
+      }
+      if (op === "gen-improvement") {
+        const [arg] = args3;
+        if (arg instanceof Map) return arg.get("improvementRatio") ?? 0;
+        return 0;
+      }
+      if (op === "gen-termination") {
+        const [arg] = args3;
+        if (arg instanceof Map) return arg.get("terminationReason") ?? "max-generations";
+        return "max-generations";
+      }
+      if (op === "fitness-proximity") {
+        const fpValue = Number(args3[0]);
+        const fpTarget = Number(args3[1]);
+        const fpTol = args3[2] !== void 0 ? Number(args3[2]) : void 0;
+        const fpRes = globalFitness.proximity(fpValue, fpTarget, fpTol);
+        return /* @__PURE__ */ new Map([["score", fpRes.score], ["rawScore", fpRes.rawScore], ["details", new Map(Object.entries(fpRes.details))]]);
+      }
+      if (op === "fitness-string") {
+        const fsA = String(args3[0] ?? "");
+        const fsB = String(args3[1] ?? "");
+        const fsRes = globalFitness.stringSimilarity(fsA, fsB);
+        return /* @__PURE__ */ new Map([["score", fsRes.score], ["rawScore", fsRes.rawScore], ["details", new Map(Object.entries(fsRes.details))]]);
+      }
+      if (op === "fitness-array") {
+        const faArr = Array.isArray(args3[0]) ? args3[0] : [];
+        const faTgt = Array.isArray(args3[1]) ? args3[1] : [];
+        const faRes = globalFitness.arrayMatch(faArr, faTgt);
+        return /* @__PURE__ */ new Map([["score", faRes.score], ["rawScore", faRes.rawScore], ["details", new Map(Object.entries(faRes.details))]]);
+      }
+      if (op === "fitness-multi") {
+        const fmVMap = args3[0] instanceof Map ? args3[0] : /* @__PURE__ */ new Map();
+        const fmTMap = args3[1] instanceof Map ? args3[1] : /* @__PURE__ */ new Map();
+        const fmWMap = args3[2] instanceof Map ? args3[2] : void 0;
+        const fmV = {};
+        const fmT = {};
+        const fmW = fmWMap ? {} : void 0;
+        fmVMap.forEach((v, k) => {
+          fmV[String(k)] = Number(v);
+        });
+        fmTMap.forEach((v, k) => {
+          fmT[String(k)] = Number(v);
+        });
+        if (fmWMap && fmW) fmWMap.forEach((v, k) => {
+          fmW[String(k)] = Number(v);
+        });
+        const fmRes = globalFitness.multiObjective(fmV, fmT, fmW);
+        return /* @__PURE__ */ new Map([["score", fmRes.score], ["rawScore", fmRes.rawScore], ["details", new Map(Object.entries(fmRes.details))]]);
+      }
+      if (op === "fitness-constraint") {
+        const fcVal = args3[0];
+        const fcRaw = Array.isArray(args3[1]) ? args3[1] : [];
+        const fcFns = fcRaw.map((c) => {
+          if (typeof c === "function") return c;
+          if (c?.kind === "function-value") return (v) => callFn(c, [v]);
+          if (c === "positive" || c === ":positive") return (v) => typeof v === "number" && v > 0;
+          if (c === "negative" || c === ":negative") return (v) => typeof v === "number" && v < 0;
+          if (c === "even" || c === ":even") return (v) => typeof v === "number" && v % 2 === 0;
+          if (c === "odd" || c === ":odd") return (v) => typeof v === "number" && v % 2 !== 0;
+          if (c === "zero" || c === ":zero") return (v) => v === 0;
+          return () => false;
+        });
+        const fcRes = globalFitness.constraintSatisfaction(fcVal, fcFns);
+        return /* @__PURE__ */ new Map([["score", fcRes.score], ["rawScore", fcRes.rawScore], ["details", new Map(Object.entries(fcRes.details))]]);
+      }
+      if (op === "fitness-rank") {
+        const frItems = Array.isArray(args3[0]) ? args3[0] : [];
+        const frScorer = args3[1];
+        const frFn = (item) => {
+          if (typeof frScorer === "function") return frScorer(item);
+          if (frScorer?.kind === "function-value") return callFn(frScorer, [item]);
+          return 0;
+        };
+        const frRanked = globalFitness.rank(frItems, frFn);
+        return frRanked.map((r) => new Map(Object.entries(r)));
+      }
+      if (op === "fitness-pareto") {
+        const fpPItems = Array.isArray(args3[0]) ? args3[0] : [];
+        const fpObjs = (Array.isArray(args3[1]) ? args3[1] : []).map((f) => {
+          if (typeof f === "function") return f;
+          if (f?.kind === "function-value") return (item) => callFn(f, [item]);
+          return () => 0;
+        });
+        return globalFitness.paretoFront(fpPItems, fpObjs);
+      }
+      if (op === "fitness-score") {
+        const fsResult = args3[0];
+        if (fsResult instanceof Map) return fsResult.get("score") ?? 0;
+        if (typeof fsResult === "object" && fsResult !== null) return fsResult.score ?? 0;
+        return Number(fsResult);
+      }
+      if (op === "prune-threshold") {
+        const [pItems, pScorerFn, ...pKw] = args3;
+        const pThreshold = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
+          }
+          return 0.5;
+        })();
+        const pScorer1 = (item) => Number(callFn(pScorerFn, [item]));
+        const pArr1 = Array.isArray(pItems) ? pItems : [];
+        const pruner1 = new Pruner();
+        return pruneResultToMap(pruner1.pruneByThreshold(pArr1, pScorer1, pThreshold));
+      }
+      if (op === "prune-top-k") {
+        const [pItems, pScorerFn, ...pKw] = args3;
+        const pK = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
+          }
+          return 5;
+        })();
+        const pScorer2 = (item) => Number(callFn(pScorerFn, [item]));
+        const pArr2 = Array.isArray(pItems) ? pItems : [];
+        const pruner2 = new Pruner();
+        return pruneResultToMap(pruner2.pruneToTopK(pArr2, pScorer2, pK));
+      }
+      if (op === "prune-top-percent") {
+        const [pItems, pScorerFn, ...pKw] = args3;
+        const pPct = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":percent" || pKw[i] === "percent") return Number(pKw[i + 1]);
+          }
+          return 0.3;
+        })();
+        const pScorer3 = (item) => Number(callFn(pScorerFn, [item]));
+        const pArr3 = Array.isArray(pItems) ? pItems : [];
+        const pruner3 = new Pruner();
+        return pruneResultToMap(pruner3.pruneToTopPercent(pArr3, pScorer3, pPct));
+      }
+      if (op === "prune-diversity") {
+        const [pItems, pScorerFn, pSimFn, ...pKw] = args3;
+        const pMinDiv = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":min" || pKw[i] === "min") return Number(pKw[i + 1]);
+          }
+          return 0.2;
+        })();
+        const pScorer4 = (item) => Number(callFn(pScorerFn, [item]));
+        const pSim4 = (a, b) => Number(callFn(pSimFn, [a, b]));
+        const pArr4 = Array.isArray(pItems) ? pItems : [];
+        const pruner4 = new Pruner();
+        return pruneResultToMap(pruner4.pruneForDiversity(pArr4, pScorer4, pSim4, pMinDiv));
+      }
+      if (op === "prune-dedup") {
+        const [pItems, pKeyFn] = args3;
+        const pArr5 = Array.isArray(pItems) ? pItems : [];
+        const pruner5 = new Pruner();
+        const pKeyFnWrapped = pKeyFn ? (item) => String(callFn(pKeyFn, [item])) : void 0;
+        return pruneResultToMap(pruner5.dedup(pArr5, pKeyFnWrapped));
+      }
+      if (op === "prune-weak") {
+        const [pItems, pScorerFn] = args3;
+        const pScorer6 = (item) => Number(callFn(pScorerFn, [item]));
+        const pArr6 = Array.isArray(pItems) ? pItems : [];
+        const pruner6 = new Pruner();
+        return pruneResultToMap(pruner6.pruneWeak(pArr6, pScorer6));
+      }
+      if (op === "keep-best") {
+        const [pItems, pScorerFn, ...pKw] = args3;
+        const pK7 = (() => {
+          for (let i = 0; i < pKw.length - 1; i++) {
+            if (pKw[i] === ":k" || pKw[i] === "k") return Number(pKw[i + 1]);
+          }
+          return 3;
+        })();
+        const pScorer7 = (item) => Number(callFn(pScorerFn, [item]));
+        const pArr7 = Array.isArray(pItems) ? pItems : [];
+        return keepBest(pArr7, pScorer7, pK7);
+      }
+      if (op === "prune-stats") {
+        const pRes = args3[0];
+        if (pRes instanceof Map && pRes.has("stats")) {
+          return pRes.get("stats");
+        }
+        return null;
+      }
+      if (op.startsWith("refactor-")) {
+        const r137 = evalRefactorSelf(op, args3);
+        if (r137 !== null) return r137;
+      }
+      if (op === "version-snapshot") {
+        const data = args3[0] ?? null;
+        const description = String(args3[1] ?? "snapshot");
+        const tags = [];
+        let performance2;
+        for (let i = 2; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "tags" && Array.isArray(v)) tags.push(...v.map(String));
+          if (k === "performance") performance2 = Number(v);
+        }
+        const snap = globalVersioning.snapshot(data, description, tags, performance2);
+        return /* @__PURE__ */ new Map([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["data", snap.data],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["performance", snap.metadata.performance ?? null],
+          ["parentId", snap.parentId ?? null],
+          ["diff", snap.diff ?? null]
+        ]);
+      }
+      if (op === "version-rollback") {
+        const id = String(args3[0] ?? "");
+        const result = globalVersioning.rollback(id);
+        return /* @__PURE__ */ new Map([
+          ["success", result.success],
+          ["reason", result.reason ?? null],
+          ["previousId", result.previous?.id ?? null],
+          ["restoredId", result.restored?.id ?? null]
+        ]);
+      }
+      if (op === "version-prev") {
+        const result = globalVersioning.rollbackPrev();
+        return /* @__PURE__ */ new Map([
+          ["success", result.success],
+          ["reason", result.reason ?? null],
+          ["previousId", result.previous?.id ?? null],
+          ["restoredId", result.restored?.id ?? null]
+        ]);
+      }
+      if (op === "version-diff") {
+        const id1 = String(args3[0] ?? "");
+        const id2 = String(args3[1] ?? "");
+        return globalVersioning.diff(id1, id2);
+      }
+      if (op === "version-get") {
+        const id = String(args3[0] ?? "");
+        const snap = globalVersioning.get(id);
+        if (!snap) return null;
+        return /* @__PURE__ */ new Map([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["data", snap.data],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["performance", snap.metadata.performance ?? null],
+          ["parentId", snap.parentId ?? null],
+          ["diff", snap.diff ?? null]
+        ]);
+      }
+      if (op === "version-latest") {
+        const snap = globalVersioning.latest();
+        if (!snap) return null;
+        return /* @__PURE__ */ new Map([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["data", snap.data],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["performance", snap.metadata.performance ?? null],
+          ["parentId", snap.parentId ?? null]
+        ]);
+      }
+      if (op === "version-history") {
+        return globalVersioning.getHistory().map((snap) => /* @__PURE__ */ new Map([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["timestamp", snap.timestamp.toISOString()],
+          ["description", snap.metadata.description],
+          ["tags", snap.metadata.tags],
+          ["parentId", snap.parentId ?? null]
+        ]));
+      }
+      if (op === "version-branch") {
+        const name = String(args3[0] ?? "");
+        const fromId = args3[1] ? String(args3[1]) : void 0;
+        return globalVersioning.branch(name, fromId);
+      }
+      if (op === "version-checkout") {
+        const name = String(args3[0] ?? "");
+        const snap = globalVersioning.checkout(name);
+        if (!snap) return null;
+        return /* @__PURE__ */ new Map([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["description", snap.metadata.description]
+        ]);
+      }
+      if (op === "version-best") {
+        const snap = globalVersioning.bestPerforming();
+        if (!snap) return null;
+        return /* @__PURE__ */ new Map([
+          ["id", snap.id],
+          ["version", snap.version],
+          ["performance", snap.metadata.performance ?? null],
+          ["description", snap.metadata.description]
+        ]);
+      }
+      if (op === "bench-measure") {
+        const bName = String(args3[0] ?? "unnamed");
+        const bFn = args3[1];
+        let bRuns = 100;
+        for (let i = 2; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          if (k === "runs") bRuns = Number(args3[i + 1]);
+        }
+        const bCallable = () => typeof bFn === "function" ? bFn() : callFnVal(bFn, []);
+        const bResult = globalBenchmark.measure(bName, bCallable, bRuns);
+        return /* @__PURE__ */ new Map([
+          ["name", bResult.name],
+          ["runs", bResult.runs],
+          ["totalMs", bResult.totalMs],
+          ["avgMs", bResult.avgMs],
+          ["minMs", bResult.minMs],
+          ["maxMs", bResult.maxMs],
+          ["p50", bResult.p50],
+          ["p95", bResult.p95],
+          ["p99", bResult.p99],
+          ["opsPerSec", bResult.opsPerSec],
+          ["memoryUsed", bResult.memoryUsed ?? 0]
+        ]);
+      }
+      if (op === "bench-compare") {
+        const bcFn1 = args3[0];
+        const bcFn2 = args3[1];
+        let bcRuns = 50;
+        for (let i = 2; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          if (k === "runs") bcRuns = Number(args3[i + 1]);
+        }
+        const bcCallable1 = () => typeof bcFn1 === "function" ? bcFn1() : callFnVal(bcFn1, []);
+        const bcCallable2 = () => typeof bcFn2 === "function" ? bcFn2() : callFnVal(bcFn2, []);
+        const bcResult = globalBenchmark.compare("fn1", bcCallable1, "fn2", bcCallable2, bcRuns);
+        const bcToMap = (r) => /* @__PURE__ */ new Map([
+          ["name", r.name],
+          ["runs", r.runs],
+          ["avgMs", r.avgMs],
+          ["minMs", r.minMs],
+          ["maxMs", r.maxMs],
+          ["p50", r.p50],
+          ["p95", r.p95],
+          ["p99", r.p99],
+          ["opsPerSec", r.opsPerSec]
+        ]);
+        return /* @__PURE__ */ new Map([
+          ["baseline", bcToMap(bcResult.baseline)],
+          ["target", bcToMap(bcResult.target)],
+          ["speedup", bcResult.speedup],
+          ["winner", bcResult.winner],
+          ["significant", bcResult.significant]
+        ]);
+      }
+      if (op === "bench-suite") {
+        const bsName = String(args3[0] ?? "suite");
+        return new SelfBenchmark(bsName);
+      }
+      if (op === "bench-add") {
+        const baSuite = args3[0];
+        const baName = String(args3[1] ?? "test");
+        const baFn = args3[2];
+        if (baSuite instanceof SelfBenchmark) {
+          const baCallable = () => typeof baFn === "function" ? baFn() : callFnVal(baFn, []);
+          baSuite.add(baName, baCallable);
+          return baSuite;
+        }
+        return null;
+      }
+      if (op === "bench-run") {
+        const brSuite = args3[0];
+        let brRuns = 100;
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          if (k === "runs") brRuns = Number(args3[i + 1]);
+        }
+        if (brSuite instanceof SelfBenchmark) {
+          const brResult = brSuite.run(brRuns);
+          const brToMap = (r) => /* @__PURE__ */ new Map([
+            ["name", r.name],
+            ["runs", r.runs],
+            ["avgMs", r.avgMs],
+            ["minMs", r.minMs],
+            ["maxMs", r.maxMs],
+            ["opsPerSec", r.opsPerSec]
+          ]);
+          return /* @__PURE__ */ new Map([
+            ["name", brResult.name],
+            ["results", brResult.results.map(brToMap)],
+            ["startTime", brResult.startTime.toISOString()],
+            ["endTime", brResult.endTime?.toISOString() ?? ""],
+            ["summary", /* @__PURE__ */ new Map([
+              ["total", brResult.summary.total],
+              ["fastest", brResult.summary.fastest ? brToMap(brResult.summary.fastest) : null],
+              ["slowest", brResult.summary.slowest ? brToMap(brResult.summary.slowest) : null],
+              ["avgOpsPerSec", brResult.summary.avgOpsPerSec]
+            ])]
+          ]);
+        }
+        return null;
+      }
+      if (op === "bench-report") {
+        const rpResult = args3[0];
+        if (rpResult instanceof Map) {
+          const r = {
+            name: String(rpResult.get("name") ?? ""),
+            runs: Number(rpResult.get("runs") ?? 0),
+            totalMs: Number(rpResult.get("totalMs") ?? 0),
+            avgMs: Number(rpResult.get("avgMs") ?? 0),
+            minMs: Number(rpResult.get("minMs") ?? 0),
+            maxMs: Number(rpResult.get("maxMs") ?? 0),
+            p50: Number(rpResult.get("p50") ?? 0),
+            p95: Number(rpResult.get("p95") ?? 0),
+            p99: Number(rpResult.get("p99") ?? 0),
+            opsPerSec: Number(rpResult.get("opsPerSec") ?? 0),
+            memoryUsed: Number(rpResult.get("memoryUsed") ?? 0)
+          };
+          return globalBenchmark.report(r);
+        }
+        return "No benchmark result provided";
+      }
+      if (op === "bench-speedup") {
+        const spComp = args3[0];
+        if (spComp instanceof Map) {
+          return Number(spComp.get("speedup") ?? 1);
+        }
+        return 1;
+      }
+      if (op === "bench-stats") {
+        const stResult = args3[0];
+        if (stResult instanceof Map) {
+          return /* @__PURE__ */ new Map([
+            ["avg", stResult.get("avgMs")],
+            ["min", stResult.get("minMs")],
+            ["max", stResult.get("maxMs")],
+            ["p95", stResult.get("p95")],
+            ["p99", stResult.get("p99")],
+            ["opsPerSec", stResult.get("opsPerSec")]
+          ]);
+        }
+        return /* @__PURE__ */ new Map([
+          ["avg", 0],
+          ["min", 0],
+          ["max", 0],
+          ["p95", 0],
+          ["p99", 0],
+          ["opsPerSec", 0]
+        ]);
+      }
+      if (op === "self-evolve") {
+        const [popArg, fitnessFnArg, mutateFnArg, crossoverFnArg, ...rest] = args3;
+        const population = Array.isArray(popArg) ? popArg : [];
+        const cfg = {};
+        for (let i = 0; i < rest.length - 1; i += 2) {
+          const k = String(rest[i]).replace(/^:/, "");
+          const v = rest[i + 1];
+          if (k === "gens" || k === "generations") cfg.generations = Number(v);
+          else if (k === "pop" || k === "populationSize") cfg.populationSize = Number(v);
+          else if (k === "rate" || k === "mutationRate") cfg.mutationRate = Number(v);
+          else if (k === "elite" || k === "eliteRatio") cfg.eliteRatio = Number(v);
+          else if (k === "prune" || k === "pruneThreshold") cfg.pruneThreshold = Number(v);
+          else if (k === "versioning" || k === "enableVersioning") cfg.enableVersioning = v === true || v === "true";
+          else if (k === "benchmark" || k === "enableBenchmark") cfg.enableBenchmark = v === true || v === "true";
+          else if (k === "refactor" || k === "enableRefactor") cfg.enableRefactor = v === true || v === "true";
+        }
+        const mkFn1 = (fnArg) => (item) => {
+          if (typeof fnArg === "function") return fnArg(item);
+          if (fnArg?.kind === "function-value") return callFn(fnArg, [item]);
+          return item;
+        };
+        const fitnessFunc140 = (item) => Number(mkFn1(fitnessFnArg)(item));
+        const mutateFunc140 = (item) => mkFn1(mutateFnArg)(item);
+        const crossoverFunc140 = (a, b) => {
+          if (typeof crossoverFnArg === "function") return crossoverFnArg(a, b);
+          if (crossoverFnArg?.kind === "function-value") return callFn(crossoverFnArg, [a, b]);
+          return a;
+        };
+        const r140 = globalSelfEvolution.runCycle(population, fitnessFunc140, mutateFunc140, crossoverFunc140, cfg);
+        return /* @__PURE__ */ new Map([
+          ["best", r140.best],
+          ["bestFitness", r140.bestFitness],
+          ["generations", r140.generations],
+          ["improvements", r140.improvements],
+          ["prunedCount", r140.prunedCount],
+          ["benchmarkMs", r140.benchmarkMs ?? null],
+          ["versionId", r140.versionId ?? null],
+          ["report", r140.report]
+        ]);
+      }
+      if (op === "self-evolve-numbers") {
+        const target140 = Array.isArray(args3[0]) ? args3[0].map(Number) : [1, 2, 3];
+        const cfg140 = {};
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "gens" || k === "generations") cfg140.generations = Number(v);
+          else if (k === "pop" || k === "populationSize") cfg140.populationSize = Number(v);
+          else if (k === "rate" || k === "mutationRate") cfg140.mutationRate = Number(v);
+          else if (k === "versioning" || k === "enableVersioning") cfg140.enableVersioning = v === true || v === "true";
+          else if (k === "benchmark" || k === "enableBenchmark") cfg140.enableBenchmark = v === true || v === "true";
+          else if (k === "refactor" || k === "enableRefactor") cfg140.enableRefactor = v === true || v === "true";
+        }
+        const r140n = globalSelfEvolution.evolveNumbers(target140, cfg140);
+        return /* @__PURE__ */ new Map([
+          ["best", r140n.best],
+          ["bestFitness", r140n.bestFitness],
+          ["generations", r140n.generations],
+          ["improvements", r140n.improvements],
+          ["prunedCount", r140n.prunedCount],
+          ["benchmarkMs", r140n.benchmarkMs ?? null],
+          ["versionId", r140n.versionId ?? null],
+          ["report", r140n.report]
+        ]);
+      }
+      if (op === "self-evolve-string") {
+        const target140s = String(args3[0] ?? "hello");
+        const cfg140s = {};
+        for (let i = 1; i < args3.length - 1; i += 2) {
+          const k = String(args3[i]).replace(/^:/, "");
+          const v = args3[i + 1];
+          if (k === "gens" || k === "generations") cfg140s.generations = Number(v);
+          else if (k === "pop" || k === "populationSize") cfg140s.populationSize = Number(v);
+          else if (k === "rate" || k === "mutationRate") cfg140s.mutationRate = Number(v);
+          else if (k === "versioning" || k === "enableVersioning") cfg140s.enableVersioning = v === true || v === "true";
+          else if (k === "benchmark" || k === "enableBenchmark") cfg140s.enableBenchmark = v === true || v === "true";
+        }
+        const r140s = globalSelfEvolution.evolveString(target140s, cfg140s);
+        return /* @__PURE__ */ new Map([
+          ["best", r140s.best],
+          ["bestFitness", r140s.bestFitness],
+          ["generations", r140s.generations],
+          ["improvements", r140s.improvements],
+          ["prunedCount", r140s.prunedCount],
+          ["benchmarkMs", r140s.benchmarkMs ?? null],
+          ["versionId", r140s.versionId ?? null],
+          ["report", r140s.report]
+        ]);
+      }
+      if (op === "evolution-report") {
+        const rawResults140 = Array.isArray(args3[0]) ? args3[0] : [args3[0]].filter(Boolean);
+        const results140 = rawResults140.map((r) => {
+          if (r instanceof Map) {
+            return {
+              best: r.get("best"),
+              bestFitness: Number(r.get("bestFitness") ?? 0),
+              generations: Number(r.get("generations") ?? 0),
+              improvements: Number(r.get("improvements") ?? 0),
+              prunedCount: Number(r.get("prunedCount") ?? 0),
+              benchmarkMs: r.get("benchmarkMs") ?? void 0,
+              versionId: r.get("versionId") ?? void 0,
+              report: String(r.get("report") ?? "")
+            };
+          }
+          return r;
+        });
+        const rep140 = globalSelfEvolution.generateReport(results140);
+        return /* @__PURE__ */ new Map([
+          ["timestamp", rep140.timestamp.toISOString()],
+          ["cycles", rep140.cycles],
+          ["totalGenerations", rep140.totalGenerations],
+          ["fitnessProgress", rep140.fitnessProgress],
+          ["refactorSuggestions", rep140.refactorSuggestions],
+          ["versions", rep140.versions],
+          ["summary", rep140.summary]
+        ]);
+      }
+      if (op === "self-improve") {
+        const rawCfg140 = args3[0];
+        const cfg140i = {};
+        if (rawCfg140 instanceof Map) {
+          const gens = rawCfg140.get("generations") ?? rawCfg140.get("gens");
+          const pop = rawCfg140.get("populationSize") ?? rawCfg140.get("pop");
+          const rate = rawCfg140.get("mutationRate") ?? rawCfg140.get("rate");
+          if (gens !== void 0) cfg140i.generations = Number(gens);
+          if (pop !== void 0) cfg140i.populationSize = Number(pop);
+          if (rate !== void 0) cfg140i.mutationRate = Number(rate);
+        }
+        const imp140 = globalSelfEvolution.selfImprove(cfg140i);
+        return /* @__PURE__ */ new Map([
+          ["optimized", new Map(Object.entries(imp140.optimized))],
+          ["improvement", imp140.improvement]
+        ]);
+      }
+      if (op === "evolve-cycle") {
+        const [popArg140, fitnessFnArg140] = args3;
+        const population140 = Array.isArray(popArg140) ? popArg140 : [];
+        const fitnessFunc140c = (item) => {
+          if (typeof fitnessFnArg140 === "function") return Number(fitnessFnArg140(item));
+          if (fitnessFnArg140?.kind === "function-value") return Number(callFn(fitnessFnArg140, [item]));
+          return typeof item === "number" ? item : 0;
+        };
+        const mutateFunc140c = (item) => {
+          if (Array.isArray(item)) {
+            const arr = [...item];
+            const idx = Math.floor(Math.random() * arr.length);
+            arr[idx] += (Math.random() - 0.5) * 0.2;
+            return arr;
+          }
+          return item;
+        };
+        const crossoverFunc140c = (a, b) => {
+          if (Array.isArray(a) && Array.isArray(b)) {
+            const point = Math.floor(Math.random() * a.length);
+            return [...a.slice(0, point), ...b.slice(point)];
+          }
+          return a;
+        };
+        const rc140 = globalSelfEvolution.runCycle(population140, fitnessFunc140c, mutateFunc140c, crossoverFunc140c);
+        return /* @__PURE__ */ new Map([
+          ["best", rc140.best],
+          ["bestFitness", rc140.bestFitness],
+          ["generations", rc140.generations],
+          ["improvements", rc140.improvements],
+          ["prunedCount", rc140.prunedCount],
+          ["report", rc140.report]
+        ]);
+      }
+      if (op === "evolution-best") {
+        const [arg140] = args3;
+        if (arg140 instanceof Map) return arg140.get("best") ?? null;
+        return null;
+      }
+      if (op === "evolution-fitness") {
+        const [arg140f] = args3;
+        if (arg140f instanceof Map) return arg140f.get("bestFitness") ?? 0;
+        return 0;
+      }
+      if (op.startsWith("world-")) {
+        const r141 = evalWorldModel141(op, args3);
+        if (r141 !== void 0) return r141;
+      }
+      if (op.startsWith("cf-")) {
+        const r143 = evalCounterfactual(op, args3, callFn);
+        if (r143 !== null) return r143;
+      }
+      if (op.startsWith("align-")) {
+        const r146 = evalAlign(op, args3);
+        if (r146 !== null) return r146;
+      }
+      if (op === "causal-add-node") {
+        const kw142 = {};
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]).replace(/^:/, "");
+          kw142[key] = args3[i + 1];
+        }
+        const node142 = { id: String(kw142["id"] ?? ""), name: String(kw142["name"] ?? kw142["id"] ?? ""), description: String(kw142["desc"] ?? kw142["description"] ?? ""), value: kw142["value"] !== void 0 ? Number(kw142["value"]) : void 0 };
+        globalCausal.addNode(node142);
+        return /* @__PURE__ */ new Map([["id", node142.id], ["name", node142.name], ["description", node142.description]]);
+      }
+      if (op === "causal-add-edge") {
+        const kw142e = {};
+        for (let i = 0; i < args3.length - 1; i += 2) {
+          const key = String(args3[i]).replace(/^:/, "");
+          kw142e[key] = args3[i + 1];
+        }
+        const edge142 = { from: String(kw142e["from"] ?? ""), to: String(kw142e["to"] ?? ""), strength: Number(kw142e["strength"] ?? 1), confidence: Number(kw142e["confidence"] ?? 1), delay: kw142e["delay"] !== void 0 ? Number(kw142e["delay"]) : void 0, mechanism: kw142e["mechanism"] !== void 0 ? String(kw142e["mechanism"]) : void 0 };
+        globalCausal.addEdge(edge142);
+        return /* @__PURE__ */ new Map([["from", edge142.from], ["to", edge142.to], ["strength", edge142.strength], ["confidence", edge142.confidence]]);
+      }
+      if (op === "causal-explain") {
+        const expl142 = globalCausal.explain(String(args3[0] ?? ""));
+        return /* @__PURE__ */ new Map([
+          ["effect", expl142.effect],
+          ["primaryCause", expl142.primaryCause],
+          ["explanation", expl142.explanation],
+          ["confidence", expl142.confidence],
+          ["causes", expl142.causes.map((c) => /* @__PURE__ */ new Map([
+            ["cause", c.cause],
+            ["contribution", c.contribution],
+            ["chain", /* @__PURE__ */ new Map([
+              ["path", c.chain.path],
+              ["totalStrength", c.chain.totalStrength],
+              ["explanation", c.chain.explanation],
+              ["confidence", c.chain.confidence]
+            ])]
+          ]))]
+        ]);
+      }
+      if (op === "causal-chains") {
+        const ch142 = globalCausal.findCausalChains(String(args3[0] ?? ""), String(args3[1] ?? ""));
+        return ch142.map((c) => /* @__PURE__ */ new Map([["path", c.path], ["totalStrength", c.totalStrength], ["explanation", c.explanation], ["confidence", c.confidence]]));
+      }
+      if (op === "causal-causes") {
+        return globalCausal.getDirectCauses(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
+      }
+      if (op === "causal-effects") {
+        return globalCausal.getDirectEffects(String(args3[0] ?? "")).map((e) => /* @__PURE__ */ new Map([["from", e.from], ["to", e.to], ["strength", e.strength], ["confidence", e.confidence]]));
+      }
+      if (op === "causal-roots") {
+        return globalCausal.findRootCauses(String(args3[0] ?? ""));
+      }
+      if (op === "causal-simulate") {
+        const arg142 = args3[0];
+        const iv142 = {};
+        if (arg142 instanceof Map) {
+          for (const [k, v] of arg142.entries()) iv142[String(k)] = Number(v);
+        }
+        return new Map(Object.entries(globalCausal.simulate(iv142)));
+      }
+      if (op === "causal-why") {
+        const chain142 = whyCaused(String(args3[0] ?? ""), String(args3[1] ?? ""));
+        if (chain142 === null) return null;
+        return /* @__PURE__ */ new Map([["path", chain142.path], ["totalStrength", chain142.totalStrength], ["explanation", chain142.explanation], ["confidence", chain142.confidence]]);
+      }
+      if (op === "causal-summary") {
+        return globalCausal.summarize(String(args3[0] ?? ""));
+      }
+      if (op.startsWith("predict-")) {
+        const r144 = evalPredict_PHASE144(op, args3);
+        if (r144 !== null) return r144;
+      }
+      if (op.startsWith("curiosity-")) {
+        const r148 = evalCuriosity(op, args3, callFn);
+        if (r148 !== null) return r148;
+      }
+      if (op.startsWith("wisdom-")) {
+        const r149 = evalWisdom(op, args3);
+        if (r149 !== null) return r149;
+      }
+      if (op.startsWith("explain-")) {
+        const r145 = evalExplain_PHASE145(op, args3, callFnVal);
+        if (r145 !== null) return r145;
+      }
+      switch (normalizedOp2) {
+        case "file-mkdir":
+        case "file_mkdir": {
+          const dirPath = String(args3[0] ?? "");
+          const fs21 = require("fs");
+          try {
+            fs21.mkdirSync(dirPath, { recursive: true });
+            return true;
+          } catch {
+            return false;
+          }
+        }
+        case "http-get":
+        case "http_get": {
+          const url2 = String(args3[0] ?? "");
+          try {
+            const { execSync: execSync2 } = require("child_process");
+            const { writeFileSync: writeFileSync14, unlinkSync: unlinkSync5 } = require("fs");
+            const { randomUUID: randomUUID5 } = require("crypto");
+            const tmpFile = `/tmp/fl-http-${randomUUID5()}.js`;
+            const nodeScript = `process.env.FL_URL=${JSON.stringify(url2)};
+const u=require('url').parse(process.env.FL_URL);
+const mod=u.protocol==='https:'?require('https'):require('http');
+const chunks=[];
+const req=mod.request({hostname:u.hostname,port:u.port||undefined,path:u.path||'/',method:'GET'},res=>{
+  res.on('data',d=>chunks.push(d));
+  res.on('end',()=>{process.stdout.write(JSON.stringify({s:res.statusCode,b:Buffer.concat(chunks).toString()}))});
+});
+req.on('error',e=>process.stdout.write(JSON.stringify({s:0,b:'',e:e.message})));
+req.setTimeout(10000,()=>{req.destroy();process.stdout.write(JSON.stringify({s:0,b:'',e:'timeout'}))});
+req.end();`;
+            writeFileSync14(tmpFile, nodeScript, "utf-8");
+            const result = execSync2(`node ${tmpFile}`, { encoding: "utf-8", timeout: 15e3 });
+            try {
+              unlinkSync5(tmpFile);
+            } catch {
+            }
+            const parsed = JSON.parse(result);
+            return { status: parsed.s || 0, body: parsed.b || "", headers: {} };
+          } catch (e) {
+            return { status: 0, body: "", headers: {}, error: e.message };
+          }
+        }
+        case "now-iso":
+        case "now_iso": {
+          return (/* @__PURE__ */ new Date()).toISOString();
+        }
+        // AI-First #5: (help "keyword") — 런타임 함수 검색
+        case "help": {
+          const query = String(args3[0] ?? "").toLowerCase();
+          let sigs = [];
+          try {
+            sigs = require_stdlib_signatures();
+          } catch {
+            sigs = [];
+          }
+          if (sigs.length === 0) {
+            console.log("\u26A0\uFE0F  stdlib \uC2DC\uADF8\uB2C8\uCC98 \uC5C6\uC74C \u2014 npm run build \uC2E4\uD589 \uD544\uC694");
+            return null;
+          }
+          if (!query) {
+            const modules = [...new Set(sigs.map((s) => s.module))].sort();
+            console.log(`\x1B[36m[help]\x1B[0m \uCE74\uD14C\uACE0\uB9AC: ${modules.join(", ")}`);
+            console.log(`\uC0AC\uC6A9\uBC95: (help "keyword")  \uC608: (help "server"), (help "file"), (help "str")`);
+            return null;
+          }
+          const exact = sigs.filter((s) => s.name === query || s.name.replace(/-/g, "_") === query);
+          const partial = sigs.filter(
+            (s) => s.name !== query && s.name.replace(/-/g, "_") !== query && (s.name.toLowerCase().includes(query) || s.module.toLowerCase().includes(query))
+          ).slice(0, 15);
+          const results = [...exact, ...partial];
+          if (results.length === 0) {
+            console.log(`\x1B[33m[help]\x1B[0m '${query}' \uAC80\uC0C9 \uACB0\uACFC \uC5C6\uC74C`);
+            return null;
+          }
+          console.log(`\x1B[36m[help]\x1B[0m '${query}' \uAC80\uC0C9 \uACB0\uACFC ${results.length}\uAC1C:`);
+          for (const s of results) {
+            const tag = exact.includes(s) ? "\x1B[32m\u25CF\x1B[0m" : " ";
+            console.log(`  ${tag} \x1B[1m${s.name}\x1B[0m (${s.params || "-"}) \u2192 ${s.returns || "any"}`);
+          }
+          return null;
+        }
+      }
+      return callUser(op, args3);
+    }
+  }
+}
+var MODULE_CACHE_DISABLED, FL_SPECIAL_FORMS, _globalCache, IO_CTRL_SLOTS, IO_CTRL_SIZE, IO_DATA_SIZE, IO_SLOT_WRITE, IO_SLOT_READ, IO_SLOT_NOTIFY, _ioWorkerCode;
+var init_eval_builtins = __esm({
+  "src/eval-builtins.ts"() {
+    init_async_runtime();
+    init_errors();
+    init_effect_enforcer();
+    init_lazy_seq();
+    init_context_window();
+    init_result_type();
+    init_error_system();
+    init_tool_registry();
+    init_memory_system();
+    init_rag();
+    init_multi_agent();
+    init_try_reason();
+    init_streaming();
+    init_quality_loop();
+    init_fl_tutor();
+    init_reasoning_debugger();
+    init_prompt_compiler();
+    init_fl_sdk();
+    init_hypothesis();
+    init_maybe_chain();
+    init_debate();
+    init_checkpoint();
+    init_meta_reason();
+    init_belief();
+    init_analogy();
+    init_critique();
+    init_compose_reason();
+    init_cognitive();
+    init_consensus();
+    init_delegate();
+    init_negotiate();
+    init_vote();
+    init_swarm();
+    init_peer_review();
+    init_compete();
+    init_chain_agents();
+    init_multi_agent_hub();
+    init_orchestrate();
+    init_evolve();
+    init_mutate();
+    init_crossover();
+    init_fitness();
+    init_generation();
+    init_prune();
+    init_benchmark_self();
+    init_version_self();
+    init_self_evolution_hub();
+    init_causal();
+    init_eval_builtins_ai();
+    init_lexer();
+    init_parser();
+    init_runtime_events();
+    init_runtime_contracts();
+    init_runtime_governance();
+    init_runtime_budget();
+    init_runtime_context();
+    init_runtime_watchdog();
+    init_runtime_store();
+    init_runtime_history();
+    init_runtime_reputation();
+    init_runtime_intelligence();
+    MODULE_CACHE_DISABLED = false;
+    FL_SPECIAL_FORMS = /* @__PURE__ */ new Set(["if", "let", "do", "begin", "fn", "and", "or", "not", "null?", "match", "call", "export", "define", "set!"]);
+    _globalCache = makeCacheHandle(1e4);
+    IO_CTRL_SLOTS = 4;
+    IO_CTRL_SIZE = IO_CTRL_SLOTS * 4;
+    IO_DATA_SIZE = 8 * 1024 * 1024;
+    IO_SLOT_WRITE = 0;
+    IO_SLOT_READ = 1;
+    IO_SLOT_NOTIFY = 2;
+    _ioWorkerCode = `
+const { workerData, parentPort } = require('worker_threads');
+const net = require('net');
+
+const ctrl = new Int32Array(workerData.ctrlBuf);
+const data = Buffer.from(workerData.dataBuf);
+const DATA_SIZE = ${IO_DATA_SIZE};
+const WP = ${IO_SLOT_WRITE};
+const NOTIFY = ${IO_SLOT_NOTIFY};
+
+// push: JSON \uC774\uBCA4\uD2B8\uB97C ring buffer\uC5D0 \uAE30\uB85D\uD558\uACE0 Main\uC744 \uAE68\uC6C0
+// wrap sentinel(0xFFFFFFFF) \uD328\uD134\uC73C\uB85C \uBC84\uD37C \uB05D \uCC98\uB9AC
+function push(eventStr) {
+  const encoded = Buffer.from(eventStr, 'utf8');
+  const totalLen = 4 + encoded.length;
+  let wp = Atomics.load(ctrl, WP);
+  // \uD604\uC7AC \uC704\uCE58\uC5D0 \uC774\uBCA4\uD2B8\uAC00 \uB4E4\uC5B4\uAC00\uC9C0 \uC54A\uC73C\uBA74 wrap sentinel \uAE30\uB85D \uD6C4 0\uC73C\uB85C \uC774\uB3D9
+  if (wp + totalLen > DATA_SIZE - 8) {
+    data.writeUInt32LE(0xFFFFFFFF, wp);
+    wp = 0;
+  }
+  data.writeUInt32LE(encoded.length, wp);
+  encoded.copy(data, wp + 4);
+  Atomics.store(ctrl, WP, wp + totalLen);
+  Atomics.store(ctrl, NOTIFY, 1);
+  Atomics.notify(ctrl, NOTIFY);
+}
+
+// \uC18C\uCF13 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: id \u2192 { sock, handler }
+const sockets = new Map();
+// \uC11C\uBC84 \uB808\uC9C0\uC2A4\uD2B8\uB9AC: port \u2192 net.Server
+const servers = new Map();
+
+parentPort.on('message', (msg) => {
+  const { cmd } = msg;
+
+  if (cmd === 'tcp-outbound') {
+    const { id, host, port, handler } = msg;
+    const sock = new net.Socket();
+    sockets.set(id, { sock, handler });
+    sock.connect(port, host);
+    sock.on('connect', () =>
+      push(JSON.stringify({ ev: 'connect', id, handler })));
+    sock.on('data', (chunk) =>
+      push(JSON.stringify({ ev: 'data', id, handler, hex: chunk.toString('hex') })));
+    sock.on('close', () => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'close', id, handler }));
+    });
+    sock.on('error', (e) => {
+      sockets.delete(id);
+      push(JSON.stringify({ ev: 'error', id, handler, msg: e.message }));
+    });
+  }
+
+  if (cmd === 'tcp-write') {
+    const entry = sockets.get(msg.id);
+    if (entry && !entry.sock.destroyed) {
+      entry.sock.write(Buffer.from(msg.hex, 'hex'));
+    }
+  }
+
+  if (cmd === 'tcp-drop') {
+    const entry = sockets.get(msg.id);
+    if (entry) { entry.sock.destroy(); sockets.delete(msg.id); }
+  }
+
+  if (cmd === 'tcp-server-raw') {
+    const { port, handler } = msg;
+    if (servers.has(port)) return;
+    let seq = 0;
+    const server = net.createServer((sock) => {
+      const cid = 'conn_' + port + '_' + (++seq);
+      sockets.set(cid, { sock, handler });
+      push(JSON.stringify({ ev: 'accept', id: cid, handler }));
+      sock.on('data', (chunk) =>
+        push(JSON.stringify({ ev: 'data', id: cid, handler, hex: chunk.toString('hex') })));
+      sock.on('close', () => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'close', id: cid, handler }));
+      });
+      sock.on('error', (e) => {
+        sockets.delete(cid);
+        push(JSON.stringify({ ev: 'error', id: cid, handler, msg: e.message }));
+      });
+    });
+    server.listen(port, () =>
+      push(JSON.stringify({ ev: 'listening', id: port, handler })));
+    servers.set(port, server);
+  }
+
+  if (cmd === 'tcp-server-stop') {
+    const server = servers.get(msg.port);
+    if (server) { server.close(); servers.delete(msg.port); }
+  }
+});
+`;
+  }
+});
+
+// src/profiler.ts
+var Profiler, globalProfiler;
+var init_profiler = __esm({
+  "src/profiler.ts"() {
+    Profiler = class {
+      constructor() {
+        this.enabled = false;
+        this.entries = /* @__PURE__ */ new Map();
+        // 호출 스택: selfMs(자식 제외 시간) 계산용
+        this.callStack = [];
+      }
+      /**
+       * enter(name) → exit 함수 반환
+       * exit 호출 시 경과 시간 기록
+       */
+      enter(name) {
+        if (!this.enabled) return () => {
+        };
+        const startMs = performance.now();
+        const stackEntry = { name, startMs, childMs: 0 };
+        this.callStack.push(stackEntry);
+        return () => {
+          const endMs = performance.now();
+          const durationMs = endMs - startMs;
+          const selfMs = durationMs - stackEntry.childMs;
+          const idx = this.callStack.lastIndexOf(stackEntry);
+          if (idx !== -1) this.callStack.splice(idx, 1);
+          if (this.callStack.length > 0) {
+            this.callStack[this.callStack.length - 1].childMs += durationMs;
+          }
+          this._addEntry(name, durationMs, selfMs);
+        };
+      }
+      /**
+       * record(name, ms): 직접 기록 (selfMs = ms로 가정)
+       */
+      record(name, ms) {
+        if (!this.enabled) return;
+        this._addEntry(name, ms, ms);
+      }
+      _addEntry(name, totalMs, selfMs) {
+        const existing = this.entries.get(name);
+        if (existing) {
+          existing.callCount++;
+          existing.totalMs += totalMs;
+          existing.selfMs += selfMs;
+          if (totalMs > existing.maxMs) existing.maxMs = totalMs;
+          if (totalMs < existing.minMs) existing.minMs = totalMs;
+        } else {
+          this.entries.set(name, {
+            callCount: 1,
+            totalMs,
+            selfMs,
+            maxMs: totalMs,
+            minMs: totalMs
+          });
+        }
+      }
+      /**
+       * getReport(): callCount 내림차순 정렬된 ProfileEntry 배열
+       */
+      getReport() {
+        const result = [];
+        for (const [name, data] of this.entries) {
+          result.push({
+            name,
+            callCount: data.callCount,
+            totalMs: data.totalMs,
+            selfMs: data.selfMs,
+            avgMs: data.totalMs / data.callCount,
+            maxMs: data.maxMs,
+            minMs: data.minMs
+          });
+        }
+        result.sort((a, b) => b.callCount - a.callCount);
+        return result;
+      }
+      /**
+       * getTop(n): 상위 N개 반환
+       */
+      getTop(n) {
+        return this.getReport().slice(0, n);
+      }
+      /**
+       * reset(): 모든 데이터 초기화
+       */
+      reset() {
+        this.entries.clear();
+        this.callStack = [];
+      }
+      /**
+       * toMarkdown(): Markdown 테이블 출력
+       */
+      toMarkdown() {
+        const report = this.getReport();
+        if (report.length === 0) {
+          return "| name | calls | totalMs | selfMs | avgMs | maxMs | minMs |\n|------|-------|---------|--------|-------|-------|-------|\n";
+        }
+        const header = "| name | calls | totalMs | selfMs | avgMs | maxMs | minMs |";
+        const divider = "|------|-------|---------|--------|-------|-------|-------|";
+        const rows = report.map(
+          (e) => `| ${e.name} | ${e.callCount} | ${e.totalMs.toFixed(3)} | ${e.selfMs.toFixed(3)} | ${e.avgMs.toFixed(3)} | ${e.maxMs.toFixed(3)} | ${e.minMs.toFixed(3)} |`
+        );
+        return [header, divider, ...rows].join("\n");
+      }
+      /**
+       * toJSON(): ProfileEntry 배열을 JSON 객체로
+       */
+      toJSON() {
+        return this.getReport();
+      }
+    };
+    globalProfiler = new Profiler();
+  }
+});
+
+// src/vm.ts
+var VM;
+var init_vm = __esm({
+  "src/vm.ts"() {
+    init_bytecode();
+    VM = class {
+      constructor() {
+        this.stack = [];
+        this.vars = /* @__PURE__ */ new Map();
+        this.ip = 0;
+      }
+      run(chunk) {
+        this.stack = [];
+        this.vars = /* @__PURE__ */ new Map();
+        this.ip = 0;
+        while (this.ip < chunk.instructions.length) {
+          const instr = chunk.instructions[this.ip];
+          this.ip++;
+          switch (instr.op) {
+            case 0 /* PUSH_CONST */: {
+              const idx = instr.arg;
+              this.push(chunk.constants[idx]);
+              break;
+            }
+            case 1 /* PUSH_VAR */: {
+              const name = instr.arg;
+              if (!this.vars.has(name)) {
+                throw new Error(`VM: \uC815\uC758\uB418\uC9C0 \uC54A\uC740 \uBCC0\uC218: ${name}`);
+              }
+              this.push(this.vars.get(name));
+              break;
+            }
+            case 2 /* SET_VAR */: {
+              const name = instr.arg;
+              const val = this.pop();
+              this.vars.set(name, val);
+              break;
+            }
+            case 7 /* POP */: {
+              this.pop();
+              break;
+            }
+            case 8 /* DUP */: {
+              if (this.stack.length === 0) {
+                throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (DUP)");
+              }
+              this.push(this.stack[this.stack.length - 1]);
+              break;
+            }
+            case 9 /* ADD */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a + b);
+              break;
+            }
+            case 10 /* SUB */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a - b);
+              break;
+            }
+            case 11 /* MUL */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a * b);
+              break;
+            }
+            case 12 /* DIV */: {
+              const b = this.pop();
+              const a = this.pop();
+              if (b === 0) throw new Error("VM: 0\uC73C\uB85C \uB098\uB204\uAE30");
+              this.push(a / b);
+              break;
+            }
+            case 13 /* MOD */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a % b);
+              break;
+            }
+            case 14 /* EQ */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a === b);
+              break;
+            }
+            case 19 /* NEQ */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a !== b);
+              break;
+            }
+            case 15 /* LT */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a < b);
+              break;
+            }
+            case 16 /* GT */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a > b);
+              break;
+            }
+            case 17 /* LE */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a <= b);
+              break;
+            }
+            case 18 /* GE */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(a >= b);
+              break;
+            }
+            case 20 /* AND */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(Boolean(a) && Boolean(b));
+              break;
+            }
+            case 21 /* OR */: {
+              const b = this.pop();
+              const a = this.pop();
+              this.push(Boolean(a) || Boolean(b));
+              break;
+            }
+            case 22 /* NOT */: {
+              const a = this.pop();
+              this.push(!Boolean(a));
+              break;
+            }
+            case 5 /* JUMP */: {
+              this.ip = instr.arg;
+              break;
+            }
+            case 6 /* JUMP_IF_FALSE */: {
+              const cond = this.pop();
+              if (!Boolean(cond)) {
+                this.ip = instr.arg;
+              }
+              break;
+            }
+            case 23 /* MAKE_LIST */: {
+              const count = instr.arg;
+              if (this.stack.length < count) {
+                throw new Error(`VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C (MAKE_LIST: need ${count}, have ${this.stack.length})`);
+              }
+              const items = this.stack.splice(this.stack.length - count, count);
+              this.push(items);
+              break;
+            }
+            case 24 /* GET_FIELD */: {
+              const obj = this.pop();
+              const field = instr.arg;
+              if (obj !== null && typeof obj === "object") {
+                this.push(obj[field]);
+              } else {
+                throw new Error(`VM: GET_FIELD \uB300\uC0C1\uC774 \uAC1D\uCCB4\uAC00 \uC544\uB2D8`);
+              }
+              break;
+            }
+            case 3 /* CALL */: {
+              throw new Error("VM: CALL \uBBF8\uAD6C\uD604");
+            }
+            case 4 /* RETURN */: {
+              return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+            }
+            case 25 /* HALT */: {
+              return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+            }
+            default: {
+              throw new Error(`VM: \uC54C \uC218 \uC5C6\uB294 OpCode: ${instr.op}`);
+            }
+          }
+        }
+        return this.stack.length > 0 ? this.stack[this.stack.length - 1] : null;
+      }
+      push(val) {
+        this.stack.push(val);
+      }
+      pop() {
+        if (this.stack.length === 0) {
+          throw new Error("VM: \uC2A4\uD0DD \uC5B8\uB354\uD50C\uB85C");
+        }
+        return this.stack.pop();
+      }
+    };
+  }
+});
+
+// src/eval-call-function.ts
+var eval_call_function_exports = {};
+__export(eval_call_function_exports, {
+  callAsyncFunctionValue: () => callAsyncFunctionValue,
+  callFunction: () => callFunction,
+  callFunctionValue: () => callFunctionValue,
+  callFunctionValueRaw: () => callFunctionValueRaw,
+  callFunctionValueTCO: () => callFunctionValueTCO,
+  callUserFunction: () => callUserFunction,
+  callUserFunctionRaw: () => callUserFunctionRaw,
+  callUserFunctionTCO: () => callUserFunctionTCO
+});
+function propagateMutations(interp2, capturedEnv, paramSet, savedStack) {
+  const finalState = interp2.context.variables.snapshot();
+  for (const [key, newVal] of finalState) {
+    if (paramSet.has(key)) continue;
+    if (!capturedEnv.has(key)) continue;
+    const oldVal = capturedEnv.get(key);
+    if (newVal === oldVal) continue;
+    capturedEnv.set(key, newVal);
+    for (let i = savedStack.length - 1; i >= 0; i--) {
+      if (savedStack[i].has(key)) {
+        savedStack[i].set(key, newVal);
+        break;
+      }
+    }
+  }
+}
+function _flCheckType(type, val) {
+  switch (type) {
+    case "int":
+      return typeof val === "number" && Number.isInteger(val);
+    case "float":
+      return typeof val === "number" && !Number.isInteger(val);
+    case "number":
+      return typeof val === "number";
+    case "string":
+      return typeof val === "string";
+    case "bool":
+    case "boolean":
+      return typeof val === "boolean";
+    case "array":
+    case "list":
+      return Array.isArray(val);
+    case "map":
+      return val !== null && typeof val === "object" && !Array.isArray(val) && val?.kind !== "function-value" && val?.kind !== "async-function-value";
+    case "fn":
+    case "function":
+      return typeof val === "function" || val?.kind === "function-value" || val?.kind === "async-function-value";
+    case "nil":
+      return val === null || val === void 0;
+    case "any":
+      return true;
+    default:
+      return true;
+  }
+}
+function _flTypeName(val) {
+  if (val === null || val === void 0) return "nil";
+  if (Array.isArray(val)) return "array";
+  if (typeof val === "function" || val?.kind === "function-value") return "function";
+  if (typeof val === "object") return "map";
+  return typeof val;
+}
+function bindParam(interp2, param, value) {
+  if (typeof param === "string") {
+    interp2.context.variables.set(param, value);
+    return;
+  }
+  if (param?.kind === "block" && param?.type === "Map") {
+    const fields = param.fields;
+    const keysField = fields?.get("keys");
+    if (keysField?.kind === "block" && keysField?.type === "Array") {
+      const keyItems = keysField.fields.get("items") ?? [];
+      for (const keyNode of keyItems) {
+        const rawName = keyNode?.kind === "literal" && keyNode?.type === "symbol" ? keyNode.value : keyNode?.kind === "variable" ? keyNode.name.replace(/^\$/, "") : null;
+        if (rawName !== null) {
+          const varName = rawName.startsWith("$") ? rawName : "$" + rawName;
+          const extracted = value !== null && typeof value === "object" ? value[rawName] ?? null : null;
+          interp2.context.variables.set(varName, extracted);
+        }
+      }
+    }
+  }
+}
+function callUserFunction(interp2, name, args3) {
+  if (interp2.tcoMode) {
+    return callUserFunctionTCO(interp2, name, args3);
+  }
+  const _effBase = name.replace(/\[.*$/, "");
+  enforceCall(_effBase);
+  if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
+    const _vmAllowed = resolveFnAllowed(_effBase);
+    pushFrame(_effBase, _vmAllowed);
+    let _vmOk = false;
+    let _vmResult;
+    try {
+      try {
+        const vmFunc = vmFunctionRegistry.get(name);
+        const initialVars = /* @__PURE__ */ new Map();
+        if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
+          for (const [k, v] of vmFunc._closure) {
+            initialVars.set(k, v);
+          }
+        } else {
+          const snapshot = interp2.context.variables.snapshot();
+          for (const [k, v] of snapshot) {
+            initialVars.set(k, v);
+          }
+        }
+        for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
+          initialVars.set("$" + vmName, vmFuncObj);
+          initialVars.set(vmName, vmFuncObj);
+        }
+        for (let i = 0; i < vmFunc._params.length; i++) {
+          initialVars.set(vmFunc._params[i], args3[i] ?? null);
+        }
+        _vmResult = _callVM.run(vmFunc._chunk, initialVars);
+        _vmOk = true;
+      } catch {
+      }
+    } finally {
+      popFrame();
+    }
+    if (_vmOk) return _vmResult;
+  }
+  const _interpAllowed = resolveFnAllowed(_effBase);
+  pushFrame(_effBase, _interpAllowed);
+  try {
+    return _callUserFunctionInterpPath(interp2, name, args3);
+  } finally {
+    popFrame();
+  }
+}
+function _callUserFunctionInterpPath(interp2, name, args3) {
+  let baseName = name;
+  let typeArgs = null;
+  const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
+  if (bracketMatch) {
+    baseName = bracketMatch[1];
+    const typeArgStr = bracketMatch[2];
+    typeArgs = typeArgStr.split(",").map((t) => ({
+      kind: "type",
+      name: t.trim()
+    }));
+  }
+  let func = interp2.context.functions.get(baseName);
+  if (!func) {
+    const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
+    if (alt !== baseName) func = interp2.context.functions.get(alt);
+  }
+  if (!func) {
+    const v = interp2.context.variables.get(baseName) ?? interp2.context.variables.get("$" + baseName);
+    if (v && (v.kind === "function-value" || v.kind === "async-function-value" || typeof v === "function" || v.params && v.body)) {
+      if (v.kind === "function-value") return callFunctionValue(interp2, v, args3);
+      if (v.kind === "async-function-value") return callAsyncFunctionValue(interp2, v, args3);
+      if (typeof v === "function") return v(...args3);
+      func = v;
+    }
+  }
+  if (!func) {
+    const candidates = [...interp2.context.functions.keys()];
+    const alias = KNOWN_ALIASES[baseName] ?? KNOWN_ALIASES[baseName.replace(/-/g, "_")] ?? KNOWN_ALIASES[baseName.replace(/_/g, "-")];
+    let hint;
+    if (alias) {
+      hint = `'${baseName}'\uB294 \uC5C6\uC2B5\uB2C8\uB2E4. \uB300\uC2E0 '${alias.correct}'\uB97C \uC0AC\uC6A9\uD558\uC138\uC694.
+  \uC0AC\uC6A9\uBC95: ${alias.usage}`;
+    } else {
+      const similar = suggestSimilar(baseName, candidates);
+      hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+    }
+    throw new FunctionNotFoundError(
+      baseName,
+      interp2.currentFilePath,
+      interp2.currentLine > 0 ? interp2.currentLine : void 0,
+      void 0,
+      hint
+    );
+  }
+  if (func._call) return func._call(...args3);
+  let isGenericCall = false;
+  if (func.generics && func.generics.length > 0) {
+    if (!typeArgs) {
+      throw new Error(`Generic function '${baseName}' requires type arguments, e.g., ${baseName}[int] or ${baseName}[int string]`);
+    }
+    if (interp2.context.typeChecker) {
+      const instantiation = interp2.context.typeChecker.instantiateGenericFunction(baseName, typeArgs);
+      if (!instantiation.valid) {
+        throw new Error(`Cannot instantiate generic function '${baseName}': ${instantiation.message}`);
+      }
+    }
+    isGenericCall = true;
+  }
+  if (!isGenericCall && interp2.context.runtimeTypeChecker) {
+    interp2.context.runtimeTypeChecker.checkCall(baseName, args3);
+  }
+  if (typeof func.body === "function") {
+    return func.body(...args3);
+  }
+  if (func.paramDefaults) {
+    while (args3.length < func.params.length) {
+      const def = func.paramDefaults[args3.length];
+      if (def !== void 0) args3 = [...args3, interp2.eval(def)];
+      else break;
+    }
+  }
+  if (func.params.length > args3.length) {
+    const paramNames = func.params.map(
+      (p) => typeof p === "string" ? p.replace(/^\$/, "") : p?.kind === "variable" ? p.name.replace(/^\$/, "") : "\u2026"
+    );
+    throw new Error(`Function '${baseName}' expects ${func.params.length} args (${paramNames.join(", ")}), got ${args3.length}`);
+  }
+  if (interp2.callDepth >= MAX_CALL_DEPTH) {
+    const _stack3 = interp2.callStack ?? [];
+    const tail2 = _stack3.slice(-10).map((s, i) => `  #${_stack3.length - 10 + i}: ${s.fn} (line ${s.line})`).join("\n");
+    throw new Error(
+      `[E_STACK_OVERFLOW] line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion in '${baseName}'
+` + (tail2 ? `\uCD5C\uADFC \uD638\uCD9C \uCCB4\uC778:
+${tail2}` : "")
+    );
+  }
+  const prefixMatch = baseName.match(/^([^:]+):/);
+  const tempAliases = [];
+  if (prefixMatch) {
+    const prefix = prefixMatch[1] + ":";
+    for (const [fname, fval] of interp2.context.functions) {
+      if (fname.startsWith(prefix)) {
+        const unqualified = fname.slice(prefix.length);
+        if (!interp2.context.functions.has(unqualified)) {
+          interp2.context.functions.set(unqualified, fval);
+          tempAliases.push(unqualified);
+        }
+      }
+    }
+  }
+  const exitProfiler = globalProfiler.enter(baseName);
+  const _callStack = interp2.context.callStack;
+  const _argsBrief = args3.slice(0, 5).map(
+    (a) => a === null ? "nil" : Array.isArray(a) ? `[${a.length}]` : typeof a === "object" ? "{obj}" : typeof a === "function" ? "<fn>" : typeof a === "string" ? a.length > 20 ? `"${a.slice(0, 17)}..."` : `"${a}"` : String(a)
+  );
+  const _stackEntry = { name: baseName, line: interp2.currentLine, args: _argsBrief };
+  if (process.env.FL_TRACE === "1") {
+    console.error(`[trace] ${"  ".repeat(Math.min(interp2.callDepth, 20))}\u2192 ${baseName}(${_argsBrief.join(", ")}) (line ${interp2.currentLine})`);
+  }
+  if (func.paramAnnotations) {
+    for (let _ti = 0; _ti < func.params.length; _ti++) {
+      const _ann = func.paramAnnotations[_ti];
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uD30C\uB77C\uBBF8\uD130 '${func.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
+        );
+      }
+    }
+  }
+  if (func.capturedEnv) {
+    const savedStack = interp2.context.variables.saveStack();
+    const paramSet = new Set(func.params);
+    interp2.callDepth++;
+    if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
+    _callStack.push(_stackEntry);
+    if (_callStack.length > 100) _callStack.shift();
+    let result;
+    try {
+      interp2.context.variables.fromSnapshot(func.capturedEnv);
+      for (let i = 0; i < func.params.length; i++) {
+        bindParam(interp2, func.params[i], args3[i]);
+      }
+      result = interp2.eval(func.body);
+      if (func.returnAnnotation && func.returnAnnotation !== "any" && !_flCheckType(func.returnAnnotation, result)) {
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${baseName}' \uBC18\uD658\uAC12: ${func.returnAnnotation} \uD544\uC694, ${_flTypeName(result)} \uBC18\uD658\uB428`
+        );
+      }
+      propagateMutations(interp2, func.capturedEnv, paramSet, savedStack);
+    } catch (e) {
+      if (isReturnSignal(e)) {
+        result = e.value;
+      } else {
+        if (e instanceof Error && !e.__flCallStack) {
+          e.__flCallStack = [..._callStack];
+        }
+        throw e;
+      }
+    } finally {
+      interp2.callDepth--;
+      _callStack.pop();
+      interp2.context.variables.restoreStack(savedStack);
+      for (const alias of tempAliases) interp2.context.functions.delete(alias);
+      exitProfiler();
+    }
+    return result;
+  }
+  const _savedGlobalStack = interp2.context.variables.resetToGlobalFrame();
+  interp2.callDepth++;
+  if (hasBudget()) checkBudget(Date.now(), 0, interp2.callDepth);
+  _callStack.push(_stackEntry);
+  if (_callStack.length > 100) _callStack.shift();
+  const _prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
+  let _currentFunc = func;
+  let _currentArgs = args3;
+  try {
+    for (let recurIter = 0; recurIter < 2e6; recurIter++) {
+      if (recurIter > 0 && recurIter % 1e3 === 0 && hasBudget()) {
+        checkBudget(Date.now(), 0, 0);
+      }
+      for (let i = 0; i < _currentFunc.params.length; i++) {
+        bindParam(interp2, _currentFunc.params[i], _currentArgs[i]);
+      }
+      let result;
+      try {
+        result = interp2.eval(_currentFunc.body);
+      } catch (e) {
+        if (isReturnSignal(e)) return e.value;
+        if (e instanceof Error && !e.__flCallStack) {
+          e.__flCallStack = [..._callStack];
+        }
+        throw e;
+      }
+      if (result && typeof result === "object" && result.__FL_RECUR__) {
+        _currentArgs = result.__args;
+        continue;
+      }
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          let nextName = result.fn;
+          let nextFunc = interp2.context.functions.get(nextName);
+          if (!nextFunc) {
+            const alt = nextName.includes("_") ? nextName.replace(/_/g, "-") : nextName.replace(/-/g, "_");
+            if (alt !== nextName) nextFunc = interp2.context.functions.get(alt);
+          }
+          if (nextFunc && !nextFunc.capturedEnv && typeof nextFunc.body !== "function") {
+            _currentFunc = nextFunc;
+            _currentArgs = result.args;
+            continue;
+          }
+          interp2.tcoMode = _prevTcoMode;
+          return callUserFunctionTCO(interp2, result.fn, result.args);
+        } else {
+          interp2.tcoMode = _prevTcoMode;
+          return callFunctionValueTCO(interp2, result.fn, result.args);
+        }
+      }
+      return result;
+    }
+    throw new Error(`recur: max iterations exceeded in '${baseName}'`);
+  } finally {
+    interp2.tcoMode = _prevTcoMode;
+    interp2.callDepth--;
+    _callStack.pop();
+    interp2.context.variables.restoreStack(_savedGlobalStack);
+    for (const alias of tempAliases) interp2.context.functions.delete(alias);
+    exitProfiler();
+  }
+}
+function callFunctionValue(interp2, fn, args3) {
+  if (interp2.tcoMode) {
+    return callFunctionValueTCO(interp2, fn, args3);
+  }
+  if (fn._call) return fn._call(...args3);
+  if (fn.kind !== "function-value") {
+    throw new Error(`Expected function-value, got ${fn.kind}`);
+  }
+  const _effName = fn.name ?? "<anonymous>";
+  enforceCall(_effName);
+  const _allowed = resolveFnAllowed(_effName);
+  pushFrame(_effName, _allowed);
+  try {
+    return _callFunctionValueBody(interp2, fn, args3);
+  } finally {
+    popFrame();
+  }
+}
+function _callFunctionValueBody(interp2, fn, args3) {
+  if (fn.paramDefaults) {
+    while (args3.length < fn.params.length) {
+      const def = fn.paramDefaults[args3.length];
+      if (def !== void 0) args3 = [...args3, def];
+      else break;
+    }
+  }
+  if (interp2.callDepth >= MAX_CALL_DEPTH) {
+    throw new Error(`FreeLang line ${interp2.currentLine}: Maximum call depth exceeded (${MAX_CALL_DEPTH}) \u2014 possible infinite recursion`);
+  }
+  if (fn.paramAnnotations) {
+    for (let _ti = 0; _ti < fn.params.length; _ti++) {
+      const _ann = fn.paramAnnotations[_ti];
+      if (_ann && _ann !== "any" && !_flCheckType(_ann, args3[_ti])) {
+        const _fn = fn.name ?? "\uC775\uBA85";
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uD30C\uB77C\uBBF8\uD130 '${fn.params[_ti]}': ${_ann} \uD544\uC694, ${_flTypeName(args3[_ti])} \uC804\uB2EC\uB428`
+        );
+      }
+    }
+  }
+  const savedStack = interp2.context.variables.saveStack();
+  const paramSet = new Set(fn.params);
+  interp2.callDepth++;
+  let result;
+  try {
+    interp2.context.variables.fromSnapshot(fn.capturedEnv);
+    for (let i = 0; i < fn.params.length; i++) {
+      bindParam(interp2, fn.params[i], args3[i]);
+    }
+    result = interp2.eval(fn.body);
+    if (fn.returnAnnotation && fn.returnAnnotation !== "any") {
+      if (!_flCheckType(fn.returnAnnotation, result)) {
+        const _fn = fn.name ?? "\uC775\uBA85";
+        throw new TypeError(
+          `[FreeLang \uD0C0\uC785 \uC624\uB958] '${_fn}' \uBC18\uD658\uAC12: ${fn.returnAnnotation} \uD544\uC694, ${_flTypeName(result)} \uBC18\uD658\uB428`
+        );
+      }
+    }
+    propagateMutations(interp2, fn.capturedEnv, paramSet, savedStack);
+  } catch (e) {
+    if (isReturnSignal(e)) {
+      result = e.value;
+    } else {
+      if (e instanceof Error && !e.__flCallStack) {
+        const _cs = interp2.context?.callStack;
+        if (_cs?.length) e.__flCallStack = [..._cs];
+      }
+      throw e;
+    }
+  } finally {
+    interp2.callDepth--;
+    interp2.context.variables.restoreStack(savedStack);
+  }
+  return result;
+}
+function callAsyncFunctionValue(interp2, fn, args3) {
+  if (fn.kind !== "async-function-value") {
+    throw new Error(`Expected async-function-value, got ${fn.kind}`);
+  }
+  const _effName = fn.name ?? "<anonymous>";
+  return new FreeLangPromise((resolve10, reject) => {
+    enforceCall(_effName);
+    pushFrame(_effName, resolveFnAllowed(_effName));
+    const savedStack = interp2.context.variables.saveStack();
+    try {
+      interp2.context.variables.fromSnapshot(fn.capturedEnv);
+      for (let i = 0; i < fn.params.length; i++) {
+        bindParam(interp2, fn.params[i], args3[i]);
+      }
+      const result = interp2.eval(fn.body);
+      if (result instanceof FreeLangPromise) {
+        result.then((value) => resolve10(value)).catch((error) => reject(error));
+      } else {
+        resolve10(result);
+      }
+    } catch (error) {
+      reject(error);
+    } finally {
+      interp2.context.variables.restoreStack(savedStack);
+      popFrame();
+    }
+  });
+}
+function callFunction(interp2, fn, args3) {
+  if (fn.kind === "builtin-function") {
+    const _bname = fn.name ?? "<builtin>";
+    enforceCall(_bname);
+    return fn.fn(args3.map((arg) => interp2.eval(arg)));
+  } else if (fn.kind === "function-value") {
+    return callFunctionValue(interp2, fn, args3);
+  } else if (fn.kind === "async-function-value") {
+    return callAsyncFunctionValue(interp2, fn, args3);
+  } else if (typeof fn === "function") {
+    return fn(...args3);
+  } else if (typeof fn === "string") {
+    const wrappedArgs = args3.map((v) => ({
+      kind: "literal",
+      value: v,
+      type: v === null ? "any" : Array.isArray(v) ? "list" : typeof v
+    }));
+    return interp2.eval({ kind: "sexpr", op: fn, args: wrappedArgs });
+  } else if (fn && fn.params && fn.body) {
+    return callUserFunction(interp2, fn.name || "anonymous", args3);
+  } else {
+    throw new Error(`Cannot call ${typeof fn}: ${JSON.stringify(fn).slice(0, 100)}`);
+  }
+}
+function callUserFunctionTCO(interp2, name, args3) {
+  let currentName = name;
+  let currentArgs = args3;
+  const prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
+  let _haveFrame = false;
+  try {
+    for (let i = 0; i < 2e6; i++) {
+      let baseName = currentName;
+      const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
+      if (bracketMatch) baseName = bracketMatch[1];
+      if (_haveFrame) popFrame();
+      enforceCall(baseName);
+      pushFrame(baseName, resolveFnAllowed(baseName));
+      _haveFrame = true;
+      let func = interp2.context.functions.get(baseName);
+      if (!func) {
+        const alt = baseName.includes("_") ? baseName.replace(/_/g, "-") : baseName.replace(/-/g, "_");
+        if (alt !== baseName) func = interp2.context.functions.get(alt);
+      }
+      if (!func) {
+        const candidates = [...interp2.context.functions.keys()];
+        const similar = suggestSimilar(baseName, candidates);
+        const hint = similar ? `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD639\uC2DC '${similar}'\uB97C \uB9D0\uC500\uD558\uC2E0 \uAC74\uAC00\uC694?` : `'${baseName}'\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD568\uC218\uAC00 \uC815\uC758\uB418\uC5B4 \uC788\uB294\uC9C0 \uD655\uC778\uD558\uC138\uC694.`;
+        throw new FunctionNotFoundError(baseName, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0, void 0, hint);
+      }
+      if (func._call) return func._call(...currentArgs);
+      if (typeof func.body === "function") {
+        return func.body(...currentArgs);
+      }
+      const prefixMatch = baseName.match(/^([^:]+):/);
+      const tempAliases = [];
+      if (prefixMatch) {
+        const prefix = prefixMatch[1] + ":";
+        for (const [fname, fval] of interp2.context.functions) {
+          if (fname.startsWith(prefix)) {
+            const unqualified = fname.slice(prefix.length);
+            if (!interp2.context.functions.has(unqualified)) {
+              interp2.context.functions.set(unqualified, fval);
+              tempAliases.push(unqualified);
+            }
+          }
+        }
+      }
+      let result;
+      try {
+        if (func.capturedEnv) {
+          const savedStack = interp2.context.variables.saveStack();
+          try {
+            interp2.context.variables.fromSnapshot(func.capturedEnv);
+            for (let j = 0; j < func.params.length; j++) {
+              bindParam(interp2, func.params[j], currentArgs[j]);
+            }
+            result = interp2.eval(func.body);
+          } catch (e) {
+            if (isReturnSignal(e)) {
+              result = e.value;
+            } else throw e;
+          } finally {
+            interp2.context.variables.restoreStack(savedStack);
+          }
+        } else {
+          interp2.context.variables.push();
+          try {
+            for (let j = 0; j < func.params.length; j++) {
+              bindParam(interp2, func.params[j], currentArgs[j]);
+            }
+            result = interp2.eval(func.body);
+          } catch (e) {
+            if (isReturnSignal(e)) {
+              result = e.value;
+            } else throw e;
+          } finally {
+            interp2.context.variables.pop();
+          }
+        }
+      } finally {
+        for (const alias of tempAliases) interp2.context.functions.delete(alias);
+      }
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          currentName = result.fn;
+          currentArgs = result.args;
+          continue;
+        } else {
+          return callFunctionValueTCO(interp2, result.fn, result.args);
+        }
+      }
+      return result;
+    }
+    throw new Error(`TCO: \uCD5C\uB300 \uBC18\uBCF5(2,000,000) \uCD08\uACFC \u2014 '${currentName}'\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131`);
+  } finally {
+    if (_haveFrame) popFrame();
+    interp2.tcoMode = prevTcoMode;
+  }
+}
+function callFunctionValueTCO(interp2, fn, args3) {
+  const prevTcoMode = interp2.tcoMode;
+  interp2.tcoMode = true;
+  let _haveFrame = false;
+  try {
+    let currentFn = fn;
+    let currentArgs = args3;
+    for (let i = 0; i < 1e6; i++) {
+      if (currentFn.kind !== "function-value") {
+        throw new Error(`Expected function-value, got ${currentFn.kind}`);
+      }
+      const _effName = currentFn.name ?? "<anonymous>";
+      if (_haveFrame) popFrame();
+      enforceCall(_effName);
+      pushFrame(_effName, resolveFnAllowed(_effName));
+      _haveFrame = true;
+      const savedStack = interp2.context.variables.saveStack();
+      let result;
+      try {
+        interp2.context.variables.fromSnapshot(currentFn.capturedEnv);
+        for (let j = 0; j < currentFn.params.length; j++) {
+          bindParam(interp2, currentFn.params[j], currentArgs[j]);
+        }
+        result = interp2.eval(currentFn.body);
+      } finally {
+        interp2.context.variables.restoreStack(savedStack);
+      }
+      if (isTailCall(result)) {
+        if (typeof result.fn === "string") {
+          if (_haveFrame) {
+            popFrame();
+            _haveFrame = false;
+          }
+          return callUserFunctionTCO(interp2, result.fn, result.args);
+        } else {
+          currentFn = result.fn;
+          currentArgs = result.args;
+          continue;
+        }
+      }
+      return result;
+    }
+    throw new Error("TCO: \uCD5C\uB300 \uBC18\uBCF5(1,000,000) \uCD08\uACFC \u2014 function-value\uC5D0\uC11C \uBB34\uD55C \uC7AC\uADC0 \uAC00\uB2A5\uC131");
+  } finally {
+    if (_haveFrame) popFrame();
+    interp2.tcoMode = prevTcoMode;
+  }
+}
+function callUserFunctionRaw(interp2, name, args3) {
+  const func = interp2.context.functions.get(name);
+  if (!func) throw new FunctionNotFoundError(name, interp2.currentFilePath, interp2.currentLine > 0 ? interp2.currentLine : void 0);
+  const _effBase = name.replace(/\[.*$/, "");
+  enforceCall(_effBase);
+  pushFrame(_effBase, resolveFnAllowed(_effBase));
+  try {
+    if (typeof func.body === "function") return func.body(...args3);
+    let result;
+    if (func.capturedEnv) {
+      const savedStack = interp2.context.variables.saveStack();
+      try {
+        interp2.context.variables.fromSnapshot(func.capturedEnv);
+        for (let i = 0; i < func.params.length; i++) {
+          interp2.context.variables.set(func.params[i], args3[i]);
+        }
+        result = interp2.eval(func.body);
+      } finally {
+        interp2.context.variables.restoreStack(savedStack);
+      }
+    } else {
+      interp2.context.variables.push();
+      try {
+        for (let i = 0; i < func.params.length; i++) {
+          interp2.context.variables.set(func.params[i], args3[i]);
+        }
+        result = interp2.eval(func.body);
+      } finally {
+        interp2.context.variables.pop();
+      }
+    }
+    return result;
+  } finally {
+    popFrame();
+  }
+}
+function callFunctionValueRaw(interp2, fn, args3) {
+  if (fn.kind !== "function-value") throw new Error(`Expected function-value, got ${fn.kind}`);
+  const _effName = fn.name ?? "<anonymous>";
+  enforceCall(_effName);
+  pushFrame(_effName, resolveFnAllowed(_effName));
+  try {
+    const savedStack = interp2.context.variables.saveStack();
+    try {
+      interp2.context.variables.fromSnapshot(fn.capturedEnv);
+      for (let i = 0; i < fn.params.length; i++) {
+        interp2.context.variables.set(fn.params[i], args3[i]);
+      }
+      return interp2.eval(fn.body);
+    } finally {
+      interp2.context.variables.restoreStack(savedStack);
+    }
+  } finally {
+    popFrame();
+  }
+}
+var _callVM, MAX_CALL_DEPTH;
+var init_eval_call_function = __esm({
+  "src/eval-call-function.ts"() {
+    init_async_runtime();
+    init_error_formatter();
+    init_errors();
+    init_tco();
+    init_profiler();
+    init_vm_eligible();
+    init_vm();
+    init_return_signal();
+    init_runtime_budget();
+    init_effect_enforcer();
+    _callVM = new VM();
+    MAX_CALL_DEPTH = 5e3;
+  }
+});
+
+// src/debugger.ts
+var debugger_exports = {};
+__export(debugger_exports, {
+  DebugSession: () => DebugSession,
+  getGlobalDebugSession: () => getGlobalDebugSession,
+  handleBreak: () => handleBreak,
+  setGlobalDebugSession: () => setGlobalDebugSession
+});
+function getGlobalDebugSession() {
+  if (!_globalSession) {
+    _globalSession = new DebugSession();
+  }
+  return _globalSession;
+}
+function setGlobalDebugSession(session) {
+  _globalSession = session;
+}
+function handleBreak(session, loc, env) {
+  if (!session.enabled) return;
+  session.onBreak(loc, env);
+}
+var DebugSession, _globalSession;
+var init_debugger = __esm({
+  "src/debugger.ts"() {
+    DebugSession = class _DebugSession {
+      constructor() {
+        /** 중단점 집합 — "file:line" 형태 */
+        this.breakpoints = /* @__PURE__ */ new Set();
+        /** step 모드 — true면 모든 줄에서 break */
+        this.stepMode = false;
+        /** 디버그 모드 활성화 여부 */
+        this.enabled = false;
+        /** 중단점 도달 시 호출할 콜백 (기본: 콘솔 출력) */
+        this.onBreakCallback = null;
+        /** 소스맵 (선택적) */
+        this.sourceMap = null;
+        /** 브레이크 이벤트 로그 (테스트 검증용) */
+        this.breakLog = [];
+        /** watch 변수 목록 */
+        this.watchList = /* @__PURE__ */ new Set();
+        /** 호출 스택 */
+        this.callStack = [];
+      }
+      static _key(file, line) {
+        return `${file}:${line}`;
+      }
+      /** 중단점 추가 */
+      addBreakpoint(file, line) {
+        this.breakpoints.add(_DebugSession._key(file, line));
+      }
+      /** 중단점 제거 */
+      removeBreakpoint(file, line) {
+        this.breakpoints.delete(_DebugSession._key(file, line));
+      }
+      /** 해당 위치가 중단점인지 확인 */
+      isBreakpoint(file, line) {
+        return this.breakpoints.has(_DebugSession._key(file, line));
+      }
+      /**
+       * 중단점 도달 시 처리:
+       * - 콘솔에 "[BREAK] file:line:col" 출력
+       * - 환경 변수 스냅샷 기록
+       * - watch 변수 값 출력
+       * - 호출 스택 출력
+       * - 콜백 실행
+       */
+      onBreak(loc, env) {
+        if (!this.enabled) return;
+        const event = { loc, env: { ...env } };
+        this.breakLog.push(event);
+        const locStr = `${loc.file}:${loc.line}:${loc.col}`;
+        console.log(`[BREAK] ${locStr}`);
+        if (this.callStack.length > 0) {
+          console.log(`  stack: [${this.callStack.join(" > ")}]`);
+        }
+        if (this.watchList.size > 0) {
+          const watchValues = this.getWatchValues(env);
+          const hasWatched = Object.keys(watchValues).length > 0;
+          if (hasWatched) {
+            console.log(`  \u{1F441} watch:`);
+            for (const [k, v] of Object.entries(watchValues)) {
+              const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+              console.log(`    ${k} = ${display.slice(0, 80)}`);
+            }
+          }
+        }
+        const entries = Object.entries(env).slice(0, 10);
+        if (entries.length > 0) {
+          console.log(`  env:`);
+          for (const [k, v] of entries) {
+            const display = typeof v === "object" ? JSON.stringify(v) : String(v);
+            console.log(`    ${k} = ${display.slice(0, 80)}`);
+          }
+        }
+        if (this.onBreakCallback) {
+          this.onBreakCallback(event);
+        }
+      }
+      /** 중단점 모두 제거 */
+      clearBreakpoints() {
+        this.breakpoints.clear();
+      }
+      /** 중단점 개수 */
+      breakpointCount() {
+        return this.breakpoints.size;
+      }
+      /** watch에 변수 추가 */
+      addWatch(varName) {
+        this.watchList.add(varName);
+      }
+      /** watch에서 변수 제거 */
+      removeWatch(varName) {
+        this.watchList.delete(varName);
+      }
+      /** watch 중인 변수들의 현재값 반환 */
+      getWatchValues(env) {
+        const values = {};
+        for (const varName of this.watchList) {
+          if (varName in env) {
+            values[varName] = env[varName];
+          } else {
+            values[varName] = void 0;
+          }
+        }
+        return values;
+      }
+      /** 호출 스택에 함수명 추가 */
+      pushCall(fnName) {
+        this.callStack.push(fnName);
+      }
+      /** 호출 스택에서 제거 */
+      popCall() {
+        if (this.callStack.length > 0) {
+          this.callStack.pop();
+        }
+      }
+      /** 현재 호출 스택 반환 */
+      getStack() {
+        return [...this.callStack];
+      }
+    };
+    _globalSession = null;
+  }
+});
+
+// src/adapter-builtin-to-funcdef.ts
+var adapter_builtin_to_funcdef_exports = {};
+__export(adapter_builtin_to_funcdef_exports, {
+  builtinToFunctionDef: () => builtinToFunctionDef,
+  callFunction: () => callFunction2,
+  resolveFunction: () => resolveFunction,
+  userFunctionToDef: () => userFunctionToDef
+});
+function getEvalBuiltin() {
+  if (!evalBuiltinCache) {
+    const mod = (init_eval_builtins(), __toCommonJS(eval_builtins_exports));
+    evalBuiltinCache = mod.evalBuiltin || mod.default;
+  }
+  return evalBuiltinCache;
+}
+function builtinToFunctionDef(interp2, name) {
+  const effectEntry = lookupBuiltinEffects(name);
+  if (effectEntry === void 0) {
+    return null;
+  }
+  const effectTags = [];
+  if (effectEntry && effectEntry instanceof Set) {
+    effectTags.push(...Array.from(effectEntry));
+  }
+  const impl = (args3) => {
+    const evalBuiltinFunc = getEvalBuiltin();
+    return evalBuiltinFunc(interp2, name, args3, null);
+  };
+  return {
+    name,
+    arity: -1,
+    // builtin은 arity 정보 부족 (DU-2에서 개선)
+    impl,
+    effects: effectTags,
+    source: "builtin",
+    meta: {
+      nativeBuiltin: true
+    }
+  };
+}
+function userFunctionToDef(name, funcObj) {
+  if (!funcObj) return null;
+  const effectTags = [];
+  if (funcObj.effects && funcObj.effects instanceof Set) {
+    effectTags.push(...Array.from(funcObj.effects));
+  } else if (funcObj.effects && Array.isArray(funcObj.effects)) {
+    effectTags.push(...funcObj.effects);
+  }
+  const impl = (args3) => {
+    throw new Error(
+      `[userFunctionToDef] User functions must be called via callUserFunction, not via impl. Function: ${name}`
+    );
+  };
+  return {
+    name,
+    arity: funcObj.params ? funcObj.params.length : -1,
+    impl,
+    effects: effectTags,
+    source: "user",
+    meta: {
+      nativeBuiltin: false
+    }
+  };
+}
+function resolveFunction(interp2, name) {
+  if (process.env.DU_DEBUG) {
+    console.log(`[DU] resolveFunction("${name}")`);
+  }
+  let baseName = name;
+  const bracketMatch = name.match(/^([\w\-]+)\[([^\]]+)\]$/);
+  if (bracketMatch) {
+    baseName = bracketMatch[1];
+  }
+  const userFunc = interp2.context.functions?.get(baseName);
+  if (userFunc) {
+    if (process.env.DU_DEBUG) console.log(`[DU] Found user function: ${baseName}`);
+    return userFunctionToDef(baseName, userFunc);
+  }
+  if (process.env.DU_DEBUG) console.log(`[DU] No user function for: ${baseName}`);
+  const normalizedName = baseName.replace(/_/g, "-");
+  if (normalizedName !== baseName) {
+    const userFuncNorm = interp2.context.functions?.get(normalizedName);
+    if (userFuncNorm) {
+      return userFunctionToDef(normalizedName, userFuncNorm);
+    }
+  }
+  const builtinDef = builtinToFunctionDef(interp2, normalizedName);
+  if (builtinDef) {
+    return builtinDef;
+  }
+  return null;
+}
+function callFunction2(interp2, name, args3, span) {
+  const fn = resolveFunction(interp2, name);
+  if (!fn) {
+    return null;
+  }
+  if (fn.effects && fn.effects.length > 0) {
+    const { _enforceEffect } = (init_effect_enforcer(), __toCommonJS(effect_enforcer_exports));
+    const spanInfo = span ? { file: span.file ?? "", line: span.line ?? 0, col: span.col ?? 0 } : { file: "", line: 0, col: 0 };
+    _enforceEffect(fn.effects, spanInfo);
+  }
+  if (fn.source === "builtin") {
+    return fn.impl(args3);
+  } else if (fn.source === "user") {
+    const { callUserFunction: callUserFunction2 } = (init_eval_call_function(), __toCommonJS(eval_call_function_exports));
+    return callUserFunction2(interp2, fn.name, args3);
+  }
+  return null;
+}
+var evalBuiltinCache;
+var init_adapter_builtin_to_funcdef = __esm({
+  "src/adapter-builtin-to-funcdef.ts"() {
+    init_builtin_effects();
+    evalBuiltinCache = null;
+  }
+});
+
+// src/cli.ts
+var fs20 = __toESM(require("fs"));
+var path18 = __toESM(require("path"));
+var readline = __toESM(require("readline"));
+init_lexer();
+init_parser();
+
+// src/interpreter.ts
+var fs15 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
+init_lexer();
+init_parser();
+init_ast();
+
+// src/type-checker.ts
+var BUILTIN_TYPES = /* @__PURE__ */ new Map([
+  // Arithmetic
+  ["+", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  ["-", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  ["*", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  ["/", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "int" } }],
+  // Comparison
+  ["=", { params: [{ kind: "type", name: "any" }, { kind: "type", name: "any" }], returnType: { kind: "type", name: "bool" } }],
+  ["<", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "bool" } }],
+  [">", { params: [{ kind: "type", name: "int" }, { kind: "type", name: "int" }], returnType: { kind: "type", name: "bool" } }],
+  // String
+  ["concat", { params: [{ kind: "type", name: "string" }, { kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
+  ["upper", { params: [{ kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
+  ["lower", { params: [{ kind: "type", name: "string" }], returnType: { kind: "type", name: "string" } }],
+  // Collection
+  ["list", { params: [{ kind: "type", name: "any" }], returnType: { kind: "type", name: "array<any>" } }]
+]);
+var TypeChecker = class {
+  constructor() {
+    this.functionTypes = /* @__PURE__ */ new Map();
+    this.variableTypes = /* @__PURE__ */ new Map();
+  }
+  /**
+   * Register a function type (from FUNC block with type annotations)
+   */
+  registerFunction(funcName, paramTypes, returnType) {
+    this.functionTypes.set(funcName, { params: paramTypes, returnType });
+  }
+  /**
+   * Register a variable type
+   */
+  registerVariable(varName, type) {
+    this.variableTypes.set(varName, type);
+  }
+  /**
+   * Check function call: verify argument types match parameter types
+   */
+  checkFunctionCall(funcName, argTypes) {
+    const builtinType = BUILTIN_TYPES.get(funcName);
+    if (builtinType) {
+      if (argTypes.length !== builtinType.params.length) {
+        return {
+          valid: false,
+          message: `Function '${funcName}' expects ${builtinType.params.length} arguments, got ${argTypes.length}`
+        };
+      }
+      return { valid: true, message: "OK", inferredType: builtinType.returnType };
+    }
+    const userFuncType = this.functionTypes.get(funcName);
+    if (userFuncType) {
+      if (argTypes.length !== userFuncType.params.length) {
+        return {
+          valid: false,
+          message: `Function '${funcName}' expects ${userFuncType.params.length} arguments, got ${argTypes.length}`
+        };
+      }
+      for (let i = 0; i < argTypes.length; i++) {
+        if (!this.isCompatible(argTypes[i], userFuncType.params[i])) {
+          return {
+            valid: false,
+            message: `Argument ${i + 1} to '${funcName}': expected ${userFuncType.params[i].name}, got ${argTypes[i].name}`
+          };
+        }
+      }
+      return { valid: true, message: "OK", inferredType: userFuncType.returnType };
+    }
+    return { valid: false, message: `Unknown function: ${funcName}` };
+  }
+  /**
+   * Check variable assignment
+   */
+  checkAssignment(varName, valueType, declaredType) {
+    if (declaredType && !this.isCompatible(valueType, declaredType)) {
+      return {
+        valid: false,
+        message: `Variable '${varName}' declared as ${declaredType.name}, but assigned ${valueType.name}`
+      };
+    }
+    return { valid: true, message: "OK" };
+  }
+  /**
+   * Infer type from AST node
+   */
+  inferType(node) {
+    const literal = node;
+    const variable = node;
+    const sexpr = node;
+    if (literal.kind === "literal") {
+      switch (literal.type) {
+        case "number":
+          return { kind: "type", name: "int" };
+        case "string":
+          return { kind: "type", name: "string" };
+        case "boolean":
+          return { kind: "type", name: "bool" };
+        default:
+          return { kind: "type", name: "any" };
+      }
+    }
+    if (variable.kind === "variable") {
+      const varType = this.variableTypes.get(variable.name);
+      return varType || { kind: "type", name: "any" };
+    }
+    if (sexpr.kind === "sexpr") {
+      const funcType = BUILTIN_TYPES.get(sexpr.op) || this.functionTypes.get(sexpr.op);
+      if (funcType) {
+        return funcType.returnType;
+      }
+    }
+    return { kind: "type", name: "any" };
+  }
+  /**
+   * Register a generic function type (Phase 4)
+   */
+  registerGenericFunction(funcName, generics, paramTypes, returnType) {
+    this.functionTypes.set(funcName, {
+      params: paramTypes,
+      returnType,
+      generics,
+      isGeneric: generics.length > 0
+    });
+  }
+  /**
+   * Instantiate generic function with concrete types (Phase 4)
+   * E.g., identity[T] with T=int becomes identity with param type int
+   */
+  instantiateGenericFunction(funcName, typeArgs) {
+    const funcType = this.functionTypes.get(funcName);
+    if (!funcType || !funcType.isGeneric) {
+      return {
+        valid: false,
+        message: `Function '${funcName}' is not generic`
+      };
+    }
+    if (!funcType.generics || typeArgs.length !== funcType.generics.length) {
+      return {
+        valid: false,
+        message: `Function '${funcName}' expects ${funcType.generics?.length || 0} type arguments, got ${typeArgs.length}`
+      };
+    }
+    const substitution = /* @__PURE__ */ new Map();
+    for (let i = 0; i < funcType.generics.length; i++) {
+      substitution.set(funcType.generics[i], typeArgs[i]);
+    }
+    const instantiatedParams = funcType.params.map((param) => this.substituteType(param, substitution));
+    const instantiatedReturn = this.substituteType(funcType.returnType, substitution);
+    return {
+      valid: true,
+      message: "OK",
+      inferredType: instantiatedReturn
+    };
+  }
+  /**
+   * Substitute type variables with concrete types (Phase 4)
+   */
+  substituteType(type, substitution) {
+    if (type.isTypeVariable && substitution.has(type.name)) {
+      return substitution.get(type.name) || type;
+    }
+    if (type.generic) {
+      return {
+        ...type,
+        generic: this.substituteType(type.generic, substitution)
+      };
+    }
+    if (type.union) {
+      return {
+        ...type,
+        union: type.union.map((t) => this.substituteType(t, substitution))
+      };
+    }
+    return type;
+  }
+  /**
+   * Check type compatibility
+   */
+  isCompatible(actualType, expectedType) {
+    if (actualType.name === expectedType.name) return true;
+    if (expectedType.name === "any" || actualType.name === "any") return true;
+    if (actualType.name === "int" && expectedType.name === "string") return true;
+    if (actualType.name === "string" && expectedType.name === "int") return true;
+    return false;
+  }
+};
+function createTypeChecker() {
+  return new TypeChecker();
+}
+
+// src/type-system.ts
+function inferType(value) {
+  if (value === null || value === void 0) return "null";
+  if (typeof value === "boolean") return "bool";
+  if (typeof value === "number") return Number.isInteger(value) ? "int" : "float";
+  if (typeof value === "string") return "string";
+  if (Array.isArray(value)) return "array";
+  if (typeof value === "function") return "fn";
+  if (typeof value === "object") return "map";
+  return "any";
+}
+function isCompatible(actual, expected) {
+  if (expected === "any") return true;
+  if (actual === "any") return true;
+  if (actual === expected) return true;
+  if (expected === "number" && (actual === "int" || actual === "float")) return true;
+  if (expected === "float" && actual === "int") return true;
+  return false;
+}
+function toFlType(typeName) {
+  switch (typeName) {
+    case "int":
+      return "int";
+    case "float":
+      return "float";
+    case "number":
+      return "number";
+    case "string":
+      return "string";
+    case "bool":
+      return "bool";
+    case "boolean":
+      return "bool";
+    case "array":
+    case "array<any>":
+      return "array";
+    case "map":
+      return "map";
+    case "fn":
+    case "function":
+      return "fn";
+    case "null":
+      return "null";
+    default:
+      return "any";
+  }
+}
+var RuntimeTypeChecker = class {
+  constructor(strict = false) {
+    // 함수 이름 → 타입 시그니처 (타입 어노테이션이 있는 함수만 등록)
+    this.funcTypes = /* @__PURE__ */ new Map();
+    this.strict = strict;
+  }
+  get isStrict() {
+    return this.strict;
+  }
+  /**
+   * 함수 타입 시그니처 등록
+   * paramTypeNames: TypeAnnotation.name 문자열 배열 (기존 type-checker와 호환)
+   */
+  registerFunc(name, paramTypeNames, retTypeName) {
+    this.funcTypes.set(name, {
+      params: paramTypeNames.map(toFlType),
+      ret: toFlType(retTypeName)
+    });
+  }
+  /**
+   * 함수 호출 시 인수 타입 검증
+   * strict 모드가 아니거나, 시그니처가 미등록이면 아무것도 하지 않음
+   */
+  checkCall(name, argValues) {
+    if (!this.strict) return;
+    const sig = this.funcTypes.get(name);
+    if (!sig) return;
+    const checkCount = Math.min(sig.params.length, argValues.length);
+    for (let i = 0; i < checkCount; i++) {
+      const expected = sig.params[i];
+      if (expected === "any") continue;
+      const actual = inferType(argValues[i]);
+      if (!isCompatible(actual, expected)) {
+        const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
+        throw new FLRuntimeError2(
+          ErrorCodes2.TYPE_MISMATCH,
+          `'${name}': arg ${i + 1} expected ${expected}, got ${actual}`,
+          { fn: name, arg: i, expected, got: actual, value: argValues[i] }
+        );
+      }
+    }
+  }
+  /**
+   * 함수 반환값 타입 검증 (optional — strict 모드)
+   */
+  checkReturn(name, retValue) {
+    if (!this.strict) return;
+    const sig = this.funcTypes.get(name);
+    if (!sig || sig.ret === "any") return;
+    const actual = inferType(retValue);
+    if (!isCompatible(actual, sig.ret)) {
+      const { FLRuntimeError: FLRuntimeError2, ErrorCodes: ErrorCodes2 } = (init_errors(), __toCommonJS(errors_exports));
+      throw new FLRuntimeError2(
+        ErrorCodes2.TYPE_MISMATCH,
+        `'${name}' return: expected ${sig.ret}, got ${actual}`,
+        { fn: name, expected: sig.ret, got: actual, value: retValue }
+      );
+    }
+  }
+  /**
+   * 등록된 함수 시그니처 조회 (테스트용)
+   */
+  getSignature(name) {
+    return this.funcTypes.get(name);
+  }
+  /**
+   * 등록된 함수 목록 (테스트용)
+   */
+  registeredFuncs() {
+    return Array.from(this.funcTypes.keys());
+  }
+};
+
+// src/interpreter.ts
+init_errors();
+init_error_formatter();
+
+// src/logger.ts
+var StructuredLogger = class {
+  constructor(initialLevel) {
+    this.logLevelOrder = {
+      debug: 0,
+      info: 1,
+      warn: 2,
+      error: 3
+    };
+    const envLevel = process.env.LOG_LEVEL;
+    this.currentLogLevel = initialLevel || envLevel || "info";
+    if (process.env.DEBUG_LOGGER) {
+      console.log(`[Logger] Initialized with log level: ${this.currentLogLevel}`);
+    }
+  }
+  debug(message, data) {
+    this.log("debug", message, data);
+  }
+  info(message, data) {
+    this.log("info", message, data);
+  }
+  warn(message, data) {
+    this.log("warn", message, data);
+  }
+  error(message, data) {
+    this.log("error", message, data);
+  }
+  setLogLevel(level) {
+    this.currentLogLevel = level;
+  }
+  /**
+   * 실제 로그 출력 로직
+   */
+  log(level, message, data) {
+    if (this.logLevelOrder[level] < this.logLevelOrder[this.currentLogLevel]) {
+      return;
+    }
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
+    const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+    const fullMessage = `${prefix} ${message}`;
+    switch (level) {
+      case "debug":
+        console.log(fullMessage, data ? data : "");
+        break;
+      case "info":
+        console.log(fullMessage, data ? data : "");
+        break;
+      case "warn":
+        console.warn(fullMessage, data ? data : "");
+        break;
+      case "error":
+        console.error(fullMessage, data ? data : "");
+        break;
+    }
+  }
+};
+var globalLogger = new StructuredLogger();
+function getGlobalLogger() {
+  return globalLogger;
+}
+
+// src/interpreter-scope.ts
+var ScopeStack = class {
+  constructor() {
+    this.stack = [/* @__PURE__ */ new Map()];
+    /** Phase Y-1: 메타정보 저장소 — 키: "depth:name", 값: ScopeVarMeta */
+    this.meta = /* @__PURE__ */ new Map();
+  }
+  /** 스코프 체인 역방향 탐색 — 가장 안쪽 스코프 우선 */
+  get(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) return this.stack[i].get(name);
+    }
+    return void 0;
+  }
+  has(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) return true;
+    }
+    return false;
+  }
+  /** 현재 스코프에 새 바인딩 생성 */
+  set(name, val, meta) {
+    this.stack[this.stack.length - 1].set(name, val);
+    if (meta) {
+      const depth = this.stack.length - 1;
+      this.meta.set(`${depth}:${name}`, {
+        scope: "local",
+        ...meta
+      });
+    }
+  }
+  /** 전역(최상위) 스코프에 직접 저장 — 최상위 define용 */
+  setGlobal(name, val, meta) {
+    this.stack[0].set(name, val);
+    if (meta) {
+      this.meta.set(`0:${name}`, {
+        scope: "global",
+        ...meta
+      });
+    }
+  }
+  /** 변수의 메타정보 조회 */
+  getMeta(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        return this.meta.get(`${i}:${name}`);
+      }
+    }
+    return void 0;
+  }
+  /** 현재 스코프의 모든 변수명 반환 (에러 메시지용) */
+  getCurrentScopeVars() {
+    if (this.stack.length === 0) return [];
+    return Array.from(this.stack[this.stack.length - 1].keys());
+  }
+  /** 현재 스코프 체인에서 정의된 모든 변수명 반환 */
+  getAllVars() {
+    const vars = /* @__PURE__ */ new Set();
+    for (const scope of this.stack) {
+      for (const name of scope.keys()) {
+        vars.add(name);
+      }
+    }
+    return Array.from(vars);
+  }
+  /** set!용: 스코프 체인에서 기존 바인딩을 찾아 수정, 없으면 false 반환 */
+  mutate(name, val) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        this.stack[i].set(name, val);
+        return true;
+      }
+    }
+    return false;
+  }
+  /** 새 함수 스코프 시작 */
+  push() {
+    this.stack.push(/* @__PURE__ */ new Map());
+  }
+  /** 함수 스코프 종료 */
+  pop() {
+    if (this.stack.length > 1) this.stack.pop();
+  }
+  /** 현재 스코프 깊이 (1 = 전역 스코프만 있음) */
+  depth() {
+    return this.stack.length;
+  }
+  /** 전역 함수 호출용: 현재 스택을 저장하고 [global_ref, new_frame]으로 리셋.
+   *  capturedEnv 없는 전역 함수 전용 — 260엔트리 복사 없이 O(1) 호출 비용.
+   *  반환값을 restoreStack()에 전달하여 복원. */
+  resetToGlobalFrame() {
+    const saved = [...this.stack];
+    this.stack = [this.stack[0], /* @__PURE__ */ new Map()];
+    return saved;
+  }
+  /** 클로저 캡처용: 현재 스코프 체인 전체를 단일 Map으로 병합 (메타정보 포함) */
+  snapshot() {
+    const merged = /* @__PURE__ */ new Map();
+    for (const scope of this.stack) {
+      for (const [k, v] of scope) merged.set(k, v);
+    }
+    return merged;
+  }
+  /** 스냅샷 Map으로 스택을 새로 초기화 (callFunctionValue용) */
+  fromSnapshot(snap) {
+    this.stack = [new Map(snap)];
+    this.meta = /* @__PURE__ */ new Map();
+  }
+  /** 전체 스택 저장 (callFunctionValue 복원용).
+   *  stack[0](전역)은 참조로 보존 — fl-reload 등 전역 수정이 함수 반환 후에도 유지됨.
+   *  클로저 스코프(stack[1+])는 격리를 위해 복사. */
+  saveStack() {
+    return [this.stack[0], ...this.stack.slice(1).map((s) => new Map(s))];
+  }
+  /** 저장된 스택으로 복원 */
+  restoreStack(saved) {
+    this.stack = saved;
+  }
+  /** 가장 안쪽 스코프에서 이름 삭제 */
+  delete(name) {
+    for (let i = this.stack.length - 1; i >= 0; i--) {
+      if (this.stack[i].has(name)) {
+        this.stack[i].delete(name);
+        return;
+      }
+    }
+  }
+};
+
+// src/web-search-adapter.ts
+var WebSearchAdapter = class {
+  // 24 hours
+  constructor(apiKey, provider = "mock") {
+    this.cacheTtlMs = 24 * 60 * 60 * 1e3;
+    this.cache = /* @__PURE__ */ new Map();
+    this.apiKey = apiKey;
+    this.apiProvider = provider;
+  }
+  /**
+   * Synchronous search (for integration with sync interpreters)
+   * Only uses cached/mock results, no real API calls
+   */
+  searchSync(query, options = {}) {
+    const { limit = 10, cache = true } = options;
+    if (cache) {
+      const cached = this.getCachedResult(query);
+      if (cached) {
+        return cached.map((r) => ({ ...r, source: "cache" }));
+      }
+    }
+    const results = this.searchMock(query, limit);
+    if (cache) {
+      this.cacheResult(query, results);
+    }
+    return results;
+  }
+  /**
+   * Asynchronous search (for async-aware interpreters)
+   * Returns cached result or calls API based on provider
+   */
+  async search(query, options = {}) {
+    const { limit = 10, cache = true, timeout = 5e3 } = options;
+    if (cache) {
+      const cached = this.getCachedResult(query);
+      if (cached) {
+        return cached.map((r) => ({ ...r, source: "cache" }));
+      }
+    }
+    let results;
+    try {
+      switch (this.apiProvider) {
+        case "brave":
+          results = await this.searchBrave(query, limit, timeout);
+          break;
+        case "serper":
+          results = await this.searchSerper(query, limit, timeout);
+          break;
+        case "mock":
+        default:
+          results = this.searchMock(query, limit);
+      }
+    } catch (error) {
+      console.warn(`Search API failed: ${error.message}, using mock results`);
+      results = this.searchMock(query, limit);
+    }
+    if (cache) {
+      this.cacheResult(query, results);
+    }
+    return results;
+  }
+  /**
+   * Brave Search API integration
+   * https://api.search.brave.com/res/v1/web/search
+   */
+  async searchBrave(query, limit, timeout) {
+    if (!this.apiKey) {
+      throw new Error("Brave Search requires API key (BRAVE_SEARCH_KEY)");
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch("https://api.search.brave.com/res/v1/web/search", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "X-Subscription-Token": this.apiKey
+        },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        throw new Error(`Brave API error: ${response.status}`);
+      }
+      const data = await response.json();
+      const webResults = data.web || [];
+      return webResults.slice(0, limit).map((item) => ({
+        title: item.title,
+        url: item.url,
+        snippet: item.description,
+        source: "api",
+        relevance: 0.9,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      }));
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  /**
+   * Serper API integration
+   * https://google.serper.dev/search
+   */
+  async searchSerper(query, limit, timeout) {
+    if (!this.apiKey) {
+      throw new Error("Serper requires API key (SERPER_API_KEY)");
+    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": this.apiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          q: query,
+          num: Math.min(limit, 10)
+        }),
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        throw new Error(`Serper API error: ${response.status}`);
+      }
+      const data = await response.json();
+      const results = data.organic || [];
+      return results.slice(0, limit).map((item) => ({
+        title: item.title,
+        url: item.link,
+        snippet: item.snippet,
+        source: "api",
+        relevance: 0.85,
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      }));
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  /**
+   * Mock search for testing/offline mode
+   */
+  searchMock(query, limit) {
+    const mockDatabase = {
+      "ai trends 2026": [
+        {
+          title: "2026 AI Trends: Multimodal Systems Dominate",
+          url: "https://example.com/ai-trends-2026",
+          snippet: "Multimodal AI systems combining text, image, and audio are becoming the standard...",
+          source: "api",
+          relevance: 0.95
+        },
+        {
+          title: "AI Safety & Alignment: Key Focus Areas",
+          url: "https://example.com/ai-safety-2026",
+          snippet: "As AI systems become more capable, safety and alignment research intensifies...",
+          source: "api",
+          relevance: 0.88
+        },
+        {
+          title: "Enterprise AI Adoption Accelerates",
+          url: "https://example.com/enterprise-ai-2026",
+          snippet: "Companies are deploying AI for productivity gains across departments...",
+          source: "api",
+          relevance: 0.82
+        }
+      ],
+      "typescript performance": [
+        {
+          title: "TypeScript Performance Optimization Guide",
+          url: "https://example.com/ts-perf",
+          snippet: "Learn how to optimize TypeScript compilation and runtime performance...",
+          source: "api",
+          relevance: 0.92
+        },
+        {
+          title: "Build Tools: esbuild vs tsc vs swc",
+          url: "https://example.com/build-tools-comparison",
+          snippet: "Comparing modern TypeScript build tools and their performance characteristics...",
+          source: "api",
+          relevance: 0.87
+        }
+      ]
+    };
+    const normalizedQuery = query.toLowerCase();
+    const results = mockDatabase[normalizedQuery] || // Generic fallback
+    [
+      {
+        title: `Results for: ${query}`,
+        url: `https://example.com/search?q=${encodeURIComponent(query)}`,
+        snippet: `Mock search results for query: "${query}"`,
+        source: "api",
+        relevance: 0.75
+      }
+    ];
+    return results.slice(0, limit);
+  }
+  /**
+   * Get cached result if not expired
+   */
+  getCachedResult(query) {
+    const cached = this.cache.get(query);
+    if (!cached) return null;
+    if (Date.now() > cached.expiresAt) {
+      this.cache.delete(query);
+      return null;
+    }
+    return cached.results;
+  }
+  /**
+   * Store search results in cache
+   */
+  cacheResult(query, results) {
+    const now = Date.now();
+    this.cache.set(query, {
+      results,
+      timestamp: now,
+      expiresAt: now + this.cacheTtlMs
+    });
+  }
+  /**
+   * Clear cache for specific query or all
+   */
+  clearCache(query) {
+    if (query) {
+      this.cache.delete(query);
+    } else {
+      this.cache.clear();
+    }
+  }
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    const queries = Array.from(this.cache.keys());
+    let oldestEntry;
+    for (const [query, entry] of this.cache.entries()) {
+      if (!oldestEntry || entry.timestamp < oldestEntry.timestamp) {
+        oldestEntry = { query, timestamp: entry.timestamp };
+      }
+    }
+    return {
+      size: this.cache.size,
+      queries,
+      oldestEntry
+    };
+  }
+};
+
+// src/learned-facts-store.ts
+var fs = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var LearnedFactsStore = class {
+  constructor(filePath = "./data/learned-facts.json", defaultTtlDays = 30) {
+    this.defaultTtlDays = 30;
+    this.autoSaveInterval = 5e3;
+    // Auto-save every 5 seconds
+    this.isDirty = false;
+    this.filePath = filePath;
+    this.facts = /* @__PURE__ */ new Map();
+    this.defaultTtlDays = defaultTtlDays;
+    const dir = path2.dirname(this.filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    this.loadFromFile();
+    this.startAutoSave();
+  }
+  /**
+   * Save a learned fact
+   */
+  save(key, data, options) {
+    const { confidence, source, ttlDays = this.defaultTtlDays } = options;
+    if (confidence < 0 || confidence > 1) {
+      throw new Error(`Invalid confidence: ${confidence}. Must be between 0 and 1.`);
+    }
+    const now = Date.now();
+    const fact = {
+      key,
+      data,
+      confidence,
+      source,
+      timestamp: now,
+      expiresAt: now + ttlDays * 24 * 60 * 60 * 1e3,
+      accessCount: 0,
+      lastAccessed: now
+    };
+    this.facts.set(key, fact);
+    this.isDirty = true;
+  }
+  /**
+   * Load a learned fact by key
+   */
+  load(key) {
+    const fact = this.facts.get(key);
+    if (!fact) return null;
+    if (Date.now() > fact.expiresAt) {
+      this.facts.delete(key);
+      this.isDirty = true;
+      return null;
+    }
+    fact.accessCount++;
+    fact.lastAccessed = Date.now();
+    this.isDirty = true;
+    return fact;
+  }
+  /**
+   * Load all learned facts (non-expired)
+   */
+  loadAll() {
+    const results = [];
+    const now = Date.now();
+    let hasExpired = false;
+    for (const [key, fact] of this.facts.entries()) {
+      if (now > fact.expiresAt) {
+        this.facts.delete(key);
+        hasExpired = true;
+      } else {
+        results.push(fact);
+      }
+    }
+    if (hasExpired) {
+      this.isDirty = true;
+    }
+    return results;
+  }
+  /**
+   * Delete a learned fact
+   */
+  delete(key) {
+    if (this.facts.has(key)) {
+      this.facts.delete(key);
+      this.isDirty = true;
+    }
+  }
+  /**
+   * Find facts by minimum confidence level
+   */
+  findByConfidence(minConfidence) {
+    return this.loadAll().filter((fact) => fact.confidence >= minConfidence);
+  }
+  /**
+   * Find facts by source
+   */
+  findBySource(source) {
+    return this.loadAll().filter((fact) => fact.source === source);
+  }
+  /**
+   * Clean up expired facts
+   * Returns the number of deleted facts
+   */
+  cleanup() {
+    const now = Date.now();
+    let deletedCount = 0;
+    for (const [key, fact] of this.facts.entries()) {
+      if (now > fact.expiresAt) {
+        this.facts.delete(key);
+        deletedCount++;
+      }
+    }
+    if (deletedCount > 0) {
+      this.isDirty = true;
+    }
+    return deletedCount;
+  }
+  /**
+   * Get store statistics
+   */
+  getStats() {
+    const all = this.loadAll();
+    const now = Date.now();
+    let expiredCount = 0;
+    let totalConfidence = 0;
+    let oldestExpiry = null;
+    const sourceDistribution = {};
+    for (const [, fact] of this.facts.entries()) {
+      if (now > fact.expiresAt) {
+        expiredCount++;
+      }
+      sourceDistribution[fact.source] = (sourceDistribution[fact.source] || 0) + 1;
+    }
+    if (all.length > 0) {
+      totalConfidence = all.reduce((sum, f) => sum + f.confidence, 0) / all.length;
+      oldestExpiry = Math.min(...all.map((f) => f.expiresAt));
+    }
+    return {
+      totalFacts: all.length,
+      expiredCount,
+      averageConfidence: totalConfidence,
+      oldestExpiry,
+      sourceDistribution
+    };
+  }
+  /**
+   * Flush all pending changes to disk
+   */
+  flush() {
+    if (!this.isDirty) return;
+    this.saveToFile();
+    this.isDirty = false;
+  }
+  /**
+   * Destroy the store (clean up auto-save timer)
+   */
+  destroy() {
+    if (this.autoSaveTimer) {
+      clearInterval(this.autoSaveTimer);
+      this.autoSaveTimer = void 0;
+    }
+    this.flush();
+  }
+  /**
+   * Private: Load facts from file
+   */
+  loadFromFile() {
+    try {
+      if (!fs.existsSync(this.filePath)) {
+        return;
+      }
+      const content = fs.readFileSync(this.filePath, "utf-8");
+      const parsed = JSON.parse(content);
+      if (!parsed.facts || !Array.isArray(parsed.facts)) {
+        console.warn("Invalid learned facts file format, starting with empty store");
+        return;
+      }
+      for (const fact of parsed.facts) {
+        this.facts.set(fact.key, fact);
+      }
+      this.cleanup();
+    } catch (error) {
+      console.error(`Failed to load learned facts: ${error.message}`);
+    }
+  }
+  /**
+   * Private: Save facts to file
+   */
+  saveToFile() {
+    try {
+      const data = {
+        version: "1.0",
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
+        facts: Array.from(this.facts.values())
+      };
+      const tempPath = this.filePath + ".tmp";
+      fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), "utf-8");
+      fs.renameSync(tempPath, this.filePath);
+    } catch (error) {
+      console.error(`Failed to save learned facts: ${error.message}`);
+    }
+  }
+  /**
+   * Private: Start auto-save timer
+   * unref() = allow process to exit even if timer is active
+   */
+  startAutoSave() {
+    this.autoSaveTimer = setInterval(() => {
+      if (this.isDirty) {
+        this.flush();
+      }
+    }, this.autoSaveInterval);
+    if (this.autoSaveTimer && typeof this.autoSaveTimer.unref === "function") {
+      this.autoSaveTimer.unref();
+    }
+  }
+};
+
+// src/interpreter.ts
+init_eval_builtins();
+
+// src/eval-ai-blocks.ts
+init_async_runtime();
+function evalAiBlock(interp2, op, expr2) {
+  const ev = (node) => interp2.eval(node);
+  if (op === "search" || op === "fetch") {
+    let query = "";
+    let source = "web";
+    let cache = false;
+    let limit = 10;
+    let name;
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (i === 0) {
+        query = String(ev(arg));
+        continue;
+      }
+      if (arg.kind === "keyword") {
+        const keywordName = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const value = ev(expr2.args[i + 1]);
+          switch (keywordName) {
+            case "source":
+              if (value === "web" || value === "api" || value === "kb") source = value;
+              break;
+            case "cache":
+              cache = value === true || value === "true";
+              break;
+            case "limit":
+              limit = Number(value) || 10;
+              break;
+            case "name":
+              name = String(value);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    if (op === "fetch") source = "api";
+    const searchBlock = { kind: "search-block", query, source, cache, limit, name };
+    return interp2.handleSearchBlock(searchBlock);
+  }
+  if (op === "learn" || op === "recall" || op === "remember" || op === "forget") {
+    let key = "";
+    let data = null;
+    let source = "search";
+    let confidence;
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (i === 0) {
+        key = String(ev(arg));
+        continue;
+      }
+      if (i === 1 && (op === "learn" || op === "remember")) {
+        data = ev(arg);
+        continue;
+      }
+      if (arg.kind === "keyword") {
+        const keywordName = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const value = ev(expr2.args[i + 1]);
+          switch (keywordName) {
+            case "source":
+              if (value === "search" || value === "feedback" || value === "analysis") source = value;
+              break;
+            case "confidence":
+              confidence = Number(value) || void 0;
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    if (op === "forget") {
+      if (!interp2.context.learned) interp2.context.learned = /* @__PURE__ */ new Map();
+      const found = interp2.context.learned.has(key);
+      if (found) interp2.context.learned.delete(key);
+      return { kind: "learn-result", operation: "forget", key, deleted: found };
+    }
+    if (op === "recall") data = null;
+    const learnBlock = {
+      kind: "learn-block",
+      key,
+      data,
+      source,
+      confidence,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    return interp2.handleLearnBlock(learnBlock);
+  }
+  if (op === "observe" || op === "analyze" || op === "decide" || op === "act" || op === "verify") {
+    const stage = op;
+    const data = /* @__PURE__ */ new Map();
+    let observations;
+    let analysis;
+    let decisions;
+    let actions;
+    let verifications;
+    let confidence;
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const keywordName = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const value = ev(expr2.args[i + 1]);
+          if (keywordName === "confidence") confidence = Number(value);
+          else data.set(keywordName, value);
+          i++;
+        }
+      } else if (i === 0) {
+        const argValue = ev(arg);
+        switch (stage) {
+          case "observe":
+            observations = [argValue];
+            data.set("observation", argValue);
+            break;
+          case "analyze":
+            data.set("firstArg", argValue);
+            break;
+          case "decide":
+            data.set("firstArg", argValue);
+            break;
+          case "act":
+            data.set("firstArg", argValue);
+            break;
+          case "verify":
+            verifications = [argValue];
+            data.set("result", argValue);
+            break;
+        }
+      }
+    }
+    const reasoningBlock = {
+      kind: "reasoning-block",
+      stage,
+      data,
+      observations,
+      analysis,
+      decisions,
+      actions,
+      verifications,
+      metadata: { confidence, startTime: (/* @__PURE__ */ new Date()).toISOString() }
+    };
+    return interp2.handleReasoningBlock(reasoningBlock);
+  }
+  if (op === "await") {
+    if (expr2.args.length < 1) throw new Error(`await requires a Promise argument`);
+    const promise = ev(expr2.args[0]);
+    if (promise instanceof FreeLangPromise) {
+      if (promise.getState() === "resolved") return promise.getValue();
+      if (promise.getState() === "rejected") throw promise.getError() || new Error("Promise rejected");
+      throw new Error("Cannot await unresolved Promise in synchronous context");
+    }
+    throw new TypeError("await requires a Promise, got " + typeof promise);
+  }
+  throw new Error(`evalAiBlock: unknown op "${op}"`);
+}
+
+// src/eval-infra-blocks.ts
+var fs3 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
+var cwd = process.cwd();
+function evalInfraBlock(interp2, op, expr2) {
+  const ev = (node) => interp2.eval(node);
+  if (op === "DOCKERFILE" || op === "dockerfile") {
+    let from = "node:20-slim";
+    let workdir = "/app";
+    let expose = [];
+    let copy = [];
+    let run2 = [];
+    let cmd2 = ["node", "server.js"];
+    let env = {};
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "from":
+              from = String(val);
+              break;
+            case "workdir":
+              workdir = String(val);
+              break;
+            case "expose":
+              expose.push(String(val));
+              break;
+            case "copy":
+              copy.push(String(val));
+              break;
+            case "run":
+              run2.push(String(val));
+              break;
+            case "cmd":
+              cmd2 = Array.isArray(val) ? val : [String(val)];
+              break;
+            case "env":
+              if (typeof val === "object") Object.assign(env, val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    let dockerfile = `FROM ${from}
+WORKDIR ${workdir}
+`;
+    Object.entries(env).forEach(([k, v]) => {
+      dockerfile += `ENV ${k}=${v}
+`;
+    });
+    copy.forEach((c) => {
+      dockerfile += `COPY ${c}
+`;
+    });
+    run2.forEach((r) => {
+      dockerfile += `RUN ${r}
+`;
+    });
+    expose.forEach((p) => {
+      dockerfile += `EXPOSE ${p}
+`;
+    });
+    dockerfile += `CMD [${cmd2.map((c) => `"${c}"`).join(", ")}]
+`;
+    const outfile = path4.join(cwd, "Dockerfile");
+    fs3.writeFileSync(outfile, dockerfile, "utf-8");
+    return { generated: "Dockerfile", bytes: dockerfile.length };
+  }
+  if (op === "K8S-DEPLOYMENT" || op === "deployment") {
+    let name = "my-app";
+    let namespace = "default";
+    let image = "my-app:latest";
+    let replicas = 1;
+    let port = 8080;
+    let containerPort = port;
+    let env = {};
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "namespace":
+              namespace = String(val);
+              break;
+            case "image":
+              image = String(val);
+              break;
+            case "replicas":
+              replicas = Number(val) || 1;
+              break;
+            case "port":
+              port = Number(val) || 8080;
+              break;
+            case "containerPort":
+              containerPort = Number(val) || port;
+              break;
+            case "env":
+              if (typeof val === "object") Object.assign(env, val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const yaml = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+spec:
+  replicas: ${replicas}
+  selector:
+    matchLabels:
+      app: ${name}
+  template:
+    metadata:
+      labels:
+        app: ${name}
+    spec:
+      containers:
+      - name: ${name}
+        image: ${image}
+        ports:
+        - containerPort: ${containerPort}
+${Object.entries(env).length > 0 ? `        env:
+${Object.entries(env).map(([k, v]) => `        - name: ${k}
+          value: "${v}"`).join("\n")}
+` : ""}`;
+    const outfile = path4.join(cwd, `${name}-deployment.yaml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: `${name}-deployment.yaml`, bytes: yaml.length };
+  }
+  if (op === "K8S-SERVICE" || op === "service") {
+    let name = "my-app";
+    let namespace = "default";
+    let port = 8080;
+    let targetPort = port;
+    let type = "ClusterIP";
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "namespace":
+              namespace = String(val);
+              break;
+            case "port":
+              port = Number(val) || 8080;
+              break;
+            case "targetPort":
+              targetPort = Number(val) || port;
+              break;
+            case "type":
+              type = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const yaml = `apiVersion: v1
+kind: Service
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+spec:
+  type: ${type}
+  ports:
+  - port: ${port}
+    targetPort: ${targetPort}
+    protocol: TCP
+  selector:
+    app: ${name}
+`;
+    const outfile = path4.join(cwd, `${name}-service.yaml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: `${name}-service.yaml`, bytes: yaml.length };
+  }
+  if (op === "K8S-INGRESS" || op === "ingress") {
+    let name = "my-app";
+    let namespace = "default";
+    let host = "app.example.com";
+    let serviceName = "my-app";
+    let servicePort = 8080;
+    let path_ = "/";
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "namespace":
+              namespace = String(val);
+              break;
+            case "host":
+              host = String(val);
+              break;
+            case "serviceName":
+              serviceName = String(val);
+              break;
+            case "servicePort":
+              servicePort = Number(val) || 8080;
+              break;
+            case "path":
+              path_ = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const yaml = `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${name}
+  namespace: ${namespace}
+spec:
+  rules:
+  - host: ${host}
+    http:
+      paths:
+      - path: ${path_}
+        pathType: Prefix
+        backend:
+          service:
+            name: ${serviceName}
+            port:
+              number: ${servicePort}
+`;
+    const outfile = path4.join(cwd, `${name}-ingress.yaml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: `${name}-ingress.yaml`, bytes: yaml.length };
+  }
+  if (op === "DOCKER-COMPOSE" || op === "docker-compose") {
+    let version = "3.8";
+    let services = {};
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "version":
+              version = String(val);
+              break;
+            case "services":
+              services = val || {};
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const serviceLines = Object.entries(services).map(([name, config]) => {
+      return `  ${name}:
+    image: ${config.image || name}
+    ports:
+      - "${config.port || 8080}:${config.containerPort || 8080}"`;
+    }).join("\n");
+    const yaml = `version: '${version}'
+services:
+${serviceLines}
+`;
+    const outfile = path4.join(cwd, "docker-compose.yml");
+    fs3.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: "docker-compose.yml", bytes: yaml.length };
+  }
+  if (op === "GITHUB-ACTIONS" || op === "github-actions" || op === "ci") {
+    let name = "CI";
+    let onEvents = ["push", "pull_request"];
+    let steps = [];
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "on":
+              onEvents = Array.isArray(val) ? val : [String(val)];
+              break;
+            case "test":
+              steps.push({ uses: "actions/checkout@v3" });
+              steps.push({ uses: "actions/setup-node@v3", with: { "node-version": "20" } });
+              steps.push({ run: String(val) });
+              break;
+            case "steps":
+              steps = Array.isArray(val) ? val : [val];
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    const onStr = onEvents.map((e) => `    - ${e}`).join("\n");
+    const stepsStr = steps.map((s) => {
+      if (typeof s === "string") return `      - run: ${s}`;
+      if (s.uses) return `      - uses: ${s.uses}${s.with ? `
+        with:
+${Object.entries(s.with).map(([k, v]) => `          ${k}: "${v}"`).join("\n")}` : ""}`;
+      if (s.run) return `      - run: ${s.run}`;
+      return `      - ${JSON.stringify(s)}`;
+    }).join("\n");
+    const yaml = `name: ${name}
+
+on:
+${onStr}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+${stepsStr}
+`;
+    const workflowDir = path4.join(cwd, ".github", "workflows");
+    fs3.mkdirSync(workflowDir, { recursive: true });
+    const outfile = path4.join(workflowDir, `${name.toLowerCase().replace(/\\s+/g, "-")}.yml`);
+    fs3.writeFileSync(outfile, yaml, "utf-8");
+    return { generated: outfile, bytes: yaml.length };
+  }
+  if (op === "AWS-S3" || op === "aws-s3") {
+    let bucket = "my-bucket";
+    let action = "list";
+    let file = "";
+    let data = null;
+    let region = "us-east-1";
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "bucket":
+              bucket = String(val);
+              break;
+            case "action":
+              action = String(val);
+              break;
+            case "file":
+              file = String(val);
+              break;
+            case "data":
+              data = val;
+              break;
+            case "region":
+              region = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    try {
+      switch (action.toLowerCase()) {
+        case "list":
+          return interp2.callUserFunction("aws-s3-list", [bucket, file]);
+        case "upload":
+          return interp2.callUserFunction("aws-s3-upload", [bucket, file, data]);
+        case "download":
+          return interp2.callUserFunction("aws-s3-download", [bucket, file]);
+        case "delete":
+          return interp2.callUserFunction("aws-s3-delete", [bucket, file]);
+        case "config":
+          return interp2.callUserFunction("aws-s3-config", [bucket, region]);
+        default:
+          return { status: "unknown_action", action, bucket };
+      }
+    } catch (err4) {
+      return { status: "error", action, bucket, reason: err4.message };
+    }
+  }
+  if (op === "GCP-RUN" || op === "gcp-run") {
+    let service = "my-service";
+    let image = "gcr.io/my-project/my-service:latest";
+    let region = "us-central1";
+    let action = "deploy";
+    let data = null;
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "service":
+              service = String(val);
+              break;
+            case "image":
+              image = String(val);
+              break;
+            case "region":
+              region = String(val);
+              break;
+            case "action":
+              action = String(val);
+              break;
+            case "data":
+              data = val;
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    try {
+      switch (action.toLowerCase()) {
+        case "deploy":
+          return interp2.callUserFunction("gcp-run-deploy", [service, image, region]);
+        case "invoke":
+          return interp2.callUserFunction("gcp-run-invoke", [service, data, region]);
+        case "list":
+          return interp2.callUserFunction("gcp-run-list", [region]);
+        default:
+          return { status: "unknown_action", action, service };
+      }
+    } catch (err4) {
+      return { status: "error", action, service, reason: err4.message };
+    }
+  }
+  if (op === "AZURE-FUNCTION" || op === "azure-function") {
+    let name = "my-function";
+    let runtime = "node";
+    let region = "eastus";
+    let action = "invoke";
+    let data = null;
+    let image = "";
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "runtime":
+              runtime = String(val);
+              break;
+            case "region":
+              region = String(val);
+              break;
+            case "action":
+              action = String(val);
+              break;
+            case "data":
+              data = val;
+              break;
+            case "image":
+              image = String(val);
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    try {
+      switch (action.toLowerCase()) {
+        case "invoke":
+          return interp2.callUserFunction("azure-function-invoke", [name, data]);
+        case "create":
+          return interp2.callUserFunction("azure-function-create", [name, runtime]);
+        case "deploy":
+          return interp2.callUserFunction("azure-app-deploy", [name, image, region]);
+        default:
+          return { status: "unknown_action", action, name };
+      }
+    } catch (err4) {
+      return { status: "error", action, name, reason: err4.message };
+    }
+  }
+  throw new Error(`Unknown infra block: ${op}`);
+}
+
+// src/style-registry.ts
+var StyleRegistry = class {
+  constructor() {
+    this.themes = [];
+    // :root { --token: value; }
+    this.styles = [];
+  }
+  // .selector { prop: value; }
+  /**
+   * THEME 블록 결과 추가
+   * CSS Variables: :root { --primary: #2563eb; ... }
+   */
+  addTheme(css) {
+    if (css.trim()) {
+      this.themes.push(css);
+    }
+  }
+  /**
+   * STYLE 블록 결과 추가
+   * 선택자 규칙: .selector { background: #fff; ... }
+   */
+  addStyle(css) {
+    if (css.trim()) {
+      this.styles.push(css);
+    }
+  }
+  /**
+   * 누적된 모든 CSS 반환 (THEME 먼저, 그 다음 STYLE)
+   * 반환 후 레지스트리 초기화 (요청 스코프)
+   */
+  flush() {
+    const allCss = [...this.themes, ...this.styles].join("\n");
+    this.themes = [];
+    this.styles = [];
+    return allCss;
+  }
+  /**
+   * 현재 CSS 크기 (디버그용)
+   */
+  size() {
+    return this.themes.length + this.styles.length;
+  }
+};
+var styleRegistry = new StyleRegistry();
+
+// src/eval-style-blocks.ts
+var cssKeyMap = {
+  // 색상
+  bg: "background",
+  fg: "color",
+  // 박스 모델
+  p: "padding",
+  m: "margin",
+  w: "width",
+  h: "height",
+  // 보더
+  r: "border-radius",
+  b: "border",
+  // 기타
+  fs: "font-size",
+  fw: "font-weight",
+  d: "display",
+  o: "opacity",
+  z: "z-index"
+};
+function normalizeCssKey(flKey) {
+  return cssKeyMap[flKey] || flKey;
+}
+function rulesToCss(rulesObj) {
+  if (typeof rulesObj !== "object" || rulesObj === null) {
+    return "";
+  }
+  const cssLines = [];
+  for (const [keyStr, value] of Object.entries(rulesObj)) {
+    let key = keyStr.startsWith(":") ? keyStr.slice(1) : keyStr;
+    key = normalizeCssKey(key);
+    const val = String(value).trim();
+    if (val) {
+      cssLines.push(`${key}: ${val}`);
+    }
+  }
+  return cssLines.join("; ");
+}
+function processThemeBlock(interp2, name, tokens) {
+  if (typeof tokens !== "object" || tokens === null) {
+    return { status: "error", reason: "tokens must be object" };
+  }
+  const cssVars = [];
+  for (const [keyStr, value] of Object.entries(tokens)) {
+    let key = keyStr.startsWith(":") ? keyStr.slice(1) : keyStr;
+    const val = String(value).trim();
+    if (val) {
+      cssVars.push(`  --${key}: ${val}`);
+    }
+  }
+  if (cssVars.length === 0) {
+    return { status: "empty", name };
+  }
+  const css = `:root {
+${cssVars.join(";\n")};
+}`;
+  styleRegistry.addTheme(css);
+  return {
+    status: "theme_defined",
+    name,
+    tokens: Object.keys(tokens).length,
+    css
+  };
+}
+function processStyleBlock(interp2, name, selector, rules) {
+  if (!selector || selector.trim() === "") {
+    return { status: "error", reason: "selector is required" };
+  }
+  const cssText = rulesToCss(rules);
+  if (!cssText) {
+    return { status: "empty", name, selector };
+  }
+  const css = `${selector} { ${cssText}; }`;
+  styleRegistry.addStyle(css);
+  return {
+    status: "style_defined",
+    name,
+    selector,
+    css
+  };
+}
+function evalStyleBlock(interp2, op, expr2) {
+  const ev = (node) => interp2.eval(node);
+  if (op === "THEME" || op === "theme") {
+    let name = "default";
+    let tokens = {};
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "tokens":
+              tokens = typeof val === "object" ? val : {};
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    return processThemeBlock(interp2, name, tokens);
+  }
+  if (op === "STYLE" || op === "style") {
+    let name = "default";
+    let selector = "";
+    let rules = {};
+    for (let i = 0; i < expr2.args.length; i++) {
+      const arg = expr2.args[i];
+      if (arg.kind === "keyword") {
+        const key = arg.name;
+        if (i + 1 < expr2.args.length) {
+          const val = ev(expr2.args[i + 1]);
+          switch (key) {
+            case "name":
+              name = String(val);
+              break;
+            case "selector":
+              selector = String(val);
+              break;
+            case "rules":
+              rules = typeof val === "object" ? val : {};
+              break;
+          }
+          i++;
+        }
+      }
+    }
+    return processStyleBlock(interp2, name, selector, rules);
+  }
+  throw new Error(`Unknown style block: ${op}`);
+}
+
+// src/interpreter.ts
+init_eval_special_forms();
+
+// src/eval-reasoning-sequence.ts
+function handleReasoningSequence(interp2, reasoningSeq) {
+  const { stages, metadata, feedbackLoop } = reasoningSeq;
+  const logger = interp2.logger;
+  const ctx = interp2.context;
+  if (!ctx.reasoning) ctx.reasoning = /* @__PURE__ */ new Map();
+  const sequenceId = (/* @__PURE__ */ new Date()).getTime();
+  const executionPath = [];
+  const sequenceResults = [];
+  const iterationHistory = [];
+  logger.info(
+    `\u{1F504} REASONING SEQUENCE START (${stages.length} stages, feedback: ${feedbackLoop?.enabled ? "enabled" : "disabled"})`
+  );
+  let currentStages = stages;
+  let iteration = 0;
+  const maxIterations = feedbackLoop?.maxIterations || 1;
+  if (!reasoningSeq.context) reasoningSeq.context = {};
+  if (!reasoningSeq.context.searches) reasoningSeq.context.searches = /* @__PURE__ */ new Map();
+  if (!reasoningSeq.context.learned) reasoningSeq.context.learned = /* @__PURE__ */ new Map();
+  ctx.currentSearches = reasoningSeq.context.searches;
+  ctx.currentLearned = reasoningSeq.context.learned;
+  while (iteration < maxIterations) {
+    iteration++;
+    if (iteration > 1) {
+      logger.info(
+        `\u{1F504} FEEDBACK LOOP ITERATION ${iteration}/${maxIterations} (damping: ${(feedbackLoop?.confidenceDamping || 0.1).toFixed(1)})`
+      );
+    }
+    const iterationResults = [];
+    let verifyResult = null;
+    for (let i = 0; i < currentStages.length; i++) {
+      const stage = currentStages[i];
+      const stageNum = i + 1;
+      if (stage.kind === "search-block") {
+        const searchBlock = stage;
+        logger.info(`  [${stageNum}/${currentStages.length}] \u{1F50E} SEARCH`);
+        const searchResult = interp2.handleSearchBlock(searchBlock);
+        if (!reasoningSeq.context) reasoningSeq.context = {};
+        if (!reasoningSeq.context.searches) reasoningSeq.context.searches = /* @__PURE__ */ new Map();
+        reasoningSeq.context.searches.set(`search_${i}`, searchResult);
+        iterationResults.push(searchResult);
+        executionPath.push("search");
+        logger.info(`  \u2713 Search result stored in context`);
+        continue;
+      }
+      if (stage.kind === "learn-block") {
+        const learnBlock = stage;
+        logger.info(`  [${stageNum}/${currentStages.length}] \u{1F4DA} LEARN`);
+        const learnResult = interp2.handleLearnBlock(learnBlock);
+        if (!reasoningSeq.context) reasoningSeq.context = {};
+        if (!reasoningSeq.context.learned) reasoningSeq.context.learned = /* @__PURE__ */ new Map();
+        const learnKey = learnBlock.key || `learn_${i}`;
+        reasoningSeq.context.learned.set(learnKey, learnResult);
+        iterationResults.push(learnResult);
+        executionPath.push("learn");
+        logger.info(`  \u2713 Learned data stored in context (key: ${learnKey})`);
+        continue;
+      }
+      const reasoningBlock = stage;
+      if (reasoningBlock.kind !== "reasoning-block") {
+        throw new Error(`Unexpected stage kind in reasoning sequence: ${stage.kind}`);
+      }
+      const stageEmoji = { observe: "\u{1F440}", analyze: "\u{1F50D}", decide: "\u{1F3AF}", act: "\u26A1", verify: "\u2705" }[reasoningBlock.stage] || "\u2753";
+      logger.info(`  [${stageNum}/${currentStages.length}] ${stageEmoji} ${reasoningBlock.stage.toUpperCase()}`);
+      if (reasoningBlock.whenGuard) {
+        const guardCondition = evalCondition(interp2, reasoningBlock.whenGuard);
+        if (!guardCondition) {
+          logger.info(`  \u23ED\uFE0F  SKIPPED (when guard condition false)`);
+          continue;
+        }
+      }
+      let adjustedStage = reasoningBlock;
+      if (iteration > 1 && reasoningBlock.metadata?.confidence !== void 0) {
+        adjustedStage = {
+          ...reasoningBlock,
+          metadata: {
+            ...reasoningBlock.metadata,
+            confidence: Math.max(
+              0,
+              (reasoningBlock.metadata.confidence || 1) - (feedbackLoop?.confidenceDamping || 0.1) * (iteration - 1)
+            )
+          }
+        };
+      }
+      let blockToHandle = adjustedStage;
+      if (reasoningBlock.conditional) {
+        const conditionMet = evalCondition(interp2, reasoningBlock.conditional.condition);
+        const selectedBlock = conditionMet ? reasoningBlock.conditional.thenBlock : reasoningBlock.conditional.elseBlock;
+        if (selectedBlock) {
+          blockToHandle = selectedBlock;
+          logger.info(`  ${conditionMet ? "\u2713" : "\u2717"} IF condition ${conditionMet ? "TRUE" : "FALSE"}`);
+        } else if (!conditionMet && !reasoningBlock.conditional.elseBlock) {
+          logger.info(`  \u23ED\uFE0F  SKIPPED (if condition false, no else block)`);
+          continue;
+        }
+      }
+      let stageResult;
+      if (reasoningBlock.loopControl) {
+        const { type, condition, maxIterations: maxIterations2 = 1e3 } = reasoningBlock.loopControl;
+        const loopMaxIter = Math.min(maxIterations2, 1e3);
+        let loopIteration = 0;
+        while (loopIteration < loopMaxIter) {
+          loopIteration++;
+          const conditionValue = evalCondition(interp2, condition);
+          const shouldContinue = type === "repeat-until" ? !conditionValue : conditionValue;
+          if (!shouldContinue && loopIteration > 1) break;
+          stageResult = interp2.handleReasoningBlock(blockToHandle);
+          logger.info(`  \u{1F501} ${type.toUpperCase()} ITERATION ${loopIteration}/${loopMaxIter}`);
+        }
+      } else {
+        stageResult = interp2.handleReasoningBlock(blockToHandle);
+      }
+      iterationResults.push(stageResult);
+      executionPath.push(reasoningBlock.stage);
+      if (reasoningBlock.stage === "verify") verifyResult = stageResult;
+      if (reasoningBlock.transitions && reasoningBlock.transitions.length > 0) {
+        for (const transition of reasoningBlock.transitions) {
+          if (transition.condition) {
+            const conditionMet = interp2.eval(transition.condition);
+            if (conditionMet && transition.to) logger.info(`    \u2193 Transition to: ${transition.to}`);
+          }
+        }
+      }
+    }
+    sequenceResults.push(...iterationResults);
+    iterationHistory.push({ iteration, results: iterationResults, verifyConfidence: verifyResult?.metadata?.confidence });
+    const shouldContinueFeedback = feedbackLoop?.enabled && iteration < maxIterations && verifyResult && evalFeedbackCondition(interp2, verifyResult, feedbackLoop);
+    if (shouldContinueFeedback) {
+      logger.info(`\u21A9\uFE0F  FEEDBACK TRIGGERED: Returning to "${feedbackLoop.toStage}" stage`);
+      const feedbackTargetIndex = currentStages.findIndex(
+        (s) => s.stage === feedbackLoop.toStage
+      );
+      if (feedbackTargetIndex >= 0) currentStages = currentStages.slice(feedbackTargetIndex);
+    } else {
+      break;
+    }
+  }
+  const sequenceResult = {
+    kind: "reasoning-sequence-result",
+    stages: sequenceResults,
+    executionPath,
+    iterations: iterationHistory.length,
+    feedbackTriggered: iteration > 1,
+    metadata: { ...metadata, sequenceId, completedAt: (/* @__PURE__ */ new Date()).toISOString(), totalStages: stages.length, iterations: iteration },
+    completed: true
+  };
+  const sequenceKey = `sequence-${sequenceId}`;
+  ctx.reasoning.set(sequenceKey, sequenceResult);
+  const totalConfidence = sequenceResults.reduce((sum, r) => sum + (r.metadata?.confidence || 0), 0) / Math.max(sequenceResults.length, 1);
+  logger.info(`\u2705 REASONING SEQUENCE COMPLETE (${stages.length} stages, ${iteration} iterations, confidence: ${(totalConfidence * 100).toFixed(0)}%)`);
+  return sequenceResult;
+}
+function evalFeedbackCondition(interp2, verifyResult, feedbackLoop) {
+  const defaultThreshold = 0.8;
+  const confidence = verifyResult?.metadata?.confidence || 0;
+  if (feedbackLoop.condition) {
+    try {
+      return interp2.eval(feedbackLoop.condition);
+    } catch (e) {
+      return confidence < defaultThreshold;
+    }
+  }
+  return confidence < defaultThreshold;
+}
+function evalCondition(interp2, conditionNode) {
+  if (!conditionNode) return false;
+  try {
+    const result = interp2.eval(conditionNode);
+    if (typeof result === "boolean") return result;
+    if (typeof result === "number") return result !== 0;
+    if (typeof result === "string") return result.length > 0;
+    if (result === null || result === void 0) return false;
+    return !!result;
+  } catch (e) {
+    return false;
+  }
+}
+
+// src/eval-ai-handlers.ts
+function handleSearchBlock(interp2, searchBlock) {
+  const { query, source = "web", cache = true, limit = 10, name } = searchBlock;
+  interp2.logger.info(`\u{1F50E} SEARCH "${query}"`);
+  try {
+    const results = interp2.searchAdapter.searchSync(query, { limit, cache });
+    const searchResult = {
+      kind: "search-result",
+      query,
+      source,
+      cache,
+      limit,
+      name,
+      status: "completed",
+      results,
+      count: results.length,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    if (!interp2.context.cache) interp2.context.cache = /* @__PURE__ */ new Map();
+    const cacheKey = name || `search_${Date.now()}`;
+    interp2.context.cache.set(cacheKey, searchResult);
+    return searchResult;
+  } catch (error) {
+    interp2.logger.error(`\u274C Search failed: ${error.message}`);
+    return { kind: "search-error", query, message: error.message, timestamp: (/* @__PURE__ */ new Date()).toISOString() };
+  }
+}
+function handleLearnBlock(interp2, learnBlock) {
+  const { key, data, source = "search", confidence = 0.85, timestamp } = learnBlock;
+  if (!interp2.context.learned) interp2.context.learned = /* @__PURE__ */ new Map();
+  try {
+    if (data === null) {
+      const loadedFact = interp2.learnedFactsStore.load(key);
+      if (loadedFact) {
+        interp2.logger.info(`\u{1F4DA} LEARN (recall) "${key}" (confidence: ${(loadedFact.confidence * 100).toFixed(0)}%)`);
+        interp2.context.learned.set(key, {
+          data: loadedFact.data,
+          source: loadedFact.source,
+          confidence: loadedFact.confidence,
+          timestamp: new Date(loadedFact.timestamp).toISOString()
+        });
+        return {
+          kind: "learn-result",
+          operation: "recall",
+          key,
+          data: loadedFact.data,
+          source: loadedFact.source,
+          confidence: loadedFact.confidence,
+          timestamp: new Date(loadedFact.timestamp).toISOString(),
+          found: true,
+          accessCount: loadedFact.accessCount
+        };
+      } else {
+        interp2.logger.info(`\u{1F4DA} LEARN (recall) "${key}" - not found`);
+        return { kind: "learn-result", operation: "recall", key, data: null, found: false };
+      }
+    }
+    if (confidence < 0 || confidence > 1) throw new Error(`Invalid confidence: ${confidence}.`);
+    interp2.learnedFactsStore.save(key, data, { confidence, source, ttlDays: 30 });
+    interp2.context.learned.set(key, { data, source, confidence, timestamp: timestamp ?? (/* @__PURE__ */ new Date()).toISOString() });
+    interp2.logger.info(`  \u2713 Learned data stored in context (key: ${key})`);
+    return {
+      kind: "learn-result",
+      operation: "learn",
+      key,
+      data,
+      source,
+      confidence,
+      timestamp: timestamp ?? (/* @__PURE__ */ new Date()).toISOString(),
+      saved: "disk"
+    };
+  } catch (error) {
+    interp2.logger.error(`\u274C Learn failed: ${error.message}`);
+    return { kind: "learn-error", key, message: error.message, timestamp: (/* @__PURE__ */ new Date()).toISOString() };
+  }
+}
+function handleReasoningBlock(interp2, reasoningBlock) {
+  const { stage, data, observations, analysis, decisions, actions, verifications, metadata, transitions } = reasoningBlock;
+  if (!interp2.context.reasoning) interp2.context.reasoning = /* @__PURE__ */ new Map();
+  const reasoningState = {
+    stage,
+    data: Object.fromEntries(data),
+    observations,
+    analysis,
+    decisions,
+    actions,
+    verifications,
+    metadata: { ...metadata, completedAt: (/* @__PURE__ */ new Date()).toISOString() },
+    transitions: transitions || []
+  };
+  const stateKey = `${stage}-${(/* @__PURE__ */ new Date()).getTime()}`;
+  interp2.context.reasoning.set(stateKey, reasoningState);
+  const stageEmoji = { observe: "\u{1F440}", analyze: "\u{1F50D}", decide: "\u{1F3AF}", act: "\u26A1", verify: "\u2705" };
+  let logMessage = `${stageEmoji[stage] || "\u2753"} ${stage.toUpperCase()}`;
+  switch (stage) {
+    case "observe":
+      if (observations && observations.length > 0) logMessage += `: ${observations.length} observations`;
+      break;
+    case "analyze": {
+      const currentSearches = interp2.context.currentSearches;
+      if (currentSearches && currentSearches.size > 0) logMessage += ` [using ${currentSearches.size} search result(s)]`;
+      const angles = data.get("angles");
+      if (angles instanceof Map) logMessage += `: ${angles.size} angles analyzed`;
+      const selected = data.get("selected");
+      if (selected) logMessage += `, selected: "${selected.value || selected}"`;
+      break;
+    }
+    case "decide": {
+      const currentLearned = interp2.context.currentLearned;
+      if (currentLearned && currentLearned.size > 0) logMessage += ` [using ${currentLearned.size} learned fact(s)]`;
+      const choice = data.get("choice");
+      if (choice) logMessage += `: "${choice.value || choice}"`;
+      const reason = data.get("reason");
+      if (reason) logMessage += ` (${reason.value || reason})`;
+      break;
+    }
+    case "act": {
+      const action = data.get("action");
+      if (action) logMessage += `: "${action.value || action}"`;
+      break;
+    }
+    case "verify": {
+      const result = data.get("result");
+      if (result) logMessage += `: ${result.value || result}`;
+      if (metadata?.confidence !== void 0) logMessage += ` (confidence: ${(metadata.confidence * 100).toFixed(0)}%)`;
+      break;
+    }
+  }
+  interp2.logger.info(logMessage);
+  return {
+    kind: "reasoning-result",
+    stage,
+    data: Object.fromEntries(data),
+    observations,
+    analysis,
+    decisions,
+    actions,
+    verifications,
+    metadata: reasoningState.metadata,
+    stateKey,
+    completed: true
+  };
+}
+
+// src/eval-module-system.ts
+var fs4 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
+init_ast();
+init_errors();
+
+// src/ast-helpers.ts
+init_ast();
+function extractParamNames(params) {
+  if (!Array.isArray(params)) {
+    return [];
+  }
+  return params.map((p) => {
+    if (typeof p === "string") {
+      return p.startsWith("$") ? p.substring(1) : p;
+    }
+    if (isVariable(p)) {
+      return p.name;
+    }
+    if (isLiteral(p)) {
+      return String(p.value);
+    }
+    throw new Error(`extractParamNames: unknown param node type '${p?.kind ?? typeof p}'`);
+  });
+}
+
+// src/eval-module-system.ts
+init_lexer();
+init_parser();
+var MODULE_CACHE2 = /* @__PURE__ */ new Map();
+function evalModuleBlock(interp2, moduleBlock) {
+  const moduleName = moduleBlock.name;
+  const exports2 = moduleBlock.exports || [];
+  const moduleBody = moduleBlock.body || [];
+  const moduleFunctions = /* @__PURE__ */ new Map();
+  for (const node of moduleBody) {
+    if (isFuncBlock(node)) {
+      const funcName = node.name;
+      const params = node.fields?.get("params") || [];
+      const paramNames = extractParamNames(params);
+      let body = node.fields?.get("body");
+      if (!body) {
+        continue;
+      }
+      if (Array.isArray(body)) {
+        body = body[0];
+        if (!body) {
+          continue;
+        }
+      }
+      const func = {
+        name: funcName,
+        params: paramNames,
+        body
+      };
+      moduleFunctions.set(funcName, func);
+    }
+  }
+  const moduleInfo = {
+    name: moduleName,
+    exports: exports2,
+    functions: moduleFunctions
+  };
+  interp2.getModules().set(moduleName, moduleInfo);
+  interp2.logger.info(`\u2705 Module registered: ${moduleName} (exports: ${exports2.join(", ")})`);
+}
+function evalImportBlock(interp2, importBlock) {
+  const moduleName = importBlock.moduleName;
+  const source = importBlock.source;
+  const selective = importBlock.selective;
+  const alias = importBlock.alias;
+  if (source) {
+    const looksLikeFile = source.endsWith(".fl") || source.includes("/") || source.startsWith("./") || source.startsWith("../");
+    let isFile = looksLikeFile;
+    if (!isFile) {
+      const baseDir = (() => {
+        try {
+          return fs4.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path5.dirname(interp2.currentFilePath);
+        } catch {
+          return interp2.currentFilePath;
+        }
+      })();
+      const candidates = [
+        path5.resolve(baseDir, source + ".fl"),
+        path5.resolve(baseDir, source),
+        path5.resolve(process.cwd(), source + ".fl"),
+        path5.resolve(process.cwd(), source)
+      ];
+      isFile = candidates.some((c) => fs4.existsSync(c));
+    }
+    if (isFile) {
+      interp2.evalImportFromFile(source, moduleName, selective, alias);
+      return;
+    }
+  }
+  const module2 = interp2.getModules().get(moduleName);
+  if (!module2) {
+    throw new ModuleNotFoundError(moduleName, source);
+  }
+  let functionsToImport = [];
+  if (selective && selective.length > 0) {
+    functionsToImport = selective.filter(
+      (name) => module2.exports.includes(name)
+    );
+    selective.forEach((name) => {
+      if (!module2.exports.includes(name)) {
+        interp2.logger.warn(
+          `Function "${name}" not exported from module "${moduleName}"`
+        );
+      }
+    });
+  } else {
+    functionsToImport = [...module2.exports];
+  }
+  functionsToImport.forEach((funcName) => {
+    const func = module2.functions.get(funcName);
+    if (func) {
+      if (alias) {
+        const qualifiedName = `${alias}:${funcName}`;
+        interp2.context.functions.set(qualifiedName, func);
+      } else {
+        const qualifiedName = `${moduleName}:${funcName}`;
+        interp2.context.functions.set(qualifiedName, func);
+      }
+    }
+  });
+  const importedCount = functionsToImport.length;
+  const aliasStr = alias ? ` as ${alias}` : "";
+  const selectStr = selective ? ` (${selective.join(", ")})` : "";
+  interp2.logger.info(
+    `\u2705 Imported ${importedCount} function(s) from "${moduleName}"${selectStr}${aliasStr}`
+  );
+}
+function evalImportFromFile(interp2, relPath, prefix, selective, alias) {
+  const baseDir = (() => {
+    try {
+      return fs4.statSync(interp2.currentFilePath).isDirectory() ? interp2.currentFilePath : path5.dirname(interp2.currentFilePath);
+    } catch {
+      return interp2.currentFilePath;
+    }
+  })();
+  const tryResolve = (candidate) => {
+    if (fs4.existsSync(candidate) && fs4.statSync(candidate).isFile()) return candidate;
+    if (!candidate.endsWith(".fl") && fs4.existsSync(candidate + ".fl")) return candidate + ".fl";
+    return null;
+  };
+  const isRelative = relPath.startsWith("./") || relPath.startsWith("../") || relPath.startsWith("/");
+  const candidates = [];
+  if (isRelative) {
+    candidates.push(path5.resolve(baseDir, relPath));
+  } else {
+    candidates.push(path5.resolve(process.cwd(), relPath));
+    candidates.push(path5.resolve(baseDir, relPath));
+  }
+  let absPath = null;
+  for (const c of candidates) {
+    const resolved = tryResolve(c);
+    if (resolved) {
+      absPath = resolved;
+      break;
+    }
+  }
+  if (!absPath) {
+    throw new Error(`Import error: file not found: ${relPath} (tried: ${candidates.join(", ")})`);
+  }
+  let cached = MODULE_CACHE2.get(absPath);
+  if (!cached) {
+    if (interp2.importedFiles.has(absPath)) {
+      return;
+    }
+    interp2.importedFiles.add(absPath);
+    const src = fs4.readFileSync(absPath, "utf-8");
+    const subInterp = new Interpreter();
+    subInterp.currentFilePath = absPath;
+    subInterp.importedFiles = interp2.importedFiles;
+    const builtinFuncs = new Set(subInterp.context.functions.keys());
+    subInterp.interpret(parse(lex(src)));
+    if (process.env.FL_IMPORT_DEBUG === "1") {
+      const userDefined = [];
+      for (const k of subInterp.context.functions.keys()) {
+        if (!builtinFuncs.has(k)) userDefined.push(k);
+      }
+      console.log(`import.debug file=${absPath} user_funcs=${userDefined.join(",")}`);
+    }
+    const userFuncs = /* @__PURE__ */ new Map();
+    for (const [funcName, func] of subInterp.context.functions) {
+      if (!builtinFuncs.has(funcName)) userFuncs.set(funcName, func);
+    }
+    const userVars = new Map(subInterp.context.variables.snapshot());
+    cached = { functions: userFuncs, variables: userVars };
+    MODULE_CACHE2.set(absPath, cached);
+  }
+  const effectivePrefix = alias ?? prefix;
+  for (const [funcName, func] of cached.functions) {
+    if (selective && selective.length > 0) {
+      if (selective.includes(funcName)) {
+        interp2.context.functions.set(funcName, func);
+      }
+    } else {
+      interp2.context.functions.set(`${effectivePrefix}:${funcName}`, func);
+    }
+  }
+  for (const [varName, varVal] of cached.variables) {
+    if (selective && selective.length > 0) {
+      if (selective.includes(varName)) {
+        interp2.context.variables.setGlobal(varName, varVal);
+      }
+    } else {
+      interp2.context.variables.setGlobal(`${effectivePrefix}:${varName}`, varVal);
+    }
+  }
+}
+function evalOpenBlock(interp2, openBlock) {
+  const moduleName = openBlock.moduleName;
+  const source = openBlock.source;
+  const module2 = interp2.getModules().get(moduleName);
+  if (!module2) {
+    throw new ModuleNotFoundError(moduleName, source);
+  }
+  module2.exports.forEach((funcName) => {
+    const func = module2.functions.get(funcName);
+    if (func) {
+      interp2.context.functions.set(funcName, func);
+    }
+  });
+  interp2.logger.info(
+    `\u2705 Opened module "${moduleName}" (${module2.exports.length} function(s) available globally)`
+  );
+}
+
+// src/stdlib-file.ts
+var fs5 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
+function validateFilePath(filePath) {
+  const base = process.env.FL_FILE_BASE;
+  if (!base) return filePath;
+  const resolved = path6.resolve(filePath);
+  const resolvedBase = path6.resolve(base);
+  if (resolved !== resolvedBase && !resolved.startsWith(resolvedBase + path6.sep)) {
+    throw new Error(`Path traversal \uCC28\uB2E8: '${filePath}' (\uD5C8\uC6A9 \uAE30\uC900: FL_FILE_BASE=${resolvedBase})`);
+  }
+  return resolved;
+}
+function createFileModule() {
+  return {
+    // file_read filePath -> string (read file content)
+    "file_read": (filePath) => {
+      try {
+        return fs5.readFileSync(validateFilePath(filePath), "utf-8");
+      } catch (err4) {
+        throw new Error(`file_read failed for '${filePath}': ${err4.message}`);
+      }
+    },
+    // file_write filePath content -> boolean (write content to file)
+    "file_write": (filePath, content) => {
+      try {
+        filePath = validateFilePath(filePath);
+        const dir = path6.dirname(filePath);
+        if (dir !== "." && !fs5.existsSync(dir)) {
+          fs5.mkdirSync(dir, { recursive: true });
+        }
+        fs5.writeFileSync(filePath, content, "utf-8");
+        return true;
+      } catch (err4) {
+        throw new Error(`file_write failed for '${filePath}': ${err4.message}`);
+      }
+    },
+    // file_exists filePath -> boolean (check if file exists)
+    "file_exists": (filePath) => {
+      return fs5.existsSync(filePath);
+    },
+    // file_delete filePath -> boolean (delete file)
+    "file_delete": (filePath) => {
+      try {
+        filePath = validateFilePath(filePath);
+        if (fs5.existsSync(filePath)) {
+          fs5.unlinkSync(filePath);
+          return true;
+        }
+        return false;
+      } catch (err4) {
+        throw new Error(`file_delete failed for '${filePath}': ${err4.message}`);
+      }
+    },
+    // file_append filePath content -> boolean (append content to file)
+    "file_append": (filePath, content) => {
+      try {
+        filePath = validateFilePath(filePath);
+        const dir = path6.dirname(filePath);
+        if (dir !== "." && !fs5.existsSync(dir)) {
+          fs5.mkdirSync(dir, { recursive: true });
+        }
+        fs5.appendFileSync(filePath, content, "utf-8");
+        return true;
+      } catch (err4) {
+        throw new Error(`file_append failed for '${filePath}': ${err4.message}`);
+      }
+    },
+    // file_copy src dest -> boolean (copy file)
+    "file_copy": (src, dest) => {
+      try {
+        const dir = path6.dirname(dest);
+        if (dir !== "." && !fs5.existsSync(dir)) {
+          fs5.mkdirSync(dir, { recursive: true });
+        }
+        fs5.copyFileSync(src, dest);
+        return true;
+      } catch (err4) {
+        throw new Error(`file_copy failed from '${src}' to '${dest}': ${err4.message}`);
+      }
+    },
+    // dir_create dirPath -> boolean (create directory)
+    "dir_create": (dirPath) => {
+      try {
+        if (!fs5.existsSync(dirPath)) {
+          fs5.mkdirSync(dirPath, { recursive: true });
+        }
+        return true;
+      } catch (err4) {
+        throw new Error(`dir_create failed for '${dirPath}': ${err4.message}`);
+      }
+    },
+    // dir_list dirPath -> [string] (list directory contents)
+    "dir_list": (dirPath) => {
+      try {
+        if (!fs5.existsSync(dirPath)) {
+          throw new Error(`Directory not found: '${dirPath}'`);
+        }
+        return fs5.readdirSync(dirPath);
+      } catch (err4) {
+        throw new Error(`dir_list failed for '${dirPath}': ${err4.message}`);
+      }
+    },
+    // dir_delete dirPath -> boolean (delete directory - must be empty)
+    "dir_delete": (dirPath) => {
+      try {
+        if (fs5.existsSync(dirPath)) {
+          fs5.rmdirSync(dirPath);
+          return true;
+        }
+        return false;
+      } catch (err4) {
+        throw new Error(`dir_delete failed for '${dirPath}': ${err4.message}`);
+      }
+    },
+    // file_size filePath -> number (get file size in bytes)
+    "file_size": (filePath) => {
+      try {
+        const stats = fs5.statSync(filePath);
+        return stats.size;
+      } catch (err4) {
+        throw new Error(`file_size failed for '${filePath}': ${err4.message}`);
+      }
+    },
+    // file_is_file filePath -> boolean (check if path is a file)
+    "file_is_file": (filePath) => {
+      try {
+        if (!fs5.existsSync(filePath)) return false;
+        return fs5.statSync(filePath).isFile();
+      } catch (err4) {
+        return false;
+      }
+    },
+    // file_is_dir filePath -> boolean (check if path is a directory)
+    "file_is_dir": (filePath) => {
+      try {
+        if (!fs5.existsSync(filePath)) return false;
+        return fs5.statSync(filePath).isDirectory();
+      } catch (err4) {
+        return false;
+      }
+    },
+    // file_mtime filePath -> number (get modification time as timestamp)
+    "file_mtime": (filePath) => {
+      try {
+        const stats = fs5.statSync(filePath);
+        return stats.mtimeMs;
+      } catch (err4) {
+        throw new Error(`file_mtime failed for '${filePath}': ${err4.message}`);
+      }
+    },
+    // file_ctime filePath -> number (get creation time as timestamp)
+    "file_ctime": (filePath) => {
+      try {
+        const stats = fs5.statSync(filePath);
+        return stats.ctimeMs;
+      } catch (err4) {
+        throw new Error(`file_ctime failed for '${filePath}': ${err4.message}`);
+      }
+    },
+    // file_read_or filePath defaultVal -> string | any (파일 없거나 오류 시 기본값 반환)
+    "file_read_or": (filePath, defaultVal = null) => {
+      try {
+        return fs5.readFileSync(filePath, "utf-8");
+      } catch {
+        return defaultVal ?? null;
+      }
+    }
+  };
+}
+
+// src/stdlib-fd.ts
+var fs6 = __toESM(require("fs"));
+var fdCache = /* @__PURE__ */ new Map();
+var nextFd = 1e3;
+function createFdModule() {
+  return {
+    // fd_open path mode -> number (fd, mode: r/w/a)
+    "fd_open": (filePath, mode) => {
+      try {
+        let fsMode;
+        switch (mode) {
+          case "r":
+            fsMode = "r";
+            break;
+          case "w":
+            fsMode = "w";
+            break;
+          case "a":
+            fsMode = "a";
+            break;
+          default:
+            throw new Error(`Invalid mode: ${mode}. Use "r", "w", or "a"`);
+        }
+        const nativeFd = fs6.openSync(filePath, fsMode);
+        const syntheticFd = nextFd++;
+        fdCache.set(syntheticFd, nativeFd);
+        return syntheticFd;
+      } catch (err4) {
+        throw new Error(`fd_open failed for '${filePath}' (${mode}): ${err4.message}`);
+      }
+    },
+    // fd_write fd data -> boolean (write data to file descriptor)
+    "fd_write": (fd, data) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        fs6.writeSync(nativeFd, data, "utf-8");
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_write failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_fsync fd -> boolean (flush file descriptor to disk)
+    "fd_fsync": (fd) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        fs6.fsyncSync(nativeFd);
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_fsync failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_close fd -> boolean (close file descriptor)
+    "fd_close": (fd) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        fs6.closeSync(nativeFd);
+        fdCache.delete(fd);
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_close failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_read fd bytes -> string (read bytes from file descriptor)
+    "fd_read": (fd, bytes) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        const buf = Buffer.alloc(bytes);
+        const bytesRead = fs6.readSync(nativeFd, buf, 0, bytes);
+        return buf.toString("utf-8", 0, bytesRead);
+      } catch (err4) {
+        throw new Error(`fd_read failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_seek fd offset whence -> number (whence: 0/1/2)
+    "fd_seek": (fd, offset, whence) => {
+      try {
+        const nativeFd = fdCache.get(fd);
+        if (nativeFd === void 0) {
+          throw new Error(`Invalid file descriptor: ${fd}`);
+        }
+        const stats = fs6.fstatSync(nativeFd);
+        return stats.size;
+      } catch (err4) {
+        throw new Error(`fd_seek failed on fd ${fd}: ${err4.message}`);
+      }
+    },
+    // fd_flush -> boolean (flush all open fds)
+    "fd_flush": () => {
+      try {
+        for (const nativeFd of fdCache.values()) {
+          fs6.fsyncSync(nativeFd);
+        }
+        return true;
+      } catch (err4) {
+        throw new Error(`fd_flush failed: ${err4.message}`);
+      }
+    }
+  };
+}
+
+// src/stdlib-bits.ts
+function createBitsModule() {
+  return {
+    // bit_and a b -> number (bitwise AND: a & b)
+    "bit_and": (a, b) => {
+      return (a & b) >>> 0;
+    },
+    // bit_or a b -> number (bitwise OR: a | b)
+    "bit_or": (a, b) => {
+      return (a | b) >>> 0;
+    },
+    // bit_xor a b -> number (bitwise XOR: a ^ b)
+    "bit_xor": (a, b) => {
+      return (a ^ b) >>> 0;
+    },
+    // bit_not a -> number (bitwise NOT: ~a)
+    "bit_not": (a) => {
+      return ~a >>> 0;
+    },
+    // bit_shl a n -> number (shift left: a << n)
+    "bit_shl": (a, n) => {
+      return a << n >>> 0;
+    },
+    // bit_shr a n -> number (unsigned right shift: a >>> n)
+    "bit_shr": (a, n) => {
+      return a >>> n >>> 0;
+    },
+    // bit_sar a n -> number (arithmetic right shift: a >> n)
+    "bit_sar": (a, n) => {
+      return a >> n >>> 0;
+    },
+    // bit_popcount a -> number (count set bits)
+    "bit_popcount": (a) => {
+      a = a >>> 0;
+      let count = 0;
+      while (a) {
+        count += a & 1;
+        a = a >>> 1;
+      }
+      return count;
+    },
+    // bit_test a n -> boolean (test bit at position n)
+    "bit_test": (a, n) => {
+      return (a >>> n & 1) === 1;
+    },
+    // bit_set a n -> number (set bit at position n)
+    "bit_set": (a, n) => {
+      return (a | 1 << n) >>> 0;
+    },
+    // bit_clear a n -> number (clear bit at position n)
+    "bit_clear": (a, n) => {
+      return (a & ~(1 << n)) >>> 0;
+    },
+    // bit_rotate_left a n -> number (rotate left: (a << n) | (a >>> (32-n)))
+    "bit_rotate_left": (a, n) => {
+      a = a >>> 0;
+      n = n % 32;
+      return (a << n | a >>> 32 - n) >>> 0;
+    },
+    // bit_rotate_right a n -> number (rotate right: (a >>> n) | (a << (32-n)))
+    "bit_rotate_right": (a, n) => {
+      a = a >>> 0;
+      n = n % 32;
+      return (a >>> n | a << 32 - n) >>> 0;
+    }
+  };
+}
+
+// src/sis-bus.ts
+var E_TIMER_EXCEPTION = 1;
+var E_EVENT_DROPPED = 3;
+var CAP = 4096;
+var ring = new Array(CAP);
+var head = 0;
+var tail = 0;
+var emit_count = 0;
+var received_count = 0;
+var dropped_count = 0;
+var dropped_since_notice = 0;
+var drop_latch = null;
+var drop_latch_seq = 0;
+function ringPush(type, payload) {
+  const next = (head + 1) % CAP;
+  if (next === tail) return false;
+  ring[head] = { ts: Date.now(), type, payload };
+  head = next;
+  received_count++;
+  return true;
+}
+var QUARANTINE_THRESHOLD = 3;
+var policyState = /* @__PURE__ */ new Map();
+var policy_event_count = 0;
+var policy_fire_count = 0;
+var quarantine_count = 0;
+var policy_error_count = 0;
+function sisPolicyOnEvent(type, payload) {
+  policy_event_count++;
+  if (type !== E_TIMER_EXCEPTION) return;
+  const tid = payload && payload.timer_id || 0;
+  let s = policyState.get(tid);
+  if (!s) {
+    s = { score: 0, quarantined: false };
+    policyState.set(tid, s);
+  }
+  s.score++;
+  if (s.score >= QUARANTINE_THRESHOLD && !s.quarantined) {
+    s.quarantined = true;
+    quarantine_count++;
+    policy_fire_count++;
+    console.error(`[SIS] event=E_TIMER_EXCEPTION score=${s.score} quarantined=true action=QUARANTINE timer=${tid}`);
+  }
+}
+function sisEmit(type, payload) {
+  emit_count++;
+  if (dropped_since_notice > 0 && type !== E_EVENT_DROPPED) {
+    if (ringPush(E_EVENT_DROPPED, { emit_count, dropped_count })) dropped_since_notice = 0;
+  }
+  const ok2 = ringPush(type, payload);
+  if (!ok2) {
+    dropped_count++;
+    dropped_since_notice++;
+    drop_latch = { emit_count, dropped_count };
+    drop_latch_seq++;
+  }
+  try {
+    sisPolicyOnEvent(type, payload);
+  } catch {
+    policy_error_count++;
+  }
+  return ok2;
+}
+function sisStats() {
+  const queued = (head + CAP - tail) % CAP;
+  return {
+    emit_count,
+    received_count,
+    dropped_count,
+    queued,
+    drop_latch_seq,
+    drop_latch,
+    invariant_ok: emit_count === received_count + dropped_count,
+    // Phase 3 정책 카운터
+    policy_event_count,
+    policy_fire_count,
+    quarantine_count,
+    policy_error_count
+  };
+}
+
+// src/stdlib-timer.ts
+var timerRegistry = /* @__PURE__ */ new Map();
+var nextTimerId = 2e3;
+var intervalStats = /* @__PURE__ */ new Map();
+function createTimerModule(interpreter) {
+  return {
+    // set_interval fn ms -> number (fn: function name string, ms: interval)
+    "set_interval": (fnName, ms) => {
+      try {
+        const isFnObj = fnName && typeof fnName === "object" && fnName.body !== void 0;
+        if (typeof fnName !== "string" && !isFnObj) {
+          throw new Error(`Function name must be string or function, got ${typeof fnName}`);
+        }
+        if (typeof ms !== "number" || ms < 1) {
+          throw new Error(`Interval must be positive number, got ${ms}`);
+        }
+        const timerId = nextTimerId++;
+        intervalStats.set(timerId, { ticks: 0, missed: 0, lastError: null, lastErrorAt: 0 });
+        const callback = () => {
+          const st = intervalStats.get(timerId);
+          if (st) st.ticks++;
+          try {
+            if (isFnObj) {
+              interpreter.callFunction(fnName, []);
+            } else {
+              interpreter.callUserFunction(fnName, []);
+            }
+          } catch (err4) {
+            if (st) {
+              st.missed++;
+              st.lastError = err4.message;
+              st.lastErrorAt = Date.now();
+            }
+            sisEmit(E_TIMER_EXCEPTION, { timer_id: timerId, exception_count: st ? st.missed : 0 });
+            const label = isFnObj ? "<fn>" : fnName;
+            console.error(`set_interval callback error for '${label}':`, err4.message);
+          }
+        };
+        const nodeTimer = setInterval(callback, ms);
+        timerRegistry.set(timerId, nodeTimer);
+        return timerId;
+      } catch (err4) {
+        throw new Error(`set_interval failed: ${err4.message}`);
+      }
+    },
+    // clear_interval timerId -> boolean (stop periodic timer)
+    "clear_interval": (timerId) => {
+      try {
+        const nodeTimer = timerRegistry.get(timerId);
+        if (nodeTimer === void 0) {
+          return false;
+        }
+        clearInterval(nodeTimer);
+        timerRegistry.delete(timerId);
+        intervalStats.delete(timerId);
+        return true;
+      } catch (err4) {
+        throw new Error(`clear_interval failed: ${err4.message}`);
+      }
+    },
+    // interval_stats [timerId] -> stat | {id: stat,...}  (FL-P1 / ROS R9)
+    // Exposes silently-skipped ticks. healthy = (missed === 0).
+    // No arg: returns all live interval stats. Unknown id: nil.
+    // A watchdog polls this and alarms when missed > 0 or ticks stop advancing.
+    "interval_stats": (timerId) => {
+      if (timerId === void 0 || timerId === null) {
+        const out = {};
+        for (const [id, st2] of intervalStats) {
+          out[String(id)] = { ...st2, healthy: st2.missed === 0 };
+        }
+        return out;
+      }
+      const st = intervalStats.get(timerId);
+      if (st === void 0) return null;
+      return { ...st, healthy: st.missed === 0 };
+    },
+    // set_timeout fn ms -> number (fn: function name string, ms: delay)
+    "set_timeout": (fnName, ms) => {
+      try {
+        if (typeof fnName !== "string") {
+          throw new Error(`Function name must be string, got ${typeof fnName}`);
+        }
+        if (typeof ms !== "number" || ms < 1) {
+          throw new Error(`Timeout must be positive number, got ${ms}`);
+        }
+        const timerId = nextTimerId++;
+        const callback = () => {
+          try {
+            interpreter.callUserFunction(fnName, []);
+          } catch (err4) {
+            console.error(`set_timeout callback error for '${fnName}':`, err4.message);
+          }
+          timerRegistry.delete(timerId);
+        };
+        const nodeTimer = setTimeout(callback, ms);
+        timerRegistry.set(timerId, nodeTimer);
+        return timerId;
+      } catch (err4) {
+        throw new Error(`set_timeout failed: ${err4.message}`);
+      }
+    },
+    // clear_timeout timerId -> boolean (cancel one-time timer)
+    "clear_timeout": (timerId) => {
+      try {
+        const nodeTimer = timerRegistry.get(timerId);
+        if (nodeTimer === void 0) {
+          return false;
+        }
+        clearTimeout(nodeTimer);
+        timerRegistry.delete(timerId);
+        return true;
+      } catch (err4) {
+        throw new Error(`clear_timeout failed: ${err4.message}`);
+      }
+    },
+    // timer_count -> number (returns count of active timers)
+    "timer_count": () => {
+      return timerRegistry.size;
+    },
+    // SIS Phase 2: Evidence Bus 통계 노출(검증/관측용)
+    "sis_stats": () => sisStats(),
+    // timer_clear_all -> boolean (clear all active timers)
+    "timer_clear_all": () => {
+      try {
+        for (const nodeTimer of timerRegistry.values()) {
+          clearInterval(nodeTimer);
+          clearTimeout(nodeTimer);
+        }
+        timerRegistry.clear();
+        return true;
+      } catch (err4) {
+        throw new Error(`timer_clear_all failed: ${err4.message}`);
+      }
+    }
+  };
+}
+
+// src/stdlib-error.ts
+function createErrorModule() {
+  return {
+    // error_message err -> string (get error message)
+    "error_message": (err4) => {
+      if (err4 instanceof Error) {
+        return err4.message;
+      }
+      if (typeof err4 === "string") {
+        return err4;
+      }
+      if (err4 && typeof err4 === "object" && err4.message) {
+        return String(err4.message);
+      }
+      return String(err4);
+    },
+    // error_type err -> string (get error type/name)
+    "error_type": (err4) => {
+      if (err4 && typeof err4 === "object" && err4.type) {
+        return String(err4.type);
+      }
+      if (err4 instanceof Error) {
+        const name = err4.constructor.name;
+        return name === "Error" ? "RuntimeError" : name;
+      }
+      if (typeof err4 === "string") {
+        return "RuntimeError";
+      }
+      return "RuntimeError";
+    },
+    // is_error value -> boolean (check if value is an error)
+    "is_error": (value) => {
+      return value instanceof Error || value && typeof value === "object" && value.message !== void 0;
+    },
+    // create_error message -> error (create an error object)
+    "create_error": (message) => {
+      return new Error(message);
+    },
+    // create_typed_error type message -> error (create a typed error)
+    "create_typed_error": (type, message) => {
+      const err4 = new Error(message);
+      err4.type = type;
+      return err4;
+    },
+    // error_stack err -> string (get error stack trace)
+    "error_stack": (err4) => {
+      if (err4 instanceof Error && err4.stack) {
+        return err4.stack;
+      }
+      return "";
+    },
+    // with_fallback try_fn fallback_fn -> any (execute try_fn, fallback on error)
+    "with_fallback": (tryFn, fallbackFn) => {
+      try {
+        if (tryFn && typeof tryFn === "object" && tryFn.kind === "function-value") {
+          return tryFn;
+        }
+        if (typeof tryFn === "function") {
+          return tryFn();
+        }
+        return tryFn;
+      } catch (err4) {
+        if (fallbackFn && typeof fallbackFn === "object" && fallbackFn.kind === "function-value") {
+          return fallbackFn;
+        }
+        if (typeof fallbackFn === "function") {
+          return fallbackFn(err4);
+        }
+        return fallbackFn;
+      }
+    }
+  };
+}
+
+// src/stdlib-http.ts
+var import_worker_threads = require("worker_threads");
+var HTTP_SYNC_WORKER_SOURCE = `
+const { parentPort, workerData } = require("worker_threads");
+const http = require("http");
+const https = require("https");
+const { URL } = require("url");
+const signal = new Int32Array(workerData.sab);
+function handle(port, msg) {
+  let settled = false;
+  const done = (r) => {
+    if (settled) return;
+    settled = true;
+    port.postMessage(r);
+    Atomics.store(signal, 0, 1);
+    Atomics.notify(signal, 0);
+  };
+  try {
+    const u = new URL(msg.url);
+    const mod = u.protocol === "https:" ? https : http;
+    const headers = Object.assign({}, msg.headers || {});
+    if (msg.body != null) {
+      headers["Content-Length"] = Buffer.byteLength(msg.body, "utf-8");
+    }
+    const req = mod.request(
+      {
+        hostname: u.hostname,
+        port: u.port || undefined,
+        path: u.pathname + (u.search || ""),
+        method: msg.method || "GET",
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (d) => chunks.push(d));
+        res.on("end", () =>
+          done({
+            status: res.statusCode || 0,
+            body: Buffer.concat(chunks).toString("utf-8"),
+          })
+        );
+      }
+    );
+    req.on("error", (e) =>
+      done({ status: 0, body: "", error: String(e && e.message ? e.message : e) })
+    );
+    const ms = msg.timeoutMs || 10000;
+    req.setTimeout(ms, () => {
+      req.destroy();
+      done({ status: 0, body: "", error: "timeout" });
+    });
+    if (msg.body != null) req.write(msg.body, "utf-8");
+    req.end();
+  } catch (e) {
+    done({ status: 0, body: "", error: String(e && e.message ? e.message : e) });
+  }
+}
+parentPort.once("message", (init) => {
+  const port = init.port;
+  port.on("message", (msg) => handle(port, msg));
+  Atomics.store(signal, 1, 1);
+  Atomics.notify(signal, 1);
+});
+`;
+var httpWorkerState = null;
+function ensureHttpWorker() {
+  if (httpWorkerState) return httpWorkerState;
+  const sab = new SharedArrayBuffer(8);
+  const signal = new Int32Array(sab);
+  const { port1, port2 } = new import_worker_threads.MessageChannel();
+  const worker = new import_worker_threads.Worker(HTTP_SYNC_WORKER_SOURCE, {
+    eval: true,
+    workerData: { sab }
+  });
+  worker.on("error", (err4) => {
+    httpWorkerState = null;
+    console.error("[FreeLang] http sync worker error:", err4 && err4.message ? err4.message : err4);
+  });
+  worker.on("exit", () => {
+    httpWorkerState = null;
+  });
+  worker.postMessage({ port: port2 }, [port2]);
+  const ready = Atomics.wait(signal, 1, 0, 5e3);
+  if (ready === "timed-out" || Atomics.load(signal, 1) !== 1) {
+    try {
+      worker.terminate();
+    } catch {
+    }
+    throw new Error("http sync worker failed to start");
+  }
+  try {
+    worker.unref();
+  } catch {
+  }
+  httpWorkerState = { worker, port: port1, signal };
+  return httpWorkerState;
+}
+function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4) {
+  try {
+    const headersObj = {};
+    if (headers && typeof headers === "object") {
+      const entries = headers instanceof Map ? Array.from(headers.entries()) : Object.entries(headers);
+      for (const [k, v] of entries) {
+        headersObj[String(k)] = String(v);
+      }
+    }
+    const { port, signal } = ensureHttpWorker();
+    Atomics.store(signal, 0, 0);
+    port.postMessage({
+      url: String(url2),
+      method: String(method || "GET").toUpperCase(),
+      headers: headersObj,
+      body: body != null ? String(body) : null,
+      timeoutMs
+    });
+    const waitMs = Math.max(1, Number(timeoutMs) || 1e4) + 2e3;
+    const wr = Atomics.wait(signal, 0, 0, waitMs);
+    if (wr === "timed-out") {
+      return { status: 0, body: "", error: "timeout" };
+    }
+    const msg = (0, import_worker_threads.receiveMessageOnPort)(port);
+    if (!msg || !msg.message) {
+      return { status: 0, body: "", error: "no response from http worker" };
+    }
+    const result = msg.message;
+    return {
+      status: result.status || 0,
+      body: result.body || "",
+      ...result.error && { error: result.error }
+    };
+  } catch (err4) {
+    return { status: 0, body: "", error: err4.message };
+  }
+}
+function createHttpModule() {
+  return {
+    // http_get url -> {:status 200 :body "..."}
+    "http_get": (url2) => {
+      const result = nodeHttpRequest(url2, "GET");
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_post url body -> {:status 200 :body "..."}
+    "http_post": (url2, body) => {
+      if (body !== null && typeof body === "object") {
+        const hint = `http-post body\uC5D0 map\uC774 \uC804\uB2EC\uB410\uC2B5\uB2C8\uB2E4.
+  v12 \uC62C\uBC14\uB978 \uBC29\uC2DD: (http-post url (json-stringify body))
+  v12\uC5D0\uC11C\uB294 \uC790\uB3D9 \uC9C1\uB82C\uD654\uAC00 \uC81C\uAC70\uB429\uB2C8\uB2E4.`;
+        if (process.env.FL_V12 === "1") throw new Error(`[v12] ${hint}`);
+        console.warn(`\u26A0\uFE0F  [FreeLang] ${hint}`);
+        body = JSON.stringify(body);
+      }
+      const result = nodeHttpRequest(
+        url2,
+        "POST",
+        { "Content-Type": "application/json" },
+        body
+      );
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_post_form url body -> {:status 200 :body "..."}
+    "http_post_form": (url2, body) => {
+      const result = nodeHttpRequest(
+        url2,
+        "POST",
+        { "Content-Type": "application/x-www-form-urlencoded" },
+        body
+      );
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_get_bearer url token -> {:status 200 :body "..."}
+    "http_get_bearer": (url2, token) => {
+      const result = nodeHttpRequest(
+        url2,
+        "GET",
+        { "Authorization": `Bearer ${token}` }
+      );
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_get_bearer_json url token -> {:status 200 :data {...}}
+    "http_get_bearer_json": (url2, token) => {
+      const result = nodeHttpRequest(
+        url2,
+        "GET",
+        { "Authorization": `Bearer ${token}` }
+      );
+      if (result.error) {
+        return { status: 0, data: null, error: result.error };
+      }
+      try {
+        return { status: result.status, data: JSON.parse(result.body) };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_put url body -> {:status 200 :body "..."}
+    "http_put": (url2, body) => {
+      const result = nodeHttpRequest(
+        url2,
+        "PUT",
+        { "Content-Type": "application/json" },
+        body
+      );
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_patch url body -> {:status 200 :body "..."}
+    "http_patch": (url2, body) => {
+      const result = nodeHttpRequest(
+        url2,
+        "PATCH",
+        { "Content-Type": "application/json" },
+        body
+      );
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_patch_json url data -> {:status 200 :data {...}}
+    "http_patch_json": (url2, data) => {
+      const body = JSON.stringify(data);
+      const result = nodeHttpRequest(
+        url2,
+        "PATCH",
+        { "Content-Type": "application/json" },
+        body
+      );
+      try {
+        return {
+          status: result.status,
+          data: result.body ? JSON.parse(result.body) : null,
+          ...result.error && { error: result.error }
+        };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_delete url -> {:status 200 :body "..."}
+    "http_delete": (url2) => {
+      const result = nodeHttpRequest(url2, "DELETE");
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_delete_json url -> {:status 200 :data {...}}
+    "http_delete_json": (url2) => {
+      const result = nodeHttpRequest(url2, "DELETE");
+      if (result.error) {
+        return { status: 0, data: null, error: result.error };
+      }
+      try {
+        return { status: result.status, data: result.body ? JSON.parse(result.body) : null };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_head url -> {:status 200 :body ""}
+    "http_head": (url2) => {
+      const result = nodeHttpRequest(url2, "HEAD");
+      return {
+        status: result.status,
+        body: "",
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_get_key url api-key -> {:status 200 :body "..."}
+    "http_get_key": (url2, apiKey) => {
+      const result = nodeHttpRequest(url2, "GET", { "X-API-Key": apiKey });
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_post_key url body api-key -> {:status 200 :body "..."}
+    "http_post_key": (url2, body, apiKey) => {
+      const result = nodeHttpRequest(
+        url2,
+        "POST",
+        { "Content-Type": "application/json", "X-API-Key": apiKey },
+        body
+      );
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_status url -> number (상태코드만)
+    "http_status": (url2) => {
+      const result = nodeHttpRequest(url2, "GET");
+      return result.status;
+    },
+    // http_json url -> {:status 200 :data {...} :error nil}
+    "http_json": (url2) => {
+      const result = nodeHttpRequest(url2, "GET");
+      if (result.error) {
+        return { status: 0, data: null, error: result.error };
+      }
+      try {
+        return { status: result.status, data: JSON.parse(result.body) };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_with_timeout url timeout -> {:status 200 :body "..."}
+    "http_with_timeout": (url2, timeout) => {
+      const ms = typeof timeout === "number" && timeout > 0 ? timeout : 1e4;
+      const result = nodeHttpRequest(url2, "GET", void 0, void 0, ms);
+      return { status: result.status, body: result.body, ...result.error && { error: result.error } };
+    },
+    // http_post_json url data -> {:status 200 :data {...}}
+    "http_post_json": (url2, data) => {
+      const body = JSON.stringify(data);
+      const result = nodeHttpRequest(
+        url2,
+        "POST",
+        { "Content-Type": "application/json" },
+        body
+      );
+      try {
+        return {
+          status: result.status,
+          data: result.body ? JSON.parse(result.body) : null,
+          ...result.error && { error: result.error }
+        };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_put_json url data -> {:status 200 :data {...}}
+    "http_put_json": (url2, data) => {
+      const body = JSON.stringify(data);
+      const result = nodeHttpRequest(
+        url2,
+        "PUT",
+        { "Content-Type": "application/json" },
+        body
+      );
+      try {
+        return {
+          status: result.status,
+          data: result.body ? JSON.parse(result.body) : null,
+          ...result.error && { error: result.error }
+        };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_request method url headers body -> {:status 200 :body "..."}
+    "http_request": (method, url2, headers, body) => {
+      const result = nodeHttpRequest(url2, method, headers, body);
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_request_timeout method url headers body timeout_ms -> {:status 200 :body "..." :error nil}
+    // timeout_ms: 최대 대기 시간 (ms). 초과 시 status:0, error:"timeout" 반환
+    "http_request_timeout": (method, url2, headers, body, timeoutMs) => {
+      const ms = Number(timeoutMs) || 5e3;
+      const result = nodeHttpRequest(url2, method, headers, body || void 0, ms);
+      return {
+        status: result.status,
+        body: result.body,
+        ...result.error && { error: result.error }
+      };
+    },
+    // http_req_status method url headers body -> number
+    "http_req_status": (method, url2, headers, body) => {
+      const result = nodeHttpRequest(url2, method, headers, body);
+      return result.status;
+    },
+    // http_get_json url headers -> {:status 200 :data {...}}
+    "http_get_json": (url2, headers) => {
+      const result = nodeHttpRequest(url2, "GET", headers);
+      try {
+        return {
+          status: result.status,
+          data: result.body ? JSON.parse(result.body) : null,
+          ...result.error && { error: result.error }
+        };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_get_json_bearer url token -> {:status 200 :data {...}}
+    "http_get_json_bearer": (url2, token) => {
+      const result = nodeHttpRequest(
+        url2,
+        "GET",
+        { "Authorization": `Bearer ${token}` }
+      );
+      try {
+        return {
+          status: result.status,
+          data: result.body ? JSON.parse(result.body) : null,
+          ...result.error && { error: result.error }
+        };
+      } catch (err4) {
+        return { status: result.status, data: null, error: err4.message };
+      }
+    },
+    // http_post_bearer url body token -> {:status 200 :body "..."}
+    "http_post_bearer": (url2, body, token) => nodeHttpRequest(
+      url2,
+      "POST",
+      { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body
+    ),
+    // http_parallel requests -> [{:status N :body "..."}]
+    // curl 없는 환경: sequential 실행 (FreeLang 단일스레드 제약)
+    "http_parallel": (requests) => {
+      const getF = (obj, key) => {
+        if (!obj) return null;
+        return obj instanceof Map ? obj.get(key) : obj[key] ?? obj[":" + key] ?? null;
+      };
+      const normReqs = Array.isArray(requests) ? requests : [requests];
+      return normReqs.map((req) => {
+        const url2 = String(getF(req, "url") || getF(req, ":url") || "");
+        const method = String(getF(req, "method") || getF(req, ":method") || "GET").toUpperCase();
+        const token = getF(req, "token") || getF(req, ":token");
+        const body = getF(req, "body") || getF(req, ":body") || "";
+        const hdrs = {};
+        if (token) hdrs["Authorization"] = `Bearer ${token}`;
+        if (body) hdrs["Content-Type"] = "application/json";
+        return nodeHttpRequest(url2, method, hdrs, body || void 0);
+      });
+    },
+    // http_retry url token retries -> {:status 200 :body "..."}
+    // GET with bearer token, retry up to N times on 5xx or network error (status 0)
+    "http_retry": (url2, token, retries = 3) => {
+      const maxRetries = Number(retries) || 3;
+      let lastResult = { status: 0, body: "" };
+      for (let i = 0; i <= maxRetries; i++) {
+        try {
+          const result = nodeHttpRequest(url2, "GET", { "Authorization": `Bearer ${token}` });
+          lastResult = result;
+          if (result.status >= 200 && result.status < 500) return result;
+        } catch (err4) {
+          lastResult = { status: 0, body: "", error: err4.message };
+        }
+        if (i < maxRetries) {
+          const delay = 200 * (i + 1);
+          const start = Date.now();
+          while (Date.now() - start < delay) {
+          }
+        }
+      }
+      return lastResult;
+    },
+    // http_retry_post url body token retries -> {:status 200 :body "..."}
+    "http_retry_post": (url2, body, token, retries = 3) => {
+      const maxRetries = Number(retries) || 3;
+      let lastResult = { status: 0, body: "" };
+      for (let i = 0; i <= maxRetries; i++) {
+        try {
+          const result = nodeHttpRequest(
+            url2,
+            "POST",
+            { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+            body
+          );
+          lastResult = result;
+          if (result.status >= 200 && result.status < 500) return result;
+        } catch (err4) {
+          lastResult = { status: 0, body: "", error: err4.message };
+        }
+        if (i < maxRetries) {
+          const delay = 200 * (i + 1);
+          const start = Date.now();
+          while (Date.now() - start < delay) {
+          }
+        }
+      }
+      return lastResult;
+    },
+    // is_http_success status -> boolean
+    "is_http_success": (status) => status >= 200 && status < 300,
+    // is_http_redirect status -> boolean
+    "is_http_redirect": (status) => status >= 300 && status < 400,
+    // is_http_error status -> boolean
+    "is_http_error": (status) => status >= 400,
+    // http-get-data url -> parsed JSON data | nil  (#11 해결)
+    // http_get_json의 {status,data} 구조 없이 data만 직접 반환
+    "http-get-data": (url2) => {
+      const result = nodeHttpRequest(url2, "GET");
+      if (!result.body) return null;
+      try {
+        return JSON.parse(result.body);
+      } catch {
+        return null;
+      }
+    },
+    // http-post-data url data -> parsed JSON data | nil  (#12 해결)
+    "http-post-data": (url2, data) => {
+      const body = typeof data === "string" ? data : JSON.stringify(data);
+      const result = nodeHttpRequest(url2, "POST", { "Content-Type": "application/json" }, body);
+      if (!result.body) return null;
+      try {
+        return JSON.parse(result.body);
+      } catch {
+        return null;
+      }
+    },
+    // http-get-status url -> number  (#13 해결)
+    // GET 요청 후 status 코드만 반환
+    "http-get-status": (url2) => {
+      const result = nodeHttpRequest(url2, "GET");
+      return result.status;
+    }
+  };
+}
+
+// src/stdlib-shell.ts
+var import_child_process = require("child_process");
+function createShellModule() {
+  return {
+    // shell cmd -> string (run command, return stdout)
+    "shell": (cmd2) => {
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+      if (result.error) throw new Error(`shell failed: ${result.error.message}`);
+      if ((result.status ?? 1) !== 0) {
+        const stderr = result.stderr?.toString().trim() ?? "";
+        throw new Error(`shell failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
+      }
+      return result.stdout?.toString() ?? "";
+    },
+    // shell_status cmd -> number (run command, return exit code)
+    "shell_status": (cmd2) => {
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+      return result.status ?? 1;
+    },
+    // shell_ok cmd -> boolean (returns true if exit code is 0)
+    "shell_ok": (cmd2) => {
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], { timeout: 3e4 });
+      return (result.status ?? 1) === 0;
+    },
+    // shell_pipe cmd1 cmd2 -> string (pipe output of cmd1 into cmd2)
+    "shell_pipe": (cmd1, cmd2) => {
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", `${cmd1} | ${cmd2}`], { timeout: 3e4 });
+      if (result.error) throw new Error(`shell_pipe failed: ${result.error.message}`);
+      if ((result.status ?? 1) !== 0) {
+        const stderr = result.stderr?.toString().trim() ?? "";
+        throw new Error(`shell_pipe failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
+      }
+      return result.stdout?.toString() ?? "";
+    },
+    // shell_capture cmd -> {stdout, stderr, code} (capture all output)
+    "shell_capture": (cmd2) => {
+      const result = (0, import_child_process.spawnSync)("sh", ["-c", cmd2], {
+        encoding: "utf-8",
+        timeout: 3e4
+      });
+      return {
+        stdout: result.stdout ?? "",
+        stderr: result.stderr ?? "",
+        code: result.status ?? 1
+      };
+    },
+    // shell_exists program -> boolean (check if a program is in PATH)
+    "shell_exists": (program) => {
+      const result = (0, import_child_process.spawnSync)("which", [program], { timeout: 5e3 });
+      return (result.status ?? 1) === 0;
+    },
+    // shell_safe program args -> string (인자 배열 방식 — 사용자 입력 안전 실행, sh -c 미사용)
+    "shell_safe": (program, args3) => {
+      if (typeof program !== "string" || !program) throw new Error("shell_safe: program\uC740 \uBB38\uC790\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
+      if (!Array.isArray(args3)) throw new Error("shell_safe: args\uB294 \uBC30\uC5F4\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4");
+      const result = (0, import_child_process.spawnSync)(program, args3.map(String), { timeout: 3e4, encoding: "utf-8" });
+      if (result.error) throw new Error(`shell_safe failed: ${result.error.message}`);
+      if ((result.status ?? 1) !== 0) {
+        const stderr = result.stderr?.trim() ?? "";
+        throw new Error(`shell_safe failed (exit ${result.status})${stderr ? ": " + stderr : ""}`);
+      }
+      return result.stdout ?? "";
+    },
+    // shell_env varname -> string | null (환경변수 없으면 null)
+    "shell_env": (varname) => {
+      const val = process.env[varname];
+      return val === void 0 || val === "" ? null : val;
+    },
+    // shell_cwd -> string (current working directory)
+    "shell_cwd": () => {
+      return process.cwd();
+    }
+  };
+}
+
+// src/stdlib-data.ts
+function createDataModule() {
+  return {
+    // ── JSON ──────────────────────────────────────────────────
+    // json_get obj path -> any  (dot-path access: "user.name" or "items.0")
+    "json_get": (obj, path19) => {
+      const parts = path19.split(".");
+      let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
+      for (const p of parts) {
+        if (cur === null || cur === void 0) return null;
+        cur = Array.isArray(cur) ? cur[parseInt(p, 10)] : cur[p];
+      }
+      return cur ?? null;
+    },
+    // json_set obj path value -> object (immutable update, returns new obj)
+    "json_set": (obj, path19, value) => {
+      const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
+      const deepClone = (o) => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
+      const parts = path19.split(".");
+      let cur = clone;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const p = parts[i];
+        if (cur[p] === void 0 || cur[p] === null) cur[p] = {};
+        cur = cur[p];
+      }
+      cur[parts[parts.length - 1]] = value;
+      return clone;
+    },
+    // json_merge obj1 obj2 -> object (shallow merge, obj2 wins on conflict)
+    "json_merge": (obj1, obj2) => {
+      const a = typeof obj1 === "string" ? JSON.parse(obj1) : obj1;
+      const b = typeof obj2 === "string" ? JSON.parse(obj2) : obj2;
+      return { ...a, ...b };
+    },
+    // json_deep_merge obj1 obj2 -> object (deep recursive merge)
+    "json_deep_merge": (obj1, obj2) => {
+      const a = typeof obj1 === "string" ? JSON.parse(obj1) : obj1;
+      const b = typeof obj2 === "string" ? JSON.parse(obj2) : obj2;
+      function deepMerge(x, y) {
+        if (typeof x !== "object" || x === null || Array.isArray(x)) return y;
+        if (typeof y !== "object" || y === null || Array.isArray(y)) return y;
+        const result = { ...x };
+        for (const k of Object.keys(y)) {
+          result[k] = k in x ? deepMerge(x[k], y[k]) : y[k];
+        }
+        return result;
+      }
+      return deepMerge(a, b);
+    },
+    // json_keys obj -> [string] (get keys of object)
+    "json_keys": (obj) => {
+      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+      return Object.keys(o);
+    },
+    // json_vals obj -> [any] (get values of object)
+    "json_vals": (obj) => {
+      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+      return Object.values(o);
+    },
+    // self-hosting 경로에서 bootstrap parser가 생성한 JS Map 형태의 AST fields를
+    // FL 코드가 순회할 수 있도록 노출. 기존 AST 구조 변경 없음, 관찰 인터페이스만 추가.
+    // map-entries m -> [[k,v],...] (introspection primitive — JS Map/plain object 모두 열거)
+    "map-entries": (m) => {
+      if (m instanceof Map) return [...m.entries()].map(([k, v]) => [k, v]);
+      if (m && typeof m === "object" && !Array.isArray(m)) return Object.entries(m).map(([k, v]) => [k, v]);
+      return [];
+    },
+    // map_entries m -> [[k,v],...] (alias for map-entries)
+    "map_entries": (m) => {
+      if (m instanceof Map) return [...m.entries()].map(([k, v]) => [k, v]);
+      if (m && typeof m === "object" && !Array.isArray(m)) return Object.entries(m).map(([k, v]) => [k, v]);
+      return [];
+    },
+    // json_parse str -> object (parse JSON string to object)
+    "json_parse": (str) => {
+      try {
+        return JSON.parse(str);
+      } catch (e) {
+        throw new Error(`json_parse: invalid JSON: ${e.message}`);
+      }
+    },
+    // Helper: Convert Maps and other types to JSON-serializable form
+    _toSerializable: (obj) => {
+      if (obj instanceof Map) return Object.fromEntries(obj);
+      if (Array.isArray(obj)) return obj.map((x) => obj._toSerializable?.(x) ?? (x instanceof Map ? Object.fromEntries(x) : x));
+      if (typeof obj === "object" && obj !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(obj)) {
+          result[k] = v instanceof Map ? Object.fromEntries(v) : typeof v === "object" && v !== null ? obj._toSerializable?.(v) : v;
+        }
+        return result;
+      }
+      return obj;
+    },
+    // json_str obj -> string (serialize to JSON string, handles Maps)
+    "json_str": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
+    },
+    // json_stringify obj -> string (alias for json_str)
+    "json_stringify": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
+    },
+    // json_pretty obj -> string (pretty-print JSON, handles Maps)
+    "json_pretty": function(obj) {
+      const toSerializable2 = (o2) => {
+        if (o2 instanceof Map) return Object.fromEntries(o2);
+        if (Array.isArray(o2)) return o2.map(toSerializable2);
+        if (typeof o2 === "object" && o2 !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o2)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o2;
+      };
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable2(obj);
+      return JSON.stringify(o, null, 2);
+    },
+    // ── Hyphen alias (Phase 후속 — Claude 평가에서 발견된 자주 틀리는 함수명) ──
+    // AI가 Lisp 관례 따라 hyphen으로 작성하는 경우 호환
+    "json-parse": (str) => {
+      try {
+        return JSON.parse(str);
+      } catch (e) {
+        throw new Error(`json-parse: invalid JSON: ${e.message}`);
+      }
+    },
+    "json-stringify": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
+    },
+    "json-str": function(obj) {
+      const toSerializable2 = (o) => {
+        if (o instanceof Map) return Object.fromEntries(o);
+        if (Array.isArray(o)) return o.map(toSerializable2);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      return JSON.stringify(toSerializable2(obj));
+    },
+    "json-pretty": function(obj) {
+      const toSerializable2 = (o2) => {
+        if (o2 instanceof Map) return Object.fromEntries(o2);
+        if (Array.isArray(o2)) return o2.map(toSerializable2);
+        if (typeof o2 === "object" && o2 !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o2)) {
+            result[k] = toSerializable2(v);
+          }
+          return result;
+        }
+        return o2;
+      };
+      const o = typeof obj === "string" ? JSON.parse(obj) : toSerializable2(obj);
+      return JSON.stringify(o, null, 2);
+    },
+    "json-merge": (a, b) => {
+      const x = typeof a === "string" ? JSON.parse(a) : a;
+      const y = typeof b === "string" ? JSON.parse(b) : b;
+      return { ...x, ...y };
+    },
+    "json-get": (obj, path19) => {
+      const parts = String(path19).split(".");
+      let cur = typeof obj === "string" ? JSON.parse(obj) : obj;
+      for (const p of parts) {
+        if (cur === null || cur === void 0) return null;
+        cur = Array.isArray(cur) ? cur[parseInt(p, 10)] : cur[p];
+      }
+      return cur ?? null;
+    },
+    "json-set": (obj, path19, value) => {
+      const parsed = typeof obj === "string" ? JSON.parse(obj) : obj;
+      const deepClone = (o) => {
+        if (o instanceof Map) return new Map(o);
+        if (Array.isArray(o)) return o.map(deepClone);
+        if (typeof o === "object" && o !== null) {
+          const result = {};
+          for (const [k, v] of Object.entries(o)) {
+            result[k] = deepClone(v);
+          }
+          return result;
+        }
+        return o;
+      };
+      const clone = deepClone(parsed);
+      const parts = String(path19).split(".");
+      let cur = clone;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const p = parts[i];
+        if (cur[p] === void 0 || cur[p] === null) cur[p] = {};
+        cur = cur[p];
+      }
+      cur[parts[parts.length - 1]] = value;
+      return clone;
+    },
+    "json-keys": (obj) => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.keys(obj) : [],
+    "json-vals": (obj) => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.values(obj) : [],
+    "json-values": (obj) => obj && typeof obj === "object" && !Array.isArray(obj) ? Object.values(obj) : [],
+    // json_has obj key -> boolean (check if key exists)
+    "json_has": (obj, key) => {
+      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+      return key in o;
+    },
+    // json_del obj key -> object (delete key, returns new obj)
+    "json_del": (obj, key) => {
+      const o = typeof obj === "string" ? JSON.parse(obj) : obj;
+      const clone = { ...o };
+      delete clone[key];
+      return clone;
+    },
+    // ── CSV ───────────────────────────────────────────────────
+    // csv_parse str -> [[string]] (parse CSV string to rows)
+    "csv_parse": (str) => {
+      const lines = str.trim().split("\n");
+      return lines.map((line) => {
+        const result = [];
+        let cur = "";
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuote && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else inQuote = !inQuote;
+          } else if (ch === "," && !inQuote) {
+            result.push(cur);
+            cur = "";
+          } else {
+            cur += ch;
+          }
+        }
+        result.push(cur);
+        return result;
+      });
+    },
+    // csv_write rows -> string (serialize rows to CSV string)
+    "csv_write": (rows) => {
+      return rows.map(
+        (row) => row.map((cell) => {
+          const s = String(cell);
+          return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+        }).join(",")
+      ).join("\n");
+    },
+    // csv_header rows -> [string] (get first row as header)
+    "csv_header": (rows) => {
+      return rows[0] ?? [];
+    },
+    // csv_to_objects rows -> [{header: value}] (rows to named objects)
+    "csv_to_objects": (rows) => {
+      if (rows.length < 2) return [];
+      const headers = rows[0];
+      return rows.slice(1).map((row) => {
+        const obj = {};
+        headers.forEach((h, i) => {
+          obj[h] = row[i] ?? "";
+        });
+        return obj;
+      });
+    },
+    // ── CSV kebab-case aliases (Phase B) ─────────────────────
+    // csv-parse text [delimiter] -> [[string]] (quoted fields 완전 지원)
+    "csv-parse": (str, delimiter) => {
+      const delim = delimiter ?? ",";
+      const lines = str.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
+      return lines.filter((l) => l.trim() !== "").map((line) => {
+        const result = [];
+        let cur = "";
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuote && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else inQuote = !inQuote;
+          } else if (line.startsWith(delim, i) && !inQuote) {
+            result.push(cur);
+            cur = "";
+            i += delim.length - 1;
+          } else {
+            cur += ch;
+          }
+        }
+        result.push(cur);
+        return result;
+      });
+    },
+    // csv-parse-map text [delimiter] -> [{header: val}] (헤더 포함 파싱)
+    "csv-parse-map": (str, delimiter) => {
+      const delim = delimiter ?? ",";
+      const lines = str.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n").filter((l) => l.trim() !== "");
+      if (lines.length < 2) return [];
+      const parseLine = (line) => {
+        const result = [];
+        let cur = "";
+        let inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuote && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else inQuote = !inQuote;
+          } else if (line.startsWith(delim, i) && !inQuote) {
+            result.push(cur);
+            cur = "";
+            i += delim.length - 1;
+          } else {
+            cur += ch;
+          }
+        }
+        result.push(cur);
+        return result;
+      };
+      const headers = parseLine(lines[0]);
+      return lines.slice(1).map((line) => {
+        const vals = parseLine(line);
+        const obj = {};
+        headers.forEach((h, i) => {
+          obj[h] = vals[i] ?? "";
+        });
+        return obj;
+      });
+    },
+    // csv-stringify rows [delimiter] -> string
+    "csv-stringify": (rows, delimiter) => {
+      const delim = delimiter ?? ",";
+      return rows.map(
+        (row) => row.map((cell) => {
+          const s = String(cell ?? "");
+          return s.includes(delim) || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+        }).join(delim)
+      ).join("\n");
+    },
+    // ── String Template ───────────────────────────────────────
+    // str_template template vars -> string  ({key} → value substitution)
+    "str_template": (template, vars) => {
+      return template.replace(
+        /\{(\w+)\}/g,
+        (_, key) => vars[key] !== void 0 ? String(vars[key]) : `{${key}}`
+      );
+    },
+    // str_lines str -> [string] (split into lines)
+    "str_lines": (str) => {
+      return str.split("\n");
+    },
+    // str_join_lines lines -> string
+    "str_join_lines": (lines) => {
+      return lines.join("\n");
+    },
+    // str_trim str -> string
+    "str_trim": (str) => {
+      return str.trim();
+    },
+    // str_words str -> [string] (split by whitespace)
+    "str_words": (str) => {
+      return str.trim().split(/\s+/);
+    },
+    // str_count str sub -> number (count occurrences of sub in str)
+    "str_count": (str, sub) => {
+      let count = 0, pos = 0;
+      while ((pos = str.indexOf(sub, pos)) !== -1) {
+        count++;
+        pos += sub.length;
+      }
+      return count;
+    },
+    // ── Number formatting (accounting) ────────────────────────
+    // number_format num decimals -> string  (1234567 0 -> "1,234,567")
+    "number_format": (num, decimals = 0) => {
+      const n = Number(num);
+      if (isNaN(n)) return "0";
+      const fixed = n.toFixed(decimals);
+      const [intPart, decPart] = fixed.split(".");
+      const withComma = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return decPart ? `${withComma}.${decPart}` : withComma;
+    },
+    // to_fixed num decimals -> string  (3.14159 2 -> "3.14")
+    "to_fixed": (num, decimals = 2) => {
+      const n = Number(num);
+      if (isNaN(n)) return "0";
+      return n.toFixed(decimals);
+    },
+    // format_currency num code -> string  (1234567 "KRW" -> "₩1,234,567")
+    "format_currency": (num, code = "KRW") => {
+      const n = Number(num);
+      if (isNaN(n)) return "0";
+      const symbol = { KRW: "\u20A9", USD: "$", EUR: "\u20AC", JPY: "\xA5", CNY: "\xA5", GBP: "\xA3" };
+      const decimals = code === "KRW" || code === "JPY" ? 0 : 2;
+      const fixed = n.toFixed(decimals);
+      const [intPart, decPart] = fixed.split(".");
+      const withComma = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      const sign = symbol[code] ?? code + " ";
+      return decPart ? `${sign}${withComma}.${decPart}` : `${sign}${withComma}`;
+    },
+    // ── str_ 확장 (Python str 47개 수준) ──────────────────────
+    "str_upper": (s) => String(s).toUpperCase(),
+    "str_lower": (s) => String(s).toLowerCase(),
+    "str_capitalize": (s) => {
+      const t = String(s);
+      return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+    },
+    "str_title": (s) => String(s).replace(/\b\w/g, (c) => c.toUpperCase()),
+    "str_swapcase": (s) => String(s).split("").map((c) => c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase()).join(""),
+    "str_reverse": (s) => String(s).split("").reverse().join(""),
+    "str_repeat": (s, n) => String(s).repeat(Number(n)),
+    "str_pad_left": (s, width, ch = " ") => String(s).padStart(Number(width), ch || " "),
+    "str_pad_right": (s, width, ch = " ") => String(s).padEnd(Number(width), ch || " "),
+    "str_center": (s, width, ch = " ") => {
+      const t = String(s);
+      const w = Number(width);
+      if (t.length >= w) return t;
+      const pad = w - t.length;
+      const left = Math.floor(pad / 2);
+      const right = pad - left;
+      return (ch || " ").repeat(left) + t + (ch || " ").repeat(right);
+    },
+    "str_zfill": (s, width) => String(s).padStart(Number(width), "0"),
+    "str_lstrip": (s, ch) => ch ? String(s).replace(new RegExp(`^[${ch.replace(/[-\\]]/g, "\\$&")}]+`), "") : String(s).trimStart(),
+    "str_rstrip": (s, ch) => ch ? String(s).replace(new RegExp(`[${ch.replace(/[-\\]]/g, "\\$&")}]+$`), "") : String(s).trimEnd(),
+    "str_replace": (s, old, rep, count) => {
+      let t = String(s);
+      const n = count !== void 0 ? Number(count) : Infinity;
+      let i = 0;
+      return t.replace(new RegExp(old.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), (m) => i++ < n ? rep : m);
+    },
+    "str_starts": (s, prefix) => String(s).startsWith(prefix),
+    "str_ends": (s, suffix) => String(s).endsWith(suffix),
+    "str_includes": (s, sub) => String(s).includes(sub),
+    "str_find": (s, sub, start = 0) => String(s).indexOf(sub, Number(start)),
+    "str_rfind": (s, sub) => String(s).lastIndexOf(sub),
+    "str_index": (s, sub, start = 0) => {
+      const i = String(s).indexOf(sub, Number(start));
+      if (i === -1) throw new Error(`str_index: substring "${sub}" not found`);
+      return i;
+    },
+    "str_split": (s, sep2, maxsplit) => {
+      const t = String(s);
+      if (maxsplit !== void 0) {
+        const parts = [];
+        let i = 0, n = Number(maxsplit);
+        while (n-- > 0) {
+          const j = sep2 ? t.indexOf(sep2, i) : i + 1;
+          if (j === -1) break;
+          parts.push(t.slice(i, j));
+          i = j + (sep2?.length || 1);
+        }
+        parts.push(t.slice(i));
+        return parts;
+      }
+      return sep2 ? t.split(sep2) : t.split("");
+    },
+    "str_rsplit": (s, sep2, maxsplit) => {
+      const t = String(s);
+      if (maxsplit === void 0) return sep2 ? t.split(sep2) : t.split("");
+      const parts = [];
+      let i = t.length;
+      let n = Number(maxsplit);
+      while (n-- > 0) {
+        const j = t.lastIndexOf(sep2, i - 1);
+        if (j === -1) break;
+        parts.unshift(t.slice(j + sep2.length, i));
+        i = j;
+      }
+      parts.unshift(t.slice(0, i));
+      return parts;
+    },
+    "str_join": (a, b) => {
+      if (Array.isArray(a)) return a.join(String(b ?? ""));
+      if (Array.isArray(b)) return b.join(String(a ?? ""));
+      return "";
+    },
+    "str-join": (a, b) => {
+      if (Array.isArray(a)) return a.join(String(b ?? ""));
+      if (Array.isArray(b)) return b.join(String(a ?? ""));
+      return "";
+    },
+    "str_partition": (s, sep2) => {
+      const i = String(s).indexOf(sep2);
+      if (i === -1) return [s, "", ""];
+      return [s.slice(0, i), sep2, s.slice(i + sep2.length)];
+    },
+    "str_rpartition": (s, sep2) => {
+      const i = String(s).lastIndexOf(sep2);
+      if (i === -1) return ["", "", s];
+      return [s.slice(0, i), sep2, s.slice(i + sep2.length)];
+    },
+    // math-round-dec: 소수점 N자리 반올림 (금융 정밀도 — L-03)
+    // (math-round-dec (+ 0.1 0.2) 10) → 0.3
+    "math_round_dec": (n, places) => {
+      const f = Math.pow(10, Number(places));
+      return Math.round(Number(n) * f) / f;
+    },
+    "str_slice": (s, start, end) => String(s).slice(Number(start), end !== void 0 ? Number(end) : void 0),
+    "str_substr": (s, start, len) => {
+      const st = Number(start);
+      return String(s).slice(st, st + Number(len));
+    },
+    "str_removeprefix": (s, prefix) => {
+      const t = String(s);
+      return t.startsWith(prefix) ? t.slice(prefix.length) : t;
+    },
+    "str_removesuffix": (s, suffix) => {
+      const t = String(s);
+      return t.endsWith(suffix) ? t.slice(0, -suffix.length) : t;
+    },
+    "str_expandtabs": (s, tabsize = 8) => String(s).replace(/\t/g, " ".repeat(Number(tabsize))),
+    "str_isalpha": (s) => /^[a-zA-Z가-힣ㄱ-ㅎㅏ-ㅣ]+$/.test(String(s)),
+    "str_isdigit": (s) => /^\d+$/.test(String(s)),
+    "str_isalnum": (s) => /^[a-zA-Z0-9가-힣]+$/.test(String(s)),
+    "str_islower": (s) => {
+      const t = String(s);
+      return t === t.toLowerCase() && t !== t.toUpperCase();
+    },
+    "str_isupper": (s) => {
+      const t = String(s);
+      return t === t.toUpperCase() && t !== t.toLowerCase();
+    },
+    "str_isspace": (s) => /^\s+$/.test(String(s)),
+    "str_istitle": (s) => String(s) === String(s).replace(/\b\w/g, (c) => c.toUpperCase()),
+    "str_encode_base64": (s) => btoa(unescape(encodeURIComponent(s))),
+    "str_decode_base64": (s) => decodeURIComponent(escape(atob(s))),
+    "str_encode_uri": (s) => encodeURIComponent(String(s)),
+    "str_decode_uri": (s) => decodeURIComponent(String(s)),
+    // str_fmt template map → 문자열 보간
+    // (str_fmt "안녕 {name}, {age}살" {:name "김진돌" :age 30})
+    // → "안녕 김진돌, 30살"
+    "str_fmt": (template, vars) => {
+      if (typeof template !== "string") return String(template);
+      const get = (obj, key) => obj instanceof Map ? obj.get(key) ?? obj.get(":" + key) : obj?.[key];
+      return template.replace(/\{(\w+)\}/g, (_, key) => {
+        const v = get(vars, key);
+        return v !== void 0 && v !== null ? String(v) : `{${key}}`;
+      });
+    },
+    // empty? x -> boolean (배열/문자열/객체/nil 모두 지원)
+    "empty?": (x) => {
+      if (x === null || x === void 0) return true;
+      if (Array.isArray(x)) return x.length === 0;
+      if (typeof x === "string") return x.length === 0;
+      if (typeof x === "object") return Object.keys(x).length === 0;
+      return false;
+    },
+    // array-empty? x -> boolean (배열만 확인)
+    "array-empty?": (x) => Array.isArray(x) && x.length === 0,
+    "array_empty_q": (x) => Array.isArray(x) && x.length === 0,
+    // str_contains_in s pattern -> boolean (인자 순서: s 먼저, pattern 나중)
+    // 기존 str_includes(s, sub)와 동일 순서지만 명시적 별칭
+    "str_contains_in": (s, pattern) => String(s).includes(String(pattern)),
+    "str-contains-in": (s, pattern) => String(s).includes(String(pattern)),
+    // str_replace_in s old new -> string (replaceAll, 인자 순서: s 먼저)
+    "str_replace_in": (s, oldStr, newStr) => String(s).replaceAll(String(oldStr), String(newStr)),
+    "str-replace-in": (s, oldStr, newStr) => String(s).replaceAll(String(oldStr), String(newStr)),
+    // CLAUDE.md 문서화 별칭
+    "is-nil": (v) => v === null || v === void 0,
+    "is-empty": (v) => v === null || v === void 0 || Array.isArray(v) && v.length === 0 || typeof v === "string" && v.length === 0,
+    "str-to-upper": (s) => String(s || "").toUpperCase(),
+    "str-to-lower": (s) => String(s || "").toLowerCase(),
+    "str-starts-with": (s, p) => String(s || "").startsWith(String(p || "")),
+    "str-ends-with": (s, p) => String(s || "").endsWith(String(p || "")),
+    "str-to-num": (s) => {
+      const n = Number(String(s || "").trim());
+      return isNaN(n) ? null : n;
+    },
+    "html-escape": (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"),
+    // str/fmt alias
+    "str/fmt": (template, vars) => {
+      if (typeof template !== "string") return String(template);
+      const get = (obj, key) => obj instanceof Map ? obj.get(key) ?? obj.get(":" + key) : obj?.[key];
+      return template.replace(/\{(\w+)\}/g, (_, key) => {
+        const v = get(vars, key);
+        return v !== void 0 && v !== null ? String(v) : `{${key}}`;
+      });
+    }
+  };
+}
+
+// src/stdlib-collection.ts
+function createCollectionModule() {
+  return {
+    // ── Array Transformation ──────────────────────────────────
+    // arr_flatten arr -> [any]  (flatten one level deep)
+    "arr_flatten": (arr) => {
+      return arr.flat();
+    },
+    // arr_flatten_deep arr -> [any]  (flatten all levels)
+    "arr_flatten_deep": (arr) => {
+      return arr.flat(Infinity);
+    },
+    // arr_zip arr1 arr2 -> [[a,b]]  (zip two arrays into pairs)
+    "arr_zip": (arr1, arr2) => {
+      const len = Math.min(arr1.length, arr2.length);
+      return Array.from({ length: len }, (_, i) => [arr1[i], arr2[i]]);
+    },
+    // arr_unique arr -> [any]  (deduplicate, preserves order)
+    "arr_unique": (arr) => {
+      return [...new Set(arr.map((x) => JSON.stringify(x)))].map((x) => JSON.parse(x));
+    },
+    // arr_chunk arr size -> [[any]]  (split into chunks of size)
+    "arr_chunk": (arr, size) => {
+      const result = [];
+      for (let i = 0; i < arr.length; i += size) result.push(arr.slice(i, i + size));
+      return result;
+    },
+    // arr_take arr n -> [any]  (first n elements)
+    "arr_take": (arr, n) => arr.slice(0, n),
+    // arr_drop arr n -> [any]  (all but first n elements)
+    "arr_drop": (arr, n) => arr.slice(n),
+    // arr_sum arr -> number
+    "arr_sum": (arr) => arr.reduce((a, b) => a + b, 0),
+    // arr_avg arr -> number
+    "arr_avg": (arr) => {
+      if (arr.length === 0) throw new Error("arr_avg: empty array");
+      return arr.reduce((a, b) => a + b, 0) / arr.length;
+    },
+    // arr_min arr -> number
+    "arr_min": (arr) => Math.min(...arr),
+    // arr_max arr -> number
+    "arr_max": (arr) => Math.max(...arr),
+    // arr_group_by arr key -> {key: [items]}  (group objects by a key)
+    "arr_group_by": (arr, key) => {
+      const result = {};
+      for (const item of arr) {
+        const k = String(item[key] ?? "__undefined__");
+        if (!result[k]) result[k] = [];
+        result[k].push(item);
+      }
+      return result;
+    },
+    // arr_sort_by arr key -> [any]  (sort objects by a key, ascending)
+    "arr_sort_by": (arr, key) => {
+      return [...arr].sort((a, b) => {
+        const av = a[key], bv = b[key];
+        if (av < bv) return -1;
+        if (av > bv) return 1;
+        return 0;
+      });
+    },
+    // arr_sort_by_desc arr key -> [any]  (descending)
+    "arr_sort_by_desc": (arr, key) => {
+      return [...arr].sort((a, b) => {
+        const av = a[key], bv = b[key];
+        if (av > bv) return -1;
+        if (av < bv) return 1;
+        return 0;
+      });
+    },
+    // frequencies arr -> {value: count}  (count occurrences of each value)
+    "frequencies": (arr) => {
+      if (arr === null || arr === void 0) return {};
+      const result = {};
+      for (const item of arr) {
+        const k = String(item ?? "__nil__");
+        result[k] = (result[k] ?? 0) + 1;
+      }
+      return result;
+    },
+    // arr_count_by arr key -> {key: count}  (count by key value)
+    "arr_count_by": (arr, key) => {
+      const result = {};
+      for (const item of arr) {
+        const k = String(item[key] ?? "__undefined__");
+        result[k] = (result[k] ?? 0) + 1;
+      }
+      return result;
+    },
+    // arr_pluck arr key -> [any]  (extract field from each object)
+    "arr_pluck": (arr, key) => {
+      return arr.map((item) => item[key]);
+    },
+    // arr_index_by arr key -> {key: item}  (index objects by unique key)
+    "arr_index_by": (arr, key) => {
+      const result = {};
+      for (const item of arr) result[String(item[key])] = item;
+      return result;
+    },
+    // ── Execution Control ────────────────────────────────────
+    // retry n fn -> any  (call fn(), retry up to n times on error)
+    "retry": (n, fn) => {
+      let lastErr;
+      for (let i = 0; i <= n; i++) {
+        try {
+          return fn();
+        } catch (err4) {
+          lastErr = err4;
+          if (i < n) {
+            const start = Date.now();
+            while (Date.now() - start < 100 * i) {
+            }
+          }
+        }
+      }
+      throw lastErr;
+    },
+    // retry_silent n fn -> any|null  (retry n times, return null on final failure)
+    "retry_silent": (n, fn) => {
+      for (let i = 0; i <= n; i++) {
+        try {
+          return fn();
+        } catch {
+        }
+      }
+      return null;
+    },
+    // pipeline_run initial steps -> any  (chain: output of each step → input of next)
+    // steps: array of functions
+    "pipeline_run": (initial, steps) => {
+      return steps.reduce((acc, fn) => fn(acc), initial);
+    },
+    // memoize fn -> fn  (return memoized version of fn, keyed by JSON args)
+    "memoize": (fn) => {
+      const cache = /* @__PURE__ */ new Map();
+      return (...args3) => {
+        const key = JSON.stringify(args3);
+        if (cache.has(key)) return cache.get(key);
+        const result = fn(...args3);
+        cache.set(key, result);
+        return result;
+      };
+    },
+    // once fn -> fn  (return version of fn that only executes once)
+    "once": (fn) => {
+      let called = false, result;
+      return (...args3) => {
+        if (!called) {
+          called = true;
+          result = fn(...args3);
+        }
+        return result;
+      };
+    },
+    // tap value fn -> value  (call fn(value) for side effects, return value unchanged)
+    "tap": (value, fn) => {
+      fn(value);
+      return value;
+    },
+    // ── Range / Sequence ─────────────────────────────────────
+    // range end -> [number]  (0..end-1)
+    // range start end -> [number]  (start..end-1)
+    // range start end step -> [number]  (stepped)
+    "range": (startOrEnd, end, step) => {
+      const start = end === void 0 ? 0 : startOrEnd;
+      const realEnd = end === void 0 ? startOrEnd : end;
+      const realStep = step ?? 1;
+      const result = [];
+      if (realStep > 0) for (let i = start; i < realEnd; i += realStep) result.push(i);
+      else if (realStep < 0) for (let i = start; i > realEnd; i += realStep) result.push(i);
+      return result;
+    },
+    // range_step start end step -> [number]
+    "range_step": (start, end, step) => {
+      const result = [];
+      for (let i = start; i < end; i += step) result.push(i);
+      return result;
+    },
+    // repeat n value -> [value]  (array of n copies of value)
+    "repeat": (n, value) => Array(n).fill(value),
+    // arr_includes arr item -> boolean  (deep equality check)
+    "arr_includes": (arr, item) => {
+      if (!Array.isArray(arr)) return false;
+      return arr.some((x) => JSON.stringify(x) === JSON.stringify(item));
+    },
+    // arr_index_of arr item -> number  (-1 if not found)
+    "arr_index_of": (arr, item) => {
+      if (!Array.isArray(arr)) return -1;
+      return arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(item));
+    },
+    // arr_remove arr item -> [any]  (remove first occurrence)
+    "arr_remove": (arr, item) => {
+      if (!Array.isArray(arr)) return [];
+      const idx = arr.findIndex((x) => JSON.stringify(x) === JSON.stringify(item));
+      if (idx === -1) return arr;
+      return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
+    },
+    "str-repeat": (s, n) => n > 0 ? s.repeat(Math.floor(n)) : "",
+    "str-repeat": (s, n) => s.repeat(Math.max(0, Math.floor(n)))
+  };
+}
+
+// src/stdlib-agent.ts
+function createAgentModule() {
+  return {
+    // ── Agent Lifecycle ──────────────────────────────────────
+    // agent_create name -> AgentState
+    "agent_create": (name) => ({
+      name,
+      state: {},
+      history: [],
+      tools: {},
+      steps: 0,
+      status: "running"
+    }),
+    // agent_set agent key value -> AgentState (immutable update)
+    "agent_set": (agent, key, value) => ({
+      ...agent,
+      state: { ...agent.state, [key]: value }
+    }),
+    // agent_get agent key -> any
+    "agent_get": (agent, key) => {
+      return agent.state[key] ?? null;
+    },
+    // agent_update agent updates -> AgentState (merge multiple keys)
+    "agent_update": (agent, updates) => ({
+      ...agent,
+      state: { ...agent.state, ...updates }
+    }),
+    // agent_steps agent -> number
+    "agent_steps": (agent) => agent.steps,
+    // agent_status agent -> string
+    "agent_status": (agent) => agent.status,
+    // agent_done agent -> boolean
+    "agent_done": (agent) => agent.status === "done" || agent.status === "error" || agent.status === "max_steps",
+    // ── Tool Registry ────────────────────────────────────────
+    // agent_add_tool agent toolName fn -> AgentState
+    "agent_add_tool": (agent, toolName, fn) => ({
+      ...agent,
+      tools: { ...agent.tools, [toolName]: fn }
+    }),
+    // agent_call_tool agent toolName ...args -> any
+    "agent_call_tool": (agent, toolName, ...args3) => {
+      const tool = agent.tools[toolName];
+      if (!tool) throw new Error(`Tool not found: "${toolName}". Available: ${Object.keys(agent.tools).join(", ")}`);
+      return tool(...args3);
+    },
+    // agent_tools agent -> [string] (list registered tool names)
+    "agent_tools": (agent) => Object.keys(agent.tools),
+    // ── History ──────────────────────────────────────────────
+    // agent_push_history agent entry -> AgentState
+    "agent_push_history": (agent, entry) => ({
+      ...agent,
+      history: [...agent.history, { ...entry, step: agent.steps, timestamp: Date.now() }]
+    }),
+    // agent_history agent -> [AgentHistoryEntry]
+    "agent_history": (agent) => agent.history,
+    // agent_history_last agent n -> [AgentHistoryEntry] (last n entries)
+    "agent_history_last": (agent, n) => agent.history.slice(-n),
+    // agent_history_type agent type -> [AgentHistoryEntry] (filter by type)
+    "agent_history_type": (agent, type) => agent.history.filter((e) => e.type === type),
+    // ── Loop Execution ───────────────────────────────────────
+    // agent_loop agent goalFn stepFn maxSteps -> AgentState
+    // goalFn(state) -> boolean: return true to stop
+    // stepFn(agent) -> AgentState: perform one step, return updated agent
+    "agent_loop": (agent, goalFn, stepFn, maxSteps) => {
+      let cur = agent;
+      while (cur.steps < maxSteps) {
+        if (goalFn(cur.state)) {
+          return { ...cur, status: "done" };
+        }
+        try {
+          cur = stepFn({ ...cur, steps: cur.steps + 1 });
+        } catch (err4) {
+          return {
+            ...cur,
+            status: "error",
+            state: { ...cur.state, _error: err4.message }
+          };
+        }
+      }
+      return { ...cur, status: "max_steps" };
+    },
+    // agent_run_until state condition action maxSteps -> final_state
+    // Simpler version: just a value + condition + transform loop
+    "agent_run_until": (state, condition, action, maxSteps) => {
+      let cur = state;
+      let steps = 0;
+      while (!condition(cur) && steps < maxSteps) {
+        cur = action(cur);
+        steps++;
+      }
+      return cur;
+    },
+    // ── Plan Tracking ─────────────────────────────────────────
+    // plan_create steps -> Plan
+    "plan_create": (steps) => ({
+      steps,
+      current: 0,
+      done: false,
+      results: {}
+    }),
+    // plan_next plan -> string | null (current step or null if done)
+    "plan_next": (plan) => {
+      if (plan.done || plan.current >= plan.steps.length) return null;
+      return plan.steps[plan.current];
+    },
+    // plan_advance plan result -> Plan (mark current step done, move to next)
+    "plan_advance": (plan, result) => {
+      const step = plan.steps[plan.current];
+      const newCurrent = plan.current + 1;
+      return {
+        ...plan,
+        current: newCurrent,
+        done: newCurrent >= plan.steps.length,
+        results: { ...plan.results, [step]: result }
+      };
+    },
+    // plan_done plan -> boolean
+    "plan_done": (plan) => plan.done || plan.current >= plan.steps.length,
+    // plan_progress plan -> number (0.0 - 1.0)
+    "plan_progress": (plan) => {
+      if (plan.steps.length === 0) return 1;
+      return plan.current / plan.steps.length;
+    },
+    // plan_results plan -> {step: result}
+    "plan_results": (plan) => plan.results,
+    // ── Observation / Context ────────────────────────────────
+    // observe key value context -> context (accumulate observations)
+    "observe": (key, value, context) => ({
+      ...context,
+      [key]: value
+    }),
+    // summarize context -> string (human/AI readable summary of context)
+    "summarize": (context) => {
+      return Object.entries(context).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join("\n");
+    },
+    // context_create -> {} (empty context)
+    "context_create": () => ({}),
+    // context_merge ctx1 ctx2 -> context
+    "context_merge": (ctx1, ctx2) => ({
+      ...ctx1,
+      ...ctx2
+    })
+  };
+}
+
+// src/stdlib-time.ts
+var LEVEL_ORDER = { debug: 0, info: 1, warn: 2, error: 3 };
+function createTimeModule() {
+  return {
+    // ── Time ──────────────────────────────────────────────────
+    // now -> string (ISO 8601; use now_ms for numeric timestamps)
+    "now": () => (/* @__PURE__ */ new Date()).toISOString(),
+    // now_ms -> number (ms since epoch, always returns number)
+    "now_ms": () => Date.now(),
+    // now_iso -> string (ISO 8601)
+    "now_iso": () => (/* @__PURE__ */ new Date()).toISOString(),
+    // now_unix -> number (seconds since epoch)
+    "now_unix": () => Math.floor(Date.now() / 1e3),
+    // time_diff t1 t2 -> number (ms, positive if t2 > t1)
+    "time_diff": (t1, t2) => new Date(t2).getTime() - new Date(t1).getTime(),
+    // time_since ts -> number (ms elapsed since ts)
+    "time_since": (ts) => Date.now() - new Date(ts).getTime(),
+    // time_ago ts -> string (human-readable: "3s ago", "2m ago", "1h ago")
+    "time_ago": (ts) => {
+      const ms = Date.now() - new Date(ts).getTime();
+      if (ms < 1e3) return `${ms}ms ago`;
+      if (ms < 6e4) return `${Math.floor(ms / 1e3)}s ago`;
+      if (ms < 36e5) return `${Math.floor(ms / 6e4)}m ago`;
+      if (ms < 864e5) return `${Math.floor(ms / 36e5)}h ago`;
+      return `${Math.floor(ms / 864e5)}d ago`;
+    },
+    // format_date ts fmt -> string  (simple date formatting)
+    // fmt tokens: YYYY MM DD HH mm ss SSS
+    "format_date": (ts, fmt) => {
+      const d = new Date(ts);
+      return fmt.replace("YYYY", String(d.getFullYear())).replace("MM", String(d.getMonth() + 1).padStart(2, "0")).replace("DD", String(d.getDate()).padStart(2, "0")).replace("HH", String(d.getHours()).padStart(2, "0")).replace("mm", String(d.getMinutes()).padStart(2, "0")).replace("ss", String(d.getSeconds()).padStart(2, "0")).replace("SSS", String(d.getMilliseconds()).padStart(3, "0"));
+    },
+    // date_parts ts -> {year,month,day,hour,min,sec,ms,weekday}
+    "date_parts": (ts) => {
+      const d = new Date(ts);
+      return {
+        year: d.getFullYear(),
+        month: d.getMonth() + 1,
+        day: d.getDate(),
+        hour: d.getHours(),
+        min: d.getMinutes(),
+        sec: d.getSeconds(),
+        ms: d.getMilliseconds(),
+        weekday: d.getDay()
+      };
+    },
+    // date_add ts unit n -> number  (unit: "ms"|"s"|"m"|"h"|"d"|"days"|"hours"|"minutes"|"months"|"years"|"weeks"|"seconds")
+    "date_add": (ts, unit, n) => {
+      const u = String(unit).replace(/^:/, "");
+      const mul = { ms: 1, s: 1e3, m: 6e4, h: 36e5, d: 864e5 };
+      if (mul[u] !== void 0) return ts + n * mul[u];
+      const d = new Date(Number(ts));
+      if (u === "days" || u === "day") {
+        d.setDate(d.getDate() + Number(n));
+        return d.getTime();
+      }
+      if (u === "hours" || u === "hour") {
+        d.setHours(d.getHours() + Number(n));
+        return d.getTime();
+      }
+      if (u === "minutes" || u === "minute") {
+        d.setMinutes(d.getMinutes() + Number(n));
+        return d.getTime();
+      }
+      if (u === "months" || u === "month") {
+        d.setMonth(d.getMonth() + Number(n));
+        return d.getTime();
+      }
+      if (u === "years" || u === "year") {
+        d.setFullYear(d.getFullYear() + Number(n));
+        return d.getTime();
+      }
+      if (u === "seconds" || u === "second") {
+        d.setSeconds(d.getSeconds() + Number(n));
+        return d.getTime();
+      }
+      if (u === "weeks" || u === "week") {
+        d.setDate(d.getDate() + Number(n) * 7);
+        return d.getTime();
+      }
+      throw new Error(`date_add: unknown unit "${unit}". Use: ms/s/m/h/d/days/hours/minutes/months/years/weeks`);
+    },
+    // date_parse str -> number  ("2026-04-23" | "2026-04-23T12:00:00Z" -> timestamp ms)
+    "date_parse": (str) => {
+      const ts = Date.parse(str);
+      if (isNaN(ts)) throw new Error(`date_parse: invalid date string "${str}"`);
+      return ts;
+    },
+    // sleep_ms ms -> void  (synchronous spin-wait, short durations only)
+    "sleep_ms": (ms) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+      }
+    },
+    // ── Timer ─────────────────────────────────────────────────
+    // timer_start label -> Timer
+    "timer_start": (label) => ({
+      start: Date.now(),
+      label,
+      laps: []
+    }),
+    // timer_lap timer label -> Timer (record a lap time)
+    "timer_lap": (timer, label) => ({
+      ...timer,
+      laps: [...timer.laps, { label, elapsed: Date.now() - timer.start }]
+    }),
+    // timer_elapsed timer -> number (ms since start)
+    "timer_elapsed": (timer) => Date.now() - timer.start,
+    // timer_stop timer -> {label, total_ms, laps}
+    "timer_stop": (timer) => ({
+      label: timer.label,
+      total_ms: Date.now() - timer.start,
+      laps: timer.laps
+    }),
+    // ── Logger ────────────────────────────────────────────────
+    // log_create name level -> Logger  (level = minimum level to record)
+    "log_create": (name, level = "info") => ({
+      name,
+      entries: [],
+      level
+    }),
+    // log_entry logger level msg data? -> Logger
+    "log_entry": (logger, level, msg, data) => {
+      if (LEVEL_ORDER[level] < LEVEL_ORDER[logger.level]) return logger;
+      const entry = { ts: Date.now(), level, msg };
+      if (data !== void 0) entry.data = data;
+      return { ...logger, entries: [...logger.entries, entry] };
+    },
+    // log_info logger msg -> Logger
+    "log_info": (logger, msg) => {
+      if (LEVEL_ORDER["info"] < LEVEL_ORDER[logger.level]) return logger;
+      return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "info", msg }] };
+    },
+    // log_warn logger msg -> Logger
+    "log_warn": (logger, msg) => {
+      if (LEVEL_ORDER["warn"] < LEVEL_ORDER[logger.level]) return logger;
+      return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "warn", msg }] };
+    },
+    // log_error logger msg -> Logger
+    "log_error": (logger, msg) => ({
+      ...logger,
+      entries: [...logger.entries, { ts: Date.now(), level: "error", msg }]
+    }),
+    // log_debug logger msg -> Logger
+    "log_debug": (logger, msg) => {
+      if (LEVEL_ORDER["debug"] < LEVEL_ORDER[logger.level]) return logger;
+      return { ...logger, entries: [...logger.entries, { ts: Date.now(), level: "debug", msg }] };
+    },
+    // log_filter logger level -> [LogEntry]  (entries at or above level)
+    "log_filter": (logger, level) => logger.entries.filter((e) => LEVEL_ORDER[e.level] >= LEVEL_ORDER[level]),
+    // log_count logger level -> number
+    "log_count": (logger, level) => logger.entries.filter((e) => e.level === level).length,
+    // log_last logger n -> [LogEntry]
+    "log_last": (logger, n) => logger.entries.slice(-n),
+    // log_dump logger -> void  (print all entries to stdout)
+    "log_dump": (logger) => {
+      const pad = (s) => s.padEnd(5);
+      for (const e of logger.entries) {
+        const ts = new Date(e.ts).toISOString().slice(11, 23);
+        const lvl = `[${pad(e.level.toUpperCase())}]`;
+        const data = e.data !== void 0 ? ` | ${JSON.stringify(e.data)}` : "";
+        console.log(`${ts} ${lvl} [${logger.name}] ${e.msg}${data}`);
+      }
+    },
+    // ── Metrics ───────────────────────────────────────────────
+    // metrics_create name -> Metrics
+    "metrics_create": (name) => ({
+      name,
+      values: {},
+      counters: {},
+      timers: {}
+    }),
+    // metrics_record metrics key value -> Metrics
+    "metrics_record": (m, key, value) => ({
+      ...m,
+      values: { ...m.values, [key]: [...m.values[key] ?? [], value] }
+    }),
+    // metrics_inc metrics key -> Metrics  (increment counter by 1)
+    "metrics_inc": (m, key) => ({
+      ...m,
+      counters: { ...m.counters, [key]: (m.counters[key] ?? 0) + 1 }
+    }),
+    // metrics_inc_by metrics key n -> Metrics
+    "metrics_inc_by": (m, key, n) => ({
+      ...m,
+      counters: { ...m.counters, [key]: (m.counters[key] ?? 0) + n }
+    }),
+    // metrics_count metrics key -> number
+    "metrics_count": (m, key) => m.counters[key] ?? 0,
+    // metrics_avg metrics key -> number
+    "metrics_avg": (m, key) => {
+      const vals = m.values[key] ?? [];
+      if (vals.length === 0) return 0;
+      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    },
+    // metrics_min metrics key -> number
+    "metrics_min": (m, key) => {
+      const vals = m.values[key] ?? [];
+      return vals.length ? Math.min(...vals) : 0;
+    },
+    // metrics_max metrics key -> number
+    "metrics_max": (m, key) => {
+      const vals = m.values[key] ?? [];
+      return vals.length ? Math.max(...vals) : 0;
+    },
+    // metrics_p95 metrics key -> number  (95th percentile)
+    "metrics_p95": (m, key) => {
+      const vals = [...m.values[key] ?? []].sort((a, b) => a - b);
+      if (vals.length === 0) return 0;
+      return vals[Math.floor(vals.length * 0.95)];
+    },
+    // metrics_summary metrics -> {key: {count, avg, min, max}}
+    "metrics_summary": (m) => {
+      const result = {};
+      for (const [key, vals] of Object.entries(m.values)) {
+        const sorted = [...vals].sort((a, b) => a - b);
+        result[key] = {
+          count: vals.length,
+          avg: vals.reduce((a, b) => a + b, 0) / vals.length,
+          min: sorted[0],
+          max: sorted[sorted.length - 1],
+          p95: sorted[Math.floor(sorted.length * 0.95)]
+        };
+      }
+      for (const [key, count] of Object.entries(m.counters)) {
+        result[`counter.${key}`] = { count };
+      }
+      return result;
+    }
+  };
+}
+
+// src/stdlib-crypto.ts
+var nodeCrypto = __toESM(require("crypto"));
+function createCryptoModule() {
+  return {
+    // ── Hash ──────────────────────────────────────────────────
+    // sha256 str -> string (hex digest)
+    "sha256": (str) => nodeCrypto.createHash("sha256").update(str, "utf8").digest("hex"),
+    // sha256_short str -> string (first 8 chars, useful as short ID)
+    "sha256_short": (str) => nodeCrypto.createHash("sha256").update(str, "utf8").digest("hex").slice(0, 8),
+    // md5 str -> string (hex digest, for checksums only)
+    "md5": (str) => nodeCrypto.createHash("md5").update(str, "utf8").digest("hex"),
+    // sha1 str -> string
+    "sha1": (str) => nodeCrypto.createHash("sha1").update(str, "utf8").digest("hex"),
+    // hmac_sha256 key msg -> string (hex digest)
+    "hmac_sha256": (key, msg) => nodeCrypto.createHmac("sha256", key).update(msg, "utf8").digest("hex"),
+    // hash_eq hash1 hash2 -> boolean (timing-safe compare)
+    "hash_eq": (h1, h2) => {
+      if (h1.length !== h2.length) return false;
+      try {
+        return nodeCrypto.timingSafeEqual(Buffer.from(h1, "hex"), Buffer.from(h2, "hex"));
+      } catch {
+        return false;
+      }
+    },
+    // ── Encoding ──────────────────────────────────────────────
+    // base64_encode str -> string
+    "base64_encode": (str) => Buffer.from(str, "utf8").toString("base64"),
+    // base64_decode str -> string
+    "base64_decode": (str) => Buffer.from(str, "base64").toString("utf8"),
+    // base64url_encode str -> string (URL-safe, no padding)
+    "base64url_encode": (str) => Buffer.from(str, "utf8").toString("base64url"),
+    // base64url_decode str -> string (URL-safe Base64 → UTF-8)
+    "base64url_decode": (str) => Buffer.from(str, "base64url").toString("utf8"),
+    // hex_encode str -> string
+    "hex_encode": (str) => Buffer.from(str, "utf8").toString("hex"),
+    // hex_decode hex -> string
+    "hex_decode": (hex) => Buffer.from(hex, "hex").toString("utf8"),
+    // ── Random ────────────────────────────────────────────────
+    // random_bytes n -> string (hex, n bytes of randomness)
+    "random_bytes": (n) => nodeCrypto.randomBytes(n).toString("hex"),
+    // random_int min max -> number (inclusive)
+    "random_int": (min, max) => {
+      const range2 = max - min + 1;
+      return min + nodeCrypto.randomInt(range2);
+    },
+    // random_float -> number (0.0 - 1.0)
+    "random_float": () => {
+      const buf = nodeCrypto.randomBytes(4);
+      return buf.readUInt32BE(0) / 4294967295;
+    },
+    // ── UUID ──────────────────────────────────────────────────
+    // uuid_v4 -> string (random UUID)
+    "uuid_v4": () => nodeCrypto.randomUUID(),
+    // uuid_short -> string (8-char short ID from random bytes)
+    "uuid_short": () => nodeCrypto.randomBytes(4).toString("hex"),
+    // uuid_from_str str -> string (deterministic ID from string content)
+    "uuid_from_str": (str) => {
+      const hash = nodeCrypto.createHash("sha256").update(str).digest("hex");
+      return [hash.slice(0, 8), hash.slice(8, 12), "5" + hash.slice(13, 16), hash.slice(16, 20), hash.slice(20, 32)].join("-");
+    },
+    // is_uuid str -> boolean
+    "is_uuid": (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str),
+    // ── Regex ─────────────────────────────────────────────────
+    // regex_match str pattern -> boolean
+    "regex_match": (str, pattern) => {
+      try {
+        return new RegExp(pattern).test(str);
+      } catch (e) {
+        throw new Error(`regex_match: invalid pattern "${pattern}": ${e.message}`);
+      }
+    },
+    // regex_match_i str pattern -> boolean (case insensitive)
+    "regex_match_i": (str, pattern) => {
+      try {
+        return new RegExp(pattern, "i").test(str);
+      } catch (e) {
+        throw new Error(`regex_match_i: invalid pattern: ${e.message}`);
+      }
+    },
+    // regex_find str pattern -> string|null (first match)
+    "regex_find": (str, pattern) => {
+      const m = str.match(new RegExp(pattern));
+      return m ? m[0] : null;
+    },
+    // regex_find_all str pattern -> [string] (all non-overlapping matches)
+    "regex_find_all": (str, pattern) => {
+      const matches = str.match(new RegExp(pattern, "g"));
+      return matches ?? [];
+    },
+    // regex_replace str pattern replacement -> string
+    "regex_replace": (str, pattern, replacement) => str.replace(new RegExp(pattern, "g"), replacement),
+    // regex_replace_first str pattern replacement -> string (only first match)
+    "regex_replace_first": (str, pattern, replacement) => str.replace(new RegExp(pattern), replacement),
+    // regex_extract str pattern -> [string] (capture groups of first match)
+    "regex_extract": (str, pattern) => {
+      const m = str.match(new RegExp(pattern));
+      return m ? m.slice(1) : [];
+    },
+    // regex_extract_all str pattern -> [[string]] (all matches with groups)
+    "regex_extract_all": (str, pattern) => {
+      const results = [];
+      const re = new RegExp(pattern, "g");
+      let m;
+      while ((m = re.exec(str)) !== null) {
+        results.push(m.slice(1));
+      }
+      return results;
+    },
+    // regex_split str pattern -> [string]
+    "regex_split": (str, pattern) => str.split(new RegExp(pattern)),
+    // regex_count str pattern -> number (count of matches)
+    "regex_count": (str, pattern) => {
+      const m = str.match(new RegExp(pattern, "g"));
+      return m ? m.length : 0;
+    },
+    // ── AI Text Parsing Helpers ───────────────────────────────
+    // extract_json str -> any|null  (extract first JSON object/array from text)
+    "extract_json": (str) => {
+      const m = str.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      if (!m) return null;
+      try {
+        return JSON.parse(m[0]);
+      } catch {
+        return null;
+      }
+    },
+    // extract_code str lang -> string|null  (extract code block from markdown)
+    "extract_code": (str, lang) => {
+      const pattern = lang ? `\`\`\`${lang}\\n([\\s\\S]*?)\`\`\`` : `\`\`\`(?:\\w+)?\\n([\\s\\S]*?)\`\`\``;
+      const m = str.match(new RegExp(pattern));
+      return m ? m[1].trim() : null;
+    },
+    // extract_emails str -> [string]
+    "extract_emails": (str) => str.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) ?? [],
+    // extract_urls str -> [string]
+    "extract_urls": (str) => str.match(/https?:\/\/[^\s"'<>)]+/g) ?? [],
+    // extract_numbers str -> [number]
+    "extract_numbers": (str) => (str.match(/-?\d+\.?\d*/g) ?? []).map(Number),
+    // is_email str -> boolean
+    "is_email": (str) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(str),
+    // is_url str -> boolean
+    "is_url": (str) => {
+      try {
+        new URL(str);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+}
+
+// src/stdlib-crypto-utils.ts
+var import_crypto4 = require("crypto");
+function b64url(input) {
+  const buf = typeof input === "string" ? Buffer.from(input) : input;
+  return buf.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
+function b64urlDecode(s) {
+  const padded = s + "=".repeat((4 - s.length % 4) % 4);
+  return Buffer.from(padded, "base64url");
+}
+function calculatePasswordStrength(password) {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (password.length >= 12) score += 1;
+  if (/[A-Z]/.test(password)) score += 1;
+  if (/[0-9]/.test(password)) score += 1;
+  if (/[!@#$%^&*]/.test(password)) score += 1;
+  return Math.min(score, 5);
+}
+function createCryptoUtilsModule() {
+  const api = {
+    // AES-256-GCM encryption: plaintext key → base64 ciphertext (IV+tag embedded)
+    crypto_aes_encrypt: (plaintext, key) => {
+      try {
+        if (typeof plaintext !== "string" || typeof key !== "string") return null;
+        const iv = (0, import_crypto4.randomBytes)(16);
+        const derivedKey = (0, import_crypto4.scryptSync)(key, "salt", 32);
+        const cipher = (0, import_crypto4.createCipheriv)("aes-256-gcm", derivedKey, iv);
+        let encrypted = cipher.update(plaintext, "utf8", "hex");
+        encrypted += cipher.final("hex");
+        const tag = cipher.getAuthTag();
+        const combined = iv.toString("hex") + ":" + encrypted + ":" + tag.toString("hex");
+        return Buffer.from(combined, "utf8").toString("base64");
+      } catch {
+        return null;
+      }
+    },
+    // AES-256-GCM decryption: base64 ciphertext key → plaintext | null
+    crypto_aes_decrypt: (ciphertext, key) => {
+      try {
+        if (typeof ciphertext !== "string" || typeof key !== "string") return null;
+        const combined = Buffer.from(ciphertext, "base64").toString("utf8");
+        const parts = combined.split(":");
+        if (parts.length !== 3) return null;
+        const iv = Buffer.from(parts[0], "hex");
+        const encryptedHex = parts[1];
+        const tag = Buffer.from(parts[2], "hex");
+        const derivedKey = (0, import_crypto4.scryptSync)(key, "salt", 32);
+        const decipher = (0, import_crypto4.createDecipheriv)("aes-256-gcm", derivedKey, iv);
+        decipher.setAuthTag(tag);
+        let decrypted = decipher.update(encryptedHex, "hex", "utf8");
+        decrypted += decipher.final("utf8");
+        return decrypted;
+      } catch {
+        return null;
+      }
+    },
+    // SHA-512 hash: data → hex string
+    crypto_sha512: (data) => {
+      try {
+        if (typeof data !== "string") return null;
+        return (0, import_crypto4.createHash)("sha512").update(data).digest("hex");
+      } catch {
+        return null;
+      }
+    },
+    // MD5 hash (checksums only, not for security): data → hex string
+    crypto_md5: (data) => {
+      try {
+        if (typeof data !== "string") return null;
+        return (0, import_crypto4.createHash)("md5").update(data).digest("hex");
+      } catch {
+        return null;
+      }
+    },
+    // Base64URL encode (JWT-compatible): data → base64url string
+    crypto_b64url_encode: (data) => {
+      try {
+        if (typeof data !== "string") return null;
+        return b64url(data);
+      } catch {
+        return null;
+      }
+    },
+    // Base64URL decode: base64url → data string
+    crypto_b64url_decode: (b64url_str) => {
+      try {
+        if (typeof b64url_str !== "string") return null;
+        return b64urlDecode(b64url_str).toString("utf8");
+      } catch {
+        return null;
+      }
+    },
+    // PBKDF2 key derivation: password salt iterations → hex string
+    crypto_pbkdf2: (password, salt, iterations) => {
+      try {
+        if (typeof password !== "string" || typeof salt !== "string" || typeof iterations !== "number") {
+          return null;
+        }
+        if (iterations < 1) return null;
+        return (0, import_crypto4.pbkdf2Sync)(password, salt, iterations, 64, "sha512").toString("hex");
+      } catch {
+        return null;
+      }
+    },
+    // Password strength checker: password → {score, label, feedback}
+    crypto_password_strength: (password) => {
+      if (typeof password !== "string") {
+        return { score: 0, label: "invalid", feedback: ["\uC720\uD6A8\uD55C \uBB38\uC790\uC5F4\uC774 \uC544\uB2D9\uB2C8\uB2E4"] };
+      }
+      const score = calculatePasswordStrength(password);
+      const labelMap = {
+        0: "very-weak",
+        1: "weak",
+        2: "fair",
+        3: "good",
+        4: "strong",
+        5: "very-strong"
+      };
+      const label = labelMap[score] || "unknown";
+      const feedback = [];
+      if (password.length < 8) feedback.push("\uCD5C\uC18C 8\uC790 \uC774\uC0C1");
+      if (!/[A-Z]/.test(password)) feedback.push("\uB300\uBB38\uC790 \uD3EC\uD568");
+      if (!/[a-z]/.test(password)) feedback.push("\uC18C\uBB38\uC790 \uD3EC\uD568");
+      if (!/[0-9]/.test(password)) feedback.push("\uC22B\uC790 \uD3EC\uD568");
+      if (!/[!@#$%^&*]/.test(password)) feedback.push("\uD2B9\uC218\uBB38\uC790 \uD3EC\uD568");
+      return { score, label, feedback };
+    }
+  };
+  return {
+    ...api,
+    "crypto-aes-encrypt": api.crypto_aes_encrypt,
+    "crypto-aes-decrypt": api.crypto_aes_decrypt,
+    "crypto-sha512": api.crypto_sha512,
+    "crypto-md5": api.crypto_md5,
+    "crypto-b64url-encode": api.crypto_b64url_encode,
+    "crypto-b64url-decode": api.crypto_b64url_decode,
+    "crypto-pbkdf2": api.crypto_pbkdf2,
+    "crypto-password-strength": api.crypto_password_strength
+  };
+}
+
+// src/stdlib-crypto-rsa.ts
+var import_crypto5 = require("crypto");
+function createCryptoRsaModule() {
+  return {
+    // ── RSA 키 생성 ────────────────────────────────────────────
+    // crypto_rsa_generate bits -> map (publicKey/privateKey PEM)
+    "crypto_rsa_generate": (bits = 2048) => {
+      const size = bits >= 2048 ? bits : 2048;
+      const { publicKey, privateKey } = (0, import_crypto5.generateKeyPairSync)("rsa", {
+        modulusLength: size,
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" }
+      });
+      return { publicKey, privateKey };
+    },
+    // ── RS256 서명 / 검증 ─────────────────────────────────────
+    // crypto_rsa_sign private_pem data -> string (base64url 서명)
+    "crypto_rsa_sign": (privateKeyPem, data) => {
+      const signer = (0, import_crypto5.createSign)("RSA-SHA256");
+      signer.update(data);
+      signer.end();
+      return signer.sign(privateKeyPem).toString("base64url");
+    },
+    // crypto_rsa_verify public_pem data signature_b64url -> boolean
+    "crypto_rsa_verify": (publicKeyPem, data, sigB64Url) => {
+      try {
+        const verifier = (0, import_crypto5.createVerify)("RSA-SHA256");
+        verifier.update(data);
+        verifier.end();
+        const sigBuf = Buffer.from(sigB64Url, "base64url");
+        return verifier.verify(publicKeyPem, sigBuf);
+      } catch {
+        return false;
+      }
+    },
+    // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
+    // pkce_s256 verifier -> string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
+    "pkce_s256": (verifier) => {
+      return (0, import_crypto5.createHash)("sha256").update(verifier, "utf8").digest("base64url");
+    },
+    // crypto_rsa_public_to_jwk public_pem kid -> map (kty/n/e/kid/alg/use)
+    "crypto_rsa_public_to_jwk": (publicKeyPem, kid) => {
+      const key = (0, import_crypto5.createPublicKey)(publicKeyPem);
+      const jwk = key.export({ format: "jwk" });
+      return {
+        kty: jwk.kty,
+        n: jwk.n,
+        e: jwk.e,
+        kid,
+        alg: "RS256",
+        use: "sig"
+      };
+    }
+  };
+}
+
+// src/stdlib-totp.ts
+var import_crypto6 = require("crypto");
+var BASE32_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+function base32Encode(buf) {
+  let bits = 0, value = 0, output = "";
+  for (let i = 0; i < buf.length; i++) {
+    value = value << 8 | buf[i];
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_ALPHA[value >>> bits - 5 & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) output += BASE32_ALPHA[value << 5 - bits & 31];
+  return output;
+}
+function base32Decode(str) {
+  const clean = str.replace(/=+$/, "").toUpperCase();
+  let bits = 0, value = 0;
+  const out = [];
+  for (let i = 0; i < clean.length; i++) {
+    const idx = BASE32_ALPHA.indexOf(clean[i]);
+    if (idx === -1) throw new Error(`invalid base32 char: ${clean[i]}`);
+    value = value << 5 | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push(value >>> bits - 8 & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(out);
+}
+function hotp(secret, counter, digits = 6) {
+  const ctrBuf = Buffer.alloc(8);
+  const high = Math.floor(counter / 4294967296);
+  const low = counter >>> 0;
+  ctrBuf.writeUInt32BE(high, 0);
+  ctrBuf.writeUInt32BE(low, 4);
+  const hmac = (0, import_crypto6.createHmac)("sha1", secret).update(ctrBuf).digest();
+  const offset = hmac[hmac.length - 1] & 15;
+  const truncated = (hmac[offset] & 127) << 24 | (hmac[offset + 1] & 255) << 16 | (hmac[offset + 2] & 255) << 8 | hmac[offset + 3] & 255;
+  const code = truncated % Math.pow(10, digits);
+  return code.toString().padStart(digits, "0");
+}
+function totpCounter(unixSeconds, step = 30) {
+  return Math.floor(unixSeconds / step);
+}
+function createTotpModule() {
+  return {
+    // totp_secret_generate bytes -> string (base32, default 20 bytes = 160 bits = 32 chars)
+    "totp_secret_generate": (bytes = 20) => {
+      const buf = (0, import_crypto6.randomBytes)(bytes);
+      return base32Encode(buf);
+    },
+    // totp_now secret_b32 -> string (현재 시각의 6자리 코드, 디버그·등록용)
+    "totp_now": (secretB32) => {
+      const secret = base32Decode(secretB32);
+      const counter = totpCounter(Math.floor(Date.now() / 1e3));
+      return hotp(secret, counter, 6);
+    },
+    // totp_verify secret_b32 code window_steps -> boolean
+    // window=1 → 현재 ±1 step (총 90초 윈도우) 허용 (시계 오차 보정)
+    "totp_verify": (secretB32, code, window = 1) => {
+      try {
+        if (!/^\d+$/.test(code)) return false;
+        const secret = base32Decode(secretB32);
+        const now = totpCounter(Math.floor(Date.now() / 1e3));
+        const expected = Buffer.from(code);
+        for (let i = -window; i <= window; i++) {
+          const candidate = Buffer.from(hotp(secret, now + i, code.length));
+          if (candidate.length === expected.length && (0, import_crypto6.timingSafeEqual)(candidate, expected)) {
+            return true;
+          }
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    },
+    // totp_uri label issuer secret_b32 -> string (otpauth://totp/... QR 코드 표준)
+    "totp_uri": (label, issuer, secretB32) => {
+      const enc = (s) => encodeURIComponent(s);
+      return `otpauth://totp/${enc(issuer)}:${enc(label)}?secret=${secretB32}&issuer=${enc(issuer)}&algorithm=SHA1&digits=6&period=30`;
+    }
+  };
+}
+
+// src/stdlib-mail.ts
+var fs7 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
+var import_crypto7 = require("crypto");
+var tls = require("tls");
+function createMailModule() {
+  return {
+    // mail_outbox_write dir to subject body -> string (파일 경로)
+    "mail_outbox_write": (dir, to, subject, body) => {
+      try {
+        fs7.mkdirSync(dir, { recursive: true });
+      } catch {
+      }
+      const id = `${Date.now()}-${(0, import_crypto7.randomBytes)(6).toString("hex")}.json`;
+      const file = path7.join(dir, id);
+      const payload = {
+        id,
+        to,
+        subject,
+        body,
+        ts: (/* @__PURE__ */ new Date()).toISOString(),
+        status: "queued"
+      };
+      fs7.writeFileSync(file, JSON.stringify(payload, null, 2), "utf8");
+      return file;
+    },
+    // mail_outbox_list dir -> array (JSON 배열, 큐된 메시지)
+    "mail_outbox_list": (dir) => {
+      try {
+        const files = fs7.readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+        return files.map((f) => {
+          try {
+            return JSON.parse(fs7.readFileSync(path7.join(dir, f), "utf8"));
+          } catch {
+            return null;
+          }
+        }).filter((x) => x !== null);
+      } catch {
+        return [];
+      }
+    },
+    // mail_outbox_count dir -> number
+    "mail_outbox_count": (dir) => {
+      try {
+        return fs7.readdirSync(dir).filter((f) => f.endsWith(".json")).length;
+      } catch {
+        return 0;
+      }
+    },
+    // ── SMTP TLS (port 465, SMTPS) ─────────────────────────
+    // smtp_send_tls host port user pass from to subject body -> {ok, log}
+    //
+    // 동기적 비동기 — Node tls 콜백 기반이지만 Promise 인터페이스로 노출.
+    // 호출 측은 await 또는 then. FL의 async_call 헬퍼로 호출 가능.
+    "smtp_send_tls": (host, port, user, pass, from, to, subject, body) => {
+      return new Promise((resolve10) => {
+        const log = [];
+        const socket = tls.connect({ host, port, servername: host }, () => {
+        });
+        socket.setEncoding("utf8");
+        let buf = "";
+        let stage = 0;
+        const send = (line) => {
+          log.push(`> ${line.trim()}`);
+          socket.write(line);
+        };
+        const fail = (msg) => {
+          log.push(`! ${msg}`);
+          try {
+            socket.end();
+          } catch {
+          }
+          resolve10({ ok: false, log: log.join("\n"), error: msg });
+        };
+        socket.on("data", (chunk) => {
+          buf += chunk.toString();
+          const lines = buf.split(/\r?\n/);
+          buf = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line) continue;
+            log.push(`< ${line}`);
+            const code = parseInt(line.slice(0, 3), 10);
+            if (line[3] !== " " && line[3] !== void 0) continue;
+            try {
+              switch (stage) {
+                case 0:
+                  if (code !== 220) return fail(`banner: ${line}`);
+                  send(`EHLO ${host}\r
+`);
+                  stage = 1;
+                  break;
+                case 1:
+                  if (code !== 250) return fail(`ehlo: ${line}`);
+                  send("AUTH LOGIN\r\n");
+                  stage = 2;
+                  break;
+                case 2:
+                  if (code !== 334) return fail(`auth start: ${line}`);
+                  send(Buffer.from(user).toString("base64") + "\r\n");
+                  stage = 3;
+                  break;
+                case 3:
+                  if (code !== 334) return fail(`auth user: ${line}`);
+                  send(Buffer.from(pass).toString("base64") + "\r\n");
+                  stage = 4;
+                  break;
+                case 4:
+                  if (code !== 235) return fail(`auth pass: ${line}`);
+                  send(`MAIL FROM:<${from}>\r
+`);
+                  stage = 5;
+                  break;
+                case 5:
+                  if (code !== 250) return fail(`mail from: ${line}`);
+                  send(`RCPT TO:<${to}>\r
+`);
+                  stage = 6;
+                  break;
+                case 6:
+                  if (code !== 250) return fail(`rcpt to: ${line}`);
+                  send("DATA\r\n");
+                  stage = 7;
+                  break;
+                case 7:
+                  if (code !== 354) return fail(`data: ${line}`);
+                  const headers = [
+                    `From: ${from}`,
+                    `To: ${to}`,
+                    `Subject: ${subject}`,
+                    `MIME-Version: 1.0`,
+                    `Content-Type: text/plain; charset=utf-8`,
+                    ""
+                  ].join("\r\n");
+                  send(headers + "\r\n" + body + "\r\n.\r\n");
+                  stage = 8;
+                  break;
+                case 8:
+                  if (code !== 250) return fail(`accept: ${line}`);
+                  send("QUIT\r\n");
+                  stage = 9;
+                  break;
+                case 9:
+                  resolve10({ ok: true, log: log.join("\n") });
+                  try {
+                    socket.end();
+                  } catch {
+                  }
+                  return;
+              }
+            } catch (e) {
+              return fail(`exception: ${e.message}`);
+            }
+          }
+        });
+        socket.on("error", (e) => fail(`socket: ${e.message}`));
+        socket.setTimeout(15e3, () => fail("timeout"));
+      });
+    },
+    // ── Mailgun API HTTP 메일 전송 ─────────────────────────
+    // mailgun_send api_key domain from to subject text -> {ok, id, error}
+    // Mailgun REST API v3 사용 (npm 0, Node https만 사용)
+    "mailgun_send": (api_key, domain, from, to, subject, text) => {
+      return new Promise((resolve10) => {
+        try {
+          const https = require("https");
+          const querystring = require("querystring");
+          const auth = Buffer.from(`api:${api_key}`).toString("base64");
+          const postData = querystring.stringify({
+            from,
+            to,
+            subject,
+            text
+          });
+          const options = {
+            hostname: "api.mailgun.net",
+            port: 443,
+            path: `/v3/${domain}/messages`,
+            method: "POST",
+            headers: {
+              "Authorization": `Basic ${auth}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Content-Length": Buffer.byteLength(postData)
+            }
+          };
+          const req = https.request(options, (res) => {
+            let data = "";
+            res.on("data", (chunk) => {
+              data += chunk;
+            });
+            res.on("end", () => {
+              try {
+                const json = JSON.parse(data);
+                if (res.statusCode === 200) {
+                  resolve10({
+                    ok: true,
+                    id: json.id,
+                    message: "\uBA54\uC77C \uC804\uC1A1 \uC644\uB8CC"
+                  });
+                } else {
+                  resolve10({
+                    ok: false,
+                    error: json.message || "Mailgun API \uC624\uB958"
+                  });
+                }
+              } catch (e) {
+                resolve10({
+                  ok: false,
+                  error: `\uD30C\uC2F1 \uC2E4\uD328: ${e.message}`
+                });
+              }
+            });
+          });
+          req.on("error", (e) => {
+            resolve10({
+              ok: false,
+              error: `\uC694\uCCAD \uC2E4\uD328: ${e.message}`
+            });
+          });
+          req.write(postData);
+          req.end();
+        } catch (e) {
+          resolve10({
+            ok: false,
+            error: `\uC608\uC678: ${e.message}`
+          });
+        }
+      });
+    }
+  };
+}
+
+// src/stdlib-webauthn.ts
+var import_crypto8 = require("crypto");
+function cborDecode(buf, offset = 0) {
+  const ib = buf[offset];
+  const major = ib >> 5;
+  const minor = ib & 31;
+  let val;
+  let pos = offset + 1;
+  if (minor < 24) val = minor;
+  else if (minor === 24) {
+    val = buf[pos];
+    pos += 1;
+  } else if (minor === 25) {
+    val = buf.readUInt16BE(pos);
+    pos += 2;
+  } else if (minor === 26) {
+    val = buf.readUInt32BE(pos);
+    pos += 4;
+  } else if (minor === 27) {
+    val = Number(buf.readBigUInt64BE(pos));
+    pos += 8;
+  } else throw new Error(`cbor: unsupported minor ${minor}`);
+  switch (major) {
+    case 0:
+      return { value: val, next: pos };
+    case 1:
+      return { value: -1 - val, next: pos };
+    case 2: {
+      const bytes = buf.slice(pos, pos + val);
+      return { value: bytes, next: pos + val };
+    }
+    case 3: {
+      const text = buf.slice(pos, pos + val).toString("utf8");
+      return { value: text, next: pos + val };
+    }
+    case 4: {
+      const arr = [];
+      for (let i = 0; i < val; i++) {
+        const r = cborDecode(buf, pos);
+        arr.push(r.value);
+        pos = r.next;
+      }
+      return { value: arr, next: pos };
+    }
+    case 5: {
+      const map = {};
+      for (let i = 0; i < val; i++) {
+        const k = cborDecode(buf, pos);
+        pos = k.next;
+        const v = cborDecode(buf, pos);
+        pos = v.next;
+        map[String(k.value)] = v.value;
+      }
+      return { value: map, next: pos };
+    }
+    default:
+      throw new Error(`cbor: unsupported major ${major}`);
+  }
+}
+function parseAuthData(authData) {
+  if (authData.length < 37) throw new Error("authData too short");
+  const rpIdHash = authData.slice(0, 32);
+  const flags = authData[32];
+  const signCount = authData.readUInt32BE(33);
+  const result = { rpIdHash, flags, signCount };
+  if (flags & 64) {
+    if (authData.length < 55) throw new Error("authData AT but too short");
+    result.aaguid = authData.slice(37, 53);
+    const credIdLen = authData.readUInt16BE(53);
+    result.credentialId = authData.slice(55, 55 + credIdLen);
+    const cosePart = authData.slice(55 + credIdLen);
+    const decoded = cborDecode(cosePart);
+    result.credentialPublicKey = decoded.value;
+  }
+  return result;
+}
+function cosePublicKeyToJwk(cose) {
+  if (cose["1"] !== 2) throw new Error("COSE: not EC2");
+  if (cose["3"] !== -7) throw new Error("COSE: not ES256");
+  if (cose["-1"] !== 1) throw new Error("COSE: not P-256");
+  const x = cose["-2"];
+  const y = cose["-3"];
+  return {
+    kty: "EC",
+    crv: "P-256",
+    alg: "ES256",
+    x: x.toString("base64url"),
+    y: y.toString("base64url")
+  };
+}
+function createWebauthnModule() {
+  return {
+    // webauthn_challenge bytes -> base64url string (32 bytes)
+    "webauthn_challenge": (bytes = 32) => {
+      return (0, import_crypto8.randomBytes)(bytes).toString("base64url");
+    },
+    // webauthn_parse_attestation b64url_attestation_object -> {fmt, authData_parsed, jwk, credential_id, sign_count, aaguid_hex}
+    // attestation="none" 또는 "packed" self-attestation 만 처리.
+    "webauthn_parse_attestation": (attestationObjectB64Url) => {
+      const buf = Buffer.from(attestationObjectB64Url, "base64url");
+      const decoded = cborDecode(buf).value;
+      const fmt = decoded.fmt;
+      const authDataBuf = decoded.authData;
+      const auth = parseAuthData(authDataBuf);
+      if (!auth.credentialId || !auth.credentialPublicKey) {
+        throw new Error("attestation: AT flag missing");
+      }
+      const jwk = cosePublicKeyToJwk(auth.credentialPublicKey);
+      return {
+        fmt,
+        flags: auth.flags,
+        sign_count: auth.signCount,
+        rp_id_hash_hex: auth.rpIdHash.toString("hex"),
+        aaguid_hex: auth.aaguid?.toString("hex") ?? "",
+        credential_id: auth.credentialId.toString("base64url"),
+        public_jwk: jwk
+      };
+    },
+    // webauthn_verify_assertion args -> boolean
+    //   args = {jwk, authenticator_data, client_data_json_b64url, signature_b64url, expected_challenge, expected_origin, expected_rp_id, prev_sign_count}
+    // 반환: {ok, sign_count} 또는 {ok:false, error}
+    "webauthn_verify_assertion": (args3) => {
+      try {
+        const jwk = args3.jwk;
+        const authenticatorData = Buffer.from(args3.authenticator_data_b64url, "base64url");
+        const clientDataJson = Buffer.from(args3.client_data_json_b64url, "base64url");
+        const signature = Buffer.from(args3.signature_b64url, "base64url");
+        const clientData = JSON.parse(clientDataJson.toString("utf8"));
+        if (clientData.type !== "webauthn.get") return { ok: false, error: "type!=webauthn.get" };
+        if (clientData.challenge !== args3.expected_challenge) return { ok: false, error: "challenge mismatch" };
+        if (clientData.origin !== args3.expected_origin) return { ok: false, error: "origin mismatch" };
+        const auth = parseAuthData(authenticatorData);
+        const expectedRpHash = (0, import_crypto8.createHash)("sha256").update(args3.expected_rp_id).digest();
+        if (Buffer.compare(auth.rpIdHash, expectedRpHash) !== 0) return { ok: false, error: "rp_id_hash mismatch" };
+        if (!(auth.flags & 1)) return { ok: false, error: "user not present" };
+        if (auth.signCount !== 0 && auth.signCount <= (args3.prev_sign_count ?? 0)) {
+          return { ok: false, error: `signCount regression (${auth.signCount} <= ${args3.prev_sign_count})` };
+        }
+        const cdHash = (0, import_crypto8.createHash)("sha256").update(clientDataJson).digest();
+        const signedData = Buffer.concat([authenticatorData, cdHash]);
+        const pub = (0, import_crypto8.createPublicKey)({ key: jwk, format: "jwk" });
+        const verifier = (0, import_crypto8.createVerify)("SHA256");
+        verifier.update(signedData);
+        verifier.end();
+        const ok2 = verifier.verify(pub, signature);
+        return ok2 ? { ok: true, sign_count: auth.signCount } : { ok: false, error: "signature invalid" };
+      } catch (e) {
+        return { ok: false, error: `exception: ${e.message}` };
+      }
+    }
+  };
+}
+
+// src/stdlib-cron.ts
+function createCronModule() {
+  return {
+    // cron_validate expr -> bool
+    "cron_validate": (expr2) => {
+      try {
+        parseCron(expr2);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // cron_match expr ts_ms -> bool  (해당 시각이 cron 식과 일치하는지)
+    "cron_match": (expr2, tsMs) => {
+      try {
+        const fields = parseCron(expr2);
+        const d = new Date(tsMs);
+        return fieldMatch(fields[0], d.getMinutes()) && fieldMatch(fields[1], d.getHours()) && fieldMatch(fields[2], d.getDate()) && fieldMatch(fields[3], d.getMonth() + 1) && fieldMatch(fields[4], d.getDay());
+      } catch {
+        return false;
+      }
+    },
+    // cron_next_match expr from_ms -> ms  (from 이후 다음 일치 시각, 최대 1년)
+    "cron_next_match": (expr2, fromMs) => {
+      const fields = parseCron(expr2);
+      let t = Math.floor(fromMs / 6e4) * 6e4 + 6e4;
+      const limit = fromMs + 366 * 86400 * 1e3;
+      while (t < limit) {
+        const d = new Date(t);
+        if (fieldMatch(fields[0], d.getMinutes()) && fieldMatch(fields[1], d.getHours()) && fieldMatch(fields[2], d.getDate()) && fieldMatch(fields[3], d.getMonth() + 1) && fieldMatch(fields[4], d.getDay())) {
+          return t;
+        }
+        t += 6e4;
+      }
+      return -1;
+    }
+  };
+}
+function parseCron(expr2) {
+  const parts = expr2.trim().split(/\s+/);
+  if (parts.length !== 5) throw new Error(`cron: need 5 fields, got ${parts.length}`);
+  return [
+    parseField(parts[0], 0, 59),
+    // minute
+    parseField(parts[1], 0, 23),
+    // hour
+    parseField(parts[2], 1, 31),
+    // day of month
+    parseField(parts[3], 1, 12),
+    // month
+    parseField(parts[4], 0, 6)
+    // day of week (0=Sun)
+  ];
+}
+function parseField(s, min, max) {
+  if (s === "*") return { type: "any" };
+  const values = /* @__PURE__ */ new Set();
+  for (const part of s.split(",")) {
+    let stepBase = part;
+    let step = 1;
+    if (part.includes("/")) {
+      const [base, stepStr] = part.split("/");
+      stepBase = base;
+      step = parseInt(stepStr, 10);
+      if (!Number.isFinite(step) || step < 1) throw new Error(`cron: bad step ${part}`);
+    }
+    let rangeMin = min;
+    let rangeMax = max;
+    if (stepBase === "*") {
+    } else if (stepBase.includes("-")) {
+      const [a, b] = stepBase.split("-");
+      rangeMin = parseInt(a, 10);
+      rangeMax = parseInt(b, 10);
+    } else {
+      const v = parseInt(stepBase, 10);
+      if (!Number.isFinite(v)) throw new Error(`cron: bad value ${stepBase}`);
+      if (v < min || v > max) throw new Error(`cron: ${v} out of range [${min},${max}]`);
+      values.add(v);
+      continue;
+    }
+    if (rangeMin < min || rangeMax > max || rangeMin > rangeMax) {
+      throw new Error(`cron: bad range ${rangeMin}-${rangeMax}`);
+    }
+    for (let v = rangeMin; v <= rangeMax; v += step) values.add(v);
+  }
+  return { type: "values", values };
+}
+function fieldMatch(f, v) {
+  if (f.type === "any") return true;
+  return f.values.has(v);
+}
+
+// src/stdlib-queue-helpers.ts
+var import_child_process2 = require("child_process");
+function sqliteJson(dbPath, sql) {
+  const r = (0, import_child_process2.spawnSync)("sqlite3", ["-json", dbPath, sql], { timeout: 1e4, encoding: "utf-8" });
+  if (r.error) throw new Error(`sqlite3 error: ${r.error.message}`);
+  if ((r.status ?? 1) !== 0) {
+    const stderr = r.stderr?.trim() ?? "";
+    throw new Error(`sqlite3 exit ${r.status}: ${stderr}`);
+  }
+  const raw = r.stdout?.trim() ?? "";
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+function escapeStr(s) {
+  return String(s).replace(/'/g, "''");
+}
+function createQueueHelpersModule() {
+  return {
+    // queue_dequeue_atomic db_path topic worker_id lock_seconds
+    //   -> {id, topic, payload, attempt, ...} or null
+    //
+    // BEGIN IMMEDIATE → 첫 queued 메시지 잡고 in_flight 로 마킹 → COMMIT.
+    // 단일 sqlite3 호출이라 외부 race 없음.
+    "queue_dequeue_atomic": (dbPath, topic, workerId, lockSeconds = 30) => {
+      const now = Date.now();
+      const lockUntil = now + lockSeconds * 1e3;
+      const t = escapeStr(topic);
+      const w = escapeStr(workerId);
+      const sql = `
+        UPDATE q_messages
+        SET status='in_flight',
+            locked_until=${lockUntil},
+            worker_id='${w}',
+            updated_at=datetime('now')
+        WHERE id = (
+          SELECT id FROM q_messages
+          WHERE topic='${t}' AND status='queued' AND next_run_at <= ${now}
+          ORDER BY id ASC LIMIT 1
+        )
+        RETURNING id, topic, payload, attempt, next_run_at;
+      `;
+      const rows = sqliteJson(dbPath, sql);
+      return rows.length === 0 ? null : rows[0];
+    },
+    // queue_db_init db_path -> bool  (WAL 모드 + busy_timeout 활성화)
+    "queue_db_init": (dbPath) => {
+      const sql = `
+        PRAGMA journal_mode=WAL;
+        PRAGMA busy_timeout=5000;
+        PRAGMA synchronous=NORMAL;
+      `;
+      const r = (0, import_child_process2.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3 });
+      return (r.status ?? 1) === 0;
+    },
+    // queue_recover_stuck db_path stuck_seconds -> count
+    //   in_flight 상태에서 locked_until 지난 메시지를 다시 queued 로 (worker 죽은 경우 대비)
+    "queue_recover_stuck": (dbPath, stuckSeconds = 60) => {
+      const cutoff = Date.now();
+      const sql = `
+        UPDATE q_messages
+        SET status='queued', worker_id=NULL,
+            attempt=attempt+1,
+            updated_at=datetime('now')
+        WHERE status='in_flight' AND locked_until < ${cutoff};
+        SELECT changes();
+      `;
+      const r = (0, import_child_process2.spawnSync)("sqlite3", [dbPath, sql], { timeout: 5e3, encoding: "utf-8" });
+      if ((r.status ?? 1) !== 0) return 0;
+      const out = r.stdout?.trim() ?? "0";
+      return parseInt(out, 10) || 0;
+    }
+  };
+}
+
+// src/stdlib-checkpoint.ts
+var fs8 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
+function saveCheckpoint(filePath, data) {
+  try {
+    const dir = path8.dirname(filePath);
+    if (!fs8.existsSync(dir)) {
+      fs8.mkdirSync(dir, { recursive: true });
+    }
+    const toSerializable2 = (obj) => {
+      if (obj instanceof Map) return Object.fromEntries(obj);
+      if (Array.isArray(obj)) return obj.map(toSerializable2);
+      if (typeof obj === "object" && obj !== null) {
+        const result = {};
+        for (const [k, v] of Object.entries(obj)) {
+          result[k] = toSerializable2(v);
+        }
+        return result;
+      }
+      return obj;
+    };
+    fs8.writeFileSync(filePath, JSON.stringify(toSerializable2(data), null, 2), "utf-8");
+  } catch (err4) {
+    console.error(`[Checkpoint] Failed to save: ${err4.message}`);
+    throw err4;
+  }
+}
+function loadCheckpoint(filePath) {
+  try {
+    if (!fs8.existsSync(filePath)) {
+      return null;
+    }
+    const content = fs8.readFileSync(filePath, "utf-8");
+    const data = JSON.parse(content);
+    return data;
+  } catch (err4) {
+    console.error(`[Checkpoint] Failed to load: ${err4.message}`);
+    return null;
+  }
+}
+function deleteCheckpoint(filePath) {
+  try {
+    if (fs8.existsSync(filePath)) {
+      fs8.unlinkSync(filePath);
+    }
+  } catch (err4) {
+    console.error(`[Checkpoint] Failed to delete: ${err4.message}`);
+  }
+}
+
+// src/stdlib-workflow.ts
+var T = createTimeModule();
+var A = createAgentModule();
+var X = createCryptoModule();
+function categorizeError(message) {
+  const msg = message.toLowerCase();
+  if (msg.includes("timeout")) return "TIMEOUT";
+  if (msg.includes("enoent") || msg.includes("not found")) return "NOT_FOUND";
+  if (msg.includes("eacces") || msg.includes("permission")) return "PERMISSION";
+  if (msg.includes("econnrefused") || msg.includes("connection refused")) return "CONNECTION";
+  if (msg.includes("econnreset") || msg.includes("connection reset")) return "CONNECTION";
+  if (msg.includes("parse") || msg.includes("json")) return "PARSE_ERROR";
+  if (msg.includes("type") || msg.includes("typeof")) return "TYPE_ERROR";
+  if (msg.includes("null") || msg.includes("undefined")) return "NULL_ERROR";
+  if (msg.includes("network") || msg.includes("http")) return "NETWORK";
+  if (msg.includes("io error")) return "IO_ERROR";
+  return "UNKNOWN";
+}
+function createWorkflowModule() {
+  return {
+    // ── Workflow Definition ───────────────────────────────────
+    // workflow_create name steps -> Workflow object
+    "workflow_create": (name, steps) => ({
+      id: X.uuid_from_str(name + Date.now()),
+      name,
+      steps,
+      created_at: T.now()
+    }),
+    // workflow_step name fn options -> WorkflowStep  (helper for defining steps)
+    "workflow_step": (name, fn, options = {}) => ({
+      name,
+      fn,
+      retry: options.retry ?? 0,
+      required: options.required ?? true,
+      on_error: options.on_error,
+      on_timeout: options.on_timeout,
+      fallback: options.fallback,
+      timeout_ms: options.timeout_ms,
+      if: options.if,
+      parallel_tasks: options.parallel_tasks,
+      merge_strategy: options.merge_strategy,
+      compensate: options.compensate,
+      on_partial: options.on_partial,
+      distributed: options.distributed
+    }),
+    // ── Workflow Execution ────────────────────────────────────
+    // workflow_run workflow initial_ctx options -> WorkflowResult (P0, no parallel support)
+    // Use workflow_run_async for P1-1 parallel task support
+    "workflow_run": (workflow, initialCtx = {}, options) => {
+      const startMs = T.now();
+      const runId = X.uuid_short();
+      const checkpointPath = options?.checkpoint_path;
+      const checkpointEvery = options?.checkpoint_every ?? 0;
+      const autoResume = options?.auto_resume ?? true;
+      let startFromStep = 0;
+      let ctx = { ...initialCtx, _workflow: workflow.name, _run_id: runId };
+      if (autoResume && checkpointPath) {
+        const checkpoint = loadCheckpoint(checkpointPath);
+        if (checkpoint && checkpoint.workflow_id === workflow.id) {
+          startFromStep = checkpoint.step_index;
+          ctx = { ...checkpoint.context, _workflow: workflow.name, _run_id: runId };
+          console.log(`[Checkpoint] Resuming from step ${startFromStep} (${checkpoint.step_names.length} completed)`);
+        }
+      }
+      const log = [];
+      const errors = [];
+      let stepsOk = 0;
+      let stepsFailed = 0;
+      const steps = workflow.steps;
+      const completedStepNames = [];
+      for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
+        const step = steps[stepIndex];
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          return {
+            id: runId,
+            name: workflow.name,
+            status: "failed",
+            context: ctx,
+            steps_run: stepsOk + stepsFailed,
+            steps_ok: stepsOk,
+            steps_failed: stepsFailed,
+            total_ms: T.now() - startMs,
+            log,
+            errors: ["Parallel tasks detected. Use workflow_run_async() instead of workflow_run()"]
+          };
+        }
+        if (step.if !== void 0) {
+          try {
+            const shouldRun = step.if(ctx);
+            if (!shouldRun) {
+              log.push({
+                step: step.name,
+                status: "skipped",
+                ms: 0,
+                trace_id: traceId,
+                metrics: { wall_time_ms: 0 }
+              });
+              continue;
+            }
+          } catch (condErr) {
+            errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
+            if (step.required !== false) {
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors
+              };
+            }
+            continue;
+          }
+        }
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        const maxAttempts = (step.retry ?? 0) + 1;
+        let stepResult = void 0;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            stepResult = step.fn(ctx);
+            ctx = { ...ctx, ...stepResult };
+            success = true;
+            break;
+          } catch (err4) {
+            lastErr = err4.message;
+            if (attempt < maxAttempts - 1) {
+              const wait = 50 * (attempt + 1);
+              const end = Date.now() + wait;
+              while (Date.now() < end) {
+              }
+            }
+          }
+        }
+        const stepMs = T.now() - stepStart;
+        if (success) {
+          stepsOk++;
+          completedStepNames.push(step.name);
+          log.push({ step: step.name, status: "ok", ms: stepMs });
+          ctx[`_step_${step.name}_ms`] = stepMs;
+          if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
+            const checkpoint = {
+              workflow_id: workflow.id,
+              workflow_name: workflow.name,
+              step_index: stepIndex + 1,
+              context: ctx,
+              timestamp: T.now(),
+              step_names: completedStepNames,
+              steps_completed: completedStepNames.length
+            };
+            saveCheckpoint(checkpointPath, checkpoint);
+          }
+        } else {
+          stepsFailed++;
+          let fallbackValue = void 0;
+          const errorCategory = categorizeError(lastErr);
+          if (step.on_error) {
+            try {
+              fallbackValue = step.on_error({ error: lastErr, attempts: maxAttempts, step_name: step.name });
+              ctx = { ...ctx, ...fallbackValue };
+              success = true;
+              errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
+              log.push({
+                step: step.name,
+                status: "error_handled",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,
+                attempted: maxAttempts
+              });
+              stepsOk++;
+              stepsFailed--;
+              ctx[`_step_${step.name}_ms`] = stepMs;
+              continue;
+            } catch (handlerErr) {
+              errors.push(`[${step.name}] ${lastErr} \u2192 on_error handler also failed: ${handlerErr.message}`);
+            }
+          }
+          if (step.fallback !== void 0) {
+            try {
+              fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+              ctx = { ...ctx, ...fallbackValue };
+              success = true;
+              errors.push(`[${step.name}] ${lastErr} (fallback used)`);
+              log.push({
+                step: step.name,
+                status: "fallback_used",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,
+                attempted: maxAttempts
+              });
+              stepsOk++;
+              stepsFailed--;
+              ctx[`_step_${step.name}_ms`] = stepMs;
+              continue;
+            } catch (fallbackErr) {
+              errors.push(`[${step.name}] ${lastErr} \u2192 fallback also failed: ${fallbackErr.message}`);
+            }
+          }
+          if (!success) {
+            errors.push(`[${step.name}] ${lastErr}`);
+            log.push({
+              step: step.name,
+              status: "failed",
+              ms: stepMs,
+              error: lastErr,
+              category: errorCategory,
+              attempted: maxAttempts
+            });
+            if (step.required !== false) {
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors
+              };
+            }
+          }
+        }
+      }
+      const totalMs = T.now() - startMs;
+      const status = stepsFailed === 0 ? "success" : "partial";
+      if ((status === "success" || status === "partial") && checkpointPath) {
+        deleteCheckpoint(checkpointPath);
+      }
+      return {
+        id: runId,
+        name: workflow.name,
+        status,
+        context: ctx,
+        steps_run: stepsOk + stepsFailed,
+        steps_ok: stepsOk,
+        steps_failed: stepsFailed,
+        total_ms: totalMs,
+        log,
+        errors
+      };
+    },
+    // workflow_run_async workflow initial_ctx options -> Promise<WorkflowResult>
+    // P1-1 async version supporting parallel tasks
+    // P1-4: Enhanced observability with trace_id and metrics
+    // options: {checkpoint_path, checkpoint_every, auto_resume}
+    "workflow_run_async": async (workflow, initialCtx = {}, options) => {
+      const startMs = T.now();
+      const runId = X.uuid_short();
+      const traceId2 = X.uuid_short();
+      const checkpointPath = options?.checkpoint_path;
+      const checkpointEvery = options?.checkpoint_every ?? 0;
+      const autoResume = options?.auto_resume ?? true;
+      let startFromStep = 0;
+      let ctx = { ...initialCtx, _workflow: workflow.name, _run_id: runId };
+      if (autoResume && checkpointPath) {
+        const checkpoint = loadCheckpoint(checkpointPath);
+        if (checkpoint && checkpoint.workflow_id === workflow.id) {
+          startFromStep = checkpoint.step_index;
+          ctx = { ...checkpoint.context, _workflow: workflow.name, _run_id: runId };
+          console.log(`[Checkpoint] Resuming from step ${startFromStep} (${checkpoint.step_names.length} completed)`);
+        }
+      }
+      const log = [];
+      const errors = [];
+      let stepsOk = 0;
+      let stepsFailed = 0;
+      const steps = workflow.steps;
+      const completedStepNames = [];
+      const completedSteps = [];
+      const compensations = [];
+      const executeStep = async (step, currentCtx) => {
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        const maxAttempts = (step.retry ?? 0) + 1;
+        let stepResult = void 0;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            stepResult = step.fn(currentCtx);
+            success = true;
+            break;
+          } catch (err4) {
+            lastErr = err4.message;
+            if (attempt < maxAttempts - 1) {
+              const wait = 50 * (attempt + 1);
+              const end = Date.now() + wait;
+              while (Date.now() < end) {
+              }
+            }
+          }
+        }
+        const stepMs = T.now() - stepStart;
+        return { success, result: stepResult, error: lastErr, ms: stepMs };
+      };
+      const executeParallelTasks = async (parallelTasks, mergeStrategy, currentCtx) => {
+        const taskExecutions = parallelTasks.map((task) => executeStep(task, currentCtx));
+        const taskResults = await Promise.all(taskExecutions);
+        const mergedResults = {};
+        const taskErrors = [];
+        let allSuccess = true;
+        let anySuccess = false;
+        taskResults.forEach((result, index) => {
+          const taskName = parallelTasks[index].name;
+          if (result.success) {
+            mergedResults[taskName] = result.result;
+            anySuccess = true;
+          } else {
+            taskErrors.push(`${taskName}: ${result.error}`);
+            allSuccess = false;
+          }
+        });
+        let strategySuccess = false;
+        if (mergeStrategy === "all-success") {
+          strategySuccess = allSuccess;
+        } else if (mergeStrategy === "first-success") {
+          strategySuccess = anySuccess;
+        } else if (mergeStrategy === "any-partial") {
+          strategySuccess = true;
+        } else {
+          strategySuccess = allSuccess;
+        }
+        return { success: strategySuccess, results: mergedResults, errors: taskErrors };
+      };
+      const applyCompensations = async (completedSteps2, currentCtx) => {
+        for (let i = completedSteps2.length - 1; i >= 0; i--) {
+          const step = completedSteps2[i];
+          if (step.compensate) {
+            try {
+              const compensationResult = await step.compensate(currentCtx);
+              compensations.push({
+                step: step.name,
+                action: "applied",
+                result: compensationResult
+              });
+            } catch (compErr) {
+              compensations.push({
+                step: step.name,
+                action: "pending",
+                error: compErr.message
+              });
+            }
+          }
+        }
+      };
+      for (let stepIndex = startFromStep; stepIndex < steps.length; stepIndex++) {
+        const step = steps[stepIndex];
+        if (step.if !== void 0) {
+          try {
+            const shouldRun = step.if(ctx);
+            if (!shouldRun) {
+              log.push({
+                step: step.name,
+                status: "skipped",
+                ms: 0,
+                trace_id: traceId2,
+                metrics: { wall_time_ms: 0 }
+              });
+              continue;
+            }
+          } catch (condErr) {
+            errors.push(`[${step.name}] Condition failed: ${condErr.message}`);
+            if (step.required !== false) {
+              await applyCompensations(completedSteps, ctx);
+              return {
+                id: runId,
+                name: workflow.name,
+                status: "failed",
+                context: ctx,
+                steps_run: stepsOk + stepsFailed,
+                steps_ok: stepsOk,
+                steps_failed: stepsFailed,
+                total_ms: T.now() - startMs,
+                log,
+                errors,
+                compensations
+              };
+            }
+            continue;
+          }
+        }
+        const stepStart = T.now();
+        let success = false;
+        let lastErr = "";
+        let stepResult = void 0;
+        let stepMs = 0;
+        if (step.parallel_tasks && step.parallel_tasks.length > 0) {
+          const mergeStrategy = step.merge_strategy ?? "all-success";
+          const parallelResult = await executeParallelTasks(step.parallel_tasks, mergeStrategy, ctx);
+          stepMs = T.now() - stepStart;
+          if (parallelResult.success) {
+            success = true;
+            stepResult = { [step.name]: parallelResult.results };
+            ctx = { ...ctx, ...stepResult };
+            stepsOk++;
+            completedStepNames.push(step.name);
+            completedSteps.push(step);
+            log.push({
+              step: step.name,
+              status: "ok",
+              ms: stepMs,
+              trace_id: traceId2,
+              metrics: { wall_time_ms: stepMs }
+            });
+            ctx[`_step_${step.name}_ms`] = stepMs;
+          } else {
+            stepsFailed++;
+            lastErr = parallelResult.errors.join("; ");
+            const errorCategory = categorizeError(lastErr);
+            if (step.fallback !== void 0) {
+              try {
+                const fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] Parallel tasks failed (fallback used)`);
+                log.push({ step: step.name, status: "fallback_used", ms: stepMs, error: lastErr, category: errorCategory });
+                stepsOk++;
+                stepsFailed--;
+                completedSteps.push(step);
+                ctx[`_step_${step.name}_ms`] = stepMs;
+              } catch (fallbackErr) {
+                errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+                log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: errorCategory });
+                if (step.required !== false) {
+                  await applyCompensations(completedSteps, ctx);
+                  return {
+                    id: runId,
+                    name: workflow.name,
+                    status: "failed",
+                    context: ctx,
+                    steps_run: stepsOk + stepsFailed,
+                    steps_ok: stepsOk,
+                    steps_failed: stepsFailed,
+                    total_ms: T.now() - startMs,
+                    log,
+                    errors,
+                    compensations
+                  };
+                }
+              }
+            } else {
+              errors.push(`[${step.name}] Parallel tasks failed: ${lastErr}`);
+              log.push({ step: step.name, status: "failed", ms: stepMs, error: lastErr, category: categorizeError(lastErr) });
+              if (step.required !== false) {
+                await applyCompensations(completedSteps, ctx);
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors,
+                  compensations
+                };
+              }
+            }
+          }
+        } else {
+          const execResult = await executeStep(step, ctx);
+          stepMs = execResult.ms;
+          success = execResult.success;
+          lastErr = execResult.error;
+          stepResult = execResult.result;
+          if (success) {
+            stepsOk++;
+            completedStepNames.push(step.name);
+            completedSteps.push(step);
+            log.push({
+              step: step.name,
+              status: "ok",
+              ms: stepMs,
+              trace_id: traceId2,
+              metrics: { wall_time_ms: stepMs }
+            });
+            ctx = { ...ctx, ...stepResult };
+            ctx[`_step_${step.name}_ms`] = stepMs;
+            if (checkpointPath && checkpointEvery > 0 && completedStepNames.length % checkpointEvery === 0) {
+              const checkpoint = {
+                workflow_id: workflow.id,
+                workflow_name: workflow.name,
+                step_index: stepIndex + 1,
+                context: ctx,
+                timestamp: T.now(),
+                step_names: completedStepNames,
+                steps_completed: completedStepNames.length
+              };
+              saveCheckpoint(checkpointPath, checkpoint);
+            }
+          } else {
+            stepsFailed++;
+            let fallbackValue = void 0;
+            const errorCategory = categorizeError(lastErr);
+            if (step.on_error) {
+              try {
+                fallbackValue = step.on_error({ error: lastErr, attempts: 1, step_name: step.name });
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (handled by on_error)`);
+                log.push({
+                  step: step.name,
+                  status: "error_handled",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1
+                });
+                stepsOk++;
+                stepsFailed--;
+                completedSteps.push(step);
+                ctx[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (handlerErr) {
+                errors.push(`[${step.name}] ${lastErr} \u2192 on_error handler also failed: ${handlerErr.message}`);
+              }
+            }
+            if (step.fallback !== void 0) {
+              try {
+                fallbackValue = typeof step.fallback === "function" ? step.fallback() : step.fallback;
+                ctx = { ...ctx, ...fallbackValue };
+                success = true;
+                errors.push(`[${step.name}] ${lastErr} (fallback used)`);
+                log.push({
+                  step: step.name,
+                  status: "fallback_used",
+                  ms: stepMs,
+                  error: lastErr,
+                  category: errorCategory,
+                  attempted: 1
+                });
+                stepsOk++;
+                stepsFailed--;
+                completedSteps.push(step);
+                ctx[`_step_${step.name}_ms`] = stepMs;
+                continue;
+              } catch (fallbackErr) {
+                errors.push(`[${step.name}] ${lastErr} \u2192 fallback also failed: ${fallbackErr.message}`);
+              }
+            }
+            if (!success) {
+              errors.push(`[${step.name}] ${lastErr}`);
+              log.push({
+                step: step.name,
+                status: "failed",
+                ms: stepMs,
+                error: lastErr,
+                category: errorCategory,
+                attempted: 1
+              });
+              if (step.required !== false) {
+                await applyCompensations(completedSteps, ctx);
+                return {
+                  id: runId,
+                  name: workflow.name,
+                  status: "failed",
+                  context: ctx,
+                  steps_run: stepsOk + stepsFailed,
+                  steps_ok: stepsOk,
+                  steps_failed: stepsFailed,
+                  total_ms: T.now() - startMs,
+                  log,
+                  errors,
+                  compensations
+                };
+              }
+            }
+          }
+        }
+      }
+      const totalMs = T.now() - startMs;
+      const status = stepsFailed === 0 ? "success" : "partial";
+      if ((status === "success" || status === "partial") && checkpointPath) {
+        deleteCheckpoint(checkpointPath);
+      }
+      const normalizedLog = log.map((entry) => ({
+        ...entry,
+        trace_id: entry.trace_id || traceId2,
+        metrics: entry.metrics || { wall_time_ms: entry.ms || 0 }
+      }));
+      const parallelStepsCount = completedSteps.filter((s) => s.parallel_tasks && s.parallel_tasks.length > 0).length;
+      const totalSteps = stepsOk + stepsFailed;
+      const totalCompensations = compensations?.length ?? 0;
+      return {
+        id: runId,
+        name: workflow.name,
+        status,
+        context: ctx,
+        steps_run: stepsOk + stepsFailed,
+        steps_ok: stepsOk,
+        steps_failed: stepsFailed,
+        total_ms: totalMs,
+        log: normalizedLog,
+        errors,
+        compensations,
+        // P1-2: Include compensation results
+        // P1-4: Observability metrics
+        metrics: {
+          total_ms: totalMs,
+          parallel_ratio: totalSteps > 0 ? parallelStepsCount / totalSteps : 0,
+          error_ratio: totalSteps > 0 ? stepsFailed / totalSteps : 0,
+          compensation_ratio: totalSteps > 0 ? Math.min(totalCompensations / totalSteps, 1) : 0
+        }
+      };
+    },
+    // ── P0-1: Error Handling Helpers ──────────────────────────
+    // step-with-error step handler-fn -> WorkflowStep (add error handler)
+    "step-with-error": (step, handler) => ({
+      ...step,
+      on_error: handler
+    }),
+    // step-with-fallback step value-or-fn -> WorkflowStep (add fallback)
+    "step-with-fallback": (step, value) => ({
+      ...step,
+      fallback: value
+    }),
+    // step-with-timeout step ms -> WorkflowStep (add timeout)
+    "step-with-timeout": (step, ms) => ({
+      ...step,
+      timeout_ms: ms
+    }),
+    // ── P0-2: Conditional Execution Helpers ──────────────────
+    // step-when step condition-fn -> WorkflowStep (add conditional)
+    "step-when": (step, condition) => ({
+      ...step,
+      if: condition
+    }),
+    // ── Result Inspection ─────────────────────────────────────
+    // workflow_ok result -> boolean
+    "workflow_ok": (result) => result.status !== "failed",
+    // workflow_get result key -> any  (get value from result context)
+    "workflow_get": (result, key) => result.context[key] ?? null,
+    // workflow_summary result -> string  (human/AI readable summary)
+    "workflow_summary": (result) => {
+      const lines = [
+        `Workflow: ${result.name} [${result.status.toUpperCase()}]`,
+        `Run ID:   ${result.id}`,
+        `Steps:    ${result.steps_ok}/${result.steps_run} ok, ${result.steps_failed} failed`,
+        `Time:     ${result.total_ms}ms`
+      ];
+      if (result.errors.length > 0) {
+        lines.push(`Errors:`);
+        result.errors.forEach((e) => lines.push(`  - ${e}`));
+      }
+      lines.push(`Step log:`);
+      result.log.forEach((l) => {
+        const err4 = l.error ? ` \u2014 ${l.error}` : "";
+        lines.push(`  [${l.status.padEnd(6)}] ${l.step} (${l.ms}ms)${err4}`);
+      });
+      return lines.join("\n");
+    },
+    // ── Task Tracker ──────────────────────────────────────────
+    // task_create goal -> Task
+    "task_create": (goal) => ({
+      id: X.uuid_v4(),
+      goal,
+      status: "pending",
+      subtasks: [],
+      completed: [],
+      result: null,
+      created_at: T.now()
+    }),
+    // task_add_subtask task name -> task
+    "task_add_subtask": (task, name) => ({
+      ...task,
+      subtasks: [...task.subtasks, name]
+    }),
+    // task_complete_subtask task name result -> task
+    "task_complete_subtask": (task, name, result) => ({
+      ...task,
+      completed: [...task.completed, name],
+      [`result_${name}`]: result
+    }),
+    // task_finish task result -> task
+    "task_finish": (task, result) => ({
+      ...task,
+      status: "done",
+      result,
+      finished_at: T.now(),
+      duration_ms: T.now() - task.created_at
+    }),
+    // task_progress task -> number (0.0-1.0)
+    "task_progress": (task) => {
+      if (task.subtasks.length === 0) return task.status === "done" ? 1 : 0;
+      return task.completed.length / task.subtasks.length;
+    },
+    // ── Report Builder ────────────────────────────────────────
+    // report_create title -> Report
+    "report_create": (title) => ({
+      title,
+      sections: [],
+      created_at: T.now_iso()
+    }),
+    // report_add report section_name data -> Report
+    "report_add": (report, sectionName, data) => ({
+      ...report,
+      sections: [...report.sections, { name: sectionName, data }]
+    }),
+    // report_render report -> string  (formatted text report)
+    "report_render": (report) => {
+      const divider = "\u2500".repeat(50);
+      const lines = [
+        divider,
+        `  ${report.title}`,
+        `  Generated: ${report.created_at}`,
+        divider
+      ];
+      for (const section of report.sections) {
+        lines.push(`
+## ${section.name}`);
+        const d = section.data;
+        if (typeof d === "string") {
+          lines.push(d);
+        } else if (Array.isArray(d)) {
+          d.forEach((item, i) => {
+            lines.push(`  ${i + 1}. ${typeof item === "object" ? JSON.stringify(item) : item}`);
+          });
+        } else if (typeof d === "object") {
+          Object.entries(d).forEach(([k, v]) => {
+            lines.push(`  ${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`);
+          });
+        } else {
+          lines.push(String(d));
+        }
+      }
+      lines.push("\n" + divider);
+      return lines.join("\n");
+    }
+  };
+}
+
+// src/stdlib-resource.ts
+var import_child_process3 = require("child_process");
+var os = __toESM(require("os"));
+function run(cmd2, timeout = 1e4) {
+  try {
+    return (0, import_child_process3.execSync)(cmd2, { encoding: "utf-8", timeout, stdio: ["pipe", "pipe", "pipe"] }).trim();
+  } catch {
+    return "";
+  }
+}
+function runLines(cmd2) {
+  const out = run(cmd2);
+  return out ? out.split("\n").map((l) => l.trim()).filter(Boolean) : [];
+}
+function parseKv(lines, sep2 = ":") {
+  const obj = {};
+  for (const line of lines) {
+    const idx = line.indexOf(sep2);
+    if (idx > 0) {
+      const k = line.slice(0, idx).trim();
+      const v = line.slice(idx + 1).trim();
+      obj[k] = v;
+    }
+  }
+  return obj;
+}
+function createResourceModule() {
+  return {
+    // ── CPU ─────────────────────────────────────────────────────
+    // res_cpu_load -> [1m, 5m, 15m]
+    "res_cpu_load": () => {
+      return os.loadavg();
+    },
+    // res_cpu_count -> number
+    "res_cpu_count": () => {
+      return os.cpus().length;
+    },
+    // res_cpu_model -> string
+    "res_cpu_model": () => {
+      const cpus2 = os.cpus();
+      return cpus2.length > 0 ? cpus2[0].model : "unknown";
+    },
+    // res_cpu_pct -> number (1-min loadavg based, avoids busy wait)
+    "res_cpu_pct": () => {
+      const load = os.loadavg()[0];
+      const cpus2 = os.cpus().length;
+      return Math.min(100, Math.round(load / cpus2 * 100));
+    },
+    // ── Memory ──────────────────────────────────────────────────
+    // res_mem -> {total_mb, used_mb, free_mb, buffers_mb, cached_mb, available_mb}
+    "res_mem": () => {
+      const total = Math.round(os.totalmem() / 1024 / 1024);
+      const free = Math.round(os.freemem() / 1024 / 1024);
+      const used = total - free;
+      const lines = runLines("cat /proc/meminfo");
+      const kv = parseKv(lines);
+      const parseKb = (k) => Math.round(parseInt((kv[k] || "0 kB").split(" ")[0]) / 1024);
+      return {
+        total_mb: total,
+        used_mb: used,
+        free_mb: free,
+        available_mb: parseKb("MemAvailable"),
+        buffers_mb: parseKb("Buffers"),
+        cached_mb: parseKb("Cached"),
+        swap_total_mb: parseKb("SwapTotal"),
+        swap_used_mb: parseKb("SwapTotal") - parseKb("SwapFree")
+      };
+    },
+    // res_mem_pct -> number (used %)
+    "res_mem_pct": () => {
+      const total = os.totalmem();
+      const free = os.freemem();
+      return total > 0 ? Math.round((1 - free / total) * 100) : 0;
+    },
+    // ── Disk ────────────────────────────────────────────────────
+    // res_disk -> DiskInfo[]
+    "res_disk": () => {
+      const lines = runLines("df -BG --output=source,target,size,used,avail,pcent 2>/dev/null | tail -n +2");
+      return lines.filter((l) => l.startsWith("/")).map((line) => {
+        const [device, mount, total, used, avail, pct] = line.split(/\s+/);
+        return {
+          device,
+          mount,
+          total_gb: parseInt(total) || 0,
+          used_gb: parseInt(used) || 0,
+          avail_gb: parseInt(avail) || 0,
+          use_pct: parseInt(pct) || 0
+        };
+      });
+    },
+    // res_disk_usage path -> {total_gb, used_gb, avail_gb, use_pct}
+    "res_disk_usage": (path19) => {
+      const line = run(`df -BG --output=size,used,avail,pcent "${path19}" 2>/dev/null | tail -1`);
+      if (!line) return { total_gb: 0, used_gb: 0, avail_gb: 0, use_pct: 0 };
+      const [total, used, avail, pct] = line.trim().split(/\s+/);
+      return {
+        total_gb: parseInt(total) || 0,
+        used_gb: parseInt(used) || 0,
+        avail_gb: parseInt(avail) || 0,
+        use_pct: parseInt(pct) || 0
+      };
+    },
+    // ── Processes ───────────────────────────────────────────────
+    // res_procs -> ProcessInfo[]  (top 20 by CPU)
+    "res_procs": () => {
+      const lines = runLines("ps axo pid,user,pcpu,pmem,stat,comm,args --sort=-pcpu 2>/dev/null | head -21 | tail -20");
+      return lines.map((line) => {
+        const parts = line.split(/\s+/);
+        return {
+          pid: parseInt(parts[0]) || 0,
+          user: parts[1] || "",
+          cpu: parseFloat(parts[2]) || 0,
+          mem: parseFloat(parts[3]) || 0,
+          state: parts[4] || "",
+          name: parts[5] || "",
+          cmd: parts.slice(6).join(" ")
+        };
+      });
+    },
+    // res_find_proc name -> ProcessInfo[]  (search by name substring)
+    "res_find_proc": (name) => {
+      const safeName = name.replace(/[^a-zA-Z0-9_\-\.]/g, "");
+      const lines = runLines(`ps axo pid,user,pcpu,pmem,stat,comm,args 2>/dev/null | grep -i "${safeName}" | grep -v grep`);
+      return lines.map((line) => {
+        const parts = line.split(/\s+/);
+        return {
+          pid: parseInt(parts[0]) || 0,
+          user: parts[1] || "",
+          cpu: parseFloat(parts[2]) || 0,
+          mem: parseFloat(parts[3]) || 0,
+          state: parts[4] || "",
+          name: parts[5] || "",
+          cmd: parts.slice(6).join(" ")
+        };
+      });
+    },
+    // res_proc_exists name -> boolean
+    "res_proc_exists": (name) => {
+      const safeName = name.replace(/[^a-zA-Z0-9_\-\.]/g, "");
+      const result = (0, import_child_process3.spawnSync)("sh", ["-c", `pgrep -f "${safeName}" > /dev/null 2>&1`]);
+      return (result.status ?? 1) === 0;
+    },
+    // res_proc_pid name -> number | null
+    "res_proc_pid": (name) => {
+      const safeName = name.replace(/[^a-zA-Z0-9_\-\.]/g, "");
+      const out = run(`pgrep -f "${safeName}" | head -1`);
+      const pid = parseInt(out);
+      return isNaN(pid) ? null : pid;
+    },
+    // res_proc_count name -> number  (how many instances running)
+    "res_proc_count": (name) => {
+      const safeName = name.replace(/[^a-zA-Z0-9_\-\.]/g, "");
+      const out = run(`pgrep -fc "${safeName}" 2>/dev/null || echo 0`);
+      return parseInt(out) || 0;
+    },
+    // ── Ports ───────────────────────────────────────────────────
+    // res_ports -> PortInfo[]  (all listening ports)
+    "res_ports": () => {
+      const lines = runLines("ss -tlnp 2>/dev/null | tail -n +2");
+      return lines.map((line) => {
+        const parts = line.split(/\s+/);
+        const state = parts[0] || "";
+        const local = parts[3] || "";
+        const proc = line.match(/pid=(\d+)/)?.[1];
+        const name = line.match(/\"([^\"]+)\"/)?.[1] || "";
+        const colonIdx = local.lastIndexOf(":");
+        const addr = local.slice(0, colonIdx);
+        const port = parseInt(local.slice(colonIdx + 1)) || 0;
+        return {
+          port,
+          protocol: "tcp",
+          state,
+          pid: proc ? parseInt(proc) : null,
+          name,
+          addr
+        };
+      }).filter((p) => p.port > 0);
+    },
+    // res_port_used port -> boolean
+    "res_port_used": (port) => {
+      const result = (0, import_child_process3.spawnSync)("sh", ["-c", `ss -tlnp 2>/dev/null | grep -q ":${port} "`]);
+      return (result.status ?? 1) === 0;
+    },
+    // res_port_info port -> PortInfo | null
+    "res_port_info": (port) => {
+      const line = run(`ss -tlnp 2>/dev/null | grep ":${port} "`);
+      if (!line) return null;
+      const parts = line.split(/\s+/);
+      const proc = line.match(/pid=(\d+)/)?.[1];
+      const name = line.match(/\"([^\"]+)\"/)?.[1] || "";
+      return {
+        port,
+        protocol: "tcp",
+        state: parts[0] || "LISTEN",
+        pid: proc ? parseInt(proc) : null,
+        name,
+        addr: parts[3]?.split(":").slice(0, -1).join(":") || ""
+      };
+    },
+    // res_find_free_port start end -> number | null  (first free port in range)
+    "res_find_free_port": (start, end) => {
+      const usedLine = run(`ss -tlnp 2>/dev/null | awk '{print $4}' | grep -oP ':\\d+' | tr -d ':'`);
+      const used = new Set(usedLine.split("\n").map((s) => parseInt(s)).filter((n) => !isNaN(n)));
+      for (let p = start; p <= end; p++) {
+        if (!used.has(p)) return p;
+      }
+      return null;
+    },
+    // ── Network ─────────────────────────────────────────────────
+    // res_net -> NetInterface[]
+    "res_net": () => {
+      const ifaces = os.networkInterfaces();
+      const result = [];
+      for (const [name, addrs] of Object.entries(ifaces)) {
+        if (!addrs) continue;
+        for (const addr of addrs) {
+          if (addr.family === "IPv4") {
+            result.push({
+              name,
+              addr: addr.address,
+              mac: addr.mac,
+              up: true
+            });
+          }
+        }
+      }
+      return result;
+    },
+    // res_hostname -> string
+    "res_hostname": () => os.hostname(),
+    // res_uptime_s -> number  (system uptime in seconds)
+    "res_uptime_s": () => os.uptime(),
+    // ── Services ────────────────────────────────────────────────
+    // res_pm2_list -> ServiceInfo[]
+    "res_pm2_list": () => {
+      const out = run("pm2 jlist 2>/dev/null");
+      if (!out) return [];
+      try {
+        const list = JSON.parse(out);
+        return list.map((svc) => ({
+          name: svc.name,
+          status: svc.pm2_env?.status || "unknown",
+          pid: svc.pid || null,
+          uptime: svc.pm2_env?.pm_uptime ? `${Math.round((Date.now() - svc.pm2_env.pm_uptime) / 1e3)}s` : "0s",
+          manager: "pm2"
+        }));
+      } catch {
+        return [];
+      }
+    },
+    // res_pm2_find name -> ServiceInfo | null
+    "res_pm2_find": (name) => {
+      const out = run("pm2 jlist 2>/dev/null");
+      if (!out) return null;
+      try {
+        const list = JSON.parse(out);
+        const svc = list.find((s) => s.name === name);
+        if (!svc) return null;
+        return {
+          name: svc.name,
+          status: svc.pm2_env?.status || "unknown",
+          pid: svc.pid || null,
+          uptime: svc.pm2_env?.pm_uptime ? `${Math.round((Date.now() - svc.pm2_env.pm_uptime) / 1e3)}s` : "0s",
+          manager: "pm2"
+        };
+      } catch {
+        return null;
+      }
+    },
+    // res_systemd_status name -> ServiceInfo
+    "res_systemd_status": (name) => {
+      const safeName = name.replace(/[^a-zA-Z0-9_\-\.]/g, "");
+      const active = run(`systemctl is-active "${safeName}" 2>/dev/null`);
+      const pid = run(`systemctl show "${safeName}" -p MainPID --value 2>/dev/null`);
+      return {
+        name: safeName,
+        status: active || "unknown",
+        pid: parseInt(pid) || null,
+        uptime: run(`systemctl show "${safeName}" -p ActiveEnterTimestamp --value 2>/dev/null`),
+        manager: "systemd"
+      };
+    },
+    // ── kimdb integration ────────────────────────────────────────
+    // res_kimdb_project name -> Record | null  (query local kimdb)
+    "res_kimdb_project": (name) => {
+      const safeName = name.replace(/[^a-zA-Z0-9_\-]/g, "");
+      try {
+        const out = run(`curl -sf "http://localhost:40000/api/c/projects/${safeName}" 2>/dev/null`, 3e3);
+        if (!out) return null;
+        const parsed = JSON.parse(out);
+        return parsed.data ?? parsed ?? null;
+      } catch {
+        return null;
+      }
+    },
+    // res_kimdb_projects -> Record[]  (all projects)
+    "res_kimdb_projects": () => {
+      try {
+        const out = run(`curl -sf "http://localhost:40000/api/c/projects" 2>/dev/null`, 5e3);
+        if (!out) return [];
+        const parsed = JSON.parse(out);
+        return Array.isArray(parsed) ? parsed : parsed.data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    // res_kimdb_health -> boolean
+    "res_kimdb_health": () => {
+      const out = run(`curl -sf "http://localhost:40000/health" 2>/dev/null`, 2e3);
+      return out.includes("ok") || out.includes("healthy") || out.length > 0;
+    },
+    // ── Full Snapshot ────────────────────────────────────────────
+    // res_snapshot -> ResourceSnapshot  (complete server state, ~1s)
+    "res_snapshot": () => {
+      const memInfo = (() => {
+        const total = Math.round(os.totalmem() / 1024 / 1024);
+        const free = Math.round(os.freemem() / 1024 / 1024);
+        const lines = runLines("cat /proc/meminfo");
+        const kv = parseKv(lines);
+        const parseKb = (k) => Math.round(parseInt((kv[k] || "0 kB").split(" ")[0]) / 1024);
+        return { total, free, used: total - free, swapTotal: parseKb("SwapTotal"), swapFree: parseKb("SwapFree") };
+      })();
+      const diskLines = runLines("df -BG --output=source,target,size,used,avail,pcent 2>/dev/null | tail -n +2");
+      const disk = diskLines.filter((l) => l.startsWith("/")).map((line) => {
+        const [device, mount, total, used, avail, pct] = line.split(/\s+/);
+        return { device, mount, total_gb: parseInt(total) || 0, used_gb: parseInt(used) || 0, avail_gb: parseInt(avail) || 0, use_pct: parseInt(pct) || 0 };
+      });
+      const procLines = runLines("ps axo pid,user,pcpu,pmem,stat,comm,args --sort=-pcpu 2>/dev/null | head -6 | tail -5");
+      const top_procs = procLines.map((line) => {
+        const p = line.split(/\s+/);
+        return { pid: parseInt(p[0]) || 0, user: p[1] || "", cpu: parseFloat(p[2]) || 0, mem: parseFloat(p[3]) || 0, state: p[4] || "", name: p[5] || "", cmd: p.slice(6).join(" ") };
+      });
+      const portLines = runLines("ss -tlnp 2>/dev/null | tail -n +2");
+      const ports_listening = portLines.map((line) => {
+        const parts = line.split(/\s+/);
+        const local = parts[3] || "";
+        const colonIdx = local.lastIndexOf(":");
+        const port = parseInt(local.slice(colonIdx + 1)) || 0;
+        const proc = line.match(/pid=(\d+)/)?.[1];
+        return { port, protocol: "tcp", state: parts[0] || "", pid: proc ? parseInt(proc) : null, name: line.match(/\"([^\"]+)\"/)?.[1] || "", addr: local.slice(0, colonIdx) };
+      }).filter((p) => p.port > 0);
+      return {
+        ts: Date.now(),
+        hostname: os.hostname(),
+        uptime_s: os.uptime(),
+        cpu_load: os.loadavg(),
+        mem_total_mb: memInfo.total,
+        mem_used_mb: memInfo.used,
+        mem_free_mb: memInfo.free,
+        swap_total_mb: memInfo.swapTotal,
+        swap_used_mb: memInfo.swapTotal - memInfo.swapFree,
+        disk,
+        top_procs,
+        ports_listening
+      };
+    },
+    // res_snapshot_report snapshot -> string  (human/AI readable)
+    "res_snapshot_report": (snap) => {
+      const mem_pct = snap.mem_total_mb > 0 ? Math.round(snap.mem_used_mb / snap.mem_total_mb * 100) : 0;
+      const upd = new Date(snap.ts).toISOString();
+      const lines = [
+        `\u2550\u2550\u2550 Server Resource Snapshot \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550`,
+        `Host:    ${snap.hostname}  |  Time: ${upd}`,
+        `Uptime:  ${Math.round(snap.uptime_s / 3600)}h ${Math.round(snap.uptime_s % 3600 / 60)}m`,
+        ``,
+        `\u2500\u2500 CPU Load \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+        `1m: ${snap.cpu_load[0].toFixed(2)}  5m: ${snap.cpu_load[1].toFixed(2)}  15m: ${snap.cpu_load[2].toFixed(2)}`,
+        ``,
+        `\u2500\u2500 Memory \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+        `Used: ${snap.mem_used_mb}MB / ${snap.mem_total_mb}MB  (${mem_pct}%)`,
+        `Swap: ${snap.swap_used_mb}MB / ${snap.swap_total_mb}MB`,
+        ``,
+        `\u2500\u2500 Disk \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+        ...snap.disk.map((d) => `${d.mount.padEnd(12)} ${d.used_gb}G/${d.total_gb}G (${d.use_pct}%)  [${d.device}]`),
+        ``,
+        `\u2500\u2500 Top Processes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+        ...snap.top_procs.map((p) => `PID ${String(p.pid).padEnd(7)} CPU:${String(p.cpu).padEnd(6)} MEM:${String(p.mem).padEnd(5)} ${p.name}`),
+        ``,
+        `\u2500\u2500 Listening Ports \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`,
+        ...snap.ports_listening.slice(0, 15).map((p) => `${String(p.port).padEnd(7)} ${p.name || "(unknown)"}`),
+        ...snap.ports_listening.length > 15 ? [`... ${snap.ports_listening.length - 15} more`] : [],
+        `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550`
+      ];
+      return lines.join("\n");
+    },
+    // res_health_check -> {ok, warnings, errors}
+    "res_health_check": () => {
+      const warnings = [];
+      const errors = [];
+      const mem_pct = Math.round((1 - os.freemem() / os.totalmem()) * 100);
+      if (mem_pct > 95) errors.push(`Memory critical: ${mem_pct}%`);
+      else if (mem_pct > 80) warnings.push(`Memory high: ${mem_pct}%`);
+      const load = os.loadavg();
+      const cpus2 = os.cpus().length;
+      if (load[0] > cpus2 * 2) errors.push(`CPU load critical: ${load[0].toFixed(2)} (${cpus2} cores)`);
+      else if (load[0] > cpus2 * 0.8) warnings.push(`CPU load high: ${load[0].toFixed(2)} (${cpus2} cores)`);
+      const diskLines = runLines("df -BG --output=target,pcent 2>/dev/null | tail -n +2");
+      for (const line of diskLines) {
+        const [mount, pct] = line.split(/\s+/);
+        const pctNum = parseInt(pct);
+        if (pctNum > 95) errors.push(`Disk ${mount} critical: ${pct}`);
+        else if (pctNum > 85) warnings.push(`Disk ${mount} high: ${pct}`);
+      }
+      return {
+        ok: errors.length === 0,
+        warnings,
+        errors,
+        mem_pct,
+        cpu_load_1m: load[0],
+        cpu_cores: cpus2
+      };
+    }
+  };
+}
+
+// src/stdlib-http-server.ts
+var http = __toESM(require("http"));
+var url = __toESM(require("url"));
+var crypto = __toESM(require("crypto"));
+var fs9 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
+var os2 = __toESM(require("os"));
+var __activeServer = { server: null };
+function createHttpServerModule(callFn, callFunctionValue2) {
+  const routes = [];
+  const middlewares = [];
+  let server = null;
+  let requestCounter = 0;
+  const pendingResponses = /* @__PURE__ */ new Map();
+  let currentRequestId = null;
+  let currentNonce = "";
+  const sseConnections = /* @__PURE__ */ new Map();
+  const sseRoutes = /* @__PURE__ */ new Map();
+  let sseConnIdCounter = 0;
+  const wsPublicMap = /* @__PURE__ */ new Map();
+  let upgradeHandler = null;
+  let wsClientMessageHandler = null;
+  let wsClientCloseHandler = null;
+  let wssPublic = null;
+  function generateRequestId() {
+    const timestamp = Date.now();
+    const counter = ++requestCounter;
+    return `req_${timestamp}_${counter}`;
+  }
+  function logAccess(method, path19, status, duration, requestId) {
+    const icon = status >= 400 ? "\u274C" : "\u2705";
+    console.log(`${icon} [${requestId}] ${method} ${path19} ${status} ${duration}ms`);
+  }
+  function pathToRegex(path19) {
+    const params = [];
+    const pattern = path19.replace(/\//g, "\\/").replace(/\*/g, ".*").replace(/:(\w+)/g, (_, param) => {
+      params.push(param);
+      return "([^\\/]+)";
+    });
+    return [new RegExp(`^${pattern}$`), params];
+  }
+  function parseUrl(urlStr) {
+    const parsed = url.parse(urlStr, true);
+    return {
+      path: parsed.pathname || "/",
+      query: parsed.query
+    };
+  }
+  async function readBody(req) {
+    return new Promise((resolve10) => {
+      const chunks = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => {
+        const raw = Buffer.concat(chunks);
+        const ct = (req.headers["content-type"] || "").toString();
+        if (ct.includes("application/json")) {
+          try {
+            resolve10(JSON.parse(raw.toString()));
+            return;
+          } catch {
+          }
+        }
+        if (ct.includes("multipart/form-data")) {
+          try {
+            resolve10(parseMultipart(raw, ct));
+            return;
+          } catch {
+          }
+        }
+        if (ct.includes("application/x-www-form-urlencoded")) {
+          try {
+            const params = {};
+            new url.URLSearchParams(raw.toString()).forEach((v, k) => {
+              params[k] = v;
+            });
+            resolve10(params);
+            return;
+          } catch {
+          }
+        }
+        resolve10(raw.toString());
+      });
+    });
+  }
+  function parseMultipart(raw, contentType) {
+    const boundaryMatch = contentType.match(/boundary=([^\s;]+)/);
+    if (!boundaryMatch) return {};
+    const boundary = boundaryMatch[1];
+    const delimiter = Buffer.from("\r\n--" + boundary);
+    const fields = {};
+    const files = [];
+    const uploadDir = path9.join(os2.tmpdir(), "fl-uploads");
+    if (!fs9.existsSync(uploadDir)) fs9.mkdirSync(uploadDir, { recursive: true });
+    const start = Buffer.from("--" + boundary + "\r\n");
+    let pos = raw.indexOf(start);
+    if (pos < 0) return { fields, files };
+    pos += start.length;
+    while (pos < raw.length) {
+      const next = raw.indexOf(delimiter, pos);
+      const partEnd = next < 0 ? raw.length : next;
+      const part = raw.slice(pos, partEnd);
+      const headerEnd = part.indexOf("\r\n\r\n");
+      if (headerEnd < 0) break;
+      const headerStr = part.slice(0, headerEnd).toString();
+      const bodyBuf = part.slice(headerEnd + 4);
+      const dispMatch = headerStr.match(/Content-Disposition:[^\n]*?;\s*name="([^"]+)"(?:[^\n]*?filename="([^"]+)")?/i);
+      if (!dispMatch) {
+        pos = partEnd + delimiter.length + 2;
+        continue;
+      }
+      const fieldName = dispMatch[1];
+      const fileName = dispMatch[2];
+      if (fileName) {
+        const ctMatch = headerStr.match(/Content-Type:\s*([^\r\n]+)/i);
+        const mimetype = ctMatch ? ctMatch[1].trim() : "application/octet-stream";
+        const ext = path9.extname(fileName) || "";
+        const savedName = crypto.randomBytes(8).toString("hex") + ext;
+        const savedPath = path9.join(uploadDir, savedName);
+        fs9.writeFileSync(savedPath, bodyBuf);
+        const m = /* @__PURE__ */ new Map();
+        m.set("fieldname", fieldName);
+        m.set("originalname", fileName);
+        m.set("mimetype", mimetype);
+        m.set("size", bodyBuf.length);
+        m.set("path", savedPath);
+        m.set("filename", savedName);
+        files.push(m);
+      } else {
+        fields[fieldName] = bodyBuf.toString().replace(/\r\n$/, "");
+      }
+      if (next < 0) break;
+      pos = next + delimiter.length;
+      if (raw.slice(pos, pos + 2).toString() === "--") break;
+      pos += 2;
+    }
+    const result = /* @__PURE__ */ new Map();
+    const fieldsMap = /* @__PURE__ */ new Map();
+    Object.entries(fields).forEach(([k, v]) => fieldsMap.set(k, v));
+    result.set("fields", fieldsMap);
+    result.set("files", files);
+    return result;
+  }
+  function sendResponse(res, status, body, contentType = "application/json", extraHeaders) {
+    const headersToWrite = { "Content-Type": contentType };
+    if (extraHeaders) {
+      const hopByHop = /* @__PURE__ */ new Set([
+        "connection",
+        "keep-alive",
+        "transfer-encoding",
+        "te",
+        "trailer",
+        "proxy-authorization",
+        "proxy-authenticate",
+        "upgrade",
+        "content-encoding"
+      ]);
+      for (const [k, v] of Object.entries(extraHeaders)) {
+        if (!hopByHop.has(k.toLowerCase())) {
+          headersToWrite[k] = v;
+        }
+      }
+    }
+    res.writeHead(status, headersToWrite);
+    if (typeof body === "string") {
+      if (contentType.includes("text/html") && currentNonce) {
+        body = body.replace(
+          /<(script|style)(?![^>]*\bnonce=)(\s|>)/gi,
+          (_, tag, rest) => `<${tag} nonce="${currentNonce}"${rest}`
+        );
+      }
+      res.end(body);
+    } else if (Buffer.isBuffer(body)) {
+      res.end(body);
+    } else if (contentType.includes("json") && typeof body === "object") {
+      res.end(JSON.stringify(
+        body,
+        (_k, v) => v instanceof Map ? Object.fromEntries(v) : Array.isArray(v) ? v : v
+      ));
+    } else {
+      res.end(String(body ?? ""));
+    }
+  }
+  function createFlRequest(method, path19, query, headers, body, params, requestId) {
+    return {
+      __fl_request: true,
+      method,
+      path: path19,
+      query,
+      headers,
+      body: body || void 0,
+      params,
+      request_id: requestId,
+      csp_nonce: currentNonce,
+      timestamp: Date.now()
+    };
+  }
+  const rlStore = /* @__PURE__ */ new Map();
+  let rlMax = 100;
+  let rlWindowMs = 6e4;
+  function checkRateLimit(ip) {
+    const now = Date.now();
+    let entry = rlStore.get(ip);
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 1, resetAt: now + rlWindowMs };
+      rlStore.set(ip, entry);
+      return true;
+    }
+    entry.count++;
+    return entry.count <= rlMax;
+  }
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, e] of rlStore) {
+      if (now > e.resetAt + rlWindowMs) rlStore.delete(ip);
+    }
+  }, 3e5).unref();
+  return {
+    // server_use path middlewareName — 경로 패턴 매칭 시 미들웨어 실행
+    // handler가 null/undefined 반환 → 다음 미들웨어/라우트 진행
+    // handler가 응답 객체 반환 → 즉시 응답 (라우트 실행 안 함)
+    "server_use": (path19, handlerName) => {
+      const [pattern] = pathToRegex(path19);
+      middlewares.push({ pattern, handler: handlerName });
+      return null;
+    },
+    // server_rate_limit max window_ms → null  (e.g. 100req/60s)
+    "server_rate_limit": (max, windowMs) => {
+      rlMax = Math.max(1, Math.floor(max));
+      rlWindowMs = Math.max(1e3, Math.floor(windowMs));
+      return null;
+    },
+    // server_get path handlerName -> null
+    "server_get": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "GET", path: path19, pattern, params, handler: handlerName });
+      return null;
+    },
+    // server_post path handlerName -> null
+    "server_post": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "POST", path: path19, pattern, params, handler: handlerName });
+      return null;
+    },
+    // server_put path handlerName -> null
+    "server_put": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "PUT", path: path19, pattern, params, handler: handlerName });
+      return null;
+    },
+    // server_patch path handlerName -> null
+    "server_patch": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "PATCH", path: path19, pattern, params, handler: handlerName });
+      return null;
+    },
+    // server_delete path handlerName -> null
+    "server_delete": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: "DELETE", path: path19, pattern, params, handler: handlerName });
+      return null;
+    },
+    // route method path handler → 메서드 문자열로 등록
+    // (route "GET"    "/api/x" handler-fn)
+    // (route "POST"   "/api/x" handler-fn)
+    "route": (method, path19, handlerName) => {
+      const m = String(method).toUpperCase();
+      const [pattern, params] = pathToRegex(path19);
+      routes.push({ method: m, path: path19, pattern, params, handler: handlerName });
+      return null;
+    },
+    // v12: 라우트 초기화 (hot reload 시 재등록 전 호출)
+    "server-clear-routes": () => {
+      routes.length = 0;
+      return null;
+    },
+    "server_clear_routes": () => {
+      routes.length = 0;
+      return null;
+    },
+    // server_static dir [urlPrefix] -> null  정적 파일 서빙 (server-static "public" "/")
+    "server_static": (dir, urlPrefix = "/") => {
+      const mimeMap = {
+        ".html": "text/html; charset=utf-8",
+        ".htm": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".js": "application/javascript; charset=utf-8",
+        ".mjs": "application/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".svg": "image/svg+xml",
+        ".ico": "image/x-icon",
+        ".woff": "font/woff",
+        ".woff2": "font/woff2",
+        ".ttf": "font/ttf",
+        ".txt": "text/plain; charset=utf-8",
+        ".pdf": "application/pdf"
+      };
+      const absDir = path9.resolve(dir);
+      const prefix = urlPrefix.endsWith("/") ? urlPrefix : urlPrefix + "/";
+      const handler = (_req, res, reqPath) => {
+        let rel = reqPath.startsWith(prefix) ? reqPath.slice(prefix.length - 1) : reqPath;
+        if (rel === "" || rel === "/") rel = "/index.html";
+        const filePath = path9.join(absDir, rel);
+        if (!filePath.startsWith(absDir)) {
+          res.writeHead(403, { "Content-Type": "text/plain" });
+          res.end("Forbidden");
+          return true;
+        }
+        if (!fs9.existsSync(filePath) || !fs9.statSync(filePath).isFile()) return false;
+        const ext = path9.extname(filePath).toLowerCase();
+        const mime = mimeMap[ext] || "application/octet-stream";
+        const content = fs9.readFileSync(filePath);
+        res.writeHead(200, {
+          "Content-Type": mime,
+          "Content-Length": content.length,
+          "Cache-Control": "public, max-age=3600"
+        });
+        res.end(content);
+        return true;
+      };
+      const routePath = prefix === "/" ? "/*" : prefix + "*";
+      const [pattern, params] = pathToRegex(routePath);
+      routes.push({
+        method: "GET",
+        path: routePath,
+        pattern,
+        params,
+        handler: { __fl_static_handler: true, fn: handler }
+      });
+      return null;
+    },
+    // server_all path handler → 모든 메서드 등록 (catch-all)
+    "server_all": (path19, handlerName) => {
+      const [pattern, params] = pathToRegex(path19);
+      for (const m of ["GET", "POST", "PUT", "PATCH", "DELETE"]) {
+        routes.push({ method: m, path: path19, pattern, params, handler: handlerName });
+      }
+      return null;
+    },
+    // server_start port|config -> string
+    // 선언형 API: (server_start {:port 40090 :routes [...] :middleware [...]})
+    // 기존 API:   (server_start 40090)
+    "server_start": (portOrConfig) => {
+      const port = portOrConfig !== null && typeof portOrConfig === "object" ? portOrConfig[":port"] ?? portOrConfig["port"] ?? 8080 : portOrConfig;
+      if (__activeServer.server) {
+        try {
+          __activeServer.server.close();
+        } catch (_e) {
+        }
+        __activeServer.server = null;
+      }
+      server = http.createServer(async (req, res) => {
+        const requestStart = Date.now();
+        const requestId = generateRequestId();
+        currentRequestId = requestId;
+        const cspNonce = crypto.randomBytes(16).toString("base64url");
+        currentNonce = cspNonce;
+        const method = req.method || "GET";
+        const { path: path19, query } = parseUrl(req.url || "/");
+        const headers = req.headers;
+        const body = await readBody(req);
+        const allowedOrigins = process.env.FL_ALLOWED_ORIGINS;
+        if (allowedOrigins && allowedOrigins !== "*") {
+          const reqOrigin = req.headers["origin"] || "";
+          if (allowedOrigins.split(",").map((s) => s.trim()).includes(reqOrigin)) {
+            res.setHeader("Access-Control-Allow-Origin", reqOrigin);
+            res.setHeader("Vary", "Origin");
+          }
+        } else {
+          res.setHeader("Access-Control-Allow-Origin", "*");
+        }
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+        res.setHeader("X-Request-Id", requestId);
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("X-Frame-Options", "SAMEORIGIN");
+        res.setHeader("X-XSS-Protection", "1; mode=block");
+        res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;`);
+        res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+        if (method === "OPTIONS") {
+          res.writeHead(200);
+          res.end();
+          return;
+        }
+        const clientIp = process.env.FL_TRUST_PROXY === "1" ? (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim() : req.socket.remoteAddress || "unknown";
+        if (!checkRateLimit(clientIp)) {
+          const rlEntry = rlStore.get(clientIp);
+          const retryAfterSec = rlEntry ? Math.max(1, Math.ceil((rlEntry.resetAt - Date.now()) / 1e3)) : Math.ceil(rlWindowMs / 1e3);
+          res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(retryAfterSec) });
+          res.end(JSON.stringify({ error: "Too Many Requests", retry_after: retryAfterSec }));
+          return;
+        }
+        if (method === "GET" && sseRoutes.has(path19)) {
+          const connId = String(++sseConnIdCounter);
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*"
+          });
+          res.write("retry: 3000\n\n");
+          sseConnections.set(connId, res);
+          req.on("close", () => sseConnections.delete(connId));
+          const handlerName = sseRoutes.get(path19);
+          try {
+            callFn(handlerName, [connId]);
+          } catch (_e) {
+          }
+          return;
+        }
+        if (process.env.FL_DEV === "1" && path19 === "/__hot" && method === "GET") {
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+          });
+          res.write("retry: 400\n\n");
+          return;
+        }
+        const baseReq = createFlRequest(method, path19, query, headers, body, {}, requestId);
+        for (const mw of middlewares) {
+          if (!mw.pattern.exec(path19)) continue;
+          try {
+            let mwResult;
+            if (typeof mw.handler === "string") {
+              mwResult = callFn(mw.handler, [baseReq]);
+            } else if (mw.handler?.kind === "function-value" && callFunctionValue2) {
+              mwResult = callFunctionValue2(mw.handler, [baseReq]);
+            }
+            if (mwResult instanceof Promise) mwResult = await mwResult;
+            if (mwResult !== null && mwResult !== void 0) {
+              const mwStatus = mwResult.status ?? (mwResult.__fl_status ?? 200);
+              const headersObj = {};
+              if (mwResult.__fl_headers) Object.assign(headersObj, mwResult.__fl_headers);
+              const mwBody = mwResult.__fl_response ? typeof mwResult.body === "object" ? JSON.stringify(mwResult.body) : String(mwResult.body ?? "") : typeof mwResult === "object" ? JSON.stringify(mwResult) : String(mwResult);
+              const mwCT = mwResult.contentType ?? "application/json";
+              sendResponse(res, mwStatus, mwBody, mwCT, headersObj);
+              logAccess(method, path19, mwStatus, Date.now() - requestStart, requestId);
+              return;
+            }
+          } catch (mwErr) {
+            sendResponse(res, 500, JSON.stringify({ error: mwErr.message ?? "middleware error" }));
+            return;
+          }
+        }
+        let matched = false;
+        for (const route of routes) {
+          if (route.method !== method) continue;
+          const match = route.pattern.exec(path19);
+          if (!match) continue;
+          matched = true;
+          let status = 200;
+          try {
+            const params = {};
+            for (let i = 0; i < route.params.length; i++) {
+              params[route.params[i]] = match[i + 1];
+            }
+            const flReq = createFlRequest(method, path19, query, headers, body, params, requestId);
+            let rawResult;
+            if (typeof route.handler === "string") {
+              rawResult = callFn(route.handler, [flReq]);
+            } else if (route.handler && route.handler.__fl_static_handler === true) {
+              const served = route.handler.fn(req, res, path19);
+              if (served) return;
+              sendResponse(res, 404, { error: "Not found" });
+              return;
+            } else if (route.handler && route.handler.kind === "function-value" && callFunctionValue2) {
+              rawResult = callFunctionValue2(route.handler, [flReq]);
+            } else {
+              throw new Error(`Invalid handler: expected string or function-value, got ${typeof route.handler}`);
+            }
+            const result = rawResult instanceof Promise ? await rawResult : rawResult;
+            if (pendingResponses.has(requestId)) {
+              pendingResponses.delete(requestId);
+            } else if (result && typeof result === "object" && result.__fl_wait_and_respond === true) {
+              const asyncResp = await result.promise;
+              if (!asyncResp) {
+                sendResponse(res, 504, { error: "Gateway Timeout" });
+              } else {
+                status = asyncResp.status ?? 200;
+                let respBody = asyncResp.body ?? "";
+                let contentType = asyncResp.contentType ?? "application/json";
+                const extraHeaders = asyncResp.headers ?? {};
+                if (asyncResp.encoding === "base64" && typeof respBody === "string") {
+                  const buf = Buffer.from(respBody, "base64");
+                  if (extraHeaders["content-type"]) {
+                    contentType = extraHeaders["content-type"];
+                  }
+                  sendResponse(res, status, buf, contentType, extraHeaders);
+                } else {
+                  if (extraHeaders["content-type"]) {
+                    contentType = extraHeaders["content-type"];
+                  }
+                  sendResponse(res, status, respBody, contentType, extraHeaders);
+                }
+              }
+            } else {
+              if (result && typeof result === "object") {
+                const getField = (obj, key) => obj instanceof Map ? obj.get(key) ?? obj.get(":" + key) : obj[key];
+                const resStatus = getField(result, "status");
+                const resBody = getField(result, "body");
+                if (result.__fl_response === true || resStatus !== void 0 && resBody !== void 0) {
+                  status = resStatus ?? 200;
+                  const resHeaders = getField(result, "headers") ?? {};
+                  const headersObj = resHeaders instanceof Map ? Object.fromEntries(resHeaders) : resHeaders;
+                  const contentType = headersObj["content-type"] ?? getField(result, "contentType") ?? "application/json";
+                  sendResponse(res, status, resBody ?? "", contentType, headersObj);
+                } else {
+                  const hint49 = `[FreeLang #49] \uB77C\uC6B0\uD2B8 \uD578\uB4E4\uB7EC\uAC00 map\uC744 \uC9C1\uC811 \uBC18\uD658\uD588\uC2B5\uB2C8\uB2E4.
+  \uC790\uB3D9\uC73C\uB85C JSON \uC9C1\uB82C\uD654\uD558\uC5EC \uC804\uC1A1\uD569\uB2C8\uB2E4.
+  \uBA85\uC2DC\uC801 \uC751\uB2F5: (server-json result) \uC0AC\uC6A9\uC744 \uAD8C\uC7A5\uD569\uB2C8\uB2E4.`;
+                  if (process.env.FL_V12 === "1") {
+                    sendResponse(res, 400, { error: hint49 });
+                  } else {
+                    console.warn(`\u26A0\uFE0F  ${hint49}`);
+                    sendResponse(res, 200, result);
+                  }
+                }
+              } else {
+                sendResponse(res, 200, result ?? "");
+              }
+            }
+            const duration = Date.now() - requestStart;
+            logAccess(method, path19, status, duration, requestId);
+          } catch (err4) {
+            const status2 = 500;
+            sendResponse(res, status2, { error: err4.message });
+            const duration = Date.now() - requestStart;
+            logAccess(method, path19, status2, duration, requestId);
+          }
+          return;
+        }
+        if (!matched) {
+          const status = 404;
+          sendResponse(res, status, { error: "Not Found", path: path19 });
+          const duration = Date.now() - requestStart;
+          logAccess(method, path19, status, duration, requestId);
+        }
+      });
+      server.on("upgrade", (req, socket, head2) => {
+        if (!upgradeHandler) {
+          socket.destroy();
+          return;
+        }
+        const key = req.headers["sec-websocket-key"];
+        if (!key) {
+          socket.destroy();
+          return;
+        }
+        const accept = crypto.createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64");
+        socket.write([
+          "HTTP/1.1 101 Switching Protocols",
+          "Upgrade: websocket",
+          "Connection: Upgrade",
+          "Sec-WebSocket-Accept: " + accept,
+          "",
+          ""
+        ].join("\r\n"));
+        const sessionId = "wsc-" + crypto.randomBytes(8).toString("hex");
+        wsPublicMap.set(sessionId, socket);
+        let buf = Buffer.alloc(0);
+        socket.on("data", async (chunk) => {
+          buf = Buffer.concat([buf, chunk]);
+          while (buf.length >= 2) {
+            const fin = (buf[0] & 128) !== 0;
+            const opcode = buf[0] & 15;
+            const masked = (buf[1] & 128) !== 0;
+            let payloadLen = buf[1] & 127;
+            let hdrLen = 2;
+            if (payloadLen === 126) {
+              if (buf.length < 4) break;
+              payloadLen = buf.readUInt16BE(2);
+              hdrLen = 4;
+            } else if (payloadLen === 127) {
+              if (buf.length < 10) break;
+              payloadLen = Number(buf.readBigUInt64BE(2));
+              hdrLen = 10;
+            }
+            if (masked) hdrLen += 4;
+            if (buf.length < hdrLen + payloadLen) break;
+            let maskKey = null;
+            if (masked) maskKey = buf.slice(hdrLen - 4, hdrLen);
+            const payload = Buffer.from(buf.slice(hdrLen, hdrLen + payloadLen));
+            if (maskKey) {
+              for (let i = 0; i < payload.length; i++) {
+                payload[i] ^= maskKey[i % 4];
+              }
+            }
+            if (opcode === 8) {
+              wsPublicMap.delete(sessionId);
+              if (wsClientCloseHandler) {
+                try {
+                  await callFn(wsClientCloseHandler, [sessionId, 1e3]);
+                } catch {
+                }
+              }
+              socket.end();
+              return;
+            }
+            if (opcode === 9) {
+              socket.write(Buffer.from([138, 0]));
+            } else if (opcode === 1 || opcode === 2) {
+              if (wsClientMessageHandler) {
+                const isBinary = opcode === 2;
+                const data = isBinary ? payload.toString("base64") : payload.toString("utf8");
+                try {
+                  await callFn(wsClientMessageHandler, [sessionId, data, isBinary]);
+                } catch {
+                }
+              }
+            }
+            buf = buf.slice(hdrLen + payloadLen);
+          }
+        });
+        socket.on("close", async () => {
+          wsPublicMap.delete(sessionId);
+          if (wsClientCloseHandler) {
+            try {
+              await callFn(wsClientCloseHandler, [sessionId, 1006]);
+            } catch {
+            }
+          }
+        });
+        socket.on("error", () => {
+          wsPublicMap.delete(sessionId);
+        });
+        const _wsUrl = new URL(req.url || "/", "http://localhost");
+        const _wsQuery = {};
+        _wsUrl.searchParams.forEach((v, k) => {
+          _wsQuery[k] = v;
+        });
+        const upgradeReq = {
+          __fl_request: true,
+          method: "WS_UPGRADE",
+          path: req.url || "/",
+          headers: req.headers,
+          query: _wsQuery,
+          body: "",
+          params: {},
+          session_id: sessionId
+        };
+        callFn(upgradeHandler, [upgradeReq]);
+      });
+      server.on("error", (err4) => {
+        if (err4.code === "EADDRINUSE") {
+          console.warn(`[server] \uD3EC\uD2B8 ${port} \uC774\uBBF8 \uC0AC\uC6A9 \uC911 \u2014 \uC11C\uBC84 \uC2DC\uC791 \uAC74\uB108\uB700`);
+        } else {
+          console.error(`[server] \uC11C\uBC84 \uC624\uB958: ${err4.message}`);
+        }
+      });
+      server.listen(port);
+      __activeServer.server = server;
+      setInterval(() => {
+      }, 1e4).unref();
+      return `server listening on :${port}`;
+    },
+    // server_stop -> null
+    "server_stop": () => {
+      if (server) {
+        server.close();
+        server = null;
+      }
+      return null;
+    },
+    // server_json [status] obj -> response object
+    // (server_json data)        → 200 JSON
+    // (server_json 201 data)    → 201 JSON
+    "server_json": (statusOrBody, maybeBody) => {
+      const isStatus = typeof statusOrBody === "number" && statusOrBody >= 100 && statusOrBody < 600;
+      return {
+        __fl_response: true,
+        status: isStatus ? statusOrBody : 200,
+        contentType: "application/json",
+        body: isStatus ? maybeBody : statusOrBody
+      };
+    },
+    // server_text text -> response object
+    "server_text": (body) => {
+      return {
+        __fl_response: true,
+        status: 200,
         contentType: "text/plain",
         body
       };
