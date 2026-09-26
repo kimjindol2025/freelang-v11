@@ -166,7 +166,7 @@ export function createWorkflowModule() {
         auto_resume?: boolean;
       }
     ): WorkflowResult => {
-      const startMs = T.now();
+      const startMs = T.now_ms();
       const runId = X.uuid_short();
       const checkpointPath = options?.checkpoint_path;
       const checkpointEvery = options?.checkpoint_every ?? 0;
@@ -206,7 +206,7 @@ export function createWorkflowModule() {
             steps_run: stepsOk + stepsFailed,
             steps_ok: stepsOk,
             steps_failed: stepsFailed,
-            total_ms: T.now() - startMs,
+            total_ms: T.now_ms() - startMs,
             log,
             errors: ["Parallel tasks detected. Use workflow_run_async() instead of workflow_run()"],
           };
@@ -237,7 +237,7 @@ export function createWorkflowModule() {
                 steps_run: stepsOk + stepsFailed,
                 steps_ok: stepsOk,
                 steps_failed: stepsFailed,
-                total_ms: T.now() - startMs,
+                total_ms: T.now_ms() - startMs,
                 log,
                 errors,
               };
@@ -246,7 +246,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepStart = T.now();
+        const stepStart = T.now_ms();
         let success = false;
         let lastErr = "";
         const maxAttempts = (step.retry ?? 0) + 1;
@@ -268,7 +268,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepMs = T.now() - stepStart;
+        const stepMs = T.now_ms() - stepStart;
 
         if (success) {
           stepsOk++;
@@ -359,7 +359,7 @@ export function createWorkflowModule() {
                 steps_run: stepsOk + stepsFailed,
                 steps_ok: stepsOk,
                 steps_failed: stepsFailed,
-                total_ms: T.now() - startMs,
+                total_ms: T.now_ms() - startMs,
                 log,
                 errors,
               };
@@ -368,7 +368,7 @@ export function createWorkflowModule() {
         }
       }
 
-      const totalMs = T.now() - startMs;
+      const totalMs = T.now_ms() - startMs;
       const status = stepsFailed === 0 ? "success" : "partial";
 
       if ((status === "success" || status === "partial") && checkpointPath) {
@@ -402,7 +402,7 @@ export function createWorkflowModule() {
         auto_resume?: boolean;
       }
     ): Promise<WorkflowResult> => {
-      const startMs = T.now();
+      const startMs = T.now_ms();
       const runId = X.uuid_short();
       const traceId = X.uuid_short();  // P1-4: Trace ID for distributed tracing
       const checkpointPath = options?.checkpoint_path;
@@ -434,7 +434,7 @@ export function createWorkflowModule() {
 
       // P1-1: Helper to execute a single step (with retry, error handling, etc)
       const executeStep = async (step: WorkflowStep, currentCtx: Record<string, any>): Promise<{ success: boolean; result: any; error: string; ms: number }> => {
-        const stepStart = T.now();
+        const stepStart = T.now_ms();
         let success = false;
         let lastErr = "";
         const maxAttempts = (step.retry ?? 0) + 1;
@@ -455,7 +455,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepMs = T.now() - stepStart;
+        const stepMs = T.now_ms() - stepStart;
         return { success, result: stepResult, error: lastErr, ms: stepMs };
       };
 
@@ -546,7 +546,7 @@ export function createWorkflowModule() {
                 steps_run: stepsOk + stepsFailed,
                 steps_ok: stepsOk,
                 steps_failed: stepsFailed,
-                total_ms: T.now() - startMs,
+                total_ms: T.now_ms() - startMs,
                 log,
                 errors,
                 compensations,
@@ -556,7 +556,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepStart = T.now();
+        const stepStart = T.now_ms();
         let success = false;
         let lastErr = "";
         let stepResult: any = undefined;
@@ -566,7 +566,7 @@ export function createWorkflowModule() {
         if (step.parallel_tasks && step.parallel_tasks.length > 0) {
           const mergeStrategy = step.merge_strategy ?? "all-success";
           const parallelResult = await executeParallelTasks(step.parallel_tasks, mergeStrategy, ctx);
-          stepMs = T.now() - stepStart;
+          stepMs = T.now_ms() - stepStart;
 
           if (parallelResult.success) {
             success = true;
@@ -612,7 +612,7 @@ export function createWorkflowModule() {
                     steps_run: stepsOk + stepsFailed,
                     steps_ok: stepsOk,
                     steps_failed: stepsFailed,
-                    total_ms: T.now() - startMs,
+                    total_ms: T.now_ms() - startMs,
                     log,
                     errors,
                     compensations,
@@ -632,7 +632,7 @@ export function createWorkflowModule() {
                   steps_run: stepsOk + stepsFailed,
                   steps_ok: stepsOk,
                   steps_failed: stepsFailed,
-                  total_ms: T.now() - startMs,
+                  total_ms: T.now_ms() - startMs,
                   log,
                   errors,
                   compensations,
@@ -748,7 +748,7 @@ export function createWorkflowModule() {
                   steps_run: stepsOk + stepsFailed,
                   steps_ok: stepsOk,
                   steps_failed: stepsFailed,
-                  total_ms: T.now() - startMs,
+                  total_ms: T.now_ms() - startMs,
                   log,
                   errors,
                   compensations,
@@ -759,7 +759,7 @@ export function createWorkflowModule() {
         }
       }
 
-      const totalMs = T.now() - startMs;
+      const totalMs = T.now_ms() - startMs;
       const status = stepsFailed === 0 ? "success" : "partial";
 
       if ((status === "success" || status === "partial") && checkpointPath) {
