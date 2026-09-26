@@ -57,6 +57,35 @@ stop_server() {
   server_pid=""
 }
 
+assert_observed() {
+  local body_file="$1"
+  local headers_file="$2"
+  local expected_status="$3"
+  local expected_code="$4"
+  local response_request_id log_line=""
+
+  response_request_id="$(awk 'tolower($1) == "x-request-id:" { gsub("\r", "", $2); print $2 }' "${headers_file}" | tail -n 1)"
+  [[ -n "${response_request_id}" ]]
+  jq -e --arg request_id "${response_request_id}" '.request_id == $request_id' "${body_file}" >/dev/null
+
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    log_line="$(grep '^{' "${proof_tmp}/server.log" | grep -F "\"request_id\":\"${response_request_id}\"" | tail -n 1 || true)"
+    [[ -n "${log_line}" ]] && break
+    sleep 0.05
+  done
+  [[ -n "${log_line}" ]]
+
+  if [[ "${expected_code}" == "null" ]]; then
+    jq -e --argjson status "${expected_status}" \
+      '.event == "backend_request" and .status == $status and .error_code == null' \
+      <<<"${log_line}" >/dev/null
+  else
+    jq -e --argjson status "${expected_status}" --arg code "${expected_code}" \
+      '.event == "backend_request" and .status == $status and .error_code == $code' \
+      <<<"${log_line}" >/dev/null
+  fi
+}
+
 start_server
 
 migrated_columns="$(node - "${proof_db}" <<'NODE'
@@ -87,10 +116,12 @@ jq -e '
 curl -fsS -X DELETE -H "${auth_header}" http://127.0.0.1:40117/api/items/1 \
   | jq -e '.ok == true and .data.deleted == 1' >/dev/null
 
-unauthorized_status="$(curl -sS -o "${proof_tmp}/unauthorized.json" -w '%{http_code}' \
+unauthorized_status="$(curl -sS -D "${proof_tmp}/unauthorized.headers" \
+  -o "${proof_tmp}/unauthorized.json" -w '%{http_code}' \
   http://127.0.0.1:40117/api/items)"
 [[ "${unauthorized_status}" == "401" ]]
 jq -e '.ok == false and .data == null and .error.code == "UNAUTHORIZED"' "${proof_tmp}/unauthorized.json" >/dev/null
+assert_observed "${proof_tmp}/unauthorized.json" "${proof_tmp}/unauthorized.headers" 401 "UNAUTHORIZED"
 
 wrong_token_status="$(curl -sS -o /dev/null -w '%{http_code}' \
   -H 'authorization: Bearer wrong-token' http://127.0.0.1:40117/api/items)"
@@ -101,8 +132,11 @@ unauthorized_write_status="$(curl -sS -o /dev/null -w '%{http_code}' \
   http://127.0.0.1:40117/api/items)"
 [[ "${unauthorized_write_status}" == "401" ]]
 
-before_create="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
+curl -fsS -D "${proof_tmp}/list.headers" -o "${proof_tmp}/list.json" \
+  -H "${auth_header}" http://127.0.0.1:40117/api/items
+before_create="$(cat "${proof_tmp}/list.json")"
 jq -e '.ok == true and .error == null and (.data.items | length) == 0' <<<"${before_create}" >/dev/null
+assert_observed "${proof_tmp}/list.json" "${proof_tmp}/list.headers" 200 null
 
 invalid_json_status="$(curl -sS -o "${proof_tmp}/invalid-json.json" -w '%{http_code}' \
   -X POST -H "${auth_header}" -H 'idempotency-key: invalid-json' -H 'content-type: application/json' \
@@ -177,12 +211,14 @@ replayed="$(curl -fsS -X POST -H "${auth_header}" -H 'idempotency-key: concurren
   http://127.0.0.1:40117/api/items)"
 jq -e --argjson id "${item_id}" '.data.item.id == $id' <<<"${replayed}" >/dev/null
 
-conflict_status="$(curl -sS -o "${proof_tmp}/conflict.json" -w '%{http_code}' \
+conflict_status="$(curl -sS -D "${proof_tmp}/conflict.headers" \
+  -o "${proof_tmp}/conflict.json" -w '%{http_code}' \
   -X POST -H "${auth_header}" -H 'idempotency-key: concurrent-create-1' \
   -H 'content-type: application/json' --data '{"name":"different"}' \
   http://127.0.0.1:40117/api/items)"
 [[ "${conflict_status}" == "409" ]]
 jq -e '.error.code == "IDEMPOTENCY_CONFLICT"' "${proof_tmp}/conflict.json" >/dev/null
+assert_observed "${proof_tmp}/conflict.json" "${proof_tmp}/conflict.headers" 409 "IDEMPOTENCY_CONFLICT"
 
 after_concurrency="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
 jq -e --argjson id "${item_id}" \
@@ -253,6 +289,9 @@ printf '%s\n' \
   'LEGACY_SCHEMA_MIGRATION=PASS' \
   'LEGACY_DATA_PRESERVED=PASS' \
   'MIGRATION_RESTART_IDEMPOTENT=PASS' \
+  'REQUEST_ID_RESPONSE_HEADER_BODY=PASS' \
+  'STRUCTURED_LOG_CORRELATION=PASS' \
+  'SUCCESS_AUTH_FAILURE_CONFLICT_OBSERVED=PASS' \
   'NO_TOKEN_BLOCKED=PASS' \
   'WRONG_TOKEN_BLOCKED=PASS' \
   'UNAUTHORIZED_MUTATION_BLOCKED=PASS' \

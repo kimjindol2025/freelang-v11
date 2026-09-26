@@ -52,17 +52,37 @@
        (= (server-req-header $req "authorization")
           (str "Bearer " $API-TOKEN))))
 
-(defn respond-ok [$data]
-  (server-json {"ok" true "data" $data "error" null}))
+(defn request-id [$req]
+  (get $req "request_id"))
 
-(defn respond-error [$status $code]
-  (server-status $status
-    (json-stringify {"ok" false
-                     "data" null
-                     "error" {"code" $code}})))
+(defn log-response [$req $status $code]
+  (println (json-stringify
+    {"event" "backend_request"
+     "request_id" (request-id $req)
+     "method" (get $req "method")
+     "path" (get $req "path")
+     "status" $status
+     "error_code" $code})))
 
-(defn unauthorized []
-  (respond-error 401 "UNAUTHORIZED"))
+(defn respond-ok [$req $data]
+  (do
+    (log-response $req 200 null)
+    (server-json {"ok" true
+                  "data" $data
+                  "error" null
+                  "request_id" (request-id $req)})))
+
+(defn respond-error [$req $status $code]
+  (do
+    (log-response $req $status $code)
+    (server-status $status
+      (json-stringify {"ok" false
+                       "data" null
+                       "error" {"code" $code}
+                       "request_id" (request-id $req)}))))
+
+(defn unauthorized [$req]
+  (respond-error $req 401 "UNAUTHORIZED"))
 
 (defn valid-name? [$name]
   (and (string? $name) (> (length (str-trim $name)) 0)))
@@ -74,32 +94,32 @@
   (and (string? $key) (> (length (str-trim $key)) 0)))
 
 (defn handle-health [$req]
-  (respond-ok {"service" "freelang-backend-proof"}))
+  (respond-ok $req {"service" "freelang-backend-proof"}))
 
 (defn handle-list [$req]
   (if (authorized? $req)
-    (respond-ok {"items" (db-query $DB "SELECT id, name, created_at, version FROM items ORDER BY id" [])})
-    (unauthorized)))
+    (respond-ok $req {"items" (db-query $DB "SELECT id, name, created_at, version FROM items ORDER BY id" [])})
+    (unauthorized $req)))
 
 (defn handle-get [$req]
   (if (authorized? $req)
     (let [[$item (item-by-id (item-id $req))]]
       (if (= $item null)
-        (respond-error 404 "NOT_FOUND")
-        (respond-ok {"item" $item})))
-    (unauthorized)))
+        (respond-error $req 404 "NOT_FOUND")
+        (respond-ok $req {"item" $item})))
+    (unauthorized $req)))
 
 (defn handle-create [$req]
   (if (authorized? $req)
     (let [[$body (server-req-json $req)]]
       (if (= $body null)
-        (respond-error 400 "INVALID_JSON")
+        (respond-error $req 400 "INVALID_JSON")
         (let [[$name (get $body "name")]
               [$key (idempotency-key $req)]]
           (if (not (valid-name? $name))
-            (respond-error 400 "INVALID_INPUT")
+            (respond-error $req 400 "INVALID_INPUT")
             (if (not (valid-idempotency-key? $key))
-              (respond-error 400 "IDEMPOTENCY_KEY_REQUIRED")
+              (respond-error $req 400 "IDEMPOTENCY_KEY_REQUIRED")
               (let [[$clean-name (str-trim $name)]
                     [$clean-key (str-trim $key)]
                     [$existing (item-by-key $clean-key)]]
@@ -108,43 +128,43 @@
                                   "INSERT INTO items (name, created_at, idempotency_key, request_name) VALUES (?, ?, ?, ?)"
                                   [$clean-name (now-iso) $clean-key $clean-name])]
                         [$id (get $result "insertId")]]
-                    (respond-ok {"item" (item-by-id $id)}))
+                    (respond-ok $req {"item" (item-by-id $id)}))
                   (if (= (get $existing "request_name") $clean-name)
-                    (respond-ok {"item" (item-by-id (get $existing "id"))})
-                    (respond-error 409 "IDEMPOTENCY_CONFLICT")))))))))
-    (unauthorized)))
+                    (respond-ok $req {"item" (item-by-id (get $existing "id"))})
+                    (respond-error $req 409 "IDEMPOTENCY_CONFLICT")))))))))
+    (unauthorized $req)))
 
 (defn handle-update [$req]
   (if (authorized? $req)
     (let [[$id (item-id $req)]
           [$body (server-req-json $req)]]
       (if (= $body null)
-        (respond-error 400 "INVALID_JSON")
+        (respond-error $req 400 "INVALID_JSON")
         (let [[$name (get $body "name")]
               [$expected-version (get $body "version")]
               [$item (item-by-id $id)]]
           (if (or (not (valid-name? $name))
                   (not (number? $expected-version))
                   (< $expected-version 1))
-            (respond-error 400 "INVALID_INPUT")
+            (respond-error $req 400 "INVALID_INPUT")
             (if (= $item null)
-              (respond-error 404 "NOT_FOUND")
+              (respond-error $req 404 "NOT_FOUND")
               (let [[$result (db-exec $DB
                                "UPDATE items SET name = ?, version = version + 1 WHERE id = ? AND version = ?"
                                [(str-trim $name) $id $expected-version])]]
                 (if (= (get $result "affectedRows") 0)
-                  (respond-error 409 "VERSION_CONFLICT")
-                  (respond-ok {"item" (item-by-id $id)}))))))))
-    (unauthorized)))
+                  (respond-error $req 409 "VERSION_CONFLICT")
+                  (respond-ok $req {"item" (item-by-id $id)}))))))))
+    (unauthorized $req)))
 
 (defn handle-delete [$req]
   (if (authorized? $req)
     (let [[$id (item-id $req)]
           [$result (db-exec $DB "DELETE FROM items WHERE id = ?" [$id])]]
       (if (= (get $result "affectedRows") 0)
-        (respond-error 404 "NOT_FOUND")
-        (respond-ok {"deleted" 1})))
-    (unauthorized)))
+        (respond-error $req 404 "NOT_FOUND")
+        (respond-ok $req {"deleted" 1})))
+    (unauthorized $req)))
 
 (server-get "/health" "handle-health")
 (server-get "/api/items" "handle-list")

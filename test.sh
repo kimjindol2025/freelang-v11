@@ -108,7 +108,7 @@ run_integration() {
 
   if [[ -f "${SCRIPT_DIR}/tests/runners/run-integration.sh" ]]; then
     if bash "${SCRIPT_DIR}/tests/runners/run-integration.sh" 2>/dev/null; then
-      log_pass "Integration tests: HTTP/DB/migration/auth/idempotency/CAS/restart persistence 통과"
+      log_pass "Integration tests: HTTP/DB/migration/auth/idempotency/CAS/observability/restart persistence 통과"
     else
       log_fail "Integration tests: 일부 실패"
     fi
