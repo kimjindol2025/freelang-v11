@@ -4,6 +4,7 @@
 ;;   node bootstrap.js run examples/backend-proof/app.fl
 
 (define $DB-PATH (or (env-get "FL_BACKEND_PROOF_DB") "./backend-proof.sqlite"))
+(define $API-TOKEN (or (env-get "FL_BACKEND_PROOF_TOKEN") ""))
 (define $DB {:type "sqlite" :path $DB-PATH})
 
 (db-exec $DB
@@ -13,39 +14,55 @@
 (defn item-id [$req]
   (get (get $req "params") "id"))
 
+(defn authorized? [$req]
+  (and (> (length $API-TOKEN) 0)
+       (= (server-req-header $req "authorization")
+          (str "Bearer " $API-TOKEN))))
+
+(defn unauthorized []
+  (server-status 401 (json-stringify {"ok" false "error" "UNAUTHORIZED"})))
+
 (defn handle-health [$req]
   (server-json {"ok" true "service" "freelang-backend-proof"}))
 
 (defn handle-list [$req]
-  (server-json {"ok" true
-                "items" (db-query $DB "SELECT id, name, created_at FROM items ORDER BY id" [])}))
+  (if (authorized? $req)
+    (server-json {"ok" true
+                  "items" (db-query $DB "SELECT id, name, created_at FROM items ORDER BY id" [])})
+    (unauthorized)))
 
 (defn handle-create [$req]
-  (let [[$body (server-req-json $req)]
-        [$name (get $body "name")]
-        [$result (db-exec $DB
-                  "INSERT INTO items (name, created_at) VALUES (?, ?)"
-                  [$name (now-iso)])]
-        [$id (get $result "insertId")]]
-    (server-json {"ok" true
-                  "item" (first (db-query $DB
-                            "SELECT id, name, created_at FROM items WHERE id = ?"
-                            [$id]))})))
+  (if (authorized? $req)
+    (let [[$body (server-req-json $req)]
+          [$name (get $body "name")]
+          [$result (db-exec $DB
+                    "INSERT INTO items (name, created_at) VALUES (?, ?)"
+                    [$name (now-iso)])]
+          [$id (get $result "insertId")]]
+      (server-json {"ok" true
+                    "item" (first (db-query $DB
+                              "SELECT id, name, created_at FROM items WHERE id = ?"
+                              [$id]))}))
+    (unauthorized)))
 
 (defn handle-update [$req]
-  (let [[$id (item-id $req)]
-        [$body (server-req-json $req)]
-        [$name (get $body "name")]]
-    (db-exec $DB "UPDATE items SET name = ? WHERE id = ?" [$name $id])
-    (server-json {"ok" true
-                  "item" (first (db-query $DB
-                            "SELECT id, name, created_at FROM items WHERE id = ?"
-                            [$id]))})))
+  (if (authorized? $req)
+    (let [[$id (item-id $req)]
+          [$body (server-req-json $req)]
+          [$name (get $body "name")]]
+      (db-exec $DB "UPDATE items SET name = ? WHERE id = ?" [$name $id])
+      (server-json {"ok" true
+                    "item" (first (db-query $DB
+                              "SELECT id, name, created_at FROM items WHERE id = ?"
+                              [$id]))}))
+    (unauthorized)))
 
 (defn handle-delete [$req]
-  (let [[$id (item-id $req)]
-        [$result (db-exec $DB "DELETE FROM items WHERE id = ?" [$id])]]
-    (server-json {"ok" true "deleted" (get $result "affectedRows")})))
+  (if (authorized? $req)
+    (let [[$id (item-id $req)]
+          [$result (db-exec $DB "DELETE FROM items WHERE id = ?" [$id])]]
+      (server-json {"ok" true "deleted" (get $result "affectedRows")}))
+    (unauthorized)))
 
 (server-get "/health" "handle-health")
 (server-get "/api/items" "handle-list")
