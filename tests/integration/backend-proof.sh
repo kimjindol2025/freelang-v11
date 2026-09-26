@@ -48,7 +48,7 @@ start_server
 unauthorized_status="$(curl -sS -o "${proof_tmp}/unauthorized.json" -w '%{http_code}' \
   http://127.0.0.1:40117/api/items)"
 [[ "${unauthorized_status}" == "401" ]]
-jq -e '.ok == false and .error == "UNAUTHORIZED"' "${proof_tmp}/unauthorized.json" >/dev/null
+jq -e '.ok == false and .data == null and .error.code == "UNAUTHORIZED"' "${proof_tmp}/unauthorized.json" >/dev/null
 
 wrong_token_status="$(curl -sS -o /dev/null -w '%{http_code}' \
   -H 'authorization: Bearer wrong-token' http://127.0.0.1:40117/api/items)"
@@ -60,30 +60,78 @@ unauthorized_write_status="$(curl -sS -o /dev/null -w '%{http_code}' \
 [[ "${unauthorized_write_status}" == "401" ]]
 
 before_create="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
-jq -e '.ok == true and (.items | length) == 0' <<<"${before_create}" >/dev/null
+jq -e '.ok == true and .error == null and (.data.items | length) == 0' <<<"${before_create}" >/dev/null
+
+invalid_json_status="$(curl -sS -o "${proof_tmp}/invalid-json.json" -w '%{http_code}' \
+  -X POST -H "${auth_header}" -H 'content-type: application/json' \
+  --data '{"name":' http://127.0.0.1:40117/api/items)"
+[[ "${invalid_json_status}" == "400" ]]
+jq -e '.ok == false and .data == null and .error.code == "INVALID_JSON"' \
+  "${proof_tmp}/invalid-json.json" >/dev/null
+
+missing_name_status="$(curl -sS -o "${proof_tmp}/missing-name.json" -w '%{http_code}' \
+  -X POST -H "${auth_header}" -H 'content-type: application/json' \
+  --data '{}' http://127.0.0.1:40117/api/items)"
+[[ "${missing_name_status}" == "400" ]]
+jq -e '.error.code == "INVALID_INPUT"' "${proof_tmp}/missing-name.json" >/dev/null
+
+blank_name_status="$(curl -sS -o "${proof_tmp}/blank-name.json" -w '%{http_code}' \
+  -X POST -H "${auth_header}" -H 'content-type: application/json' \
+  --data '{"name":"   "}' http://127.0.0.1:40117/api/items)"
+[[ "${blank_name_status}" == "400" ]]
+jq -e '.error.code == "INVALID_INPUT"' "${proof_tmp}/blank-name.json" >/dev/null
+
+for operation in get update delete; do
+  case "${operation}" in
+    get)
+      method=GET
+      body_args=()
+      ;;
+    update)
+      method=PUT
+      body_args=(-H 'content-type: application/json' --data '{"name":"missing"}')
+      ;;
+    delete)
+      method=DELETE
+      body_args=()
+      ;;
+  esac
+  not_found_status="$(curl -sS -o "${proof_tmp}/not-found-${operation}.json" -w '%{http_code}' \
+    -X "${method}" -H "${auth_header}" "${body_args[@]}" \
+    http://127.0.0.1:40117/api/items/999999)"
+  [[ "${not_found_status}" == "404" ]]
+  jq -e '.ok == false and .data == null and .error.code == "NOT_FOUND"' \
+    "${proof_tmp}/not-found-${operation}.json" >/dev/null
+done
+
+after_failures="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
+jq -e '(.data.items | length) == 0' <<<"${after_failures}" >/dev/null
 
 created="$(curl -fsS -X POST -H "${auth_header}" -H 'content-type: application/json' \
   --data '{"name":"first"}' http://127.0.0.1:40117/api/items)"
-item_id="$(jq -er '.item.id' <<<"${created}")"
-jq -e '.ok == true and .item.name == "first"' <<<"${created}" >/dev/null
+item_id="$(jq -er '.data.item.id' <<<"${created}")"
+jq -e '.ok == true and .error == null and .data.item.name == "first"' <<<"${created}" >/dev/null
+
+read_one="$(curl -fsS -H "${auth_header}" "http://127.0.0.1:40117/api/items/${item_id}")"
+jq -e --argjson id "${item_id}" '.data.item.id == $id and .data.item.name == "first"' <<<"${read_one}" >/dev/null
 
 updated="$(curl -fsS -X PUT -H "${auth_header}" -H 'content-type: application/json' \
   --data '{"name":"updated"}' "http://127.0.0.1:40117/api/items/${item_id}")"
-jq -e '.ok == true and .item.name == "updated"' <<<"${updated}" >/dev/null
+jq -e '.ok == true and .data.item.name == "updated"' <<<"${updated}" >/dev/null
 
 stop_server
 start_server
 
 after_restart="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
 jq -e --argjson id "${item_id}" \
-  '.ok == true and (.items | length) == 1 and .items[0].id == $id and .items[0].name == "updated"' \
+  '.ok == true and (.data.items | length) == 1 and .data.items[0].id == $id and .data.items[0].name == "updated"' \
   <<<"${after_restart}" >/dev/null
 
 deleted="$(curl -fsS -X DELETE -H "${auth_header}" "http://127.0.0.1:40117/api/items/${item_id}")"
-jq -e '.ok == true and .deleted == 1' <<<"${deleted}" >/dev/null
+jq -e '.ok == true and .data.deleted == 1' <<<"${deleted}" >/dev/null
 
 final="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
-jq -e '.ok == true and (.items | length) == 0' <<<"${final}" >/dev/null
+jq -e '.ok == true and (.data.items | length) == 0' <<<"${final}" >/dev/null
 
 printf '%s\n' \
   'BACKEND_PROOF=PASS' \
@@ -91,6 +139,10 @@ printf '%s\n' \
   'WRONG_TOKEN_BLOCKED=PASS' \
   'UNAUTHORIZED_MUTATION_BLOCKED=PASS' \
   'VALID_TOKEN_ALLOWED=PASS' \
+  'INVALID_JSON=PASS' \
+  'INVALID_INPUT=PASS' \
+  'NOT_FOUND_GET_UPDATE_DELETE=PASS' \
+  'FAILED_REQUEST_DB_MUTATION=0' \
   'CREATE=PASS' \
   'READ=PASS' \
   'UPDATE=PASS' \
