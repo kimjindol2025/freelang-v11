@@ -19,6 +19,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
+node - "${proof_db}" <<'NODE'
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[2]);
+db.exec(`
+  CREATE TABLE items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  INSERT INTO items (name, created_at) VALUES ('legacy-item', '2026-01-01T00:00:00.000Z');
+`);
+db.close();
+NODE
+
 start_server() {
   FL_BACKEND_PROOF_DB="${proof_db}" \
   FL_BACKEND_PROOF_TOKEN="${proof_token}" \
@@ -44,6 +58,34 @@ stop_server() {
 }
 
 start_server
+
+migrated_columns="$(node - "${proof_db}" <<'NODE'
+const { DatabaseSync } = require('node:sqlite');
+const db = new DatabaseSync(process.argv[2]);
+const columns = db.prepare('PRAGMA table_info(items)').all().map((column) => column.name).sort();
+const indexes = db.prepare("PRAGMA index_list('items')").all().map((index) => index.name);
+console.log(JSON.stringify({ columns, indexes }));
+db.close();
+NODE
+)"
+jq -e '
+  (.columns | index("idempotency_key")) != null and
+  (.columns | index("request_name")) != null and
+  (.columns | index("version")) != null and
+  (.indexes | index("items_idempotency_key_uq")) != null
+' <<<"${migrated_columns}" >/dev/null
+
+migrated_item="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items/1)"
+jq -e '
+  .ok == true and
+  .data.item.id == 1 and
+  .data.item.name == "legacy-item" and
+  .data.item.created_at == "2026-01-01T00:00:00.000Z" and
+  .data.item.version == 1
+' <<<"${migrated_item}" >/dev/null
+
+curl -fsS -X DELETE -H "${auth_header}" http://127.0.0.1:40117/api/items/1 \
+  | jq -e '.ok == true and .data.deleted == 1' >/dev/null
 
 unauthorized_status="$(curl -sS -o "${proof_tmp}/unauthorized.json" -w '%{http_code}' \
   http://127.0.0.1:40117/api/items)"
@@ -208,6 +250,9 @@ jq -e '.ok == true and (.data.items | length) == 0' <<<"${final}" >/dev/null
 
 printf '%s\n' \
   'BACKEND_PROOF=PASS' \
+  'LEGACY_SCHEMA_MIGRATION=PASS' \
+  'LEGACY_DATA_PRESERVED=PASS' \
+  'MIGRATION_RESTART_IDEMPOTENT=PASS' \
   'NO_TOKEN_BLOCKED=PASS' \
   'WRONG_TOKEN_BLOCKED=PASS' \
   'UNAUTHORIZED_MUTATION_BLOCKED=PASS' \
