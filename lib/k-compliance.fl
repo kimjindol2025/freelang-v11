@@ -1,0 +1,467 @@
+;; lib/k-compliance.fl
+;; K-Compliance v11 port of freelang-korean src/kstdlib/compliance
+;; Load: (load "lib/k-compliance.fl")
+;;
+;; Pure format/checksum only. No live registry lookup.
+;; Test fixtures are synthetic. Do not use real identifiers.
+;; Audit/RBAC take an explicit store and return a new store (immutable).
+;; Crypto/file I/O are host-bound; wrappers fail loudly if host fn missing.
+
+;; -- chars / digits --
+
+(defn kc/char-at [$s $i]
+  (nth $s $i))
+
+(defn kc/digit-char? [$ch]
+  (or (= $ch "0") (= $ch "1") (= $ch "2") (= $ch "3") (= $ch "4")
+      (= $ch "5") (= $ch "6") (= $ch "7") (= $ch "8") (= $ch "9")))
+
+(defn kc/sep-char? [$ch]
+  (or (= $ch "-") (= $ch " ") (= $ch ".")))
+
+(defn kc/char-digit [$ch]
+  (cond
+    [(= $ch "0") 0]
+    [(= $ch "1") 1]
+    [(= $ch "2") 2]
+    [(= $ch "3") 3]
+    [(= $ch "4") 4]
+    [(= $ch "5") 5]
+    [(= $ch "6") 6]
+    [(= $ch "7") 7]
+    [(= $ch "8") 8]
+    [(= $ch "9") 9]
+    [true -1]))
+
+(defn kc/strip-seps [$s]
+  (loop [$i 0 $acc ""]
+    (if (>= $i (length $s))
+      $acc
+      (let [[$ch (kc/char-at $s $i)]]
+        (recur (+ $i 1)
+               (if (kc/sep-char? $ch) $acc (str $acc $ch)))))))
+
+(defn kc/all-digits? [$s]
+  (if (= (length $s) 0)
+    false
+    (loop [$i 0]
+      (if (>= $i (length $s))
+        true
+        (if (kc/digit-char? (kc/char-at $s $i))
+          (recur (+ $i 1))
+          false)))))
+
+(defn kc/slice [$s $start $end]
+  (loop [$i $start $acc ""]
+    (if (>= $i $end)
+      $acc
+      (recur (+ $i 1) (str $acc (kc/char-at $s $i))))))
+
+(defn kc/two-digit [$s $i]
+  (let [[$a (kc/char-digit (kc/char-at $s $i))]
+        [$b (kc/char-digit (kc/char-at $s (+ $i 1)))]]
+    (if (or (< $a 0) (< $b 0))
+      -1
+      (+ (* $a 10) $b))))
+
+(defn kc/leap-year? [$y]
+  (cond
+    [(= (mod $y 400) 0) true]
+    [(= (mod $y 100) 0) false]
+    [(= (mod $y 4) 0) true]
+    [true false]))
+
+(defn kc/last-day [$y $m]
+  (cond
+    [(= $m 2) (if (kc/leap-year? $y) 29 28)]
+    [(or (= $m 4) (= $m 6) (= $m 9) (= $m 11)) 30]
+    [true 31]))
+
+(defn kc/valid-date? [$y $m $d]
+  (if (or (< $m 1) (> $m 12) (< $d 1))
+    false
+    (if (> $d (kc/last-day $y $m))
+      false
+      true)))
+
+(defn kc/rrn-year [$gender $yy]
+  (cond
+    [(or (= $gender 1) (= $gender 2) (= $gender 5) (= $gender 6)) (+ 1900 $yy)]
+    [(or (= $gender 3) (= $gender 4) (= $gender 7) (= $gender 8)) (+ 2000 $yy)]
+    [(or (= $gender 9) (= $gender 0)) (+ 1800 $yy)]
+    [true -1]))
+
+;; -- identity --
+
+(defn 주민등록번호_유효성확인 [$rrn]
+  (let [[$digits (kc/strip-seps $rrn)]]
+    (if (not (= (length $digits) 13))
+      false
+      (if (not (kc/all-digits? $digits))
+        false
+        (let [[$yy (kc/two-digit $digits 0)]
+              [$mm (kc/two-digit $digits 2)]
+              [$dd (kc/two-digit $digits 4)]
+              [$g (kc/char-digit (kc/char-at $digits 6))]
+              [$year (kc/rrn-year $g $yy)]]
+          (if (< $year 0)
+            false
+            (if (not (kc/valid-date? $year $mm $dd))
+              false
+              (let [[$weights [2 3 4 5 6 7 8 9 2 3 4 5]]
+                    [$sum (loop [$i 0 $acc 0]
+                            (if (>= $i 12)
+                              $acc
+                              (recur (+ $i 1)
+                                     (+ $acc (* (kc/char-digit (kc/char-at $digits $i))
+                                                (nth $weights $i))))))]
+                    [$check (mod (- 11 (mod $sum 11)) 10)]]
+                (= $check (kc/char-digit (kc/char-at $digits 12)))))))))))
+
+(defn 사업자등록번호_유효성확인 [$brn]
+  (let [[$digits (kc/strip-seps $brn)]]
+    (if (not (= (length $digits) 10))
+      false
+      (if (not (kc/all-digits? $digits))
+        false
+        (let [[$weights [1 3 7 1 3 7 1 3 5]]
+              [$base (loop [$i 0 $acc 0]
+                       (if (>= $i 9)
+                         $acc
+                         (recur (+ $i 1)
+                                (+ $acc (* (kc/char-digit (kc/char-at $digits $i))
+                                           (nth $weights $i))))))]
+              [$extra (quot (* (kc/char-digit (kc/char-at $digits 8)) 5) 10)]
+              [$sum (+ $base $extra)]
+              [$check (mod (- 10 (mod $sum 10)) 10)]]
+          (= $check (kc/char-digit (kc/char-at $digits 9))))))))
+
+(defn 법인등록번호_유효성확인 [$crn]
+  (let [[$digits (kc/strip-seps $crn)]]
+    (if (not (= (length $digits) 13))
+      false
+      (if (not (kc/all-digits? $digits))
+        false
+        (let [[$weights [1 2 1 2 1 2 1 2 1 2 1 2]]
+              [$sum (loop [$i 0 $acc 0]
+                      (if (>= $i 12)
+                        $acc
+                        (let [[$p (* (kc/char-digit (kc/char-at $digits $i))
+                                     (nth $weights $i))]
+                              [$folded (if (>= $p 10)
+                                         (+ (quot $p 10) (mod $p 10))
+                                         $p)]]
+                          (recur (+ $i 1) (+ $acc $folded)))))]
+              [$check (mod (- 10 (mod $sum 10)) 10)]]
+          (= $check (kc/char-digit (kc/char-at $digits 12))))))))
+
+(defn kc/mobile-prefix? [$p]
+  (or (= $p "010") (= $p "011") (= $p "016")
+      (= $p "017") (= $p "018") (= $p "019")))
+
+(defn 국내휴대폰번호_유효성확인 [$phone]
+  (let [[$digits (kc/strip-seps $phone)]
+        [$n (length $digits)]]
+    (if (not (or (= $n 10) (= $n 11)))
+      false
+      (if (not (kc/all-digits? $digits))
+        false
+        (let [[$prefix (kc/slice $digits 0 3)]]
+          (if (not (kc/mobile-prefix? $prefix))
+            false
+            (if (and (= $prefix "010") (not (= $n 11)))
+              false
+              true)))))))
+
+(defn kc/area-len [$digits]
+  (if (and (= (kc/char-at $digits 0) "0")
+           (= (kc/char-at $digits 1) "2"))
+    2
+    3))
+
+(defn kc/area-code? [$p]
+  (or (= $p "02")
+      (= $p "031") (= $p "032") (= $p "033")
+      (= $p "041") (= $p "042") (= $p "043") (= $p "044")
+      (= $p "051") (= $p "052") (= $p "053") (= $p "054") (= $p "055")
+      (= $p "061") (= $p "062") (= $p "063") (= $p "064")
+      (= $p "070") (= $p "080")))
+
+(defn 국내전화번호_유효성확인 [$phone]
+  (let [[$digits (kc/strip-seps $phone)]
+        [$n (length $digits)]]
+    (if (not (kc/all-digits? $digits))
+      false
+      (if (or (< $n 9) (> $n 11))
+        false
+        (let [[$alen (kc/area-len $digits)]
+              [$prefix (kc/slice $digits 0 $alen)]
+              [$rest (- $n $alen)]]
+          (if (not (kc/area-code? $prefix))
+            false
+            (if (or (< $rest 7) (> $rest 8))
+              false
+              true)))))))
+
+;; -- PII mask --
+
+(defn kc/repeat-char [$n $ch]
+  (loop [$i 0 $acc ""]
+    (if (>= $i $n)
+      $acc
+      (recur (+ $i 1) (str $acc $ch)))))
+
+(defn 민감정보_마스킹 [$data $mask]
+  (let [[$ch (if (= (length $mask) 0) "*" $mask)]
+        [$n (length $data)]]
+    (cond
+      [(= $n 0) ""]
+      [(= $n 1) $ch]
+      [(= $n 2) (str (kc/char-at $data 0) $ch)]
+      [true (str (kc/char-at $data 0)
+                 (kc/repeat-char (- $n 2) $ch)
+                 (kc/char-at $data (- $n 1)))])))
+
+(defn kc/mask-rrn [$data]
+  (let [[$digits (kc/strip-seps $data)]]
+    (if (not (= (length $digits) 13))
+      (민감정보_마스킹 $data "*")
+      (str (kc/slice $digits 0 6) "-" (kc/char-at $digits 6) "******"))))
+
+(defn kc/mask-mobile [$data]
+  (let [[$digits (kc/strip-seps $data)]
+        [$n (length $digits)]]
+    (cond
+      [(= $n 11) (str (kc/slice $digits 0 3) "-****-" (kc/slice $digits 7 11))]
+      [(= $n 10) (str (kc/slice $digits 0 3) "-***-" (kc/slice $digits 6 10))]
+      [true (민감정보_마스킹 $data "*")])))
+
+(defn kc/find-at [$s]
+  (loop [$i 0 $found -1]
+    (if (>= $i (length $s))
+      $found
+      (recur (+ $i 1)
+             (if (= (kc/char-at $s $i) "@") $i $found)))))
+
+(defn kc/mask-email [$data]
+  (let [[$at (kc/find-at $data)]]
+    (if (<= $at 0)
+      (민감정보_마스킹 $data "*")
+      (str (kc/char-at $data 0) "***" (kc/slice $data $at (length $data))))))
+
+(defn kc/mask-card [$data]
+  (let [[$digits (kc/strip-seps $data)]
+        [$n (length $digits)]]
+    (if (< $n 12)
+      (민감정보_마스킹 $data "*")
+      (str "****-****-****-" (kc/slice $digits (- $n 4) $n)))))
+
+(defn 개인정보_비식별화 [$data $kind]
+  (cond
+    [(or (= $kind "주민번호") (= $kind "주민등록번호")) (kc/mask-rrn $data)]
+    [(= $kind "휴대폰") (kc/mask-mobile $data)]
+    [(= $kind "이메일") (kc/mask-email $data)]
+    [(= $kind "카드번호") (kc/mask-card $data)]
+    [true (민감정보_마스킹 $data "*")]))
+
+;; -- host crypto --
+
+(defn kc/host-call [$name $args]
+  (error (str "host-fn-required:" $name)))
+
+(defn SHA256_해시화 [$text]
+  (kc/host-call "sha256" [$text]))
+
+(defn ARIA_암호화 [$plain $key]
+  (kc/host-call "aria-256" [$plain $key]))
+
+(defn SEED_암호화 [$plain $key]
+  (kc/host-call "seed-128" [$plain $key]))
+
+(defn 개인정보_암호화 [$plain $algo]
+  (cond
+    [(= $algo "SEED-128") (SEED_암호화 $plain "")]
+    [true (ARIA_암호화 $plain "")]))
+
+(defn 개인정보_복호화 [$cipher $key $algo]
+  (kc/host-call "decrypt" [$cipher $key $algo]))
+
+;; -- audit --
+
+(defn kc/empty-audit [] [])
+
+(defn kc/norm-access-type [$t]
+  (if (or (= $t "읽기") (= $t "쓰기") (= $t "삭제")) $t "읽기"))
+
+(defn kc/norm-event-type [$t]
+  (if (or (= $t "인증실패") (= $t "접근거부") (= $t "이상탐지")) $t "이상탐지"))
+
+(defn kc/norm-severity [$s]
+  (if (or (= $s "낮음") (= $s "중간") (= $s "높음") (= $s "심각")) $s "중간"))
+
+(defn 접근로그_기록 [$store $user $resource $type $ok]
+  (conj $store {:kind "접근"
+                :user $user
+                :resource $resource
+                :access-type (kc/norm-access-type $type)
+                :result (if $ok "성공" "실패")}))
+
+(defn 보안이벤트_로그 [$store $etype $sev $desc]
+  (conj $store {:kind "보안이벤트"
+                :event-type (kc/norm-event-type $etype)
+                :severity (kc/norm-severity $sev)
+                :desc $desc}))
+
+(defn kc/date-prefix [$s]
+  (if (< (length $s) 10) $s (kc/slice $s 0 10)))
+
+(defn 감사로그_조회 [$store $from $to $filter]
+  (filter
+    (fn [$item]
+      (let [[$date (kc/date-prefix (get-or $item :at ""))]
+            [$ok-from (if (= (length $from) 0) true (not (< $date $from)))]
+            [$ok-to (if (= (length $to) 0) true (not (> $date $to)))]
+            [$kind (get-or $item :kind "")]
+            [$etype (get-or $item :event-type "")]
+            [$atype (get-or $item :access-type "")]
+            [$ok-f (if (= (length $filter) 0)
+                     true
+                     (or (= $kind $filter) (= $etype $filter) (= $atype $filter)))]]
+        (and $ok-from $ok-to $ok-f)))
+    $store))
+
+;; -- access control --
+
+(defn kc/empty-acl [] {:perms {} :roles {} :sessions {}})
+
+(defn kc/perm-key [$user $perm]
+  (str $user "|" $perm))
+
+(defn kc/allowed-perm? [$perm]
+  (or (= $perm "읽기") (= $perm "쓰기") (= $perm "삭제") (= $perm "관리")))
+
+(defn 권한_부여 [$acl $user $perm]
+  (let [[$perms (get-or $acl :perms {})]]
+    (assoc $acl :perms (assoc $perms (kc/perm-key $user $perm) true))))
+
+(defn 권한_확인 [$acl $user $perm]
+  (if (not (kc/allowed-perm? $perm))
+    false
+    (let [[$perms (get-or $acl :perms {})]]
+      (or (= (get-or $perms (kc/perm-key $user $perm) false) true)
+          (= (get-or $perms (kc/perm-key $user "관리") false) true)))))
+
+(defn 역할_부여 [$acl $user $role]
+  (let [[$roles (get-or $acl :roles {})]]
+    (assoc $acl :roles (assoc $roles $user $role))))
+
+(defn 역할_권한_확인 [$acl $user $role $resource]
+  (let [[$roles (get-or $acl :roles {})]
+        [$actual (get-or $roles $user "")]]
+    (if (not (= $actual $role))
+      false
+      (cond
+        [(= $role "관리자") true]
+        [(= $role "사용자") (or (= $resource "공개") (권한_확인 $acl $user "읽기"))]
+        [(= $role "게스트") (= $resource "공개")]
+        [true false]))))
+
+(defn 세션_등록 [$acl $sid $now]
+  (let [[$sessions (get-or $acl :sessions {})]]
+    (assoc $acl :sessions (assoc $sessions $sid $now))))
+
+(defn 세션_유효성확인 [$acl $sid $max-min $now]
+  (let [[$limit (if (<= $max-min 0) 30 $max-min)]
+        [$sessions (get-or $acl :sessions {})]
+        [$start (get $sessions $sid)]]
+    (if (nil? $start)
+      false
+      (let [[$elapsed (- $now $start)]]
+        (if (< $elapsed 0)
+          false
+          (if (> $elapsed (* $limit 60))
+            false
+            true))))))
+
+;; -- integrity --
+
+(defn 파일_체크섬검증 [$content $expected]
+  (= (SHA256_해시화 $content) $expected))
+
+(defn 데이터_서명생성 [$data $priv]
+  (kc/host-call "rsa-sign" [$data $priv]))
+
+(defn 데이터_서명검증 [$data $sig $pub]
+  (kc/host-call "rsa-verify" [$data $sig $pub]))
+
+;; -- regulation --
+
+(defn PIPA_개인정보수집동의_검증 [$items $agreed $date]
+  (if (not $agreed)
+    false
+    (if (= (length $items) 0)
+      false
+      (if (< (length $date) 10)
+        false
+        (if (includes-item $items "주민등록번호")
+          false
+          true)))))
+
+(defn ISMS_보안수준_평가 [$items]
+  (let [[$known ["접근권한관리" "암호화" "접속기록" "백업"]]
+        [$ok (length (filter (fn [$x] (includes-item $known $x)) $items))]
+        [$bad (- (length $items) $ok)]]
+    {:충분 $ok :부족 $bad}))
+
+(defn 카드번호_룬검증 [$num]
+  (let [[$digits (kc/strip-seps $num)]
+        [$n (length $digits)]]
+    (if (or (< $n 13) (> $n 19) (not (kc/all-digits? $digits)))
+      false
+      (let [[$sum (loop [$i (- $n 1) $acc 0 $double false]
+                    (if (< $i 0)
+                      $acc
+                      (let [[$v (kc/char-digit (kc/char-at $digits $i))]
+                            [$d (if $double
+                                  (let [[$t (* $v 2)]]
+                                    (if (> $t 9) (- $t 9) $t))
+                                  $v)]]
+                        (recur (- $i 1) (+ $acc $d) (not $double)))))]]
+        (= (mod $sum 10) 0)))))
+
+(defn kc/expiry-ok? [$exp]
+  (if (not (= (length $exp) 5))
+    false
+    (if (not (= (kc/char-at $exp 2) "/"))
+      false
+      (let [[$mm (+ (* (kc/char-digit (kc/char-at $exp 0)) 10)
+                    (kc/char-digit (kc/char-at $exp 1)))]
+            [$yy (+ (* (kc/char-digit (kc/char-at $exp 3)) 10)
+                    (kc/char-digit (kc/char-at $exp 4)))]]
+        (if (or (< $mm 1) (> $mm 12) (< $yy 0))
+          false
+          true)))))
+
+(defn PCI_DSS_신용카드검증 [$card $exp $cvv]
+  (if (not (카드번호_룬검증 $card))
+    false
+    (if (not (kc/expiry-ok? $exp))
+      false
+      (let [[$cn (length $cvv)]]
+        (if (not (or (= $cn 3) (= $cn 4)))
+          false
+          (kc/all-digits? $cvv))))))
+
+;; kebab aliases
+
+(defn kc/rrn-valid? [$x] (주민등록번호_유효성확인 $x))
+(defn kc/brn-valid? [$x] (사업자등록번호_유효성확인 $x))
+(defn kc/crn-valid? [$x] (법인등록번호_유효성확인 $x))
+(defn kc/mobile-valid? [$x] (국내휴대폰번호_유효성확인 $x))
+(defn kc/phone-valid? [$x] (국내전화번호_유효성확인 $x))
+(defn kc/deidentify [$x $k] (개인정보_비식별화 $x $k))
+(defn kc/mask [$x $ch] (민감정보_마스킹 $x $ch))
+(defn kc/luhn? [$x] (카드번호_룬검증 $x))
+(defn kc/pci-card? [$c $e $v] (PCI_DSS_신용카드검증 $c $e $v))
+(defn kc/pipa-consent? [$items $ok $date] (PIPA_개인정보수집동의_검증 $items $ok $date))
+(defn kc/isms-score [$items] (ISMS_보안수준_평가 $items))
