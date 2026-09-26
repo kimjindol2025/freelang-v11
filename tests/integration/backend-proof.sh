@@ -63,20 +63,20 @@ before_create="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)
 jq -e '.ok == true and .error == null and (.data.items | length) == 0' <<<"${before_create}" >/dev/null
 
 invalid_json_status="$(curl -sS -o "${proof_tmp}/invalid-json.json" -w '%{http_code}' \
-  -X POST -H "${auth_header}" -H 'content-type: application/json' \
+  -X POST -H "${auth_header}" -H 'idempotency-key: invalid-json' -H 'content-type: application/json' \
   --data '{"name":' http://127.0.0.1:40117/api/items)"
 [[ "${invalid_json_status}" == "400" ]]
 jq -e '.ok == false and .data == null and .error.code == "INVALID_JSON"' \
   "${proof_tmp}/invalid-json.json" >/dev/null
 
 missing_name_status="$(curl -sS -o "${proof_tmp}/missing-name.json" -w '%{http_code}' \
-  -X POST -H "${auth_header}" -H 'content-type: application/json' \
+  -X POST -H "${auth_header}" -H 'idempotency-key: missing-name' -H 'content-type: application/json' \
   --data '{}' http://127.0.0.1:40117/api/items)"
 [[ "${missing_name_status}" == "400" ]]
 jq -e '.error.code == "INVALID_INPUT"' "${proof_tmp}/missing-name.json" >/dev/null
 
 blank_name_status="$(curl -sS -o "${proof_tmp}/blank-name.json" -w '%{http_code}' \
-  -X POST -H "${auth_header}" -H 'content-type: application/json' \
+  -X POST -H "${auth_header}" -H 'idempotency-key: blank-name' -H 'content-type: application/json' \
   --data '{"name":"   "}' http://127.0.0.1:40117/api/items)"
 [[ "${blank_name_status}" == "400" ]]
 jq -e '.error.code == "INVALID_INPUT"' "${proof_tmp}/blank-name.json" >/dev/null
@@ -107,10 +107,45 @@ done
 after_failures="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
 jq -e '(.data.items | length) == 0' <<<"${after_failures}" >/dev/null
 
-created="$(curl -fsS -X POST -H "${auth_header}" -H 'content-type: application/json' \
+missing_key_status="$(curl -sS -o "${proof_tmp}/missing-key.json" -w '%{http_code}' \
+  -X POST -H "${auth_header}" -H 'content-type: application/json' \
   --data '{"name":"first"}' http://127.0.0.1:40117/api/items)"
-item_id="$(jq -er '.data.item.id' <<<"${created}")"
-jq -e '.ok == true and .error == null and .data.item.name == "first"' <<<"${created}" >/dev/null
+[[ "${missing_key_status}" == "400" ]]
+jq -e '.error.code == "IDEMPOTENCY_KEY_REQUIRED"' "${proof_tmp}/missing-key.json" >/dev/null
+
+mkdir "${proof_tmp}/concurrent"
+request_pids=()
+for request_no in $(seq 1 20); do
+  curl -fsS -X POST -H "${auth_header}" -H 'idempotency-key: concurrent-create-1' \
+    -H 'content-type: application/json' --data '{"name":"first"}' \
+    http://127.0.0.1:40117/api/items >"${proof_tmp}/concurrent/${request_no}.json" &
+  request_pids+=("$!")
+done
+for request_pid in "${request_pids[@]}"; do
+  wait "${request_pid}"
+done
+
+jq -s -e \
+  'length == 20 and all(.[]; .ok == true and .data.item.name == "first") and (map(.data.item.id) | unique | length) == 1' \
+  "${proof_tmp}"/concurrent/*.json >/dev/null
+item_id="$(jq -er '.data.item.id' "${proof_tmp}/concurrent/1.json")"
+
+replayed="$(curl -fsS -X POST -H "${auth_header}" -H 'idempotency-key: concurrent-create-1' \
+  -H 'content-type: application/json' --data '{"name":"first"}' \
+  http://127.0.0.1:40117/api/items)"
+jq -e --argjson id "${item_id}" '.data.item.id == $id' <<<"${replayed}" >/dev/null
+
+conflict_status="$(curl -sS -o "${proof_tmp}/conflict.json" -w '%{http_code}' \
+  -X POST -H "${auth_header}" -H 'idempotency-key: concurrent-create-1' \
+  -H 'content-type: application/json' --data '{"name":"different"}' \
+  http://127.0.0.1:40117/api/items)"
+[[ "${conflict_status}" == "409" ]]
+jq -e '.error.code == "IDEMPOTENCY_CONFLICT"' "${proof_tmp}/conflict.json" >/dev/null
+
+after_concurrency="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
+jq -e --argjson id "${item_id}" \
+  '(.data.items | length) == 1 and .data.items[0].id == $id and .data.items[0].name == "first"' \
+  <<<"${after_concurrency}" >/dev/null
 
 read_one="$(curl -fsS -H "${auth_header}" "http://127.0.0.1:40117/api/items/${item_id}")"
 jq -e --argjson id "${item_id}" '.data.item.id == $id and .data.item.name == "first"' <<<"${read_one}" >/dev/null
@@ -143,6 +178,11 @@ printf '%s\n' \
   'INVALID_INPUT=PASS' \
   'NOT_FOUND_GET_UPDATE_DELETE=PASS' \
   'FAILED_REQUEST_DB_MUTATION=0' \
+  'IDEMPOTENCY_KEY_REQUIRED=PASS' \
+  'SAME_KEY_CONCURRENCY=20/20_PASS' \
+  'SAME_KEY_SINGLE_ROW=PASS' \
+  'SAME_KEY_REPLAY=PASS' \
+  'IDEMPOTENCY_CONFLICT=PASS' \
   'CREATE=PASS' \
   'READ=PASS' \
   'UPDATE=PASS' \
