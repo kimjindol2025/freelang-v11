@@ -8,11 +8,14 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { execSync } from 'child_process';
 
 const PROJECT_ROOT = path.resolve(__dirname, '../../');
 const TESTS_DIR = path.join(PROJECT_ROOT, 'tests/l2-proof');
+const WORK_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'freelang-semantic-'));
+const STAGE1_COMPILER = path.join(WORK_DIR, 'stage1.js');
 
 // 테스트 케이스 목록
 const TEST_CASES = [
@@ -41,7 +44,7 @@ interface CompilationResult {
  * bootstrap.js로 FL 파일 컴파일
  */
 function compileWithBootstrap(flFile: string): CompilationResult {
-  const jsFile = flFile.replace('.fl', '.bootstrap.js');
+  const jsFile = path.join(WORK_DIR, `${path.basename(flFile, '.fl')}.bootstrap.js`);
   try {
     execSync(
       `node ${path.join(PROJECT_ROOT, 'bootstrap.js')} run self/all.fl ${flFile} ${jsFile}`,
@@ -59,10 +62,10 @@ function compileWithBootstrap(flFile: string): CompilationResult {
  * 현재: stage1.js 자체 컴파일 버그로 인해 skip
  */
 function compileWithStage1(flFile: string): CompilationResult {
-  const jsFile = flFile.replace('.fl', '.stage1.js');
+  const jsFile = path.join(WORK_DIR, `${path.basename(flFile, '.fl')}.stage1.js`);
   try {
     execSync(
-      `node --stack-size=65536 ${path.join(PROJECT_ROOT, 'stage1.js')} run self/all.fl ${flFile} ${jsFile}`,
+      `node --stack-size=65536 ${STAGE1_COMPILER} ${flFile} ${jsFile}`,
       { cwd: PROJECT_ROOT, stdio: 'pipe' }
     );
     const jsCode = fs.readFileSync(jsFile, 'utf-8');
@@ -71,6 +74,17 @@ function compileWithStage1(flFile: string): CompilationResult {
     return { success: false, error: String(e) };
   }
 }
+
+beforeAll(() => {
+  execSync(
+    `node ${path.join(PROJECT_ROOT, 'bootstrap.js')} compile self/all.fl -o ${STAGE1_COMPILER} --runtime`,
+    { cwd: PROJECT_ROOT, stdio: 'pipe' }
+  );
+});
+
+afterAll(() => {
+  fs.rmSync(WORK_DIR, { recursive: true, force: true });
+});
 
 /**
  * 생성된 JS 코드 실행
