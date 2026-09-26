@@ -1,7 +1,7 @@
 ;; tests/unit/stdlib/array.test.fl — Array Library Unit Tests
 ;; 13개 테스트 (배열 함수)
 
-(load "/home/kimjin/freelang-v11/tests/lib/assert.fl")
+(load "../../lib/assert.fl")
 
 (test-section "Array Tests")
 

@@ -1,7 +1,7 @@
 ;; tests/unit/stdlib/string.test.fl — String Library Unit Tests
 ;; 16개 테스트 (문자열 함수)
 
-(load "/home/kimjin/freelang-v11/tests/lib/assert.fl")
+(load "../../lib/assert.fl")
 
 (test-section "String Tests")
 

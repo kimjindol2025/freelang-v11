@@ -1,7 +1,7 @@
 ;; tests/unit/stdlib/map.test.fl — Map Library Unit Tests
 ;; 10개 테스트 (맵 함수)
 
-(load "/home/kimjin/freelang-v11/tests/lib/assert.fl")
+(load "../../lib/assert.fl")
 
 (test-section "Map Tests")
 

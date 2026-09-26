@@ -65,11 +65,14 @@ log_fail() {
 run_static() {
   log_section "L0" "Static Validation"
 
+  mapfile -t static_files < <(
+    find "${SCRIPT_DIR}/self" -maxdepth 1 -type f -name '*.fl' -print 2>/dev/null
+    find "${SCRIPT_DIR}/tests/unit" -type f -name '*.fl' -print 2>/dev/null
+  )
+
   # check-parens
   if python3 "${SCRIPT_DIR}/scripts/check-parens.py" \
-    "${SCRIPT_DIR}"/self/*.fl \
-    "${SCRIPT_DIR}"/tests/unit/*.fl \
-    "${SCRIPT_DIR}"/tests/integration/*.fl 2>/dev/null; then
+    "${static_files[@]}" 2>/dev/null; then
     log_pass "check-parens: 괄호/브래킷 균형"
   else
     log_fail "check-parens: 괄호 오류"
@@ -77,8 +80,7 @@ run_static() {
 
   # lint-p0
   if python3 "${SCRIPT_DIR}/scripts/lint-p0.py" \
-    "${SCRIPT_DIR}"/self/*.fl \
-    "${SCRIPT_DIR}"/tests/unit/*.fl 2>/dev/null | grep -q "violation"; then
+    "${static_files[@]}" 2>/dev/null | grep -q "violation"; then
     log_fail "lint-p0: P0 규칙 위반"
   else
     log_pass "lint-p0: P0 규칙 (5개) 준수"

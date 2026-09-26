@@ -77,4 +77,4 @@
 ;; ──────────────────────────────────────
 
 [FUNC scope-debug :params [s]
-  :body (str "scope-depth=" (length s)))
+  :body (str "scope-depth=" (length s))]
