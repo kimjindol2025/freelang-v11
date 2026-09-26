@@ -30197,6 +30197,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   let wsClientMessageHandler = null;
   let wsClientCloseHandler = null;
   let wssPublic = null;
+  let maxBodyBytes = 1024 * 1024;
   function generateRequestId() {
     const timestamp = Date.now();
     const counter = ++requestCounter;
@@ -30224,8 +30225,21 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   async function readBody(req) {
     return new Promise((resolve10) => {
       const chunks = [];
-      req.on("data", (chunk) => chunks.push(chunk));
+      let receivedBytes = 0;
+      let tooLarge = false;
+      req.on("data", (chunk) => {
+        receivedBytes += chunk.length;
+        if (receivedBytes > maxBodyBytes) {
+          tooLarge = true;
+          return;
+        }
+        chunks.push(chunk);
+      });
       req.on("end", () => {
+        if (tooLarge) {
+          resolve10({ __fl_body_too_large: true, limit: maxBodyBytes, received: receivedBytes });
+          return;
+        }
         const raw = Buffer.concat(chunks);
         const ct = (req.headers["content-type"] || "").toString();
         if (ct.includes("application/json")) {
@@ -30404,6 +30418,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       rlWindowMs = Math.max(1e3, Math.floor(windowMs));
       return null;
     },
+    // server_body_limit max_bytes → null
+    "server_body_limit": (maxBytes) => {
+      maxBodyBytes = Math.max(1, Math.floor(maxBytes));
+      return null;
+    },
     // server_get path handlerName -> null
     "server_get": (path19, handlerName) => {
       const [pattern, params] = pathToRegex(path19);
@@ -30555,6 +30574,17 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         res.setHeader("X-XSS-Protection", "1; mode=block");
         res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;`);
         res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+        if (body && body.__fl_body_too_large === true) {
+          const status = 413;
+          sendResponse(res, status, {
+            ok: false,
+            data: null,
+            error: { code: "PAYLOAD_TOO_LARGE", limit_bytes: body.limit },
+            request_id: requestId
+          });
+          logAccess(method, path19, status, Date.now() - requestStart, requestId);
+          return;
+        }
         if (method === "OPTIONS") {
           res.writeHead(200);
           res.end();
@@ -30564,8 +30594,14 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         if (!checkRateLimit(clientIp)) {
           const rlEntry = rlStore.get(clientIp);
           const retryAfterSec = rlEntry ? Math.max(1, Math.ceil((rlEntry.resetAt - Date.now()) / 1e3)) : Math.ceil(rlWindowMs / 1e3);
-          res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(retryAfterSec) });
-          res.end(JSON.stringify({ error: "Too Many Requests", retry_after: retryAfterSec }));
+          const status = 429;
+          sendResponse(res, status, {
+            ok: false,
+            data: null,
+            error: { code: "RATE_LIMITED", retry_after: retryAfterSec },
+            request_id: requestId
+          }, "application/json", { "Retry-After": String(retryAfterSec) });
+          logAccess(method, path19, status, Date.now() - requestStart, requestId);
           return;
         }
         if (method === "GET" && sseRoutes.has(path19)) {
