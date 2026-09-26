@@ -8,7 +8,7 @@
 (define $DB {:type "sqlite" :path $DB-PATH})
 
 (db-exec $DB
-  "CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created_at TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, request_name TEXT NOT NULL)"
+  "CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created_at TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE, request_name TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1)"
   [])
 
 (defn item-id [$req]
@@ -16,7 +16,7 @@
 
 (defn item-by-id [$id]
   (first (db-query $DB
-           "SELECT id, name, created_at FROM items WHERE id = ?"
+           "SELECT id, name, created_at, version FROM items WHERE id = ?"
            [$id])))
 
 (defn item-by-key [$key]
@@ -55,7 +55,7 @@
 
 (defn handle-list [$req]
   (if (authorized? $req)
-    (respond-ok {"items" (db-query $DB "SELECT id, name, created_at FROM items ORDER BY id" [])})
+    (respond-ok {"items" (db-query $DB "SELECT id, name, created_at, version FROM items ORDER BY id" [])})
     (unauthorized)))
 
 (defn handle-get [$req]
@@ -98,14 +98,20 @@
       (if (= $body null)
         (respond-error 400 "INVALID_JSON")
         (let [[$name (get $body "name")]
+              [$expected-version (get $body "version")]
               [$item (item-by-id $id)]]
-          (if (not (valid-name? $name))
+          (if (or (not (valid-name? $name))
+                  (not (number? $expected-version))
+                  (< $expected-version 1))
             (respond-error 400 "INVALID_INPUT")
             (if (= $item null)
               (respond-error 404 "NOT_FOUND")
-              (do
-                (db-exec $DB "UPDATE items SET name = ? WHERE id = ?" [(str-trim $name) $id])
-                (respond-ok {"item" (item-by-id $id)})))))))
+              (let [[$result (db-exec $DB
+                               "UPDATE items SET name = ?, version = version + 1 WHERE id = ? AND version = ?"
+                               [(str-trim $name) $id $expected-version])]]
+                (if (= (get $result "affectedRows") 0)
+                  (respond-error 409 "VERSION_CONFLICT")
+                  (respond-ok {"item" (item-by-id $id)}))))))))
     (unauthorized)))
 
 (defn handle-delete [$req]

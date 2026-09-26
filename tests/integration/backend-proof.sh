@@ -89,7 +89,7 @@ for operation in get update delete; do
       ;;
     update)
       method=PUT
-      body_args=(-H 'content-type: application/json' --data '{"name":"missing"}')
+      body_args=(-H 'content-type: application/json' --data '{"name":"missing","version":1}')
       ;;
     delete)
       method=DELETE
@@ -148,18 +148,56 @@ jq -e --argjson id "${item_id}" \
   <<<"${after_concurrency}" >/dev/null
 
 read_one="$(curl -fsS -H "${auth_header}" "http://127.0.0.1:40117/api/items/${item_id}")"
-jq -e --argjson id "${item_id}" '.data.item.id == $id and .data.item.name == "first"' <<<"${read_one}" >/dev/null
+jq -e --argjson id "${item_id}" '.data.item.id == $id and .data.item.name == "first" and .data.item.version == 1' <<<"${read_one}" >/dev/null
 
-updated="$(curl -fsS -X PUT -H "${auth_header}" -H 'content-type: application/json' \
+missing_version_status="$(curl -sS -o "${proof_tmp}/missing-version.json" -w '%{http_code}' \
+  -X PUT -H "${auth_header}" -H 'content-type: application/json' \
   --data '{"name":"updated"}' "http://127.0.0.1:40117/api/items/${item_id}")"
-jq -e '.ok == true and .data.item.name == "updated"' <<<"${updated}" >/dev/null
+[[ "${missing_version_status}" == "400" ]]
+jq -e '.error.code == "INVALID_INPUT"' "${proof_tmp}/missing-version.json" >/dev/null
+
+update_pids=()
+for variant in a b; do
+  curl -sS -o "${proof_tmp}/update-${variant}.json" -w '%{http_code}' \
+    -X PUT -H "${auth_header}" -H 'content-type: application/json' \
+    --data "{\"name\":\"updated-${variant}\",\"version\":1}" \
+    "http://127.0.0.1:40117/api/items/${item_id}" >"${proof_tmp}/update-${variant}.status" &
+  update_pids+=("$!")
+done
+for update_pid in "${update_pids[@]}"; do
+  wait "${update_pid}"
+done
+
+status_a="$(cat "${proof_tmp}/update-a.status")"
+status_b="$(cat "${proof_tmp}/update-b.status")"
+if [[ "${status_a}" == "200" && "${status_b}" == "409" ]]; then
+  winner_file="${proof_tmp}/update-a.json"
+  loser_file="${proof_tmp}/update-b.json"
+elif [[ "${status_a}" == "409" && "${status_b}" == "200" ]]; then
+  winner_file="${proof_tmp}/update-b.json"
+  loser_file="${proof_tmp}/update-a.json"
+else
+  printf 'unexpected CAS statuses: a=%s b=%s\n' "${status_a}" "${status_b}" >&2
+  exit 1
+fi
+
+jq -e '.ok == true and .data.item.version == 2' "${winner_file}" >/dev/null
+jq -e '.ok == false and .error.code == "VERSION_CONFLICT"' "${loser_file}" >/dev/null
+winning_name="$(jq -er '.data.item.name' "${winner_file}")"
+
+stale_status="$(curl -sS -o "${proof_tmp}/stale-update.json" -w '%{http_code}' \
+  -X PUT -H "${auth_header}" -H 'content-type: application/json' \
+  --data '{"name":"stale-overwrite","version":1}' \
+  "http://127.0.0.1:40117/api/items/${item_id}")"
+[[ "${stale_status}" == "409" ]]
+jq -e '.error.code == "VERSION_CONFLICT"' "${proof_tmp}/stale-update.json" >/dev/null
 
 stop_server
 start_server
 
 after_restart="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
-jq -e --argjson id "${item_id}" \
-  '.ok == true and (.data.items | length) == 1 and .data.items[0].id == $id and .data.items[0].name == "updated"' \
+jq -e --argjson id "${item_id}" --arg name "${winning_name}" \
+  '.ok == true and (.data.items | length) == 1 and .data.items[0].id == $id and .data.items[0].name == $name and .data.items[0].version == 2' \
   <<<"${after_restart}" >/dev/null
 
 deleted="$(curl -fsS -X DELETE -H "${auth_header}" "http://127.0.0.1:40117/api/items/${item_id}")"
@@ -183,6 +221,10 @@ printf '%s\n' \
   'SAME_KEY_SINGLE_ROW=PASS' \
   'SAME_KEY_REPLAY=PASS' \
   'IDEMPOTENCY_CONFLICT=PASS' \
+  'VERSION_REQUIRED=PASS' \
+  'SAME_VERSION_CONCURRENCY=1_SUCCESS_1_CONFLICT' \
+  'STALE_WRITE_BLOCKED=PASS' \
+  'FINAL_VERSION=2' \
   'CREATE=PASS' \
   'READ=PASS' \
   'UPDATE=PASS' \
