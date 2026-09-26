@@ -173,5 +173,7 @@
 (server-put "/api/items/:id" "handle-update")
 (server-delete "/api/items/:id" "handle-delete")
 
+(server-body-limit 4096)
+(server-rate-limit 100 60000)
 (server-start 40117)
 (println "FreeLang backend proof: http://127.0.0.1:40117")

@@ -123,6 +123,21 @@ unauthorized_status="$(curl -sS -D "${proof_tmp}/unauthorized.headers" \
 jq -e '.ok == false and .data == null and .error.code == "UNAUTHORIZED"' "${proof_tmp}/unauthorized.json" >/dev/null
 assert_observed "${proof_tmp}/unauthorized.json" "${proof_tmp}/unauthorized.headers" 401 "UNAUTHORIZED"
 
+oversized_name="$(head -c 5000 /dev/zero | tr '\0' 'x')"
+oversized_payload="$(jq -nc --arg name "${oversized_name}" '{name: $name}')"
+oversized_status="$(curl -sS -D "${proof_tmp}/oversized.headers" \
+  -o "${proof_tmp}/oversized.json" -w '%{http_code}' \
+  -X POST -H "${auth_header}" -H 'idempotency-key: oversized' \
+  -H 'content-type: application/json' --data-binary "${oversized_payload}" \
+  http://127.0.0.1:40117/api/items)"
+[[ "${oversized_status}" == "413" ]]
+jq -e '.ok == false and .error.code == "PAYLOAD_TOO_LARGE" and .error.limit_bytes == 4096' \
+  "${proof_tmp}/oversized.json" >/dev/null
+oversized_header_request_id="$(awk 'tolower($1) == "x-request-id:" { gsub("\r", "", $2); print $2 }' \
+  "${proof_tmp}/oversized.headers" | tail -n 1)"
+jq -e --arg request_id "${oversized_header_request_id}" '.request_id == $request_id' \
+  "${proof_tmp}/oversized.json" >/dev/null
+
 wrong_token_status="$(curl -sS -o /dev/null -w '%{http_code}' \
   -H 'authorization: Bearer wrong-token' http://127.0.0.1:40117/api/items)"
 [[ "${wrong_token_status}" == "401" ]]
@@ -284,6 +299,20 @@ jq -e '.ok == true and .data.deleted == 1' <<<"${deleted}" >/dev/null
 final="$(curl -fsS -H "${auth_header}" http://127.0.0.1:40117/api/items)"
 jq -e '.ok == true and (.data.items | length) == 0' <<<"${final}" >/dev/null
 
+rate_limited=0
+for _ in $(seq 1 110); do
+  rate_status="$(curl -sS -o "${proof_tmp}/rate.json" -w '%{http_code}' \
+    -H "${auth_header}" http://127.0.0.1:40117/api/items)"
+  if [[ "${rate_status}" == "429" ]]; then
+    rate_limited=1
+    break
+  fi
+  [[ "${rate_status}" == "200" ]]
+done
+[[ "${rate_limited}" == "1" ]]
+jq -e '.ok == false and .error.code == "RATE_LIMITED" and .error.retry_after >= 1 and (.request_id | length) > 0' \
+  "${proof_tmp}/rate.json" >/dev/null
+
 printf '%s\n' \
   'BACKEND_PROOF=PASS' \
   'LEGACY_SCHEMA_MIGRATION=PASS' \
@@ -292,6 +321,9 @@ printf '%s\n' \
   'REQUEST_ID_RESPONSE_HEADER_BODY=PASS' \
   'STRUCTURED_LOG_CORRELATION=PASS' \
   'SUCCESS_AUTH_FAILURE_CONFLICT_OBSERVED=PASS' \
+  'PAYLOAD_LIMIT_413=PASS' \
+  'OVERSIZED_DB_MUTATION=0' \
+  'RATE_LIMIT_429=PASS' \
   'NO_TOKEN_BLOCKED=PASS' \
   'WRONG_TOKEN_BLOCKED=PASS' \
   'UNAUTHORIZED_MUTATION_BLOCKED=PASS' \

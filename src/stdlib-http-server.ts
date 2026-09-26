@@ -70,6 +70,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   let wsClientMessageHandler: string | null = null;
   let wsClientCloseHandler: string | null = null;
   let wssPublic: WebSocketServer | null = null;
+  let maxBodyBytes = 1024 * 1024;
 
   // Request ID 생성
   function generateRequestId(): string {
@@ -110,8 +111,21 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   async function readBody(req: http.IncomingMessage): Promise<string | any> {
     return new Promise((resolve) => {
       const chunks: Buffer[] = [];
-      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      let receivedBytes = 0;
+      let tooLarge = false;
+      req.on("data", (chunk: Buffer) => {
+        receivedBytes += chunk.length;
+        if (receivedBytes > maxBodyBytes) {
+          tooLarge = true;
+          return;
+        }
+        chunks.push(chunk);
+      });
       req.on("end", () => {
+        if (tooLarge) {
+          resolve({ __fl_body_too_large: true, limit: maxBodyBytes, received: receivedBytes });
+          return;
+        }
         const raw = Buffer.concat(chunks);
         const ct = (req.headers["content-type"] || "").toString();
 
@@ -322,6 +336,12 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       return null;
     },
 
+    // server_body_limit max_bytes → null
+    "server_body_limit": (maxBytes: number): null => {
+      maxBodyBytes = Math.max(1, Math.floor(maxBytes));
+      return null;
+    },
+
     // server_get path handlerName -> null
     "server_get": (path: string, handlerName: string | any): null => {
       const [pattern, params] = pathToRegex(path);
@@ -495,6 +515,18 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;`);
           res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
 
+          if (body && body.__fl_body_too_large === true) {
+            const status = 413;
+            sendResponse(res, status, {
+              ok: false,
+              data: null,
+              error: { code: "PAYLOAD_TOO_LARGE", limit_bytes: body.limit },
+              request_id: requestId,
+            });
+            logAccess(method, path, status, Date.now() - requestStart, requestId);
+            return;
+          }
+
           if (method === "OPTIONS") {
             res.writeHead(200);
             res.end();
@@ -508,8 +540,14 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           if (!checkRateLimit(clientIp)) {
             const rlEntry = rlStore.get(clientIp);
             const retryAfterSec = rlEntry ? Math.max(1, Math.ceil((rlEntry.resetAt - Date.now()) / 1000)) : Math.ceil(rlWindowMs / 1000);
-            res.writeHead(429, { "Content-Type": "application/json", "Retry-After": String(retryAfterSec) });
-            res.end(JSON.stringify({ error: "Too Many Requests", retry_after: retryAfterSec }));
+            const status = 429;
+            sendResponse(res, status, {
+              ok: false,
+              data: null,
+              error: { code: "RATE_LIMITED", retry_after: retryAfterSec },
+              request_id: requestId,
+            }, "application/json", { "Retry-After": String(retryAfterSec) });
+            logAccess(method, path, status, Date.now() - requestStart, requestId);
             return;
           }
 
