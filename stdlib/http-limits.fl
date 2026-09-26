@@ -1,0 +1,19 @@
+;; Canonical HTTP limit names for AFJ v11 (master e264c1d runtime).
+;; Builtins live in bootstrap.js. This file only documents and aliases.
+;;
+;;   (server_body_limit 65536)     ;; bytes, default 1MiB
+;;   (server_rate_limit 100 60000) ;; max, window-ms
+;;
+;; 413 body: {:ok false :data nil :error {:code "PAYLOAD_TOO_LARGE" :limit_bytes N} :request_id "req_..."}
+;; 429 body: {:ok false :data nil :error {:code "RATE_LIMITED" :retry_after SEC} :request_id "req_..."}
+;;
+;; Do not invent server_max_body in .fl. That name is not on master.
+
+(defn http-limit-payload-too-large? [body]
+  (= "PAYLOAD_TOO_LARGE" (get (get body :error) :code)))
+
+(defn http-limit-rate-limited? [body]
+  (= "RATE_LIMITED" (get (get body :error) :code)))
+
+(defn http-limit-request-id [body]
+  (get body :request_id))

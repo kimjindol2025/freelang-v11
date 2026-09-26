@@ -1,0 +1,26 @@
+;; Language truth: names on master runtime, not Jest aliases.
+(load "stdlib/http-limits.fl")
+
+(def $body-413 {:ok false
+                :data nil
+                :error {:code "PAYLOAD_TOO_LARGE" :limit_bytes 64}
+                :request_id "req_1"})
+
+(def $body-429 {:ok false
+                :data nil
+                :error {:code "RATE_LIMITED" :retry_after 2}
+                :request_id "req_2"})
+
+(if (not (http-limit-payload-too-large? $body-413))
+  (throw "expected PAYLOAD_TOO_LARGE")
+  nil)
+
+(if (not (http-limit-rate-limited? $body-429))
+  (throw "expected RATE_LIMITED")
+  nil)
+
+(if (not (= "req_1" (http-limit-request-id $body-413)))
+  (throw "expected request_id")
+  nil)
+
+(println "http-limits-truth ok")
