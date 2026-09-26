@@ -158,7 +158,7 @@ const SPECIAL_FORMS = new Set([
   "load", "fl-require",
   "server-get", "server-post", "server-put", "server-delete",
   "server-start", "server-json", "server-html", "server-text", "server-status",
-  "server-body-limit", "server-rate-limit",
+  "server-body-limit", "server-max-body", "server-rate-limit",
   "db-create", "db-query", "db-exec", "db-insert",
 ]);
 
