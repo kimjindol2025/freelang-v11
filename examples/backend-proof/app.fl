@@ -1,0 +1,57 @@
+;; FreeLang backend proof — HTTP + SQLite CRUD + restart persistence
+;; 실행:
+;;   FL_BACKEND_PROOF_DB=/tmp/backend-proof.sqlite \
+;;   node bootstrap.js run examples/backend-proof/app.fl
+
+(define $DB-PATH (or (env-get "FL_BACKEND_PROOF_DB") "./backend-proof.sqlite"))
+(define $DB {:type "sqlite" :path $DB-PATH})
+
+(db-exec $DB
+  "CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, created_at TEXT NOT NULL)"
+  [])
+
+(defn item-id [$req]
+  (get (get $req "params") "id"))
+
+(defn handle-health [$req]
+  (server-json {"ok" true "service" "freelang-backend-proof"}))
+
+(defn handle-list [$req]
+  (server-json {"ok" true
+                "items" (db-query $DB "SELECT id, name, created_at FROM items ORDER BY id" [])}))
+
+(defn handle-create [$req]
+  (let [[$body (server-req-json $req)]
+        [$name (get $body "name")]
+        [$result (db-exec $DB
+                  "INSERT INTO items (name, created_at) VALUES (?, ?)"
+                  [$name (now-iso)])]
+        [$id (get $result "insertId")]]
+    (server-json {"ok" true
+                  "item" (first (db-query $DB
+                            "SELECT id, name, created_at FROM items WHERE id = ?"
+                            [$id]))})))
+
+(defn handle-update [$req]
+  (let [[$id (item-id $req)]
+        [$body (server-req-json $req)]
+        [$name (get $body "name")]]
+    (db-exec $DB "UPDATE items SET name = ? WHERE id = ?" [$name $id])
+    (server-json {"ok" true
+                  "item" (first (db-query $DB
+                            "SELECT id, name, created_at FROM items WHERE id = ?"
+                            [$id]))})))
+
+(defn handle-delete [$req]
+  (let [[$id (item-id $req)]
+        [$result (db-exec $DB "DELETE FROM items WHERE id = ?" [$id])]]
+    (server-json {"ok" true "deleted" (get $result "affectedRows")})))
+
+(server-get "/health" "handle-health")
+(server-get "/api/items" "handle-list")
+(server-post "/api/items" "handle-create")
+(server-put "/api/items/:id" "handle-update")
+(server-delete "/api/items/:id" "handle-delete")
+
+(server-start 40117)
+(println "FreeLang backend proof: http://127.0.0.1:40117")
