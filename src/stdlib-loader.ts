@@ -12,6 +12,7 @@ import { createDataModule } from "./stdlib-data";        // Phase 13: Data Trans
 import { createCollectionModule } from "./stdlib-collection"; // Phase 14: Collection + Control
 import { createAgentModule } from "./stdlib-agent";      // Phase 15: AI Agent State Machine
 import { createTimeModule } from "./stdlib-time";        // Phase 16: Time + Logging + Monitoring
+import { createPerfModule } from "./stdlib-perf";        // Phase F-2: Performance profiling
 import { createCryptoModule } from "./stdlib-crypto";    // Phase 17: Crypto + UUID + Regex
 import { createCryptoUtilsModule } from "./stdlib-crypto-utils"; // Phase 17.1: AES + advanced hashing
 import { createCryptoRsaModule } from "./stdlib-crypto-rsa"; // Phase A.1: RSA / RS256 (dclub-auth)
@@ -82,6 +83,9 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createCollectionModule());
   interp.registerModule(createAgentModule());
   interp.registerModule(createTimeModule());
+  interp.registerModule(createPerfModule(
+    (fnValue: any, args: any[]) => interp.callFunctionValue(fnValue, args)
+  ));
   interp.registerModule(createCryptoModule());
   interp.registerModule(createCryptoUtilsModule());
   interp.registerModule(createCryptoRsaModule()); // Phase A.1: crypto_rsa_generate/sign/verify/public_to_jwk
