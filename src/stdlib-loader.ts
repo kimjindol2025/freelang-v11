@@ -57,6 +57,7 @@ import { createBlogModule } from "./stdlib-blog";          // Q2-5: 태그/관�
 import { createCloudModule } from "./stdlib-cloud";        // Phase 58: Cloud (AWS/GCP/Azure)
 import { createMatrixModule } from "./stdlib-matrix";      // Phase 99: Matrix/Vector + Parallel for GPT training
 import { createBinaryFoundationModule } from "./stdlib-binary-0b"; // Phase 0B: binary/UTF-8 foundation
+import { createV117CompatModule } from "./stdlib-v117-compat"; // v11.7 public helper compatibility
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -74,6 +75,7 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createFdModule());
   interp.registerModule(createBitsModule());
   interp.registerModule(createBinaryFoundationModule());
+  interp.registerModule(createV117CompatModule());
   interp.registerModule(createTimerModule(interp)); // Pass interp for callback invocation
   interp.registerModule(createErrorModule());
   interp.registerModule(createHttpModule());
