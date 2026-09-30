@@ -151,20 +151,30 @@ function _fl_process_chdir(p) { try { process.chdir(p); } catch(e) {} }
 function _fl_process_pid() { return process.pid; }
 function _fl_process_ppid() { return process.ppid || null; }
 function _fl_readline(prompt) {
-  if (prompt) process.stdout.write(prompt);
-  try {
-    const fs = require("fs");
-    const parts = [];
-    const b = Buffer.alloc(1);
-    while (true) {
-      const n = fs.readSync(process.stdin.fd, b, 0, 1);
-      if (n === 0) return parts.length === 0 ? null : parts.join("");
-      const c = b[0];
-      if (c === 10) break;
-      if (c !== 13) parts.push(String.fromCharCode(c));
+  if (prompt !== undefined && prompt !== null && prompt !== "") process.stderr.write(String(prompt));
+  const fs = require("fs");
+  const bytes = [];
+  const byte = Buffer.allocUnsafe(1);
+  const maxBytes = 1024 * 1024;
+  while (true) {
+    let count;
+    try {
+      count = fs.readSync(process.stdin.fd, byte, 0, 1, null);
+    } catch (error) {
+      throw new Error("read-line: stdin read failed: " + error.message);
     }
-    return parts.join("");
-  } catch(e) { return null; }
+    if (count === 0 && bytes.length === 0) return null;
+    if (count === 0 || byte[0] === 10) {
+      if (count !== 0 && bytes[bytes.length - 1] === 13) bytes.pop();
+      try {
+        return new (require("util").TextDecoder)("utf-8", { fatal: true }).decode(Buffer.from(bytes));
+      } catch {
+        throw new Error("read-line: invalid UTF-8");
+      }
+    }
+    bytes.push(byte[0]);
+    if (bytes.length > maxBytes) throw new RangeError("read-line: line exceeds " + maxBytes + " bytes");
+  }
 }
 function _fl_shell_capture(cmd) {
   try {
@@ -243,7 +253,7 @@ export const HELPER_FUNCTIONS = [
   '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_concat', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_has_key_q',
   '_fl_atom', '_fl_atom_deref', '_fl_atom_reset', '_fl_atom_swap',
   '_fl_str', '_fl_char_at', '_fl_substring', '_fl_lower', '_fl_upper', '_fl_trim', '_fl_replace', '_fl_str_index_of', '_fl_contains_q', '_fl_str_to_num', '_fl_join', '_fl_split', '_fl_repeat', '_fl_range',
-  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture',
+  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_readline', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture',
   '_fl_take', '_fl_drop', '_fl_zip', '_fl_flatten', '_fl_reverse', '_fl_sort'
 ];
 

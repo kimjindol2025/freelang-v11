@@ -2,6 +2,7 @@
 // Phase 58: interpreter.ts constructor에서 분리된 stdlib 모듈 등록 로직
 
 import { createFileModule } from "./stdlib-file";        // Phase 10: File I/O
+import { createStdioModule } from "./stdlib-stdio";      // UTF-8 stdin line input
 import { createFdModule } from "./stdlib-fd";            // Phase 11.5: File Descriptor (NEW)
 import { createBitsModule } from "./stdlib-bits";        // Phase 11.6: Bitwise Operations (NEW)
 import { createTimerModule } from "./stdlib-timer";      // Phase 11.7: Timer (NEW)
@@ -71,6 +72,7 @@ interface InterpreterLike {
  */
 export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createFileModule());
+  interp.registerModule(createStdioModule());
   interp.registerModule(createFdModule());
   interp.registerModule(createBitsModule());
   interp.registerModule(createBinaryFoundationModule());

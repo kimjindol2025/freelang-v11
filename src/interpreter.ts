@@ -1983,6 +1983,8 @@ export class Interpreter {
           return duAdapter.callFunction(this, op, args, expr);
         }
       } catch (_duErr: any) {
+        // stdin errors are terminal; the legacy fallback would turn them into null.
+        if (_duErr?.code === "FL_READ_LINE_ERROR") throw _duErr;
         // DU error: fallback to evalBuiltin
         if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: DU 오류: ${_duErr?.message}`);
       }
