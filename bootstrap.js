@@ -33827,6 +33827,10 @@ function _fl_readline(prompt) {
     try {
       count = require("fs").readSync(process.stdin.fd, byte, 0, 1, null);
     } catch (error) {
+      if (error?.code === "EAGAIN" || error?.code === "EWOULDBLOCK") {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+        continue;
+      }
       const failure = new Error("read-line: stdin read failed: " + error.message);
       failure.code = "FL_READ_LINE_ERROR";
       throw failure;
@@ -37960,6 +37964,10 @@ function readStdinLine(prompt) {
     try {
       count = require("fs").readSync(process.stdin.fd, byte, 0, 1, null);
     } catch (error) {
+      if (error?.code === "EAGAIN" || error?.code === "EWOULDBLOCK") {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+        continue;
+      }
       fail("read-line: stdin read failed: " + error.message);
     }
     if (count === 0 && bytes.length === 0) return null;

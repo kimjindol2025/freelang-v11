@@ -10,6 +10,10 @@ function inputError(message: string, range = false): Error {
   return error;
 }
 
+function waitForInputRetry(): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+}
+
 export function readLine(prompt?: unknown): string | null {
   if (prompt !== undefined && prompt !== null && prompt !== "") {
     process.stderr.write(String(prompt));
@@ -22,6 +26,10 @@ export function readLine(prompt?: unknown): string | null {
     try {
       count = fs.readSync(process.stdin.fd, byte, 0, 1, null);
     } catch (error: any) {
+      if (error?.code === "EAGAIN" || error?.code === "EWOULDBLOCK") {
+        waitForInputRetry();
+        continue;
+      }
       throw inputError(`read-line: stdin read failed: ${error.message}`);
     }
     if (count === 0 && bytes.length === 0) return null;

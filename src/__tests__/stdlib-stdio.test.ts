@@ -28,6 +28,21 @@ test("prompt goes to stderr", () => {
   expect(stderr).toHaveBeenCalledWith("prompt> ");
 });
 
+test("retries transient non-blocking stdin reads", () => {
+  let attempts = 0;
+  jest.spyOn(fs, "readSync").mockImplementation(((_fd: number, byte: Buffer) => {
+    if (attempts++ === 0) {
+      const error = new Error("EAGAIN") as NodeJS.ErrnoException;
+      error.code = "EAGAIN";
+      throw error;
+    }
+    byte[0] = 10;
+    return 1;
+  }) as typeof fs.readSync);
+  expect(readLine()).toBe("");
+  expect(attempts).toBe(2);
+});
+
 test("invalid UTF-8, read failures, and overlong lines are distinct errors", () => {
   feed(Buffer.from([0xc3, 0x28, 10]));
   expect(readLine).toThrow("read-line: invalid UTF-8");
