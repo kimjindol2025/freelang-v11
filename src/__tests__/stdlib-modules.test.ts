@@ -147,6 +147,16 @@ describe("stdlib-file (temp dir)", () => {
     run(`(file_write "${p.replace(/\\/g, "\\\\")}" "hello")`);
     expect(run(`(file_read "${p.replace(/\\/g, "\\\\")}")`)).toBe("hello");
   });
+  test("file_read_base64 preserves bytes and enforces its limit", () => {
+    const p = path.join(TMP, "binary.bin");
+    fs.writeFileSync(p, Buffer.from([0, 255, 1]));
+    expect(run(`(file-read-base64 "${p}" 3)`)).toBe("AP8B");
+    expect(() => run(`(file-read-base64 "${p}" 2)`)).toThrow(/bounded regular file/);
+    expect(() => run(`(file-read-base64 "${p}" 0)`)).toThrow(/byte limit/);
+    const link = path.join(TMP, "binary-link.bin");
+    fs.symlinkSync(p, link);
+    expect(() => run(`(file-read-base64 "${link}" 3)`)).toThrow();
+  });
   test("file_exists", () => {
     const p = path.join(TMP, "b.txt");
     run(`(file_write "${p.replace(/\\/g, "\\\\")}" "x")`);

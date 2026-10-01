@@ -61,7 +61,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
 
   // SSE (Server-Sent Events)
   const sseConnections = new Map<string, http.ServerResponse>(); // connId → res
-  const sseRoutes = new Map<string, string>(); // path → handlerName
+  const sseRoutes = new Map<string, { handler: string; authorize?: string }>();
   let sseConnIdCounter = 0;
 
   // WebSocket 공개 클라이언트 (터널 WS 프록시용)
@@ -71,6 +71,10 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   let wsClientCloseHandler: string | null = null;
   let wssPublic: WebSocketServer | null = null;
   let maxBodyBytes = 1024 * 1024;
+  let rawBody = false;
+  let rejectUnknownOrigins = false;
+  let permittedOrigins: string[] = [];
+  let accessLogTarget: "stdout" | "stderr" | "none" = "stdout";
 
   // Request ID 생성
   function generateRequestId(): string {
@@ -82,7 +86,9 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
   // Access log 출력
   function logAccess(method: string, path: string, status: number, duration: number, requestId: string): void {
     const icon = status >= 400 ? "❌" : "✅";
-    console.log(`${icon} [${requestId}] ${method} ${path} ${status} ${duration}ms`);
+    if (accessLogTarget === "none") return;
+    const write = accessLogTarget === "stderr" ? console.error : console.log;
+    write(`${icon} [${requestId}] ${method} ${path} ${status} ${duration}ms`);
   }
 
   // URL 경로를 정규표현식으로 변환 (예: /users/:id → /users/(.+), /* → /.*))
@@ -127,6 +133,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           return;
         }
         const raw = Buffer.concat(chunks);
+        if (rawBody) {
+          try { resolve(new TextDecoder("utf-8", { fatal: true }).decode(raw)); }
+          catch { resolve({ __fl_body_invalid_utf8: true }); }
+          return;
+        }
         const ct = (req.headers["content-type"] || "").toString();
 
         if (ct.includes("application/json")) {
@@ -476,6 +487,22 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
       const port: number = (portOrConfig !== null && typeof portOrConfig === "object")
         ? ((portOrConfig as any)[":port"] ?? (portOrConfig as any)["port"] ?? 8080)
         : portOrConfig as number;
+      const config = portOrConfig !== null && typeof portOrConfig === "object" ? portOrConfig as Record<string, any> : {};
+      const option = (key: string) => config[key] ?? config[":" + key];
+      const host = option("host");
+      if (host !== undefined && typeof host !== "string") throw new Error("server_start: host must be a string");
+      rawBody = option("rawBody") === true;
+      rejectUnknownOrigins = option("rejectUnknownOrigins") === true;
+      const origins = option("allowedOrigins") ?? [];
+      if (!Array.isArray(origins) || !origins.every((origin) => typeof origin === "string")) {
+        throw new Error("server_start: allowedOrigins must be an array of strings");
+      }
+      permittedOrigins = origins;
+      const logTarget = option("accessLog") ?? "stdout";
+      if (logTarget !== "stdout" && logTarget !== "stderr" && logTarget !== "none") {
+        throw new Error("server_start: accessLog must be stdout, stderr, or none");
+      }
+      accessLogTarget = logTarget;
       // Hot-reload: close previous server before starting new one
       if (__activeServer.server) {
         try {
@@ -492,11 +519,23 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           const method = req.method || "GET";
           const { path, query } = parseUrl(req.url || "/");
           const headers = req.headers;
+          const reqOrigin = headers["origin"];
+          if (rejectUnknownOrigins && reqOrigin !== undefined &&
+              (typeof reqOrigin !== "string" || !permittedOrigins.includes(reqOrigin))) {
+            sendResponse(res, 403, "Forbidden", "text/plain; charset=utf-8");
+            logAccess(method, path, 403, Date.now() - requestStart, requestId);
+            return;
+          }
           const body = await readBody(req);
 
           // CORS (M-1: FL_ALLOWED_ORIGINS 환경변수로 제어)
           const allowedOrigins = process.env.FL_ALLOWED_ORIGINS;
-          if (allowedOrigins && allowedOrigins !== "*") {
+          if (rejectUnknownOrigins) {
+            if (typeof reqOrigin === "string" && permittedOrigins.includes(reqOrigin)) {
+              res.setHeader("Access-Control-Allow-Origin", reqOrigin);
+              res.setHeader("Vary", "Origin");
+            }
+          } else if (allowedOrigins && allowedOrigins !== "*") {
             const reqOrigin = (req.headers["origin"] as string) || "";
             if (allowedOrigins.split(",").map(s => s.trim()).includes(reqOrigin)) {
               res.setHeader("Access-Control-Allow-Origin", reqOrigin);
@@ -526,6 +565,11 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
             logAccess(method, path, status, Date.now() - requestStart, requestId);
             return;
           }
+          if (body && body.__fl_body_invalid_utf8 === true) {
+            sendResponse(res, 400, "Invalid UTF-8", "text/plain; charset=utf-8");
+            logAccess(method, path, 400, Date.now() - requestStart, requestId);
+            return;
+          }
 
           if (method === "OPTIONS") {
             res.writeHead(200);
@@ -553,19 +597,48 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
 
           // SSE 라우트 처리 (server_sse 등록)
           if (method === "GET" && sseRoutes.has(path)) {
+            const sseRoute = sseRoutes.get(path)!;
+            const flReq = createFlRequest(method, path, query, headers, body, {}, requestId);
+            if (sseRoute.authorize) {
+              try {
+                const rawDecision = callFn(sseRoute.authorize, [flReq]);
+                const decision = rawDecision instanceof Promise ? await rawDecision : rawDecision;
+                if (decision !== null && decision !== undefined) {
+                  const status = decision.status ?? 403;
+                  sendResponse(res, status, decision.body ?? "", decision.contentType ?? "application/json", decision.headers ?? {});
+                  logAccess(method, path, status, Date.now() - requestStart, requestId);
+                  return;
+                }
+              } catch (error: any) {
+                sendResponse(res, 500, { error: error.message ?? "SSE authorization failed" });
+                return;
+              }
+            }
             const connId = String(++sseConnIdCounter);
-            res.writeHead(200, {
+            const sseHeaders: Record<string, string> = {
               "Content-Type": "text/event-stream",
               "Cache-Control": "no-cache",
               "Connection": "keep-alive",
               "X-Accel-Buffering": "no",
-              "Access-Control-Allow-Origin": "*",
-            });
+            };
+            if (rejectUnknownOrigins) {
+              if (typeof reqOrigin === "string" && permittedOrigins.includes(reqOrigin)) {
+                sseHeaders["Access-Control-Allow-Origin"] = reqOrigin;
+                sseHeaders["Vary"] = "Origin";
+              }
+            } else {
+              sseHeaders["Access-Control-Allow-Origin"] = res.getHeader("Access-Control-Allow-Origin")?.toString() ?? "*";
+            }
+            res.writeHead(200, sseHeaders);
             res.write("retry: 3000\n\n");
             sseConnections.set(connId, res);
-            req.on("close", () => sseConnections.delete(connId));
-            const handlerName = sseRoutes.get(path)!;
-            try { callFn(handlerName, [connId]); } catch (_e) { /* ignore */ }
+            res.on("close", () => sseConnections.delete(connId));
+            try { callFn(sseRoute.handler, [connId, flReq]); }
+            catch (error) {
+              console.error("SSE handler failed:", error instanceof Error ? error.message : String(error));
+              res.end();
+              sseConnections.delete(connId);
+            }
             return;
           }
 
@@ -655,9 +728,27 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
                 throw new Error(`Invalid handler: expected string or function-value, got ${typeof route.handler}`);
               }
               const result = (rawResult instanceof Promise) ? await rawResult : rawResult;
+              const isSsePending = result && typeof result === "object" &&
+                (result instanceof Map ? result.get("__fl_sse_pending") : result.__fl_sse_pending) === true;
 
               // 응답 처리 (응답 보류 중이면 skip)
-              if (pendingResponses.has(requestId)) {
+              if (isSsePending) {
+                status = 200;
+                const pendingSseHeaders: Record<string, string> = {
+                  "Content-Type": "text/event-stream; charset=utf-8",
+                  "Cache-Control": "no-cache",
+                  "Connection": "keep-alive",
+                  "X-Accel-Buffering": "no",
+                };
+                if (rejectUnknownOrigins && typeof reqOrigin === "string" && permittedOrigins.includes(reqOrigin)) {
+                  pendingSseHeaders["Access-Control-Allow-Origin"] = reqOrigin;
+                  pendingSseHeaders["Vary"] = "Origin";
+                }
+                res.writeHead(200, pendingSseHeaders);
+                res.write("retry: 3000\n\n");
+                sseConnections.set(requestId, res);
+                res.on("close", () => sseConnections.delete(requestId));
+              } else if (pendingResponses.has(requestId)) {
                 pendingResponses.delete(requestId);
               } else if (result && typeof result === "object" && result.__fl_wait_and_respond === true) {
                 // Phase 57+: 비동기 응답 대기 (Promise 처리)
@@ -855,7 +946,7 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
           console.error(`[server] 서버 오류: ${err.message}`);
         }
       });
-      server.listen(port);
+      server.listen(port, host);
       __activeServer.server = server;
       // Keep process alive while server is running
       setInterval(() => {}, 10000).unref();
@@ -1327,17 +1418,19 @@ export function createHttpServerModule(callFn: CallFn, callFunctionValue?: CallF
     },
 
     // ── SSE (Server-Sent Events) ────────────────────────────────────
-    // server_sse path handlerName → null (라우트 등록)
-    "server_sse": (path: string, handlerName: string): null => {
-      sseRoutes.set(path, handlerName);
+    // server_sse path handlerName [authorizeName] → null (라우트 등록)
+    "server_sse": (path: string, handlerName: string, authorizeName?: string): null => {
+      sseRoutes.set(path, { handler: handlerName, authorize: authorizeName });
       return null;
     },
 
-    // sse_send connId data → boolean (특정 연결에 이벤트 전송)
-    "sse_send": (connId: string, data: string): boolean => {
+    // sse_send connId data [eventId] → boolean (특정 연결에 이벤트 전송)
+    "sse_send": (connId: string, data: string, eventId?: string): boolean => {
+      if (eventId !== undefined &&
+          (typeof eventId !== "string" || /[\r\n\0]/.test(eventId))) return false;
       const res = sseConnections.get(connId);
       if (!res || (res as any).destroyed) { sseConnections.delete(connId); return false; }
-      try { res.write(`data: ${data}\n\n`); return true; }
+      try { res.write(eventId === undefined ? `data: ${data}\n\n` : `id: ${eventId}\ndata: ${data}\n\n`); return true; }
       catch (_e) { sseConnections.delete(connId); return false; }
     },
 

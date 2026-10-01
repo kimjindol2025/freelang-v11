@@ -55,6 +55,21 @@ export function createCryptoRsaModule() {
       }
     },
 
+    // crypto_rsa_verify_jwk public_jwk data signature_b64url -> boolean
+    "crypto_rsa_verify_jwk": (jwk: Record<string, unknown>, data: string, signature: string): boolean => {
+      try {
+        if (!jwk || jwk.kty !== "RSA" || typeof jwk.n !== "string" ||
+            typeof jwk.e !== "string" || (jwk.alg != null && jwk.alg !== "RS256") ||
+            (jwk.use != null && jwk.use !== "sig") || typeof data !== "string" ||
+            typeof signature !== "string" || !/^[A-Za-z0-9_-]+$/.test(signature)) return false;
+        const key = createPublicKey({ key: { kty: "RSA", n: jwk.n, e: jwk.e }, format: "jwk" });
+        const verifier = createVerify("RSA-SHA256");
+        verifier.update(data);
+        verifier.end();
+        return verifier.verify(key, Buffer.from(signature, "base64url"));
+      } catch { return false; }
+    },
+
     // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
 
     // pkce_s256 verifier -> string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))

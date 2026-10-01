@@ -24,7 +24,7 @@ function handle(port, msg) {
   const done = (r) => {
     if (settled) return;
     settled = true;
-    port.postMessage(r);
+    port.postMessage({ ...r, requestId: msg.requestId });
     Atomics.store(signal, 0, 1);
     Atomics.notify(signal, 0);
   };
@@ -45,7 +45,16 @@ function handle(port, msg) {
       },
       (res) => {
         const chunks = [];
-        res.on("data", (d) => chunks.push(d));
+        let received = 0;
+        res.on("data", (d) => {
+          received += d.length;
+          if (msg.maxBytes > 0 && received > msg.maxBytes) {
+            done({ status: 0, body: "", error: "response-too-large" });
+            req.destroy();
+            return;
+          }
+          chunks.push(d);
+        });
         res.on("end", () =>
           done({
             status: res.statusCode || 0,
@@ -83,6 +92,7 @@ type HttpWorkerState = {
 };
 
 let httpWorkerState: HttpWorkerState | null = null;
+let nextHttpRequestId = 0;
 
 function ensureHttpWorker(): HttpWorkerState {
   if (httpWorkerState) return httpWorkerState;
@@ -126,7 +136,8 @@ function nodeHttpRequest(
   method: string = "GET",
   headers?: any,
   body?: string,
-  timeoutMs: number = 10000
+  timeoutMs: number = 10000,
+  maxBytes: number = 0
 ): HttpResult {
   try {
     const headersObj: Record<string, string> = {};
@@ -139,29 +150,35 @@ function nodeHttpRequest(
     }
 
     const { port, signal } = ensureHttpWorker();
-    Atomics.store(signal, 0, 0);
+    const requestId = ++nextHttpRequestId;
     port.postMessage({
+      requestId,
       url: String(url),
       method: String(method || "GET").toUpperCase(),
       headers: headersObj,
       body: body != null ? String(body) : null,
       timeoutMs,
+      maxBytes,
     });
     const waitMs = Math.max(1, Number(timeoutMs) || 10000) + 2000;
-    const wr = Atomics.wait(signal, 0, 0, waitMs);
-    if (wr === "timed-out") {
-      return { status: 0, body: "", error: "timeout" };
+    const deadline = Date.now() + waitMs;
+    while (Date.now() < deadline) {
+      Atomics.exchange(signal, 0, 0);
+      let packet = receiveMessageOnPort(port);
+      while (packet) {
+        const result = packet.message as HttpResult & { requestId?: number };
+        if (result.requestId === requestId) {
+          return {
+            status: result.status || 0,
+            body: result.body || "",
+            ...(result.error && { error: result.error }),
+          };
+        }
+        packet = receiveMessageOnPort(port);
+      }
+      Atomics.wait(signal, 0, 0, Math.max(1, deadline - Date.now()));
     }
-    const msg = receiveMessageOnPort(port);
-    if (!msg || !msg.message) {
-      return { status: 0, body: "", error: "no response from http worker" };
-    }
-    const result = msg.message as HttpResult;
-    return {
-      status: result.status || 0,
-      body: result.body || "",
-      ...(result.error && { error: result.error }),
-    };
+    return { status: 0, body: "", error: "timeout" };
   } catch (err: any) {
     return { status: 0, body: "", error: err.message };
   }
@@ -173,9 +190,10 @@ export function __nodeHttpRequestForTest(
   method: string = "GET",
   headers?: any,
   body?: string,
-  timeoutMs: number = 10000
+  timeoutMs: number = 10000,
+  maxBytes: number = 0
 ): HttpResult {
-  return nodeHttpRequest(url, method, headers, body, timeoutMs);
+  return nodeHttpRequest(url, method, headers, body, timeoutMs, maxBytes);
 }
 
 
@@ -189,6 +207,13 @@ export function createHttpModule() {
         body: result.body,
         ...(result.error && { error: result.error })
       };
+    },
+
+    // http_get_bounded url max_bytes timeout_ms -> bounded HTTP result
+    "http_get_bounded": (url: string, maxBytes: number, timeoutMs: number): any => {
+      const limit = Math.min(1048576, Math.max(1, Math.floor(Number(maxBytes) || 0)));
+      const timeout = Math.min(10000, Math.max(100, Math.floor(Number(timeoutMs) || 0)));
+      return nodeHttpRequest(url, "GET", {}, undefined, timeout, limit);
     },
 
     // http_post url body -> {:status 200 :body "..."}

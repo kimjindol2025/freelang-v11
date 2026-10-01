@@ -25616,6 +25616,31 @@ function createFileModule() {
         throw new Error(`file_read failed for '${filePath}': ${err4.message}`);
       }
     },
+    // file_read_base64 filePath maxBytes -> string (bounded binary file content)
+    "file_read_base64": (filePath, maxBytes) => {
+      if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > 1048576) {
+        throw new Error("file_read_base64 requires a 1..1048576 byte limit");
+      }
+      const fd = fs5.openSync(validateFilePath(filePath),
+        fs5.constants.O_RDONLY | (fs5.constants.O_NOFOLLOW || 0));
+      try {
+        const stat = fs5.fstatSync(fd);
+        if (!stat.isFile() || stat.size > maxBytes) {
+          throw new Error("file_read_base64 file is not a bounded regular file");
+        }
+        const buffer = Buffer.alloc(maxBytes + 1);
+        let length = 0;
+        for (;;) {
+          const count = fs5.readSync(fd, buffer, length, buffer.length - length, null);
+          if (count === 0) break;
+          length += count;
+          if (length > maxBytes) throw new Error("file_read_base64 byte limit exceeded");
+        }
+        return buffer.subarray(0, length).toString("base64");
+      } finally {
+        fs5.closeSync(fd);
+      }
+    },
     // file_write filePath content -> boolean (write content to file)
     "file_write": (filePath, content) => {
       try {
@@ -26249,7 +26274,7 @@ function handle(port, msg) {
   const done = (r) => {
     if (settled) return;
     settled = true;
-    port.postMessage(r);
+    port.postMessage({ ...r, requestId: msg.requestId });
     Atomics.store(signal, 0, 1);
     Atomics.notify(signal, 0);
   };
@@ -26270,7 +26295,16 @@ function handle(port, msg) {
       },
       (res) => {
         const chunks = [];
-        res.on("data", (d) => chunks.push(d));
+        let received = 0;
+        res.on("data", (d) => {
+          received += d.length;
+          if (msg.maxBytes > 0 && received > msg.maxBytes) {
+            done({ status: 0, body: "", error: "response-too-large" });
+            req.destroy();
+            return;
+          }
+          chunks.push(d);
+        });
         res.on("end", () =>
           done({
             status: res.statusCode || 0,
@@ -26301,6 +26335,7 @@ parentPort.once("message", (init) => {
 });
 `;
 var httpWorkerState = null;
+var nextHttpRequestId = 0;
 function ensureHttpWorker() {
   if (httpWorkerState) return httpWorkerState;
   const sab = new SharedArrayBuffer(8);
@@ -26333,7 +26368,7 @@ function ensureHttpWorker() {
   httpWorkerState = { worker, port: port1, signal };
   return httpWorkerState;
 }
-function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4) {
+function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4, maxBytes = 0) {
   try {
     const headersObj = {};
     if (headers && typeof headers === "object") {
@@ -26343,29 +26378,35 @@ function nodeHttpRequest(url2, method = "GET", headers, body, timeoutMs = 1e4) {
       }
     }
     const { port, signal } = ensureHttpWorker();
-    Atomics.store(signal, 0, 0);
+    const requestId = ++nextHttpRequestId;
     port.postMessage({
+      requestId,
       url: String(url2),
       method: String(method || "GET").toUpperCase(),
       headers: headersObj,
       body: body != null ? String(body) : null,
-      timeoutMs
+      timeoutMs,
+      maxBytes
     });
     const waitMs = Math.max(1, Number(timeoutMs) || 1e4) + 2e3;
-    const wr = Atomics.wait(signal, 0, 0, waitMs);
-    if (wr === "timed-out") {
-      return { status: 0, body: "", error: "timeout" };
+    const deadline = Date.now() + waitMs;
+    while (Date.now() < deadline) {
+      Atomics.exchange(signal, 0, 0);
+      let packet = (0, import_worker_threads.receiveMessageOnPort)(port);
+      while (packet) {
+        const result = packet.message;
+        if (result.requestId === requestId) {
+          return {
+            status: result.status || 0,
+            body: result.body || "",
+            ...result.error && { error: result.error }
+          };
+        }
+        packet = (0, import_worker_threads.receiveMessageOnPort)(port);
+      }
+      Atomics.wait(signal, 0, 0, Math.max(1, deadline - Date.now()));
     }
-    const msg = (0, import_worker_threads.receiveMessageOnPort)(port);
-    if (!msg || !msg.message) {
-      return { status: 0, body: "", error: "no response from http worker" };
-    }
-    const result = msg.message;
-    return {
-      status: result.status || 0,
-      body: result.body || "",
-      ...result.error && { error: result.error }
-    };
+    return { status: 0, body: "", error: "timeout" };
   } catch (err4) {
     return { status: 0, body: "", error: err4.message };
   }
@@ -26380,6 +26421,12 @@ function createHttpModule() {
         body: result.body,
         ...result.error && { error: result.error }
       };
+    },
+    // http_get_bounded url max_bytes timeout_ms -> bounded HTTP result
+    "http_get_bounded": (url2, maxBytes, timeoutMs) => {
+      const limit = Math.min(1048576, Math.max(1, Math.floor(Number(maxBytes) || 0)));
+      const timeout = Math.min(10000, Math.max(100, Math.floor(Number(timeoutMs) || 0)));
+      return nodeHttpRequest(url2, "GET", {}, void 0, timeout, limit);
     },
     // http_post url body -> {:status 200 :body "..."}
     "http_post": (url2, body) => {
@@ -28389,6 +28436,19 @@ function createCryptoRsaModule() {
         return false;
       }
     },
+    // crypto_rsa_verify_jwk public_jwk data signature_b64url -> boolean
+    "crypto_rsa_verify_jwk": (jwk, data, signature) => {
+      try {
+        if (!jwk || jwk.kty !== "RSA" || typeof jwk.n !== "string" || typeof jwk.e !== "string" || (jwk.alg != null && jwk.alg !== "RS256") || (jwk.use != null && jwk.use !== "sig") || typeof data !== "string" || typeof signature !== "string" || !/^[A-Za-z0-9_-]+$/.test(signature)) return false;
+        const key = (0, import_crypto5.createPublicKey)({ key: { kty: "RSA", n: jwk.n, e: jwk.e }, format: "jwk" });
+        const verifier = (0, import_crypto5.createVerify)("RSA-SHA256");
+        verifier.update(data);
+        verifier.end();
+        return verifier.verify(key, Buffer.from(signature, "base64url"));
+      } catch {
+        return false;
+      }
+    },
     // ── JWK 직렬화 (RFC 7517) ─────────────────────────────────
     // pkce_s256 verifier -> string (PKCE S256 challenge: base64url(SHA256(verifier_bytes)))
     "pkce_s256": (verifier) => {
@@ -30282,6 +30342,10 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   let wsClientCloseHandler = null;
   let wssPublic = null;
   let maxBodyBytes = 1024 * 1024;
+  let rawBody = false;
+  let rejectUnknownOrigins = false;
+  let permittedOrigins = [];
+  let accessLogTarget = "stdout";
   function generateRequestId() {
     const timestamp = Date.now();
     const counter = ++requestCounter;
@@ -30289,7 +30353,9 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   }
   function logAccess(method, path19, status, duration, requestId) {
     const icon = status >= 400 ? "\u274C" : "\u2705";
-    console.log(`${icon} [${requestId}] ${method} ${path19} ${status} ${duration}ms`);
+    if (accessLogTarget === "none") return;
+    const write = accessLogTarget === "stderr" ? console.error : console.log;
+    write(`${icon} [${requestId}] ${method} ${path19} ${status} ${duration}ms`);
   }
   function pathToRegex(path19) {
     const params = [];
@@ -30325,6 +30391,14 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           return;
         }
         const raw = Buffer.concat(chunks);
+        if (rawBody) {
+          try {
+            resolve10(new TextDecoder("utf-8", { fatal: true }).decode(raw));
+          } catch {
+            resolve10({ __fl_body_invalid_utf8: true });
+          }
+          return;
+        }
         const ct = (req.headers["content-type"] || "").toString();
         if (ct.includes("application/json")) {
           try {
@@ -30623,6 +30697,18 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     // 기존 API:   (server_start 40090)
     "server_start": (portOrConfig) => {
       const port = portOrConfig !== null && typeof portOrConfig === "object" ? portOrConfig[":port"] ?? portOrConfig["port"] ?? 8080 : portOrConfig;
+      const config = portOrConfig !== null && typeof portOrConfig === "object" ? portOrConfig : {};
+      const option = (key) => config[key] ?? config[":" + key];
+      const host = option("host");
+      if (host !== void 0 && typeof host !== "string") throw new Error("server_start: host must be a string");
+      rawBody = option("rawBody") === true;
+      rejectUnknownOrigins = option("rejectUnknownOrigins") === true;
+      const origins = option("allowedOrigins") ?? [];
+      if (!Array.isArray(origins) || !origins.every((origin) => typeof origin === "string")) throw new Error("server_start: allowedOrigins must be an array of strings");
+      permittedOrigins = origins;
+      const logTarget = option("accessLog") ?? "stdout";
+      if (logTarget !== "stdout" && logTarget !== "stderr" && logTarget !== "none") throw new Error("server_start: accessLog must be stdout, stderr, or none");
+      accessLogTarget = logTarget;
       if (__activeServer.server) {
         try {
           __activeServer.server.close();
@@ -30639,9 +30725,20 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const method = req.method || "GET";
         const { path: path19, query } = parseUrl(req.url || "/");
         const headers = req.headers;
+        const reqOrigin = headers["origin"];
+        if (rejectUnknownOrigins && reqOrigin !== void 0 && (typeof reqOrigin !== "string" || !permittedOrigins.includes(reqOrigin))) {
+          sendResponse(res, 403, "Forbidden", "text/plain; charset=utf-8");
+          logAccess(method, path19, 403, Date.now() - requestStart, requestId);
+          return;
+        }
         const body = await readBody(req);
         const allowedOrigins = process.env.FL_ALLOWED_ORIGINS;
-        if (allowedOrigins && allowedOrigins !== "*") {
+        if (rejectUnknownOrigins) {
+          if (typeof reqOrigin === "string" && permittedOrigins.includes(reqOrigin)) {
+            res.setHeader("Access-Control-Allow-Origin", reqOrigin);
+            res.setHeader("Vary", "Origin");
+          }
+        } else if (allowedOrigins && allowedOrigins !== "*") {
           const reqOrigin = req.headers["origin"] || "";
           if (allowedOrigins.split(",").map((s) => s.trim()).includes(reqOrigin)) {
             res.setHeader("Access-Control-Allow-Origin", reqOrigin);
@@ -30669,6 +30766,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           logAccess(method, path19, status, Date.now() - requestStart, requestId);
           return;
         }
+        if (body && body.__fl_body_invalid_utf8 === true) {
+          sendResponse(res, 400, "Invalid UTF-8", "text/plain; charset=utf-8");
+          logAccess(method, path19, 400, Date.now() - requestStart, requestId);
+          return;
+        }
         if (method === "OPTIONS") {
           res.writeHead(200);
           res.end();
@@ -30689,21 +30791,48 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           return;
         }
         if (method === "GET" && sseRoutes.has(path19)) {
+          const sseRoute = sseRoutes.get(path19);
+          const flReq = createFlRequest(method, path19, query, headers, body, {}, requestId);
+          if (sseRoute.authorize) {
+            try {
+              const rawDecision = callFn(sseRoute.authorize, [flReq]);
+              const decision = rawDecision instanceof Promise ? await rawDecision : rawDecision;
+              if (decision !== null && decision !== void 0) {
+                const status = decision.status ?? 403;
+                sendResponse(res, status, decision.body ?? "", decision.contentType ?? "application/json", decision.headers ?? {});
+                logAccess(method, path19, status, Date.now() - requestStart, requestId);
+                return;
+              }
+            } catch (error) {
+              sendResponse(res, 500, { error: error.message ?? "SSE authorization failed" });
+              return;
+            }
+          }
           const connId = String(++sseConnIdCounter);
-          res.writeHead(200, {
+          const sseHeaders = {
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-            "Access-Control-Allow-Origin": "*"
-          });
+            "X-Accel-Buffering": "no"
+          };
+          if (rejectUnknownOrigins) {
+            if (typeof reqOrigin === "string" && permittedOrigins.includes(reqOrigin)) {
+              sseHeaders["Access-Control-Allow-Origin"] = reqOrigin;
+              sseHeaders["Vary"] = "Origin";
+            }
+          } else {
+            sseHeaders["Access-Control-Allow-Origin"] = res.getHeader("Access-Control-Allow-Origin")?.toString() ?? "*";
+          }
+          res.writeHead(200, sseHeaders);
           res.write("retry: 3000\n\n");
           sseConnections.set(connId, res);
-          req.on("close", () => sseConnections.delete(connId));
-          const handlerName = sseRoutes.get(path19);
+          res.on("close", () => sseConnections.delete(connId));
           try {
-            callFn(handlerName, [connId]);
-          } catch (_e) {
+            callFn(sseRoute.handler, [connId, flReq]);
+          } catch (error) {
+            console.error("SSE handler failed:", error instanceof Error ? error.message : String(error));
+            res.end();
+            sseConnections.delete(connId);
           }
           return;
         }
@@ -30770,7 +30899,24 @@ function createHttpServerModule(callFn, callFunctionValue2) {
               throw new Error(`Invalid handler: expected string or function-value, got ${typeof route.handler}`);
             }
             const result = rawResult instanceof Promise ? await rawResult : rawResult;
-            if (pendingResponses.has(requestId)) {
+            const isSsePending = result && typeof result === "object" && (result instanceof Map ? result.get("__fl_sse_pending") : result.__fl_sse_pending) === true;
+            if (isSsePending) {
+              status = 200;
+              const pendingSseHeaders = {
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no"
+              };
+              if (rejectUnknownOrigins && typeof reqOrigin === "string" && permittedOrigins.includes(reqOrigin)) {
+                pendingSseHeaders["Access-Control-Allow-Origin"] = reqOrigin;
+                pendingSseHeaders["Vary"] = "Origin";
+              }
+              res.writeHead(200, pendingSseHeaders);
+              res.write("retry: 3000\n\n");
+              sseConnections.set(requestId, res);
+              res.on("close", () => sseConnections.delete(requestId));
+            } else if (pendingResponses.has(requestId)) {
               pendingResponses.delete(requestId);
             } else if (result && typeof result === "object" && result.__fl_wait_and_respond === true) {
               const asyncResp = await result.promise;
@@ -30948,7 +31094,7 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           console.error(`[server] \uC11C\uBC84 \uC624\uB958: ${err4.message}`);
         }
       });
-      server.listen(port);
+      server.listen(port, host);
       __activeServer.server = server;
       setInterval(() => {
       }, 1e4).unref();
@@ -31409,20 +31555,24 @@ function createHttpServerModule(callFn, callFunctionValue2) {
       return req?.session_id ?? null;
     },
     // ── SSE (Server-Sent Events) ────────────────────────────────────
-    // server_sse path handlerName → null (라우트 등록)
-    "server_sse": (path19, handlerName) => {
-      sseRoutes.set(path19, handlerName);
+    // server_sse path handlerName [authorizeName] → null (라우트 등록)
+    "server_sse": (path19, handlerName, authorizeName) => {
+      sseRoutes.set(path19, { handler: handlerName, authorize: authorizeName });
       return null;
     },
-    // sse_send connId data → boolean (특정 연결에 이벤트 전송)
-    "sse_send": (connId, data) => {
+    // sse_send connId data [eventId] → boolean (특정 연결에 이벤트 전송)
+    "sse_send": (connId, data, eventId) => {
+      if (eventId !== void 0 && (typeof eventId !== "string" || /[\r\n\0]/.test(eventId))) return false;
       const res = sseConnections.get(connId);
       if (!res || res.destroyed) {
         sseConnections.delete(connId);
         return false;
       }
       try {
-        res.write(`data: ${data}
+        res.write(eventId === void 0 ? `data: ${data}
+
+` : `id: ${eventId}
+data: ${data}
 
 `);
         return true;
@@ -33708,6 +33858,7 @@ function _fl_null_q(v) { return v === null || v === undefined; }
 function _fl_true_q(v) { return v === true; }
 function _fl_false_q(v) { return v === false; }
 function _fl_number_q(v) { return typeof v === 'number'; }
+function _fl_boolean_q(v) { return typeof v === 'boolean'; }
 function _fl_string_q(v) { return typeof v === 'string'; }
 function _fl_list_q(v) { return Array.isArray(v); }
 function _fl_array_q(v) { return Array.isArray(v); }
@@ -33750,6 +33901,15 @@ var map_entries = _fl_entries;
 var map_keys = _fl_keys;
 var map_values = _fl_values;
 function _fl_map_set(o, ...args) { const result = {...(o || {})}; for (let i = 0; i + 1 < args.length; i += 2) { result[args[i]] = args[i + 1]; } return result; }
+function _fl_dissoc(o, ...keys) {
+  if (o != null && (typeof o !== "object" || Array.isArray(o))) throw new Error("dissoc: expected map");
+  const result = {...(o || {})};
+  for (const rawKey of keys) {
+    const key = typeof rawKey === "string" && rawKey.startsWith(":") ? rawKey.slice(1) : String(rawKey);
+    delete result[key];
+  }
+  return result;
+}
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
 function _fl_atom(v) { return { value: v }; }
 function _fl_atom_deref(a) { return a == null ? null : a.value; }
@@ -33770,6 +33930,7 @@ function _fl_trim(s) { return String(s || "").trim(); }
 function _fl_replace(s, a, b) { return String(s || "").split(a).join(b); }
 function _fl_str_index_of(s, sub) { return (s || "").indexOf(sub); }
 function _fl_contains_q(s, sub) { return (s || "").includes(sub); }
+function _fl_str_starts_with(s, prefix) { return String(s || "").startsWith(String(prefix || "")); }
 function _fl_str_to_num(s) { const n = Number(s); return isNaN(n) ? null : n; }
 function _fl_join(arr, sep) { return (arr || []).join(sep !== undefined ? sep : ""); }
 function _fl_split(s, sep) { return (s || "").split(sep !== undefined ? sep : ""); }
@@ -33787,7 +33948,110 @@ function _fl_slice(l, a, b) { return (l || []).slice(a, b); }
 // \u2500 \uC2DC\uC2A4\uD15C \uBC0F I/O \u2500
 function _fl_print(v) { console.log(v); return v; }
 function _fl_get_argv() { return (typeof process !== "undefined" ? process.argv.slice(2) : []); }
+const _fl_host_functions = Object.create(null);
+function _fl_register_host_functions(functions) { Object.assign(_fl_host_functions, functions); }
+let _fl_generated_http_host = null;
+function _fl_http_host_call(method, ...args) {
+  if (_fl_generated_http_host === null) {
+    const root = process.env.FREELANG_V11_ROOT;
+    if (!root) throw new Error("generated HTTP requires FREELANG_V11_ROOT");
+    const filename = require("path").join(root, "generated-http-host.cjs");
+    const factory = require(filename).createGeneratedHttpHost;
+    _fl_generated_http_host = factory((name, values) => {
+      const callback = _fl_host_functions[name];
+      if (typeof callback !== "function") throw new Error("FreeLang HTTP callback not found: " + name);
+      return callback(...values);
+    });
+  }
+  const methodFn = _fl_generated_http_host[method];
+  if (typeof methodFn !== "function") throw new Error("FreeLang HTTP host method not found: " + method);
+  return methodFn(...args);
+}
+function _fl_server_post(...args) { return _fl_http_host_call("server_post", ...args); }
+function _fl_server_get(...args) { return _fl_http_host_call("server_get", ...args); }
+function _fl_server_delete(...args) { return _fl_http_host_call("server_delete", ...args); }
+function _fl_server_sse(...args) { return _fl_http_host_call("server_sse", ...args); }
+function _fl_server_body_limit(...args) { return _fl_http_host_call("server_body_limit", ...args); }
+function _fl_server_start(...args) { return _fl_http_host_call("server_start", ...args); }
+function _fl_sse_alive(...args) { return _fl_http_host_call("sse_alive", ...args); }
+function _fl_sse_send(...args) { return _fl_http_host_call("sse_send", ...args); }
+function _fl_sse_close(...args) { return _fl_http_host_call("sse_close", ...args); }
+function _fl_set_interval(...args) { return _fl_http_host_call("set_interval", ...args); }
+function _fl_http_get_bounded(...args) { return _fl_http_host_call("http_get_bounded", ...args); }
+function _fl_uuid_v4(...args) { return _fl_http_host_call("uuid_v4", ...args); }
+function _fl_now_unix(...args) { return _fl_http_host_call("now_unix", ...args); }
+function _fl_base64url_decode(...args) { return _fl_http_host_call("base64url_decode", ...args); }
+function _fl_auth_jwt_verify(...args) { return _fl_http_host_call("auth_jwt_verify", ...args); }
 function _fl_file_read(p) { return require("fs").readFileSync(p, "utf8"); }
+function _fl_utf8_decode_strict(base64) {
+  if (typeof base64 !== "string" ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) {
+    throw new Error("binary: invalid base64 buffer");
+  }
+  const bytes = Buffer.from(base64, "base64");
+  if (bytes.toString("base64") !== base64) throw new Error("binary: non-canonical base64 buffer");
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+function _fl_file_read_base64(p, maxBytes) {
+  if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > 1048576) {
+    throw new Error("file_read_base64 requires a 1..1048576 byte limit");
+  }
+  const fs = require("fs");
+  const path = require("path");
+  const base = process.env.FL_FILE_BASE;
+  const resolved = path.resolve(p);
+  if (base) {
+    const root = path.resolve(base);
+    if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+      throw new Error("file_read_base64 path outside FL_FILE_BASE");
+    }
+  }
+  const fd = fs.openSync(resolved, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > maxBytes) {
+      throw new Error("file_read_base64 file is not a bounded regular file");
+    }
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let length = 0;
+    for (;;) {
+      const count = fs.readSync(fd, buffer, length, buffer.length - length, null);
+      if (count === 0) break;
+      length += count;
+      if (length > maxBytes) throw new Error("file_read_base64 byte limit exceeded");
+    }
+    return buffer.subarray(0, length).toString("base64");
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+function _fl_shell_cwd() { return process.cwd(); }
+function _fl_crypto_rsa_verify(publicKey, data, signature) {
+  try {
+    const verifier = require("crypto").createVerify("RSA-SHA256");
+    verifier.update(data);
+    verifier.end();
+    return verifier.verify(publicKey, Buffer.from(signature, "base64url"));
+  } catch { return false; }
+}
+function _fl_crypto_rsa_verify_jwk(jwk, data, signature) {
+  try {
+    if (!jwk || jwk.kty !== "RSA" || typeof jwk.n !== "string" || typeof jwk.e !== "string" ||
+        (jwk.alg != null && jwk.alg !== "RS256") || (jwk.use != null && jwk.use !== "sig") ||
+        typeof data !== "string" || typeof signature !== "string" ||
+        !/^[A-Za-z0-9_-]+$/.test(signature)) return false;
+    const key = require("crypto").createPublicKey({key: {kty: "RSA", n: jwk.n, e: jwk.e}, format: "jwk"});
+    return _fl_crypto_rsa_verify(key, data, signature);
+  } catch { return false; }
+}
+function _fl_shell_safe(program, args) {
+  if (typeof program !== "string" || !program) throw new Error("shell_safe: program must be a string");
+  if (!Array.isArray(args)) throw new Error("shell_safe: args must be an array");
+  const result = require("child_process").spawnSync(program, args.map(String), { timeout: 30000, encoding: "utf8" });
+  if (result.error) throw new Error("shell_safe failed: " + result.error.message);
+  if (result.status !== 0) throw new Error("shell_safe failed (exit " + result.status + "): " + String(result.stderr || "").trim());
+  return result.stdout || "";
+}
 function _fl_file_write(p, c) { return require("fs").writeFileSync(p, c); }
 function _fl_file_exists(p) { return require("fs").existsSync(p); }
 function _fl_file_delete(p) { try { require("fs").unlinkSync(p); } catch(e) {} }
@@ -33853,6 +34117,66 @@ function _fl_readline(prompt) {
       throw failure;
     }
   }
+}
+function _fl_stdin_on_line(callback, tickMs) {
+  if (typeof callback !== "function") throw new Error("stdin-on-line: callback required");
+  if (tickMs !== undefined && (!Number.isInteger(tickMs) || tickMs < 1 || tickMs > 60000))
+    throw new Error("stdin-on-line: invalid tick interval");
+  const maxBytes = 1024 * 1024;
+  const Decoder = require("util").TextDecoder;
+  let pending = Buffer.alloc(0);
+  let ended = false;
+  let timer;
+  const stop = () => {
+    if (timer) clearInterval(timer);
+    process.stdin.removeListener("data", onData);
+    process.stdin.removeListener("end", onEnd);
+    process.stdin.removeListener("error", onError);
+    process.stdin.pause();
+  };
+  const fail = (message) => {
+    if (ended) return;
+    ended = true;
+    stop();
+    process.stderr.write(message + "\\n");
+    process.exitCode = 1;
+    callback({kind: "error", message});
+  };
+  const deliver = (bytes) => {
+    if (bytes.length > maxBytes) { fail("stdin-on-line: line exceeds " + maxBytes + " bytes"); return; }
+    const line = bytes.length > 0 && bytes[bytes.length - 1] === 13 ? bytes.subarray(0, -1) : bytes;
+    let decoded;
+    try { decoded = new Decoder("utf-8", {fatal: true}).decode(line); }
+    catch { fail("stdin-on-line: invalid UTF-8"); return; }
+    callback({kind: "line", line: decoded});
+  };
+  const onData = (chunk) => {
+    let start = 0;
+    for (let index = 0; index < chunk.length && !ended; index++) {
+      if (chunk[index] !== 10) continue;
+      deliver(Buffer.concat([pending, chunk.subarray(start, index)]));
+      pending = Buffer.alloc(0);
+      start = index + 1;
+    }
+    if (ended) return;
+    pending = Buffer.concat([pending, chunk.subarray(start)]);
+    if (pending.length > maxBytes) fail("stdin-on-line: line exceeds " + maxBytes + " bytes");
+  };
+  const onEnd = () => {
+    if (ended) return;
+    if (pending.length > 0) deliver(pending);
+    if (ended) return;
+    ended = true;
+    stop();
+    callback({kind: "eof"});
+  };
+  const onError = (error) => fail("stdin-on-line: stdin read failed: " + error.message);
+  process.stdin.on("data", onData);
+  process.stdin.on("end", onEnd);
+  process.stdin.on("error", onError);
+  if (tickMs !== undefined) timer = setInterval(() => callback({kind: "tick"}), tickMs);
+  process.stdin.resume();
+  return null;
 }
 function _fl_shell_capture(cmd) {
   try {
@@ -33939,6 +34263,7 @@ var HELPER_FUNCTIONS = [
   "_fl_true_q",
   "_fl_false_q",
   "_fl_number_q",
+  "_fl_boolean_q",
   "_fl_string_q",
   "_fl_list_q",
   "_fl_array_q",
@@ -33955,6 +34280,7 @@ var HELPER_FUNCTIONS = [
   "_fl_values",
   "_fl_entries",
   "_fl_map_set",
+  "_fl_dissoc",
   "_fl_has_key_q",
   "_fl_atom",
   "_fl_atom_deref",
@@ -33982,6 +34308,25 @@ var HELPER_FUNCTIONS = [
   "_fl_get_argv",
   "_fl_readline",
   "_fl_file_read",
+  "_fl_file_read_base64",
+  "_fl_register_host_functions",
+  "_fl_http_host_call",
+  "_fl_server_post",
+  "_fl_server_get",
+  "_fl_server_delete",
+  "_fl_server_sse",
+  "_fl_server_body_limit",
+  "_fl_server_start",
+  "_fl_sse_alive",
+  "_fl_sse_send",
+  "_fl_sse_close",
+  "_fl_set_interval",
+  "_fl_http_get_bounded",
+  "_fl_uuid_v4",
+  "_fl_now_unix",
+  "_fl_base64url_decode",
+  "_fl_auth_jwt_verify",
+  "_fl_utf8_decode_strict",
   "_fl_file_write",
   "_fl_file_exists",
   "_fl_shell_capture",
@@ -34014,12 +34359,33 @@ var BUILTIN_MAP = {
   "cli-args": "_fl_get_argv",
   "file_read": "_fl_file_read",
   "file-read": "_fl_file_read",
+  "file_read_base64": "_fl_file_read_base64",
+  "file-read-base64": "_fl_file_read_base64",
+  "utf8-decode-strict": "_fl_utf8_decode_strict",
+  "utf8_decode_strict": "_fl_utf8_decode_strict",
   "file_write": "_fl_file_write",
   "file-write": "_fl_file_write",
   "file-exists": "_fl_file_exists",
   "file_exists": "_fl_file_exists",
   "readline": "_fl_readline",
   "read-line": "_fl_readline",
+  "stdin-on-line": "_fl_stdin_on_line",
+  "server-post": "_fl_server_post",
+  "server-get": "_fl_server_get",
+  "server-delete": "_fl_server_delete",
+  "server-sse": "_fl_server_sse",
+  "server-body-limit": "_fl_server_body_limit",
+  "server-start": "_fl_server_start",
+  "sse_alive": "_fl_sse_alive",
+  "sse_send": "_fl_sse_send",
+  "sse_close": "_fl_sse_close",
+  "set_interval": "_fl_set_interval",
+  "http_get_bounded": "_fl_http_get_bounded",
+  "uuid_v4": "_fl_uuid_v4",
+  "now_unix": "_fl_now_unix",
+  "base64url_decode": "_fl_base64url_decode",
+  "auth_jwt_verify": "_fl_auth_jwt_verify",
+  "dissoc": "_fl_dissoc",
   "char_at": "_fl_char_at",
   "char-at": "_fl_char_at",
   "substring": "_fl_substring",
@@ -34031,6 +34397,13 @@ var BUILTIN_MAP = {
   "list?": "_fl_list_q",
   "array?": "_fl_array_q",
   "map?": "_fl_map_q",
+  "integer?": "Number.isInteger",
+  "str-starts-with": "_fl_str_starts_with",
+  "shell-cwd": "_fl_shell_cwd",
+  "shell-safe": "_fl_shell_safe",
+  "shell_env": "_fl_env_get",
+  "crypto_rsa_verify": "_fl_crypto_rsa_verify",
+  "crypto_rsa_verify_jwk": "_fl_crypto_rsa_verify_jwk",
   "fn?": "_fl_fn_q",
   "boolean?": "_fl_boolean_q",
   "type-of": "_fl_type_of",
@@ -34202,6 +34575,15 @@ var JSCodegen = class {
       }
     }
     parts.push(...bodyParts);
+    if (bodyParts.some((part) => /_fl_(?:server_|sse_|set_interval|http_get_bounded)/.test(part))) {
+      const callbacks = nodes.flatMap((node) => {
+        if (node.kind !== "sexpr" || node.op !== "defn" && node.op !== "defun") return [];
+        const nameNode = node.args[0];
+        const rawName = nameNode.kind === "variable" ? nameNode.name : nameNode.kind === "literal" ? String(nameNode.value) : null;
+        return rawName === null ? [] : [`${JSON.stringify(rawName)}: ${flNameToJs(rawName)}`];
+      });
+      parts.push(`_fl_register_host_functions({${callbacks.join(", ")}});`);
+    }
     if (this.exportedNames.length > 0) {
       if (this.opts.module === "commonjs") {
         const exports2 = this.exportedNames.map((n) => `  ${n}: ${n}`).join(",\n");
@@ -34305,6 +34687,9 @@ ${exportsStr}
   }
   genSExpr(node) {
     const { op, args: args3 } = node;
+    if (op === "load") {
+      throw new Error("compile supports only top-level static load paths");
+    }
     if (op === "and") {
       if (args3.length === 0) return "true";
       return "(" + args3.map((a) => this.genNode(a)).join(" && ") + ")";
@@ -34490,8 +34875,13 @@ ${exportsStr}
     if (op === "defn" || op === "defun") {
       const name = this.extractVarName(args3[0]);
       const { params, preamble } = this.extractParamListWithDestructuring(args3[1]);
-      const bodyNode = args3[2];
-      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      let bodyArgs = args3.slice(2);
+      const first = bodyArgs[0];
+      if (bodyArgs.length > 1 && first?.kind === "block" && first.type === "Map" &&
+          ["doc", "returns", "context", "effects", "examples", "property"].some((key) => first.fields.has(key))) {
+        bodyArgs = bodyArgs.slice(1);
+      }
+      const body = bodyArgs.length === 0 ? "null" : bodyArgs.length === 1 ? this.genNode(bodyArgs[0]) : `((() => { ${bodyArgs.slice(0, -1).map((node) => this.genNode(node) + ";").join(" ")} return ${this.genNode(bodyArgs[bodyArgs.length - 1])}; })())`;
       const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
       return `const ${name} = (${params.join(", ")}) => ${finalBody}`;
     }
@@ -37983,12 +38373,82 @@ function readStdinLine(prompt) {
     if (bytes.length > maxBytes) fail("read-line: line exceeds " + maxBytes + " bytes", true);
   }
 }
-function createStdioModule() {
-  return { "read-line": readStdinLine, "readline": readStdinLine };
+function onStdinLine(callback, tickMs) {
+  if (typeof callback !== "function") throw new Error("stdin-on-line: callback required");
+  if (tickMs !== void 0 && (!Number.isInteger(tickMs) || tickMs < 1 || tickMs > 6e4))
+    throw new Error("stdin-on-line: invalid tick interval");
+  const maxBytes = 1024 * 1024;
+  let pending = Buffer.alloc(0);
+  let ended = false;
+  let timer;
+  const stop = () => {
+    if (timer) clearInterval(timer);
+    process.stdin.removeListener("data", onData);
+    process.stdin.removeListener("end", onEnd);
+    process.stdin.removeListener("error", onError);
+    process.stdin.pause();
+  };
+  const fail = (message) => {
+    if (ended) return;
+    ended = true;
+    stop();
+    process.stderr.write(message + "\n");
+    process.exitCode = 1;
+    callback({ kind: "error", message });
+  };
+  const deliver = (bytes) => {
+    if (bytes.length > maxBytes) {
+      fail("stdin-on-line: line exceeds " + maxBytes + " bytes");
+      return;
+    }
+    const line = bytes.length > 0 && bytes[bytes.length - 1] === 13 ? bytes.subarray(0, -1) : bytes;
+    let decoded;
+    try {
+      decoded = new (require("util").TextDecoder)("utf-8", { fatal: true }).decode(line);
+    } catch {
+      fail("stdin-on-line: invalid UTF-8");
+      return;
+    }
+    callback({ kind: "line", line: decoded });
+  };
+  const onData = (chunk) => {
+    let start = 0;
+    for (let index = 0; index < chunk.length && !ended; index++) {
+      if (chunk[index] !== 10) continue;
+      deliver(Buffer.concat([pending, chunk.subarray(start, index)]));
+      pending = Buffer.alloc(0);
+      start = index + 1;
+    }
+    if (ended) return;
+    pending = Buffer.concat([pending, chunk.subarray(start)]);
+    if (pending.length > maxBytes) fail("stdin-on-line: line exceeds " + maxBytes + " bytes");
+  };
+  const onEnd = () => {
+    if (ended) return;
+    if (pending.length > 0) deliver(pending);
+    if (ended) return;
+    ended = true;
+    stop();
+    callback({ kind: "eof" });
+  };
+  const onError = (error) => fail("stdin-on-line: stdin read failed: " + error.message);
+  process.stdin.on("data", onData);
+  process.stdin.on("end", onEnd);
+  process.stdin.on("error", onError);
+  if (tickMs !== void 0) timer = setInterval(() => callback({ kind: "tick" }), tickMs);
+  process.stdin.resume();
+  return null;
+}
+function createStdioModule(invokeCallback) {
+  return {
+    "read-line": readStdinLine,
+    "readline": readStdinLine,
+    "stdin-on-line": (fnValue, tickMs) => onStdinLine((event) => invokeCallback(fnValue, [event]), tickMs)
+  };
 }
 function loadAllStdlib(interp2) {
   interp2.registerModule(createFileModule());
-  interp2.registerModule(createStdioModule());
+  interp2.registerModule(createStdioModule((fnValue, args) => fnValue?.name ? interp2.callUserFunction(fnValue.name, args) : interp2.callFunctionValue(fnValue, args)));
   interp2.registerModule(createFdModule());
   interp2.registerModule(createBitsModule());
   interp2.registerModule(createBinaryFoundationModule());
@@ -43949,9 +44409,28 @@ function cmdCodegen(args3) {
     process.exit(1);
   }
 }
+function expandCompileLoads(nodes, currentFile, loaded) {
+  const expanded = [];
+  for (const node of nodes) {
+    if (node.kind !== "sexpr" || node.op !== "load") {
+      expanded.push(node);
+      continue;
+    }
+    const arg = node.args[0];
+    if (node.args.length !== 1 || !arg || arg.kind !== "literal" || arg.type !== "string") {
+      throw new Error('compile supports only top-level (load "relative-file.fls")');
+    }
+    const loadedFile = path18.resolve(path18.dirname(currentFile), String(arg.value));
+    if (loaded.has(loadedFile)) continue;
+    loaded.add(loadedFile);
+    const source = fs20.readFileSync(loadedFile, "utf-8");
+    expanded.push(...expandCompileLoads(parse(lex(source, loadedFile)), loadedFile, loaded));
+  }
+  return expanded;
+}
 function cmdCompile(args3) {
   const outputIdx = args3.indexOf("-o");
-  const inputFile = args3.find((a) => !a.startsWith("-") && a !== args3[outputIdx + 1]);
+  const inputFile = args3.find((a) => !a.startsWith("-") && (outputIdx === -1 || a !== args3[outputIdx + 1]));
   const outputFile = outputIdx !== -1 ? args3[outputIdx + 1] : null;
   const useEsm = args3.includes("--esm");
   const withRuntime = args3.includes("--runtime");
@@ -43967,7 +44446,7 @@ function cmdCompile(args3) {
   try {
     const source = fs20.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
-    const ast = parse(tokens);
+    const ast = expandCompileLoads(parse(tokens), absInput, /* @__PURE__ */ new Set([absInput]));
     const cg = new JSCodegen();
     const js = cg.generate(ast, {
       module: useEsm ? "esm" : "commonjs",

@@ -72,7 +72,8 @@ interface InterpreterLike {
  */
 export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createFileModule());
-  interp.registerModule(createStdioModule());
+  interp.registerModule(createStdioModule((fnValue, args) =>
+    fnValue?.name ? interp.callUserFunction(fnValue.name, args) : interp.callFunctionValue(fnValue, args)));
   interp.registerModule(createFdModule());
   interp.registerModule(createBitsModule());
   interp.registerModule(createBinaryFoundationModule());

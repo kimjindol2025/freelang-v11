@@ -15,7 +15,7 @@ import * as readline from "readline";
 import { lex } from "./lexer";
 import { parse, ParserError } from "./parser";
 import { interpret, Interpreter } from "./interpreter";
-import { Block } from "./ast";
+import { ASTNode, Block } from "./ast";
 import { JSCodegen } from "./codegen-js"; // Phase 6: FL 컴파일러
 import { typeCheckSource, formatTypeIssues } from "./type-check-static";
 import { DebugSession, setGlobalDebugSession } from "./debugger"; // Phase 78: 디버거
@@ -589,10 +589,31 @@ function cmdCodegen(args: string[]): void {
   }
 }
 
+function expandCompileLoads(nodes: ASTNode[], currentFile: string, loaded: Set<string>): ASTNode[] {
+  const expanded: ASTNode[] = [];
+  for (const node of nodes) {
+    if (node.kind !== "sexpr" || node.op !== "load") {
+      expanded.push(node);
+      continue;
+    }
+    const arg = node.args[0];
+    if (node.args.length !== 1 || !arg || arg.kind !== "literal" || arg.type !== "string") {
+      throw new Error("compile supports only top-level (load \"relative-file.fls\")");
+    }
+    const loadedFile = path.resolve(path.dirname(currentFile), String(arg.value));
+    if (loaded.has(loadedFile)) continue;
+    loaded.add(loadedFile);
+    const source = fs.readFileSync(loadedFile, "utf-8");
+    expanded.push(...expandCompileLoads(parse(lex(source, loadedFile)), loadedFile, loaded));
+  }
+  return expanded;
+}
+
 function cmdCompile(args: string[]): void {
   // 옵션 파싱: compile input.fl -o output.js [--esm] [--runtime]
   const outputIdx = args.indexOf("-o");
-  const inputFile = args.find(a => !a.startsWith("-") && a !== args[outputIdx + 1]);
+  const inputFile = args.find(a => !a.startsWith("-") &&
+    (outputIdx === -1 || a !== args[outputIdx + 1]));
   const outputFile = outputIdx !== -1 ? args[outputIdx + 1] : null;
   const useEsm = args.includes("--esm");
   const withRuntime = args.includes("--runtime");
@@ -613,7 +634,7 @@ function cmdCompile(args: string[]): void {
     // 파이프라인: lex → parse → JSCodegen.generate()
     const source = fs.readFileSync(absInput, "utf-8");
     const tokens = lex(source);
-    const ast = parse(tokens);
+    const ast = expandCompileLoads(parse(tokens), absInput, new Set([absInput]));
 
     const cg = new JSCodegen();
     const js = cg.generate(ast, {

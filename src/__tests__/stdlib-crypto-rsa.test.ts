@@ -81,6 +81,23 @@ describe("stdlib-crypto-rsa (RS256)", () => {
     expect(fields[5].length).toBeGreaterThan(0);
   });
 
+  test("JWK 공개키로 RS256 서명을 검증하고 잘못된 키·알고리즘을 거부", () => {
+    const result = run(`
+      (let [keysA (crypto_rsa_generate 2048)
+            keysB (crypto_rsa_generate 2048)
+            jwkA (crypto_rsa_public_to_jwk (get $keysA "publicKey") "a")
+            jwkB (crypto_rsa_public_to_jwk (get $keysB "publicKey") "b")
+            sig (crypto_rsa_sign (get $keysA "privateKey") "signed-data")]
+        [(crypto_rsa_verify_jwk $jwkA "signed-data" $sig)
+         (crypto_rsa_verify_jwk $jwkA "altered-data" $sig)
+         (crypto_rsa_verify_jwk $jwkB "signed-data" $sig)
+         (crypto_rsa_verify_jwk {"kty" "RSA" "n" (get $jwkA "n")
+                                 "e" (get $jwkA "e") "alg" "HS256"}
+                                "signed-data" $sig)])
+    `);
+    expect(result).toEqual([true, false, false, false]);
+  });
+
   test("외부 Node crypto로 서명한 것을 우리가 검증 가능 (cross-verify)", () => {
     const { publicKey, privateKey } = generateKeyPairSync("rsa", {
       modulusLength: 2048,

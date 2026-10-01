@@ -31,6 +31,32 @@ export function createFileModule() {
       }
     },
 
+    // file_read_base64 filePath maxBytes -> string (bounded binary file content)
+    "file_read_base64": (filePath: string, maxBytes: number): string => {
+      if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > 1048576) {
+        throw new Error("file_read_base64 requires a 1..1048576 byte limit");
+      }
+      const fd = fs.openSync(validateFilePath(filePath),
+        fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+      try {
+        const stat = fs.fstatSync(fd);
+        if (!stat.isFile() || stat.size > maxBytes) {
+          throw new Error("file_read_base64 file is not a bounded regular file");
+        }
+        const buffer = Buffer.alloc(maxBytes + 1);
+        let length = 0;
+        for (;;) {
+          const count = fs.readSync(fd, buffer, length, buffer.length - length, null);
+          if (count === 0) break;
+          length += count;
+          if (length > maxBytes) throw new Error("file_read_base64 byte limit exceeded");
+        }
+        return buffer.subarray(0, length).toString("base64");
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
+
     // file_write filePath content -> boolean (write content to file)
     "file_write": (filePath: string, content: string): boolean => {
       try {

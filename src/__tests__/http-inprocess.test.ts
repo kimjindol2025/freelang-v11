@@ -16,6 +16,8 @@ function startChildServer(): Promise<{ port: number; kill: () => void }> {
         `
 const http=require('http');
 const s=http.createServer((req,res)=>{
+  if(req.url==='/large'){res.writeHead(200);res.end('x'.repeat(70000));return;}
+  if(req.url==='/slow'){setTimeout(()=>{res.writeHead(200);res.end('slow');},200);return;}
   if(req.method==='POST'){
     let b=''; req.on('data',d=>b+=d); req.on('end',()=>{res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({echo:b}))});
     return;
@@ -80,6 +82,21 @@ describe("http in-process (HTTP-INPROCESS-001)", () => {
     );
     expect(r.status).toBe(200);
     expect(r.body).toContain("echo");
+  });
+
+  test("bounded fetch rejects oversized body and keeps the next reply separate", () => {
+    const oversized = nodeHttpRequest(`http://127.0.0.1:${port}/large`, "GET",
+      undefined, undefined, 1000, 65536);
+    expect(oversized).toEqual({ status: 0, body: "", error: "response-too-large" });
+    expect(nodeHttpRequest(`http://127.0.0.1:${port}/`, "GET").body).toBe("ok");
+  });
+
+  test("timed-out request does not supply the next request's response", () => {
+    const slow = nodeHttpRequest(`http://127.0.0.1:${port}/slow`, "GET",
+      undefined, undefined, 100);
+    expect(slow.status).toBe(0);
+    expect(slow.error).toBe("timeout");
+    expect(nodeHttpRequest(`http://127.0.0.1:${port}/`, "GET").body).toBe("ok");
   });
 
   test("per-call median under 10ms (n=21, warm 3)", () => {

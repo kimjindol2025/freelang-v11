@@ -52,12 +52,33 @@ const BUILTIN_MAP: Record<string, string> = {
   "cli-args": "_fl_get_argv",
   "file_read": "_fl_file_read",
   "file-read": "_fl_file_read",
+  "file_read_base64": "_fl_file_read_base64",
+  "file-read-base64": "_fl_file_read_base64",
+  "utf8-decode-strict": "_fl_utf8_decode_strict",
+  "utf8_decode_strict": "_fl_utf8_decode_strict",
   "file_write": "_fl_file_write",
   "file-write": "_fl_file_write",
   "file-exists": "_fl_file_exists",
   "file_exists": "_fl_file_exists",
   "readline": "_fl_readline",
   "read-line": "_fl_readline",
+  "stdin-on-line": "_fl_stdin_on_line",
+  "server-post": "_fl_server_post",
+  "server-get": "_fl_server_get",
+  "server-delete": "_fl_server_delete",
+  "server-sse": "_fl_server_sse",
+  "server-body-limit": "_fl_server_body_limit",
+  "server-start": "_fl_server_start",
+  "sse_alive": "_fl_sse_alive",
+  "sse_send": "_fl_sse_send",
+  "sse_close": "_fl_sse_close",
+  "set_interval": "_fl_set_interval",
+  "http_get_bounded": "_fl_http_get_bounded",
+  "uuid_v4": "_fl_uuid_v4",
+  "now_unix": "_fl_now_unix",
+  "base64url_decode": "_fl_base64url_decode",
+  "auth_jwt_verify": "_fl_auth_jwt_verify",
+  "dissoc": "_fl_dissoc",
   "char_at": "_fl_char_at",
   "char-at": "_fl_char_at",
   "substring": "_fl_substring",
@@ -69,6 +90,13 @@ const BUILTIN_MAP: Record<string, string> = {
   "list?": "_fl_list_q",
   "array?": "_fl_array_q",
   "map?": "_fl_map_q",
+  "integer?": "Number.isInteger",
+  "str-starts-with": "_fl_str_starts_with",
+  "shell-cwd": "_fl_shell_cwd",
+  "shell-safe": "_fl_shell_safe",
+  "shell_env": "_fl_env_get",
+  "crypto_rsa_verify": "_fl_crypto_rsa_verify",
+  "crypto_rsa_verify_jwk": "_fl_crypto_rsa_verify_jwk",
   "fn?": "_fl_fn_q",
   "boolean?": "_fl_boolean_q",
   "type-of": "_fl_type_of",
@@ -217,6 +245,19 @@ export class JSCodegen {
     }
     parts.push(...bodyParts);
 
+    // Named HTTP/timer callbacks are invoked later by the shared host I/O module.
+    // Register only generated FreeLang defn values; never evaluate handler names.
+    if (bodyParts.some(part => /_fl_(?:server_|sse_|set_interval|http_get_bounded)/.test(part))) {
+      const callbacks = nodes.flatMap(node => {
+        if (node.kind !== "sexpr" || (node.op !== "defn" && node.op !== "defun")) return [];
+        const nameNode = node.args[0] as Variable | Literal;
+        const rawName = nameNode.kind === "variable" ? nameNode.name
+          : nameNode.kind === "literal" ? String(nameNode.value) : null;
+        return rawName === null ? [] : [`${JSON.stringify(rawName)}: ${flNameToJs(rawName)}`];
+      });
+      parts.push(`_fl_register_host_functions({${callbacks.join(", ")}});`);
+    }
+
     // 모듈 export 처리
     if (this.exportedNames.length > 0) {
       if (this.opts.module === "commonjs") {
@@ -332,6 +373,10 @@ export class JSCodegen {
 
   genSExpr(node: SExpr): string {
     const { op, args } = node;
+
+    if (op === "load") {
+      throw new Error("compile supports only top-level static load paths");
+    }
 
     if (op === "and") {
       if (args.length === 0) return "true";
@@ -536,8 +581,15 @@ export class JSCodegen {
     if (op === "defn" || op === "defun") {
       const name = this.extractVarName(args[0]);
       const { params, preamble } = this.extractParamListWithDestructuring(args[1]);
-      const bodyNode = args[2];
-      const body = bodyNode ? this.genNode(bodyNode) : "null";
+      let bodyArgs = args.slice(2);
+      const first = bodyArgs[0];
+      if (bodyArgs.length > 1 && first?.kind === "block" && first.type === "Map" &&
+          ["doc", "returns", "context", "effects", "examples", "property"].some(key => first.fields.has(key))) {
+        bodyArgs = bodyArgs.slice(1);
+      }
+      const body = bodyArgs.length === 0 ? "null" : bodyArgs.length === 1
+        ? this.genNode(bodyArgs[0])
+        : `((() => { ${bodyArgs.slice(0, -1).map(node => this.genNode(node) + ";").join(" ")} return ${this.genNode(bodyArgs[bodyArgs.length - 1])}; })())`;
       const finalBody = preamble ? `((() => { ${preamble} return ${body}; })())` : body;
       return `const ${name} = (${params.join(", ")}) => ${finalBody}`;
     }

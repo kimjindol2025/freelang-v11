@@ -41,6 +41,7 @@ function _fl_null_q(v) { return v === null || v === undefined; }
 function _fl_true_q(v) { return v === true; }
 function _fl_false_q(v) { return v === false; }
 function _fl_number_q(v) { return typeof v === 'number'; }
+function _fl_boolean_q(v) { return typeof v === 'boolean'; }
 function _fl_string_q(v) { return typeof v === 'string'; }
 function _fl_list_q(v) { return Array.isArray(v); }
 function _fl_array_q(v) { return Array.isArray(v); }
@@ -83,6 +84,15 @@ var map_entries = _fl_entries;
 var map_keys = _fl_keys;
 var map_values = _fl_values;
 function _fl_map_set(o, ...args) { const result = {...(o || {})}; for (let i = 0; i + 1 < args.length; i += 2) { result[args[i]] = args[i + 1]; } return result; }
+function _fl_dissoc(o, ...keys) {
+  if (o != null && (typeof o !== "object" || Array.isArray(o))) throw new Error("dissoc: expected map");
+  const result = {...(o || {})};
+  for (const rawKey of keys) {
+    const key = typeof rawKey === "string" && rawKey.startsWith(":") ? rawKey.slice(1) : String(rawKey);
+    delete result[key];
+  }
+  return result;
+}
 function _fl_has_key_q(o, k) { return o ? (String(k) in o) : false; }
 function _fl_atom(v) { return { value: v }; }
 function _fl_atom_deref(a) { return a == null ? null : a.value; }
@@ -103,6 +113,7 @@ function _fl_trim(s) { return String(s || "").trim(); }
 function _fl_replace(s, a, b) { return String(s || "").split(a).join(b); }
 function _fl_str_index_of(s, sub) { return (s || "").indexOf(sub); }
 function _fl_contains_q(s, sub) { return (s || "").includes(sub); }
+function _fl_str_starts_with(s, prefix) { return String(s || "").startsWith(String(prefix || "")); }
 function _fl_str_to_num(s) { const n = Number(s); return isNaN(n) ? null : n; }
 function _fl_join(arr, sep) { return (arr || []).join(sep !== undefined ? sep : ""); }
 function _fl_split(s, sep) { return (s || "").split(sep !== undefined ? sep : ""); }
@@ -120,7 +131,110 @@ function _fl_slice(l, a, b) { return (l || []).slice(a, b); }
 // ─ 시스템 및 I/O ─
 function _fl_print(v) { console.log(v); return v; }
 function _fl_get_argv() { return (typeof process !== "undefined" ? process.argv.slice(2) : []); }
+const _fl_host_functions = Object.create(null);
+function _fl_register_host_functions(functions) { Object.assign(_fl_host_functions, functions); }
+let _fl_generated_http_host = null;
+function _fl_http_host_call(method, ...args) {
+  if (_fl_generated_http_host === null) {
+    const root = process.env.FREELANG_V11_ROOT;
+    if (!root) throw new Error("generated HTTP requires FREELANG_V11_ROOT");
+    const filename = require("path").join(root, "generated-http-host.cjs");
+    const factory = require(filename).createGeneratedHttpHost;
+    _fl_generated_http_host = factory((name, values) => {
+      const callback = _fl_host_functions[name];
+      if (typeof callback !== "function") throw new Error("FreeLang HTTP callback not found: " + name);
+      return callback(...values);
+    });
+  }
+  const methodFn = _fl_generated_http_host[method];
+  if (typeof methodFn !== "function") throw new Error("FreeLang HTTP host method not found: " + method);
+  return methodFn(...args);
+}
+function _fl_server_post(...args) { return _fl_http_host_call("server_post", ...args); }
+function _fl_server_get(...args) { return _fl_http_host_call("server_get", ...args); }
+function _fl_server_delete(...args) { return _fl_http_host_call("server_delete", ...args); }
+function _fl_server_sse(...args) { return _fl_http_host_call("server_sse", ...args); }
+function _fl_server_body_limit(...args) { return _fl_http_host_call("server_body_limit", ...args); }
+function _fl_server_start(...args) { return _fl_http_host_call("server_start", ...args); }
+function _fl_sse_alive(...args) { return _fl_http_host_call("sse_alive", ...args); }
+function _fl_sse_send(...args) { return _fl_http_host_call("sse_send", ...args); }
+function _fl_sse_close(...args) { return _fl_http_host_call("sse_close", ...args); }
+function _fl_set_interval(...args) { return _fl_http_host_call("set_interval", ...args); }
+function _fl_http_get_bounded(...args) { return _fl_http_host_call("http_get_bounded", ...args); }
+function _fl_uuid_v4(...args) { return _fl_http_host_call("uuid_v4", ...args); }
+function _fl_now_unix(...args) { return _fl_http_host_call("now_unix", ...args); }
+function _fl_base64url_decode(...args) { return _fl_http_host_call("base64url_decode", ...args); }
+function _fl_auth_jwt_verify(...args) { return _fl_http_host_call("auth_jwt_verify", ...args); }
 function _fl_file_read(p) { return require("fs").readFileSync(p, "utf8"); }
+function _fl_utf8_decode_strict(base64) {
+  if (typeof base64 !== "string" ||
+      !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) {
+    throw new Error("binary: invalid base64 buffer");
+  }
+  const bytes = Buffer.from(base64, "base64");
+  if (bytes.toString("base64") !== base64) throw new Error("binary: non-canonical base64 buffer");
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+}
+function _fl_file_read_base64(p, maxBytes) {
+  if (!Number.isInteger(maxBytes) || maxBytes < 1 || maxBytes > 1048576) {
+    throw new Error("file_read_base64 requires a 1..1048576 byte limit");
+  }
+  const fs = require("fs");
+  const path = require("path");
+  const base = process.env.FL_FILE_BASE;
+  const resolved = path.resolve(p);
+  if (base) {
+    const root = path.resolve(base);
+    if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+      throw new Error("file_read_base64 path outside FL_FILE_BASE");
+    }
+  }
+  const fd = fs.openSync(resolved, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+  try {
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > maxBytes) {
+      throw new Error("file_read_base64 file is not a bounded regular file");
+    }
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let length = 0;
+    for (;;) {
+      const count = fs.readSync(fd, buffer, length, buffer.length - length, null);
+      if (count === 0) break;
+      length += count;
+      if (length > maxBytes) throw new Error("file_read_base64 byte limit exceeded");
+    }
+    return buffer.subarray(0, length).toString("base64");
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+function _fl_shell_cwd() { return process.cwd(); }
+function _fl_crypto_rsa_verify(publicKey, data, signature) {
+  try {
+    const verifier = require("crypto").createVerify("RSA-SHA256");
+    verifier.update(data);
+    verifier.end();
+    return verifier.verify(publicKey, Buffer.from(signature, "base64url"));
+  } catch { return false; }
+}
+function _fl_crypto_rsa_verify_jwk(jwk, data, signature) {
+  try {
+    if (!jwk || jwk.kty !== "RSA" || typeof jwk.n !== "string" || typeof jwk.e !== "string" ||
+        (jwk.alg != null && jwk.alg !== "RS256") || (jwk.use != null && jwk.use !== "sig") ||
+        typeof data !== "string" || typeof signature !== "string" ||
+        !/^[A-Za-z0-9_-]+$/.test(signature)) return false;
+    const key = require("crypto").createPublicKey({key: {kty: "RSA", n: jwk.n, e: jwk.e}, format: "jwk"});
+    return _fl_crypto_rsa_verify(key, data, signature);
+  } catch { return false; }
+}
+function _fl_shell_safe(program, args) {
+  if (typeof program !== "string" || !program) throw new Error("shell_safe: program must be a string");
+  if (!Array.isArray(args)) throw new Error("shell_safe: args must be an array");
+  const result = require("child_process").spawnSync(program, args.map(String), { timeout: 30000, encoding: "utf8" });
+  if (result.error) throw new Error("shell_safe failed: " + result.error.message);
+  if (result.status !== 0) throw new Error("shell_safe failed (exit " + result.status + "): " + String(result.stderr || "").trim());
+  return result.stdout || "";
+}
 function _fl_file_write(p, c) { return require("fs").writeFileSync(p, c); }
 function _fl_file_exists(p) { return require("fs").existsSync(p); }
 function _fl_file_delete(p) { try { require("fs").unlinkSync(p); } catch(e) {} }
@@ -179,6 +293,66 @@ function _fl_readline(prompt) {
     bytes.push(byte[0]);
     if (bytes.length > maxBytes) throw new RangeError("read-line: line exceeds " + maxBytes + " bytes");
   }
+}
+function _fl_stdin_on_line(callback, tickMs) {
+  if (typeof callback !== "function") throw new Error("stdin-on-line: callback required");
+  if (tickMs !== undefined && (!Number.isInteger(tickMs) || tickMs < 1 || tickMs > 60000))
+    throw new Error("stdin-on-line: invalid tick interval");
+  const maxBytes = 1024 * 1024;
+  const Decoder = require("util").TextDecoder;
+  let pending = Buffer.alloc(0);
+  let ended = false;
+  let timer;
+  const stop = () => {
+    if (timer) clearInterval(timer);
+    process.stdin.removeListener("data", onData);
+    process.stdin.removeListener("end", onEnd);
+    process.stdin.removeListener("error", onError);
+    process.stdin.pause();
+  };
+  const fail = (message) => {
+    if (ended) return;
+    ended = true;
+    stop();
+    process.stderr.write(message + "\\n");
+    process.exitCode = 1;
+    callback({kind: "error", message});
+  };
+  const deliver = (bytes) => {
+    if (bytes.length > maxBytes) { fail("stdin-on-line: line exceeds " + maxBytes + " bytes"); return; }
+    const line = bytes.length > 0 && bytes[bytes.length - 1] === 13 ? bytes.subarray(0, -1) : bytes;
+    let decoded;
+    try { decoded = new Decoder("utf-8", {fatal: true}).decode(line); }
+    catch { fail("stdin-on-line: invalid UTF-8"); return; }
+    callback({kind: "line", line: decoded});
+  };
+  const onData = (chunk) => {
+    let start = 0;
+    for (let index = 0; index < chunk.length && !ended; index++) {
+      if (chunk[index] !== 10) continue;
+      deliver(Buffer.concat([pending, chunk.subarray(start, index)]));
+      pending = Buffer.alloc(0);
+      start = index + 1;
+    }
+    if (ended) return;
+    pending = Buffer.concat([pending, chunk.subarray(start)]);
+    if (pending.length > maxBytes) fail("stdin-on-line: line exceeds " + maxBytes + " bytes");
+  };
+  const onEnd = () => {
+    if (ended) return;
+    if (pending.length > 0) deliver(pending);
+    if (ended) return;
+    ended = true;
+    stop();
+    callback({kind: "eof"});
+  };
+  const onError = (error) => fail("stdin-on-line: stdin read failed: " + error.message);
+  process.stdin.on("data", onData);
+  process.stdin.on("end", onEnd);
+  process.stdin.on("error", onError);
+  if (tickMs !== undefined) timer = setInterval(() => callback({kind: "tick"}), tickMs);
+  process.stdin.resume();
+  return null;
 }
 function _fl_shell_capture(cmd) {
   try {
@@ -253,11 +427,12 @@ let __argv__ = _fl_get_argv();
  */
 export const HELPER_FUNCTIONS = [
   '_plus', '_minus', '_star', '_slash', '_gt', '_lt', '_eq', '_gt_eq', '_lt_eq', '_not', '_and', '_or', '_concat',
-  '_fl_null_q', '_fl_true_q', '_fl_false_q', '_fl_number_q', '_fl_string_q', '_fl_list_q', '_fl_array_q', '_fl_map_q', '_fl_fn_q',
-  '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_concat', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_has_key_q',
+  '_fl_null_q', '_fl_true_q', '_fl_false_q', '_fl_number_q', '_fl_boolean_q', '_fl_string_q', '_fl_list_q', '_fl_array_q', '_fl_map_q', '_fl_fn_q',
+  '_fl_length', '_fl_get', '_fl_first', '_fl_last', '_fl_rest', '_fl_append', '_fl_concat', '_fl_keys', '_fl_values', '_fl_entries', '_fl_map_set', '_fl_dissoc', '_fl_has_key_q',
   '_fl_atom', '_fl_atom_deref', '_fl_atom_reset', '_fl_atom_swap',
-  '_fl_str', '_fl_char_at', '_fl_substring', '_fl_lower', '_fl_upper', '_fl_trim', '_fl_replace', '_fl_str_index_of', '_fl_contains_q', '_fl_str_to_num', '_fl_join', '_fl_split', '_fl_repeat', '_fl_range',
-  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_readline', '_fl_file_read', '_fl_file_write', '_fl_file_exists', '_fl_shell_capture',
+  '_fl_str', '_fl_char_at', '_fl_substring', '_fl_lower', '_fl_upper', '_fl_trim', '_fl_replace', '_fl_str_index_of', '_fl_contains_q', '_fl_str_starts_with', '_fl_str_to_num', '_fl_join', '_fl_split', '_fl_repeat', '_fl_range',
+  '_fl_map', '_fl_filter', '_fl_reduce', '_fl_slice', '_fl_print', '_fl_get_argv', '_fl_readline', '_fl_stdin_on_line', '_fl_file_read', '_fl_file_read_base64', '_fl_utf8_decode_strict', '_fl_file_write', '_fl_file_exists', '_fl_shell_cwd', '_fl_shell_safe', '_fl_shell_capture', '_fl_crypto_rsa_verify', '_fl_crypto_rsa_verify_jwk',
+  '_fl_register_host_functions', '_fl_http_host_call', '_fl_server_post', '_fl_server_get', '_fl_server_delete', '_fl_server_sse', '_fl_server_body_limit', '_fl_server_start', '_fl_sse_alive', '_fl_sse_send', '_fl_sse_close', '_fl_set_interval', '_fl_http_get_bounded', '_fl_uuid_v4', '_fl_now_unix', '_fl_base64url_decode', '_fl_auth_jwt_verify',
   '_fl_take', '_fl_drop', '_fl_zip', '_fl_flatten', '_fl_reverse', '_fl_sort'
 ];
 
