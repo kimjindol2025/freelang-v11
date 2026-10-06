@@ -77,6 +77,7 @@ function propagateMutations(
 }
 
 const MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 처리하므로 안전망 역할)
+const MAX_TCO_ITERATIONS = 10;
 
 // ── 런타임 타입 시스템 ────────────────────────────────────────────────────────
 function _flCheckType(type: string, val: any): boolean {
@@ -413,7 +414,9 @@ function _callUserFunctionInterpPath(interp: InterpreterLike, name: string, args
   let _currentFunc = func;
   let _currentArgs = args;
   try {
-    for (let recurIter = 0; recurIter < 2_000_000; recurIter++) {
+    // TCO prevents JS-stack growth, but an unbounded tail-recursive program
+    // must still terminate instead of consuming the runner indefinitely.
+    for (let recurIter = 0; recurIter < MAX_TCO_ITERATIONS; recurIter++) {
       // budget max-ms 체크 (TCO 루프 — 1000회마다)
       if (recurIter > 0 && recurIter % 1000 === 0 && hasBudget()) {
         checkBudget(Date.now(), 0, 0);
@@ -462,7 +465,9 @@ function _callUserFunctionInterpPath(interp: InterpreterLike, name: string, args
       }
       return result;
     }
-    throw new Error(`recur: max iterations exceeded in '${baseName}'`);
+    throw new Error(
+      `[E_STACK_OVERFLOW] line ${interp.currentLine}: Maximum tail-call depth exceeded (${MAX_TCO_ITERATIONS}) — possible infinite recursion in '${baseName}'`
+    );
   } finally {
     (interp as any).tcoMode = _prevTcoMode;
     interp.callDepth--;
@@ -629,7 +634,7 @@ export function callFunction(interp: InterpreterLike, fn: any, args: any[]): any
  * callUserFunctionTCO: 꼬리 재귀를 반복문으로 변환
  * - tcoMode=true로 eval 실행 → if 꼬리 위치 함수 호출이 TailCall 토큰 반환
  * - TailCall 토큰이 반환되면 인자만 교체하고 다시 실행
- * - 1,000,000번 반복 가능 (스택 없음)
+ * - 제한된 횟수만 반복해 무한 tail recursion을 안전하게 중단
  */
 export function callUserFunctionTCO(interp: InterpreterLike, name: string, args: any[]): any {
   let currentName = name;
@@ -642,7 +647,7 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
   // frame identity 가 iteration 마다 swap 되어야 effect chain trace 정확.
   let _haveFrame = false;
   try {
-    for (let i = 0; i < 2_000_000; i++) {
+    for (let i = 0; i < MAX_TCO_ITERATIONS; i++) {
       let baseName = currentName;
       const bracketMatch = currentName.match(/^([\w\-]+)\[([^\]]+)\]$/);
       if (bracketMatch) baseName = bracketMatch[1];
