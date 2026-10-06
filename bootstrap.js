@@ -30197,7 +30197,8 @@ function createHttpServerModule(callFn, callFunctionValue2) {
   let wsClientMessageHandler = null;
   let wsClientCloseHandler = null;
   let wssPublic = null;
-  let maxBodyBytes = 1024 * 1024;
+  const configuredBodyLimit = Number(process.env.FL_MAX_BODY || 1024 * 1024);
+  let maxBodyBytes = Number.isFinite(configuredBodyLimit) && configuredBodyLimit > 0 ? Math.floor(configuredBodyLimit) : 1024 * 1024;
   function generateRequestId() {
     const timestamp = Date.now();
     const counter = ++requestCounter;
@@ -30226,20 +30227,21 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     return new Promise((resolve10) => {
       const chunks = [];
       let receivedBytes = 0;
-      let tooLarge = false;
+      let settled = false;
       req.on("data", (chunk) => {
+        if (settled) return;
         receivedBytes += chunk.length;
         if (receivedBytes > maxBodyBytes) {
-          tooLarge = true;
+          settled = true;
+          req.pause();
+          resolve10({ __fl_body_too_large: true, limit: maxBodyBytes, received: receivedBytes });
           return;
         }
         chunks.push(chunk);
       });
       req.on("end", () => {
-        if (tooLarge) {
-          resolve10({ __fl_body_too_large: true, limit: maxBodyBytes, received: receivedBytes });
-          return;
-        }
+        if (settled) return;
+        settled = true;
         const raw = Buffer.concat(chunks);
         const ct = (req.headers["content-type"] || "").toString();
         if (ct.includes("application/json")) {
@@ -30392,10 +30394,14 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     if (!entry || now > entry.resetAt) {
       entry = { count: 1, resetAt: now + rlWindowMs };
       rlStore.set(ip, entry);
-      return true;
+      return { allowed: true, remaining: Math.max(0, rlMax - 1), resetAt: entry.resetAt };
     }
     entry.count++;
-    return entry.count <= rlMax;
+    return {
+      allowed: entry.count <= rlMax,
+      remaining: Math.max(0, rlMax - entry.count),
+      resetAt: entry.resetAt
+    };
   }
   setInterval(() => {
     const now = Date.now();
@@ -30420,6 +30426,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
     },
     // server_body_limit max_bytes → null
     "server_body_limit": (maxBytes) => {
+      maxBodyBytes = Math.max(1, Math.floor(maxBytes));
+      return null;
+    },
+    // server_max_body — server_body_limit 호환 별칭
+    "server_max_body": (maxBytes) => {
       maxBodyBytes = Math.max(1, Math.floor(maxBytes));
       return null;
     },
@@ -30555,7 +30566,6 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         const method = req.method || "GET";
         const { path: path19, query } = parseUrl(req.url || "/");
         const headers = req.headers;
-        const body = await readBody(req);
         const allowedOrigins = process.env.FL_ALLOWED_ORIGINS;
         if (allowedOrigins && allowedOrigins !== "*") {
           const reqOrigin = req.headers["origin"] || "";
@@ -30574,15 +30584,24 @@ function createHttpServerModule(callFn, callFunctionValue2) {
         res.setHeader("X-XSS-Protection", "1; mode=block");
         res.setHeader("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${cspNonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:;`);
         res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-        if (body && body.__fl_body_too_large === true) {
+        const rejectOversizedBody = (details) => {
           const status = 413;
           sendResponse(res, status, {
             ok: false,
             data: null,
-            error: { code: "PAYLOAD_TOO_LARGE", limit_bytes: body.limit },
+            error: {
+              code: "PAYLOAD_TOO_LARGE",
+              limit_bytes: details.limit,
+              received_bytes: details.received ?? null,
+              declared_bytes: details.declared ?? null
+            },
             request_id: requestId
-          });
+          }, "application/json", { "Connection": "close" });
           logAccess(method, path19, status, Date.now() - requestStart, requestId);
+        };
+        const declaredLength = Number(req.headers["content-length"]);
+        if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
+          rejectOversizedBody({ limit: maxBodyBytes, declared: declaredLength });
           return;
         }
         if (method === "OPTIONS") {
@@ -30591,9 +30610,12 @@ function createHttpServerModule(callFn, callFunctionValue2) {
           return;
         }
         const clientIp = process.env.FL_TRUST_PROXY === "1" ? (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim() : req.socket.remoteAddress || "unknown";
-        if (!checkRateLimit(clientIp)) {
-          const rlEntry = rlStore.get(clientIp);
-          const retryAfterSec = rlEntry ? Math.max(1, Math.ceil((rlEntry.resetAt - Date.now()) / 1e3)) : Math.ceil(rlWindowMs / 1e3);
+        const rate = checkRateLimit(clientIp);
+        res.setHeader("X-RateLimit-Limit", String(rlMax));
+        res.setHeader("X-RateLimit-Remaining", String(rate.remaining));
+        res.setHeader("X-RateLimit-Reset", String(Math.ceil(rate.resetAt / 1e3)));
+        if (!rate.allowed) {
+          const retryAfterSec = Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1e3));
           const status = 429;
           sendResponse(res, status, {
             ok: false,
@@ -30602,6 +30624,11 @@ function createHttpServerModule(callFn, callFunctionValue2) {
             request_id: requestId
           }, "application/json", { "Retry-After": String(retryAfterSec) });
           logAccess(method, path19, status, Date.now() - requestStart, requestId);
+          return;
+        }
+        const body = await readBody(req);
+        if (body && body.__fl_body_too_large === true) {
+          rejectOversizedBody({ limit: body.limit, received: body.received });
           return;
         }
         if (method === "GET" && sseRoutes.has(path19)) {
