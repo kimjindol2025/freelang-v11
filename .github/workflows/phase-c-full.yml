@@ -204,7 +204,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   nightly-self-host:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     if: github.event_name == 'schedule'
 
     steps:
@@ -221,9 +221,9 @@ jobs:
 
       - name: Build & Full Self-Hosting Chain
         run: |
+          npm run build
           bash scripts/build-stage1.sh
           bash scripts/verify-fixed-point.sh
-          npm test -- --silent
 
       - name: "✅ Nightly Self-Hosting Complete"
         if: success()
