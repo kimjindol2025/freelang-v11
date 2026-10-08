@@ -45,22 +45,26 @@ jobs:
 
       - name: "🔍 FL-Token Scan (Early-Fail)"
         id: scan
-        run: bash scripts/scan-for-fl-tokens.sh stage1.js
+        run: bash scripts/ci-run-check.sh --name scan --output-dir ci-results --timeout-seconds 600 -- bash scripts/scan-for-fl-tokens.sh stage1.js
         continue-on-error: false
 
       - name: "🔗 Fixed-Point Verification (5-stage SHA)"
         id: verify
-        run: |
-          bash scripts/verify-fixed-point.sh
-        continue-on-error: true
+        if: always()
+        run: bash scripts/ci-run-check.sh --name verify --output-dir ci-results --timeout-seconds 600 -- bash scripts/verify-fixed-point.sh
 
       - name: "🧪 Let-in-Expression Regression"
         id: regression
-        run: node scripts/check-let-regressions.js
-        continue-on-error: true
+        if: always()
+        run: bash scripts/ci-run-check.sh --name regression --output-dir ci-results --timeout-seconds 600 -- node scripts/check-let-regressions.js
 
-      - name: "📦 Upload artifacts (on scan/verify failure)"
-        if: failure()
+      - name: "🔐 Validate scan and verify results"
+        id: aggregate
+        if: always()
+        run: node scripts/ci-aggregate.js --root . --expected scan,verify,regression
+
+      - name: "📦 Upload scan/verify artifacts"
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: scan-verify-artifacts
@@ -69,6 +73,7 @@ jobs:
             stage2.js
             stage3.js
             /tmp/build.log
+            ci-results/
           retention-days: 7
 
       - name: "✅ Summary (Scan & Verify)"
@@ -101,8 +106,20 @@ jobs:
         run: npm ci --prefer-offline
 
       - name: "🧪 Jest Regression Tests (Codegen + Let)"
-        run: npm test -- src/__tests__/codegen.let.test.ts --silent
+        run: bash scripts/ci-run-check.sh --name regression-tests --output-dir ci-results --timeout-seconds 270 --source-json ci-results/regression-tests-source.json -- npm test -- src/__tests__/codegen.let.test.ts --silent --json --outputFile=ci-results/regression-tests-source.json
         timeout-minutes: 5
+
+      - name: "🔐 Validate regression result"
+        if: always()
+        run: node scripts/ci-aggregate.js --root . --expected regression-tests
+
+      - name: "📦 Upload regression evidence"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-results
+          path: ci-results/
+          retention-days: 7
 
       - name: "✅ Regression Tests PASS"
         if: success()
@@ -135,14 +152,12 @@ jobs:
         run: npm ci --prefer-offline
 
       - name: "📊 Jest Shard ${{ matrix.shard }}/3"
-        run: |
-          npm test -- \
-            --shard=${{ matrix.shard }}/3 \
-            --bail=false \
-            --silent \
-            --maxWorkers=4
+        run: bash scripts/ci-run-check.sh --name jest-${{ matrix.shard }} --output-dir ci-results --timeout-seconds 1770 --source-json ci-results/jest-${{ matrix.shard }}-source.json -- npm test -- --shard=${{ matrix.shard }}/3 --bail=false --silent --maxWorkers=4 --json --outputFile=ci-results/jest-${{ matrix.shard }}-source.json
         timeout-minutes: 30
-        continue-on-error: true
+
+      - name: "🔐 Validate Jest result"
+        if: always()
+        run: node scripts/ci-aggregate.js --root . --expected jest-${{ matrix.shard }}
 
       - name: "📦 Upload Jest Results"
         if: always()
@@ -152,6 +167,7 @@ jobs:
           path: |
             coverage/
             junit.xml
+            ci-results/
           retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════════
@@ -164,8 +180,11 @@ jobs:
     if: always()
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download artifacts (summary)
         uses: actions/download-artifact@v4
+        if: always()
         continue-on-error: true
 
       - name: "📊 Build Summary"
@@ -183,12 +202,17 @@ jobs:
           echo ""
           echo "---"
           echo ""
-          if [ "${{ needs.scan-and-verify.result }}" == "success" ] && \
+          set +e
+          node scripts/ci-aggregate.js --root . --expected scan,verify,regression,regression-tests,jest-1,jest-2,jest-3
+          aggregate_status=$?
+          if [ "$aggregate_status" -eq 0 ] && \
+             [ "${{ needs.scan-and-verify.result }}" == "success" ] && \
              [ "${{ needs.regression-tests.result }}" == "success" ] && \
              [ "${{ needs.jest-full.result }}" == "success" ]; then
             echo "✨ **All checks PASSED**"
           else
             echo "❌ **Some checks FAILED** — Review logs above"
+            exit 1
           fi
 
       - name: "🚨 Notify on Failure (Optional)"

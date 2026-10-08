@@ -26,6 +26,7 @@ jobs:
     outputs:
       scan-status: ${{ steps.scan.outcome }}
       verify-status: ${{ steps.verify.outcome }}
+      ci-status: ${{ steps.aggregate.outcome }}
       stage1-sha: ${{ steps.stage1.outputs.sha }}
 
     steps:
@@ -54,18 +55,23 @@ jobs:
 
       - name: "🔍 FL-Token Scan (Early-Fail)"
         id: scan
-        run: bash scripts/scan-for-fl-tokens.sh stage1.js
+        run: bash scripts/ci-run-check.sh --name scan --output-dir ci-results --timeout-seconds 600 -- bash scripts/scan-for-fl-tokens.sh stage1.js
         continue-on-error: false
 
       - name: "🔗 Fixed-Point Verification (5-stage SHA)"
         id: verify
-        run: bash scripts/verify-fixed-point.sh
-        continue-on-error: true
+        if: always()
+        run: bash scripts/ci-run-check.sh --name verify --output-dir ci-results --timeout-seconds 600 -- bash scripts/verify-fixed-point.sh
 
       - name: "🧪 Let-in-Expression Regression"
         id: regression
-        run: node scripts/check-let-regressions.js
-        continue-on-error: true
+        if: always()
+        run: bash scripts/ci-run-check.sh --name regression --output-dir ci-results --timeout-seconds 600 -- node scripts/check-let-regressions.js
+
+      - name: "🔐 Validate scan and verify results"
+        id: aggregate
+        if: always()
+        run: node scripts/ci-aggregate.js --root . --expected scan,verify,regression
 
       - name: "📦 Upload scan-verify artifacts"
         if: always()
@@ -77,6 +83,7 @@ jobs:
             stage2.js
             stage3.js
             /tmp/build.log
+            ci-results/
           retention-days: 7
 
       - name: "🚨 Slack Notify — Scan Failed"
@@ -107,7 +114,7 @@ jobs:
             }
 
       - name: "✅ Slack Notify — Scan Passed"
-        if: env.SLACK_WEBHOOK_URL != '' && steps.scan.outcome == 'success'
+        if: env.SLACK_WEBHOOK_URL != '' && steps.aggregate.outcome == 'success'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
@@ -162,9 +169,20 @@ jobs:
 
       - name: "🧪 Jest Regression Tests (Codegen + Let)"
         id: regression
-        run: npm test -- src/__tests__/codegen.let.test.ts --silent
+        run: bash scripts/ci-run-check.sh --name regression-tests --output-dir ci-results --timeout-seconds 270 --source-json ci-results/regression-tests-source.json -- npm test -- src/__tests__/codegen.let.test.ts --silent --json --outputFile=ci-results/regression-tests-source.json
         timeout-minutes: 5
-        continue-on-error: true
+
+      - name: "🔐 Validate regression result"
+        if: always()
+        run: node scripts/ci-aggregate.js --root . --expected regression-tests
+
+      - name: "📦 Upload regression evidence"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-results-${{ github.run_id }}
+          path: ci-results/
+          retention-days: 7
 
       - name: "✅ Regression Tests PASS"
         if: steps.regression.outcome == 'success'
@@ -201,14 +219,12 @@ jobs:
 
       - name: "📊 Jest Shard ${{ matrix.shard }}/3"
         id: jest
-        run: |
-          npm test -- \
-            --shard=${{ matrix.shard }}/3 \
-            --bail=false \
-            --silent \
-            --maxWorkers=4
+        run: bash scripts/ci-run-check.sh --name jest-${{ matrix.shard }} --output-dir ci-results --timeout-seconds 1770 --source-json ci-results/jest-${{ matrix.shard }}-source.json -- npm test -- --shard=${{ matrix.shard }}/3 --bail=false --silent --maxWorkers=4 --json --outputFile=ci-results/jest-${{ matrix.shard }}-source.json
         timeout-minutes: 30
-        continue-on-error: true
+
+      - name: "🔐 Validate Jest result"
+        if: always()
+        run: node scripts/ci-aggregate.js --root . --expected jest-${{ matrix.shard }}
 
       - name: "📦 Upload Jest Results"
         if: always()
@@ -218,6 +234,7 @@ jobs:
           path: |
             coverage/
             junit.xml
+            ci-results/
           retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════════
@@ -233,15 +250,34 @@ jobs:
       overall-status: ${{ steps.summary.outputs.status }}
 
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts (summary)
+        uses: actions/download-artifact@v4
+        if: always()
+        continue-on-error: true
+
       - name: "📊 Determine Overall Status"
         id: summary
         run: |
-          if [ "${{ needs.scan-and-verify.result }}" == "success" ] && \
+          set +e
+          node scripts/ci-aggregate.js --root . --expected scan,verify,regression,regression-tests,jest-1,jest-2,jest-3
+          aggregate_status=$?
+          if [ "$aggregate_status" -eq 0 ] && \
+             [ "${{ needs.scan-and-verify.result }}" == "success" ] && \
              [ "${{ needs.regression-tests.result }}" == "success" ] && \
              [ "${{ needs.jest-full.result }}" == "success" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
           else
             echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "🔐 Enforce product verification result"
+        if: always()
+        run: |
+          if [ "${{ steps.summary.outputs.status }}" != "success" ]; then
+            echo "Product verification failed; Slack notification status is independent."
+            exit 1
           fi
 
       - name: "✅ Slack Notify — All Green"
