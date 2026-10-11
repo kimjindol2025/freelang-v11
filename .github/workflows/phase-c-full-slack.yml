@@ -1,12 +1,8 @@
 name: Phase C — Full Integration (Scan + Verify + Jest + Slack)
 
+# Optional full suite and Slack notifications; run manually to avoid duplicate CI.
 on:
-  push:
-    branches: [feature/phase-c*, master]
-  pull_request:
-    branches: [feature/phase-c*, master]
-  schedule:
-    - cron: '0 2 * * *'  # Nightly (02:00 UTC)
+  workflow_dispatch:
 
 env:
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
