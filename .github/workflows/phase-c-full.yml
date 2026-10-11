@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [feature/phase-c*, master]
   schedule:
-    - cron: '0 2 * * *'  # Nightly (02:00 UTC)
+    - cron: '0 2 * * 0'  # Weekly (Sunday 02:00 UTC)
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -224,11 +224,11 @@ jobs:
           echo "- jest-results-shard-*/"
 
   # ═══════════════════════════════════════════════════════════════════
-  # Nightly: Full Self-Hosting Chain (Optional)
+  # Weekly: Full Self-Hosting Chain (Optional)
   # ═══════════════════════════════════════════════════════════════════
   nightly-self-host:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     if: github.event_name == 'schedule'
 
     steps:
