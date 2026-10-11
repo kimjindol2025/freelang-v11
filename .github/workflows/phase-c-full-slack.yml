@@ -352,8 +352,8 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   nightly-self-host:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    if: github.event_name == 'schedule'
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch'
 
     steps:
       - uses: actions/checkout@v4
