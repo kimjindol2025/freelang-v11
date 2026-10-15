@@ -1,16 +1,8 @@
-/* cgc-bridge.c — S27: fl_parse 래퍼 (parser.c + runtime.c 연결) */
+/* cgc-bridge.c — v11 compiler-only runtime helpers */
 #include "runtime.h"
 #include <string.h>
 
-/* parser.c에서 제공 */
-extern FLValue fl_user_lex(FLValue src);
-extern FLValue fl_user_parse(FLValue tokens);
-
-FLValue fl_parse(FLValue src) {
-    return fl_user_parse(fl_user_lex(src));
-}
-
-/* cgc-main.fl이 사용하는 추가 헬퍼 */
+/* cgc-main.fl이 사용하는 v11 전용 헬퍼 */
 
 static inline const char* _cgcb_strval(FLValue v) {
     if (v.tag == FL_STRING && v.obj) return ((FLString*)v.obj)->data;
