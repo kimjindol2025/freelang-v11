@@ -1,0 +1,51 @@
+;; tests/test-k-compliance.fl
+;; Synthetic fixtures only.
+;; Run after (load "lib/k-compliance.fl")
+
+(load "lib/k-compliance.fl")
+
+(defn kc-assert [$name $got $want]
+  (if (= $got $want)
+    (do (println (str "PASS " $name)) 1)
+    (do (println (str "FAIL " $name " got=" $got " want=" $want)) 0)))
+
+(def $s0 (kc-assert "rrn-ok" (주민등록번호_유효성확인 "900101-1000006") true))
+(def $s1 (kc-assert "rrn-bad-check" (주민등록번호_유효성확인 "900101-1000000") false))
+(def $s2 (kc-assert "rrn-bad-len" (주민등록번호_유효성확인 "900101") false))
+(def $s3 (kc-assert "brn-ok" (사업자등록번호_유효성확인 "123-45-67891") true))
+(def $s4 (kc-assert "brn-known" (사업자등록번호_유효성확인 "120-81-50007") true))
+(def $s5 (kc-assert "brn-bad" (사업자등록번호_유효성확인 "123-45-67890") false))
+(def $s6 (kc-assert "crn-ok" (법인등록번호_유효성확인 "110111-0000002") true))
+(def $s7 (kc-assert "crn-bad" (법인등록번호_유효성확인 "110111-0000000") false))
+(def $s8 (kc-assert "mobile-ok" (국내휴대폰번호_유효성확인 "010-1234-5678") true))
+(def $s9 (kc-assert "mobile-010-10" (국내휴대폰번호_유효성확인 "010-123-5678") false))
+(def $s10 (kc-assert "phone-seoul" (국내전화번호_유효성확인 "02-1234-5678") true))
+(def $s11 (kc-assert "phone-bad" (국내전화번호_유효성확인 "00-1234-5678") false))
+(def $s12 (kc-assert "mask-rrn" (개인정보_비식별화 "900101-1000006" "주민등록번호") "900101-1******"))
+(def $s13 (kc-assert "mask-mobile" (개인정보_비식별화 "01012345678" "휴대폰") "010-****-5678"))
+(def $s14 (kc-assert "mask-email" (개인정보_비식별화 "ab@ex.com" "이메일") "a***@ex.com"))
+(def $s15 (kc-assert "luhn-visa-test" (카드번호_룬검증 "4111111111111111") true))
+(def $s16 (kc-assert "luhn-bad" (카드번호_룬검증 "4111111111111112") false))
+(def $s17 (kc-assert "pci-ok" (PCI_DSS_신용카드검증 "4111111111111111" "12/29" "123") true))
+(def $s18 (kc-assert "pipa-ok" (PIPA_개인정보수집동의_검증 ["이름" "전화"] true "2026-09-27") true))
+(def $s19 (kc-assert "pipa-rrn-deny" (PIPA_개인정보수집동의_검증 ["주민등록번호"] true "2026-09-27") false))
+(def $s20 (kc-assert "isms-ok" (get (ISMS_보안수준_평가 ["암호화" "백업" "기타"]) :충분) 2))
+
+(def $acl0 (권한_부여 (kc/empty-acl) "u1" "읽기"))
+(def $s21 (kc-assert "acl-read" (권한_확인 $acl0 "u1" "읽기") true))
+(def $s22 (kc-assert "acl-write-deny" (권한_확인 $acl0 "u1" "쓰기") false))
+
+(def $acl1 (역할_부여 $acl0 "u1" "게스트"))
+(def $s23 (kc-assert "role-public" (역할_권한_확인 $acl1 "u1" "게스트" "공개") true))
+(def $s24 (kc-assert "role-secret" (역할_권한_확인 $acl1 "u1" "게스트" "비밀") false))
+
+(def $acl2 (세션_등록 $acl1 "s1" 1000))
+(def $s25 (kc-assert "session-ok" (세션_유효성확인 $acl2 "s1" 30 1600) true))
+(def $s26 (kc-assert "session-exp" (세션_유효성확인 $acl2 "s1" 1 10000) false))
+
+(def $log0 (접근로그_기록 (kc/empty-audit) "u1" "file" "읽기" true))
+(def $log1 (보안이벤트_로그 $log0 "인증실패" "높음" "bad login"))
+(def $s27 (kc-assert "audit-len" (length $log1) 2))
+
+(def $pass (+ $s0 $s1 $s2 $s3 $s4 $s5 $s6 $s7 $s8 $s9 $s10 $s11 $s12 $s13 $s14 $s15 $s16 $s17 $s18 $s19 $s20 $s21 $s22 $s23 $s24 $s25 $s26 $s27))
+(println (str "RESULT " $pass "/28"))
