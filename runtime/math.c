@@ -449,6 +449,18 @@ FLValue str_lower(FLValue s) {
     return r;
 }
 
+FLValue str_to_upper(FLValue s) {
+    const char* p = "";
+    if (s.tag == FL_STRING && s.obj) p = ((FLString*)s.obj)->data;
+    size_t n = strlen(p);
+    char* buf = malloc(n + 1);
+    for (size_t i = 0; i < n; i++) buf[i] = (char)toupper((unsigned char)p[i]);
+    buf[n] = 0;
+    FLValue r = fl_str_val(buf);
+    free(buf);
+    return r;
+}
+
 static void fl_sort_key(FLValue v, char* buf, size_t sz) {
     if (v.tag == FL_STRING && v.obj) {
         snprintf(buf, sz, "%s", ((FLString*)v.obj)->data);

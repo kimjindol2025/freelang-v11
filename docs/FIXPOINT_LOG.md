@@ -470,3 +470,25 @@ CMP_3_4_EXIT=0
 CMP_2_3_EXIT=0
 CMP_3_4_EXIT=0
 ```
+
+2026-10-18, 8-60 수정 전 기준. 수정 전 `self/cgc-main.fl`을 기존 시드로 2·3·4단계 생성해 기준 지문을 기록했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-2.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-3.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
+
+2026-10-18, 8-60 수정 후 고정점. 기존 시드를 유지하고 `range/1`, 다중 인자 `max`/`min`의 C 코드 생성을 추가했다. 수정 후 stage 2·3·4 결과가 같고 두 비교가 통과했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+e0eb4960665102ae806a243cbfe2c169b0794ecfb2a9a97aae514564e58b8010  result-2.c
+e0eb4960665102ae806a243cbfe2c169b0794ecfb2a9a97aae514564e58b8010  result-3.c
+e0eb4960665102ae806a243cbfe2c169b0794ecfb2a9a97aae514564e58b8010  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```

@@ -1,7 +1,8 @@
 ;; tests/unit/stdlib/map.test.fl — Map Library Unit Tests
-;; 10개 테스트 (맵 함수)
+;; 9개 assertion (맵 함수)
 
 (load "../../lib/assert.fl")
+(load "../../../stdlib/native-compat.fl")
 
 (test-section "Map Tests")
 
@@ -20,6 +21,7 @@
 ;; 키 제거
 (define $m3 (dissoc $m "age"))
 (assert-nil (get $m3 "age") "dissoc removed")
+(assert-eq (dissoc $m "missing") $m "dissoc missing key")
 (assert-eq (get $m3 "name") "Alice" "dissoc kept")
 
 ;; 키 목록

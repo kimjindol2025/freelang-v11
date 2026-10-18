@@ -225,6 +225,7 @@ FLValue fl_mapcat(FLValue fn, FLValue vec);
 FLValue str_split(FLValue s, FLValue sep);
 FLValue str_trim(FLValue s);
 FLValue str_lower(FLValue s);
+FLValue str_to_upper(FLValue s);
 FLValue sort(FLValue vec);
 FLValue dir_list(FLValue path);
 FLValue dir_exists_p(FLValue path);

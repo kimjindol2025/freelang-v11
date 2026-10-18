@@ -1,7 +1,8 @@
 ;; tests/unit/stdlib/string.test.fl — String Library Unit Tests
-;; 16개 테스트 (문자열 함수)
+;; 17개 assertion (문자열 함수)
 
 (load "../../lib/assert.fl")
+(load "../../../stdlib/native-compat.fl")
 
 (test-section "String Tests")
 
@@ -12,7 +13,9 @@
 
 ;; 대소문자
 (assert-eq (str-to-upper "hello") "HELLO" "str-to-upper")
+(assert-eq (str-to-upper "") "" "str-to-upper empty")
 (assert-eq (str-to-lower "HELLO") "hello" "str-to-lower")
+(assert-eq (str-to-lower "") "" "str-to-lower empty")
 
 ;; 분할
 (assert-eq (length (str-split "a,b,c" ",")) 3 "str-split count")
