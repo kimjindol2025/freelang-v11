@@ -123,6 +123,26 @@ FLValue fl_map_get(FLValue map, FLValue key);
 FLValue fl_map_set(FLValue map, FLValue key, FLValue val);
 FLValue fl_map_len(FLValue map);
 
+/* ── SQLite ── */
+FLValue fl_db_open(FLValue path);
+FLValue fl_db_close(FLValue db);
+FLValue fl_db_query(FLValue db, FLValue sql, FLValue params);
+FLValue fl_db_exec(FLValue db, FLValue sql, FLValue params);
+
+/* ── HTTP server ── */
+FLValue fl_http_start(FLValue port);
+FLValue fl_http_stop(void);
+FLValue fl_http_route(FLValue method, FLValue path, FLValue handler);
+FLValue fl_resp_json(FLValue value);
+FLValue fl_resp_status(FLValue status, FLValue body);
+FLValue fl_resp_html(FLValue body);
+FLValue server_put(FLValue path, FLValue handler);
+FLValue server_delete(FLValue path, FLValue handler);
+FLValue server_body_limit(FLValue bytes);
+FLValue server_rate_limit(FLValue count, FLValue window_ms);
+FLValue server_req_header(FLValue request, FLValue name);
+FLValue server_req_json(FLValue request);
+
 /* ── S7: Closure ── */
 typedef struct FLClosure {
     FLObject base;   /* type = FL_FN */
