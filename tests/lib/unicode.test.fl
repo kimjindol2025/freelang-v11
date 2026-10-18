@@ -13,7 +13,7 @@
 (assert-eq (result-error-code (char-from-byte 256)) "BYTE_RANGE" "byte upper bound")
 (assert-eq (result-error-code (char-from-byte -1)) "BYTE_RANGE" "byte lower bound")
 (assert-eq (result-error-code (char-from-byte 65.5)) "BYTE_RANGE" "byte fractional value")
-(assert-eq (length (result-value (char-from-byte 0))) 0 "nul length limitation")
+(assert-eq (result-error-code (char-from-byte 0)) "UNSUPPORTED_NUL" "byte nul rejected")
 
 (assert-eq (result-value (utf8-encode 65)) "A" "encode ascii")
 (assert-eq (result-value (utf8-encode 44032)) "가" "encode hangul")

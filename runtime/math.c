@@ -166,9 +166,11 @@ FLValue range(FLValue start, FLValue end) {
 }
 FLValue char_code_at(FLValue s, FLValue idx) {
     if (s.tag!=FL_STRING||idx.tag!=FL_INT) return fl_nil();
-    const char *p=((FLString*)s.obj)->data;
-    int64_t i=idx.i, len=(int64_t)strlen(p);
+    FLString *string=(FLString*)s.obj;
+    const char *p=string->data;
+    int64_t i=idx.i, len=(int64_t)string->len;
     if (i<0||i>=len) return fl_nil();
+    if (p[i]=='\0') return fl_nil();
     return fl_int((unsigned char)p[i]);
 }
 static FLValue char_byte_error(const char* code, const char* message) {
@@ -189,6 +191,8 @@ FLValue char_from_byte(FLValue byte) {
         return char_byte_error("BYTE_RANGE", "expected integer byte in range 0..255");
     if (n < 0 || n > 255)
         return char_byte_error("BYTE_RANGE", "expected integer byte in range 0..255");
+    if (n == 0)
+        return char_byte_error("UNSUPPORTED_NUL", "runtime strings truncate at NUL");
     FLString* obj = malloc(sizeof(FLString) + 2);
     obj->base.type = FL_STRING;
     obj->base.rc = 1;

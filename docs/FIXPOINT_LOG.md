@@ -504,3 +504,15 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-19, TASK 9-2 ② JSON 이후 고정점. 시드는 유지했다. `[FUNC]` 선언을 forward declaration 목록에 포함해 표준 라이브러리의 `json-parse`/`json-stringify`가 FreeLang 구현으로 연결되게 했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+dd5528735a6a2beb16aea40b7b09954817caa2e39b25b91b78c1e1c545f7ee3f  stage2.c
+dd5528735a6a2beb16aea40b7b09954817caa2e39b25b91b78c1e1c545f7ee3f  stage3.c
+dd5528735a6a2beb16aea40b7b09954817caa2e39b25b91b78c1e1c545f7ee3f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

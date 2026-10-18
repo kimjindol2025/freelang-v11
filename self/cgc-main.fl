@@ -812,7 +812,10 @@
     (cgc-fncall (cgc $op) $args))))
 
 (defn cgc-dispatch [$op $args]
-  (cond
+  (if (and (or (= $op "json-parse") (= $op "json-stringify"))
+           (includes-item @known-defns-atom (c-name $op)))
+    (cgc-dispatch-fallback $op $args)
+    (cond
   [(= $op "if")     (cgc-if $args)]
   [(= $op "case")   (cgc-case $args)]
   [(= $op "cond")   (cgc-cond $args)]
@@ -1036,8 +1039,14 @@
   [(= $op "bit-shl") (str "fl_bit_shl(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "bit-shr") (str "fl_bit_shr(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S17: json — 타입 안전 stub (S18에서 실 구현)
-  [(= $op "json-parse")      (str "fl_json_parse(" (cgc (get $args 0)) ")")]
-  [(= $op "json-stringify")  (str "fl_json_stringify(" (cgc (get $args 0)) ")")]
+  [(= $op "json-parse")
+    (if (includes-item @known-defns-atom (c-name $op))
+      (cgc-dispatch-fallback $op $args)
+      (str "fl_json_parse(" (cgc (get $args 0)) ")"))]
+  [(= $op "json-stringify")
+    (if (includes-item @known-defns-atom (c-name $op))
+      (cgc-dispatch-fallback $op $args)
+      (str "fl_json_stringify(" (cgc (get $args 0)) ")"))]
   ;; 병렬 실행
   [(= $op "run-parallel")      (str "fl_run_parallel(" (cgc (get $args 0)) ", " (if (>= (length $args) 2) (cgc (get $args 1)) "fl_int(0)") ")")]
   ;; HTTP 클라이언트 (libcurl) — {:status N :body "..." :headers {}}
@@ -1110,7 +1119,7 @@
   [(= $op "auth-jwt-decode")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", fl_str_val(\"\"))")]
   [(= $op "auth-hash-password")  (str "fl_hash_password(" (cgc (get $args 0)) ")")]
   [(= $op "auth-verify-password")(str "fl_verify_password(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [true             (cgc-dispatch-fallback $op $args)]))
+  [true             (cgc-dispatch-fallback $op $args)])))
 
 (defn cgc-swap! [$args]
   (let [[$atom-c  (cgc (get $args 0))]
@@ -1596,15 +1605,25 @@
 (defn cgc-forward-loop [$_nodes $_i $_acc]
   (loop [$i $_i $acc $_acc]
     (if (>= $i (length $_nodes)) $acc
-    (let [[$n (get $_nodes $i)]]
+    (let [[$n (get $_nodes $i)]
+          [$kind (get $n :kind)]
+          [$is-defn (and (= $kind "sexpr") (= (get $n :op) "defn"))]
+          [$is-block-func (and (= $kind "block") (= (get $n :type) "FUNC"))]]
     (recur (+ $i 1)
-      (if (and (= (get $n :kind) "sexpr") (= (get $n :op) "defn"))
-        (let [[$name (c-name (cgc-extract-name (get (get $n :args) 0)))]
-              [$ps (cgc-params (get-block-items (get (get $n :args) 1)))]]
+      (if (or $is-defn $is-block-func)
+        (let [[$name (if $is-defn
+                       (c-name (cgc-extract-name (get (get $n :args) 0)))
+                       (c-name (get $n :name)))]
+              [$params (if $is-defn
+                         (get-block-items (get (get $n :args) 1))
+                         (get-block-items (get (get $n :fields) :params)))]
+              [$ps (cgc-params $params)]]
           (swap! known-defns-atom push $name)
           (str $acc
                "FLValue " $name "(" $ps ");\n"
-               "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n"))
+               (if $is-defn
+                 (str "static FLValue __fl_wrap_" $name "(FLClosure*, int, FLValue*);\n")
+                 "")))
         $acc))))))
 
 ;; S24: defn wrapper argv 호출 인자 생성 "argv[0], argv[1], ..."

@@ -1,0 +1,17 @@
+(load "../../self/stdlib/json.fl")
+(defn repeat-double [text count]
+  (if (<= count 0) text (repeat-double (str text text) (- count 1))))
+(defn assert-eq [actual expected name]
+  (if (= actual expected)
+    (println (str "PASS " name))
+    (throw (str "FAIL " name))))
+(let [[payload (repeat-double "a" 20)]
+      [source (str "{\"data\":\"" payload "\"}")]
+      [started (now-ms)]
+      [parsed (json-parse source)]
+      [elapsed (- (now-ms) started)]]
+  (assert-eq (get parsed "ok") true "parse one mebibyte JSON")
+  (assert-eq (length (get (get parsed "value") "data")) 1048576 "one mebibyte payload length")
+  (println (str "JSON_LARGE_BYTES=" (length source)))
+  (println (str "JSON_LARGE_MS=" elapsed))
+  (println "JSON_LARGE_SUMMARY=2/2"))

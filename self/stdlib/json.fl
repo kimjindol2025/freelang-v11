@@ -1,11 +1,338 @@
-;; self/stdlib/json.fl — JSON stdlib
+;; Strict JSON standard library. Public API: json-parse, json-stringify,
+;; json-get, json-valid?. All parser/serializer helpers are internal.
+(load "self/stdlib/encoding.fl")
 
-[FUNC json-str :params [obj] :body (json-stringify obj)]
-[FUNC json-load :params [path] :body (json-parse (file_read path))]
-[FUNC json-save :params [path obj] :body (file_write path (json-stringify obj))]
+[FUNC json-internal-ok :params [value index]
+  :body {:ok true :value value :index index}]
+[FUNC json-internal-error :params [code message position]
+  :body {:ok false :error {:code code :message message :position position}}]
+[FUNC json-internal-value-error :params [code message]
+  :body {:ok false :error {:code code :message message}}]
+[FUNC json-internal-byte :params [number]
+  :body (get (char-from-byte number) "value")]
+[FUNC json-internal-peek :params [text index size]
+  :body (if (>= index size) -1 (char-code-at text index))]
+[FUNC json-internal-ws? :params [code]
+  :body (or (= code 32) (or (= code 9) (or (= code 10) (= code 13))))]
+[FUNC json-internal-skip-ws :params [text index size]
+  :body (if (and (< index size) (json-internal-ws? (char-code-at text index)))
+    (json-internal-skip-ws text (+ index 1) size) index)]
+[FUNC json-internal-digit? :params [code]
+  :body (and (>= code 48) (<= code 57))]
+[FUNC json-internal-digits-end :params [text index size]
+  :body (if (and (< index size) (json-internal-digit? (char-code-at text index)))
+    (json-internal-digits-end text (+ index 1) size) index)]
 
-[FUNC json-get :params [obj key] :body (get obj key)]
-[FUNC json-keys :params [obj] :body (keys obj)]
-[FUNC json-values :params [obj] :body (values obj)]
-[FUNC json-has? :params [obj key] :body (has-key? obj key)]
-[FUNC json-merge :params [a b] :body (merge a b)]
+[FUNC json-internal-number-finish :params [text start finish]
+  :body (let [[token (substring text start finish)]
+              [number (str-to-num token)]]
+    (if (= number nil)
+      (json-internal-error "JSON_NUMBER" "number is outside runtime range" start)
+      (json-internal-ok number finish)))]
+[FUNC json-internal-number-exponent :params [text start index size]
+  :body (let [[code (json-internal-peek text index size)]]
+    (if (or (= code 69) (= code 101))
+      (let [[sign-index (+ index 1)]
+            [sign-code (json-internal-peek text sign-index size)]
+            [digits-index (if (or (= sign-code 43) (= sign-code 45)) (+ sign-index 1) sign-index)]
+            [finish (json-internal-digits-end text digits-index size)]]
+        (if (= finish digits-index)
+          (json-internal-error "JSON_NUMBER" "exponent requires digits" digits-index)
+          (json-internal-number-finish text start finish)))
+      (json-internal-number-finish text start index)))]
+[FUNC json-internal-number-tail :params [text start index size]
+  :body (let [[code (json-internal-peek text index size)]]
+    (if (= code 46)
+      (let [[digits-index (+ index 1)]
+            [finish (json-internal-digits-end text digits-index size)]]
+        (if (= finish digits-index)
+          (json-internal-error "JSON_NUMBER" "fraction requires digits" digits-index)
+          (json-internal-number-exponent text start finish size)))
+      (json-internal-number-exponent text start index size)))]
+[FUNC json-internal-number :params [text start size]
+  :body (let [[first-index (if (= (json-internal-peek text start size) 45) (+ start 1) start)]
+              [first-code (json-internal-peek text first-index size)]]
+    (if (= first-code 48)
+      (let [[after-zero (+ first-index 1)]]
+        (if (json-internal-digit? (json-internal-peek text after-zero size))
+          (json-internal-error "JSON_NUMBER" "leading zero is not allowed" after-zero)
+          (json-internal-number-tail text start after-zero size)))
+      (if (and (>= first-code 49) (<= first-code 57))
+        (json-internal-number-tail text start
+          (json-internal-digits-end text (+ first-index 1) size) size)
+        (json-internal-error "JSON_NUMBER" "expected digit" first-index))))]
+
+[FUNC json-internal-hex4 :params [text start size]
+  :body (if (> (+ start 4) size)
+    (json-internal-error "JSON_ESCAPE" "incomplete Unicode escape" start)
+    (let [[digits (substring text start (+ start 4))]]
+      (if (not (is-hex-string? digits))
+        (json-internal-error "JSON_ESCAPE" "invalid hexadecimal escape" start)
+        (json-internal-ok
+          (+ (* (hex-to-num (substring digits 0 2)) 256)
+             (hex-to-num (substring digits 2 4))) (+ start 4)))))]
+[FUNC json-internal-surrogate-pair :params [text u-index after-high high size]
+  :body (if (or (> (+ u-index 6) size)
+                (not (= (json-internal-peek text after-high size) 92))
+                (not (= (json-internal-peek text (+ after-high 1) size) 117)))
+    (json-internal-error "JSON_SURROGATE" "high surrogate requires low surrogate" after-high)
+    (let [[low-result (json-internal-hex4 text (+ after-high 2) size)]]
+      (if (not (get low-result "ok")) low-result
+        (let [[low (get low-result "value")]]
+          (if (and (>= low 56320) (<= low 57343))
+            (let [[cp (+ 65536 (+ (* (- high 55296) 1024) (- low 56320)))]]
+              (let [[encoded (utf8-encode cp)]]
+                (if (get encoded "ok")
+                  (json-internal-ok (get encoded "value") (get low-result "index"))
+                  (json-internal-error "JSON_SURROGATE" "invalid surrogate pair" u-index))))
+            (json-internal-error "JSON_SURROGATE" "high surrogate requires low surrogate" after-high))))))]
+[FUNC json-internal-unicode :params [text u-index size]
+  :body (let [[unit (json-internal-hex4 text (+ u-index 1) size)]]
+    (if (not (get unit "ok")) unit
+      (let [[high (get unit "value")]
+            [after-high (get unit "index")]]
+        (cond
+          [(= high 0) (json-internal-error "UNSUPPORTED_NUL" "runtime strings truncate at NUL" u-index)]
+          [(and (>= high 55296) (<= high 56319))
+            (json-internal-surrogate-pair text u-index after-high high size)]
+          [(and (>= high 56320) (<= high 57343))
+            (json-internal-error "JSON_SURROGATE" "unpaired low surrogate" u-index)]
+          [true
+            (let [[encoded (utf8-encode high)]]
+              (if (get encoded "ok")
+                (json-internal-ok (get encoded "value") after-high)
+                (json-internal-error "JSON_UNICODE" "invalid Unicode scalar" u-index)))]))))]
+[FUNC json-internal-string-loop :params [text index size acc segment-start]
+  :body (loop [cursor index out acc segment segment-start]
+    (if (>= cursor size)
+      (json-internal-error "JSON_STRING" "unterminated string" cursor)
+      (let [[code (char-code-at text cursor)]]
+        (cond
+          [(= code 34) (json-internal-ok (str out (substring text segment cursor)) (+ cursor 1))]
+          [(= code 92)
+            (let [[raw (substring text segment cursor)]
+                  [escape-index (+ cursor 1)]
+                  [escape (json-internal-peek text escape-index size)]]
+              (cond
+                [(= escape 34) (recur (+ cursor 2) (str out raw (json-internal-byte 34)) (+ cursor 2))]
+                [(= escape 92) (recur (+ cursor 2) (str out raw (json-internal-byte 92)) (+ cursor 2))]
+                [(= escape 47) (recur (+ cursor 2) (str out raw "/") (+ cursor 2))]
+                [(= escape 98) (recur (+ cursor 2) (str out raw (json-internal-byte 8)) (+ cursor 2))]
+                [(= escape 102) (recur (+ cursor 2) (str out raw (json-internal-byte 12)) (+ cursor 2))]
+                [(= escape 110) (recur (+ cursor 2) (str out raw (json-internal-byte 10)) (+ cursor 2))]
+                [(= escape 114) (recur (+ cursor 2) (str out raw (json-internal-byte 13)) (+ cursor 2))]
+                [(= escape 116) (recur (+ cursor 2) (str out raw (json-internal-byte 9)) (+ cursor 2))]
+                [(= escape 117)
+                  (let [[escaped (json-internal-unicode text escape-index size)]]
+                    (if (get escaped "ok")
+                      (recur (get escaped "index") (str out raw (get escaped "value")) (get escaped "index"))
+                      escaped))]
+                [true (json-internal-error "JSON_ESCAPE" "unknown string escape" escape-index)]))]
+          [(< code 32) (json-internal-error "JSON_CONTROL" "unescaped control character" cursor)]
+          [true (recur (+ cursor 1) out segment)]))))]
+[FUNC json-internal-string :params [text index size]
+  :body (json-internal-string-loop text (+ index 1) size "" (+ index 1))]
+[FUNC json-internal-literal :params [text index size literal value]
+  :body (let [[finish (+ index (length literal))]]
+    (if (and (<= finish size) (= (substring text index finish) literal))
+      (json-internal-ok value finish)
+      (json-internal-error "JSON_VALUE" "invalid literal" index)))]
+
+;; One self-recursive state machine handles values, arrays, and objects so
+;; native C generation needs no mutually recursive C helpers.
+[FUNC json-internal-engine :params [text index size mode acc key]
+  :body (cond
+    [(= mode "value")
+      (let [[i (json-internal-skip-ws text index size)]
+            [code (json-internal-peek text i size)]]
+        (cond
+          [(= code 34) (json-internal-string text i size)]
+          [(= code 91) (json-internal-engine text (+ i 1) size "array-first" [] nil)]
+          [(= code 123) (json-internal-engine text (+ i 1) size "object-first" {} nil)]
+          [(= code 116) (json-internal-literal text i size "true" true)]
+          [(= code 102) (json-internal-literal text i size "false" false)]
+          [(= code 110) (json-internal-literal text i size "null" nil)]
+          [(or (= code 45) (json-internal-digit? code)) (json-internal-number text i size)]
+          [true (json-internal-error "JSON_VALUE" "expected JSON value" i)]))]
+    [(or (= mode "array-first") (= mode "array"))
+      (let [[i (json-internal-skip-ws text index size)]
+            [code (json-internal-peek text i size)]]
+        (if (and (= mode "array-first") (= code 93))
+          (json-internal-ok acc (+ i 1))
+          (let [[item (json-internal-engine text i size "value" nil nil)]]
+            (if (get item "ok")
+              (json-internal-engine text (get item "index") size "array-after"
+                (append acc (get item "value")) nil)
+              item))))]
+    [(= mode "array-after")
+      (let [[i (json-internal-skip-ws text index size)]
+            [code (json-internal-peek text i size)]]
+        (cond
+          [(= code 44) (json-internal-engine text (+ i 1) size "array" acc nil)]
+          [(= code 93) (json-internal-ok acc (+ i 1))]
+          [true (json-internal-error "JSON_ARRAY" "expected comma or closing bracket" i)]))]
+    [(or (= mode "object-first") (= mode "object"))
+      (let [[i (json-internal-skip-ws text index size)]
+            [code (json-internal-peek text i size)]]
+        (if (and (= mode "object-first") (= code 125))
+          (json-internal-ok acc (+ i 1))
+          (if (= code 34)
+            (let [[name (json-internal-string text i size)]]
+              (if (get name "ok")
+                (json-internal-engine text (get name "index") size "object-colon" acc (get name "value"))
+                name))
+            (json-internal-error "JSON_OBJECT" "object key must be a string" i))))]
+    [(= mode "object-colon")
+      (let [[i (json-internal-skip-ws text index size)]
+            [code (json-internal-peek text i size)]]
+        (if (= code 58)
+          (let [[item (json-internal-engine text (+ i 1) size "value" nil nil)]]
+            (if (get item "ok")
+              (json-internal-engine text (get item "index") size "object-after"
+                (assoc acc key (get item "value")) nil)
+              item))
+          (json-internal-error "JSON_OBJECT" "expected colon after object key" i)))]
+    [(= mode "object-after")
+      (let [[i (json-internal-skip-ws text index size)]
+            [code (json-internal-peek text i size)]]
+        (cond
+          [(= code 44) (json-internal-engine text (+ i 1) size "object" acc nil)]
+          [(= code 125) (json-internal-ok acc (+ i 1))]
+          [true (json-internal-error "JSON_OBJECT" "expected comma or closing brace" i)]))]
+    [true (json-internal-error "JSON_INTERNAL" "invalid parser state" index)])]
+
+[FUNC json-internal-utf8-cont? :params [byte]
+  :body (and (>= byte 128) (<= byte 191))]
+[FUNC json-internal-utf8-check :params [text size]
+  :body (loop [index 0]
+    (if (>= index size)
+      (json-internal-ok true index)
+      (let [[b1 (char-code-at text index)]
+            [b2 (json-internal-peek text (+ index 1) size)]
+            [b3 (json-internal-peek text (+ index 2) size)]
+            [b4 (json-internal-peek text (+ index 3) size)]]
+        (cond
+          [(< b1 128) (recur (+ index 1))]
+          [(and (>= b1 194) (<= b1 223) (json-internal-utf8-cont? b2)) (recur (+ index 2))]
+          [(and (>= b1 224) (<= b1 239)
+                (json-internal-utf8-cont? b2) (json-internal-utf8-cont? b3)
+                (if (= b1 224) (>= b2 160) (if (= b1 237) (<= b2 159) true)))
+            (recur (+ index 3))]
+          [(and (>= b1 240) (<= b1 244)
+                (json-internal-utf8-cont? b2) (json-internal-utf8-cont? b3)
+                (json-internal-utf8-cont? b4)
+                (if (= b1 240) (>= b2 144) (if (= b1 244) (<= b2 143) true)))
+            (recur (+ index 4))]
+          [true (json-internal-error "JSON_UTF8" "invalid UTF-8 input" index)]))))]
+
+[FUNC json-parse :params [text]
+  :body (if (not (string? text))
+    (json-internal-error "JSON_TYPE" "expected JSON text" 0)
+    (let [[utf8 (json-internal-utf8-check text (length text))]]
+      (if (not (get utf8 "ok"))
+        utf8
+        (let [[size (length text)]
+              [parsed (json-internal-engine text 0 size "value" nil nil)]]
+          (if (not (get parsed "ok")) parsed
+            (let [[finish (json-internal-skip-ws text (get parsed "index") size)]]
+              (if (< finish size)
+                (json-internal-error "JSON_TRAILING" "trailing data after JSON value" finish)
+                {:ok true :value (get parsed "value")}))))))) ]
+[FUNC json-valid? :params [text]
+  :body (get (json-parse text) "ok")]
+
+[FUNC json-internal-get-loop :params [value path index]
+  :body (if (>= index (length path))
+    {:ok true :value value}
+    (let [[key (get path index)]]
+      (if (and (map? value) (contains? value key))
+        (json-internal-get-loop (get value key) path (+ index 1))
+        (if (and (array? value) (integer? key) (>= key 0) (< key (length value)))
+          (json-internal-get-loop (get value key) path (+ index 1))
+          (json-internal-error "JSON_PATH" "path segment does not exist" index)))))]
+[FUNC json-get :params [value path]
+  :body (json-internal-get-loop value (if (array? path) path [path]) 0)]
+
+[FUNC json-internal-escape-loop :params [points index acc]
+  :body (if (>= index (length points))
+    (json-internal-ok (str (json-internal-byte 34) acc (json-internal-byte 34)) index)
+    (let [[code (get points index)]
+          [slash (json-internal-byte 92)]]
+      (cond
+        [(= code 34) (json-internal-escape-loop points (+ index 1) (str acc slash (json-internal-byte 34)))]
+        [(= code 92) (json-internal-escape-loop points (+ index 1) (str acc slash slash))]
+        [(= code 8) (json-internal-escape-loop points (+ index 1) (str acc slash "b"))]
+        [(= code 12) (json-internal-escape-loop points (+ index 1) (str acc slash "f"))]
+        [(= code 10) (json-internal-escape-loop points (+ index 1) (str acc slash "n"))]
+        [(= code 13) (json-internal-escape-loop points (+ index 1) (str acc slash "r"))]
+        [(= code 9) (json-internal-escape-loop points (+ index 1) (str acc slash "t"))]
+        [(< code 32) (json-internal-escape-loop points (+ index 1)
+          (str acc slash "u00" (to-hex code)))]
+        [true
+          (let [[encoded (utf8-encode code)]]
+            (if (get encoded "ok")
+              (json-internal-escape-loop points (+ index 1) (str acc (get encoded "value")))
+              (json-internal-error "JSON_UNICODE" "cannot encode string scalar" index)))])))]
+[FUNC json-internal-string-value :params [text]
+  :body (let [[decoded (utf8-decode text)]]
+    (if (not (get decoded "ok"))
+      (json-internal-error "JSON_UTF8" "invalid UTF-8 string" (get (get decoded "error") "position"))
+      (json-internal-escape-loop (get decoded "value") 0 "")))]
+
+;; The serializer's one recursive state machine handles nested arrays/maps.
+[FUNC json-internal-stringify-engine :params [value mode acc items index]
+  :body (cond
+    [(= mode "value")
+      (cond
+        [(null? value) (json-internal-ok "null" 0)]
+        [(boolean? value) (json-internal-ok (if value "true" "false") 0)]
+        [(number? value)
+          (let [[text (str value)]
+                [parsed (json-internal-number text 0 (length text))]]
+            (if (and (get parsed "ok") (= (get parsed "index") (length text)))
+              (json-internal-ok text 0)
+              (json-internal-value-error "JSON_NUMBER" "number is not finite JSON")))]
+        [(string? value) (json-internal-string-value value)]
+        [(array? value)
+          (if (= (length value) 0) (json-internal-ok "[]" 0)
+            (let [[first (json-internal-stringify-engine (get value 0) "value" "" nil 0)]]
+              (if (get first "ok")
+                (json-internal-stringify-engine value "array-after" (get first "value") value 1)
+                first)))]
+        [(map? value)
+          (let [[entries (map-entries value)]]
+            (if (= (length entries) 0) (json-internal-ok "{}" 0)
+              (let [[entry (get entries 0)]
+                    [key (get entry 0)]]
+                (if (not (string? key))
+                  (json-internal-value-error "JSON_KEY" "object keys must be strings")
+                  (let [[key-text (json-internal-string-value key)]
+                        [value-text (json-internal-stringify-engine (get entry 1) "value" "" nil 0)]]
+                    (if (not (get key-text "ok")) key-text
+                      (if (not (get value-text "ok")) value-text
+                        (json-internal-stringify-engine value "object-after"
+                          (str (get key-text "value") ":" (get value-text "value")) entries 1))))))))]
+        [true (json-internal-value-error "JSON_TYPE" "value cannot be represented as JSON")])]
+    [(= mode "array-after")
+      (if (>= index (length items))
+        (json-internal-ok (str "[" acc "]") 0)
+        (let [[next (json-internal-stringify-engine (get items index) "value" "" nil 0)]]
+          (if (get next "ok")
+            (json-internal-stringify-engine value "array-after" (str acc "," (get next "value")) items (+ index 1))
+            next)))]
+    [(= mode "object-after")
+      (if (>= index (length items))
+        (json-internal-ok (str "{" acc "}") 0)
+        (let [[entry (get items index)]
+              [key (get entry 0)]]
+          (if (not (string? key))
+            (json-internal-value-error "JSON_KEY" "object keys must be strings")
+            (let [[key-text (json-internal-string-value key)]
+                  [value-text (json-internal-stringify-engine (get entry 1) "value" "" nil 0)]]
+              (if (not (get key-text "ok")) key-text
+                (if (not (get value-text "ok")) value-text
+                  (json-internal-stringify-engine value "object-after"
+                    (str acc "," (get key-text "value") ":" (get value-text "value")) items (+ index 1))))))))]
+    [true (json-internal-value-error "JSON_INTERNAL" "invalid serializer state")])]
+[FUNC json-stringify :params [value]
+  :body (json-internal-stringify-engine value "value" "" nil 0)]
