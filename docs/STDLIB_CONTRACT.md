@@ -22,12 +22,12 @@ Unicode character index. Public names are stable; helper names ending in
 |---|---|---|---|
 | `char-at` | exists | string, byte index → one-byte string | `nil` for invalid index/type |
 | `char-code-at` | exists | string, byte index → integer byte | `nil` for invalid index/type |
-| `char-from-byte` | new | integer 0..255 → one-byte string | `Result` with `BYTE_RANGE` otherwise; NUL behavior is tested before support is claimed |
+| `char-from-byte` | new | integer-valued number 0..255 → `Result<string>` with one byte | `BYTE_RANGE` otherwise; NUL behavior is tested before support is claimed |
 | `utf8-encode` | new | Unicode scalar integer → UTF-8 byte string | `Result` with `INVALID_CODEPOINT` or `SURROGATE` |
 | `utf8-decode` | new | UTF-8 string → scalar integer list | `Result` with `INVALID_UTF8` and byte position |
 | `char-count` | new | UTF-8 string → Unicode scalar count | same `INVALID_UTF8` result |
 | `char-slice` | new | UTF-8 string, character start, character end → string | same `INVALID_UTF8` result; out-of-range bounds clamp |
-| `str-to-upper`, `str-to-lower` | new | string → case-mapped string | invalid UTF-8 returns `INVALID_UTF8`; initially ASCII mapping only is documented if full Unicode tables are unavailable |
+| `unicode-upper`, `unicode-lower` | new | string → case-mapped string | invalid UTF-8 returns `INVALID_UTF8`; v1 maps ASCII and preserves other Unicode scalars |
 
 `\u0000` is unsupported if the runtime's string length stops at NUL. In that
 case JSON decoding must return `UNSUPPORTED_NUL`, and this limitation remains
@@ -94,8 +94,9 @@ truncates strings at NUL.
 
 ## Compatibility and implementation notes
 
-- FreeLang implementations are preferred. C additions are limited to byte-level
-  primitives that cannot be expressed with the currently available runtime.
+- FreeLang implementations are preferred. `char-from-byte` is the sole C
+  addition in area ① because the runtime can read an existing byte but cannot
+  construct a one-byte string from an integer.
 - Existing low-level APIs retain their current behavior; the `*-result` APIs
   provide structured failures without silently changing old callers.
 - The test suite records supported behavior. An unsupported capability is

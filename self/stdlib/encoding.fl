@@ -1,49 +1,161 @@
 ;; self/stdlib/encoding.fl — Phase 26 Part 3
 ;; Base32, Hex 인코딩/디코딩
 
-[FUNC hex-encode :params [s]
-  :body (hex-encode-loop (str s) 0 "")]
-[FUNC hex-encode-loop :params [s i acc]
-  :body (if (>= i (length s)) acc
-          (let [[code (char-code-at s i)]]
-            (hex-encode-loop s (+ i 1)
-              (str acc (to-hex code)))))]
-
-[FUNC hex-decode :params [hex]
-  :body (hex-decode-loop (str hex) 0 "")]
-[FUNC hex-decode-loop :params [hex i acc]
-  :body (if (>= i (length hex)) acc
-          (let [[code (hex-to-num (substring hex i (+ i 2)))]]
-            (hex-decode-loop hex (+ i 2)
-              (str acc (char-from-code code)))))]
-
-[FUNC to-hex :params [num]
-  :body (let [[h (/ (floor (% num 256)) 16)]
-              [l (% (floor num) 16)]]
-          (str (digit-to-hex (floor h)) (digit-to-hex (floor l))))]
-
 [FUNC digit-to-hex :params [d]
   :body (cond
-          (< d 10) (str d)
-          (= d 10) "a"
-          (= d 11) "b"
-          (= d 12) "c"
-          (= d 13) "d"
-          (= d 14) "e"
-          true "f")]
+    [(= d 0) "0"] [(= d 1) "1"] [(= d 2) "2"] [(= d 3) "3"]
+    [(= d 4) "4"] [(= d 5) "5"] [(= d 6) "6"] [(= d 7) "7"]
+    [(= d 8) "8"] [(= d 9) "9"] [(= d 10) "a"] [(= d 11) "b"]
+    [(= d 12) "c"] [(= d 13) "d"] [(= d 14) "e"] [true "f"])]
 
+[FUNC hex-digit :params [c]
+  :body (let [[code (char-code-at c 0)]]
+    (cond
+      [(and (>= code 48) (<= code 57)) (- code 48)]
+      [(and (>= code 65) (<= code 70)) (+ (- code 65) 10)]
+      [(and (>= code 97) (<= code 102)) (+ (- code 97) 10)]
+      [true -1]))]
+
+[FUNC to-hex :params [num]
+  :body (let [[h (floor (/ (% num 256) 16))]
+              [l (floor (% num 16))]]
+          (str (digit-to-hex h) (digit-to-hex l)))]
 [FUNC hex-to-num :params [hex]
   :body (let [[h1 (hex-digit (substring hex 0 1))]
               [h2 (hex-digit (substring hex 1 2))]]
           (+ (* h1 16) h2))]
 
-[FUNC hex-digit :params [c]
-  :body (let [[u (upper (str c))]]
-          (cond
-            (= u "0") 0 (= u "1") 1 (= u "2") 2 (= u "3") 3
-            (= u "4") 4 (= u "5") 5 (= u "6") 6 (= u "7") 7
-            (= u "8") 8 (= u "9") 9 (= u "A") 10 (= u "B") 11
-            (= u "C") 12 (= u "D") 13 (= u "E") 14 true 15))]
+[FUNC hex-encode-loop :params [s i acc]
+  :body (if (>= i (length s)) acc
+          (let [[code (char-code-at s i)]]
+            (hex-encode-loop s (+ i 1) (str acc (to-hex code)))))]
+[FUNC hex-encode :params [s] :body (hex-encode-loop (str s) 0 "")]
 
+[FUNC hex-decode-loop :params [hex i acc]
+  :body (if (>= i (length hex)) acc
+          (let [[code (hex-to-num (substring hex i (+ i 2)))]]
+            (hex-decode-loop hex (+ i 2)
+              (str acc (get (char-from-byte code) "value")))))]
+[FUNC hex-decode :params [hex] :body (hex-decode-loop (str hex) 0 "")]
+
+[FUNC hex-string-loop :params [s i]
+  :body (if (>= i (length s)) true
+    (let [[code (char-code-at s i)]]
+      (if (or (and (>= code 48) (<= code 57))
+              (and (>= code 65) (<= code 70))
+              (and (>= code 97) (<= code 102)))
+        (hex-string-loop s (+ i 1)) false)))]
 [FUNC is-hex-string? :params [s]
-  :body (regex-match "^[0-9a-fA-F]*$" (str s))]
+  :body (hex-string-loop (str s) 0)]
+
+;; Unicode and byte primitives. Public values use the Result map contract.
+[FUNC unicode-ok :params [value]
+  :body {:ok true :value value}]
+[FUNC unicode-error :params [code message position]
+  :body {:ok false :error {:code code :message message :position position}}]
+[FUNC byte-string :params [byte]
+  :body (get (char-from-byte byte) "value")]
+
+[FUNC utf8-encode :params [code]
+  :body (cond
+    [(not (integer? code)) (unicode-error "INVALID_CODEPOINT" "expected integer scalar" 0)]
+    [(< code 0) (unicode-error "INVALID_CODEPOINT" "codepoint below zero" 0)]
+    [(= code 0) (unicode-error "UNSUPPORTED_NUL" "runtime strings truncate at NUL" 0)]
+    [(>= code 55296) (if (<= code 57343)
+      (unicode-error "SURROGATE" "surrogate is not a Unicode scalar" 0)
+      (if (<= code 1114111)
+        (unicode-ok (str (byte-string (+ 240 (floor (/ code 262144))))
+                         (byte-string (+ 128 (floor (/ (% code 262144) 4096))))
+                         (byte-string (+ 128 (floor (/ (% code 4096) 64))))
+                         (byte-string (+ 128 (% code 64)))))
+        (unicode-error "INVALID_CODEPOINT" "codepoint above Unicode range" 0)))]
+    [(< code 128) (unicode-ok (byte-string code))]
+    [(< code 2048)
+      (unicode-ok (str (byte-string (+ 192 (floor (/ code 64))))
+                       (byte-string (+ 128 (% code 64)))))]
+    [true
+      (unicode-ok (str (byte-string (+ 224 (floor (/ code 4096))))
+                       (byte-string (+ 128 (floor (/ (% code 4096) 64))))
+                       (byte-string (+ 128 (% code 64)))))])]
+
+[FUNC utf8-continuation? :params [byte]
+  :body (and (not (= byte nil)) (>= byte 128) (<= byte 191))]
+[FUNC utf8-decode-loop :params [text index size values]
+  :body (if (>= index size)
+    (unicode-ok values)
+    (let [[b1 (char-code-at text index)]
+          [b2 (char-code-at text (+ index 1))]
+          [b3 (char-code-at text (+ index 2))]
+          [b4 (char-code-at text (+ index 3))]]
+      (cond
+        [(< b1 128) (utf8-decode-loop text (+ index 1) size (append values b1))]
+        [(and (>= b1 194) (<= b1 223) (utf8-continuation? b2))
+          (utf8-decode-loop text (+ index 2) size
+            (append values (+ (* (- b1 192) 64) (- b2 128))))]
+        [(and (>= b1 224) (<= b1 239)
+              (utf8-continuation? b2) (utf8-continuation? b3)
+              (if (= b1 224) (>= b2 160)
+                (if (= b1 237) (<= b2 159) true)))
+          (utf8-decode-loop text (+ index 3) size
+            (append values (+ (* (- b1 224) 4096)
+                              (* (- b2 128) 64) (- b3 128))))]
+        [(and (>= b1 240) (<= b1 244)
+              (utf8-continuation? b2) (utf8-continuation? b3)
+              (utf8-continuation? b4)
+              (if (= b1 240) (>= b2 144)
+                (if (= b1 244) (<= b2 143) true)))
+          (utf8-decode-loop text (+ index 4) size
+            (append values (+ (* (- b1 240) 262144)
+                              (* (- b2 128) 4096)
+                              (* (- b3 128) 64) (- b4 128))))]
+        [true (unicode-error "INVALID_UTF8" "invalid or incomplete UTF-8 sequence" index)])))]
+[FUNC utf8-decode :params [text]
+  :body (if (string? text)
+    (utf8-decode-loop text 0 (length text) (list))
+    (unicode-error "INVALID_UTF8" "expected string" 0))]
+
+[FUNC utf8-encode-list :params [values index acc]
+  :body (if (>= index (length values))
+    (unicode-ok acc)
+    (let [[part (utf8-encode (get values index))]]
+      (if (get part "ok")
+        (utf8-encode-list values (+ index 1) (str acc (get part "value")))
+        part)))]
+[FUNC char-count :params [text]
+  :body (let [[decoded (utf8-decode text)]]
+    (if (get decoded "ok")
+      (unicode-ok (length (get decoded "value")))
+      decoded))]
+[FUNC char-slice-loop :params [values index finish acc]
+  :body (if (>= index finish)
+    (unicode-ok acc)
+    (let [[encoded (utf8-encode (get values index))]]
+      (if (get encoded "ok")
+        (char-slice-loop values (+ index 1) finish (str acc (get encoded "value")))
+        encoded)))]
+[FUNC char-slice :params [text start finish]
+  :body (let [[decoded (utf8-decode text)]]
+    (if (not (get decoded "ok")) decoded
+      (let [[values (get decoded "value")]
+            [n (length values)]
+            [a (if (< start 0) 0 (if (> start n) n start))]
+            [b (if (< finish a) a (if (> finish n) n finish))]]
+        (char-slice-loop values a b ""))))]
+
+[FUNC unicode-case-loop :params [values index upper? acc]
+  :body (if (>= index (length values))
+    (unicode-ok acc)
+    (let [[cp (get values index)]
+          [mapped (if upper?
+            (if (and (>= cp 97) (<= cp 122)) (- cp 32) cp)
+            (if (and (>= cp 65) (<= cp 90)) (+ cp 32) cp)]
+          [encoded (utf8-encode mapped)]]
+      (if (get encoded "ok")
+        (unicode-case-loop values (+ index 1) upper? (str acc (get encoded "value")))
+        encoded)))]
+[FUNC unicode-case :params [text upper?]
+  :body (let [[decoded (utf8-decode text)]]
+    (if (not (get decoded "ok")) decoded
+      (unicode-case-loop (get decoded "value") 0 upper? "")))]
+[FUNC unicode-upper :params [text] :body (unicode-case text true)]
+[FUNC unicode-lower :params [text] :body (unicode-case text false)]

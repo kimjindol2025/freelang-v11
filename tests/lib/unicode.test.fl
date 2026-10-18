@@ -1,0 +1,41 @@
+(load "../../self/stdlib/encoding.fl")
+
+(defn assert-eq [actual expected name]
+  (if (= actual expected)
+    (println (str "PASS " name))
+    (throw (str "FAIL " name " expected=" expected " actual=" actual))))
+
+(defn result-value [result] (get result "value"))
+(defn result-error-code [result] (get (get result "error") "code"))
+
+(assert-eq (get (char-from-byte 65) "ok") true "byte ascii ok")
+(assert-eq (char-code-at (result-value (char-from-byte 234)) 0) 234 "byte high value")
+(assert-eq (result-error-code (char-from-byte 256)) "BYTE_RANGE" "byte upper bound")
+(assert-eq (result-error-code (char-from-byte -1)) "BYTE_RANGE" "byte lower bound")
+(assert-eq (result-error-code (char-from-byte 65.5)) "BYTE_RANGE" "byte fractional value")
+(assert-eq (length (result-value (char-from-byte 0))) 0 "nul length limitation")
+
+(assert-eq (result-value (utf8-encode 65)) "A" "encode ascii")
+(assert-eq (result-value (utf8-encode 44032)) "가" "encode hangul")
+(assert-eq (result-value (utf8-encode 128512)) "😀" "encode supplementary")
+(assert-eq (result-error-code (utf8-encode 0)) "UNSUPPORTED_NUL" "encode nul rejected")
+(assert-eq (result-error-code (utf8-encode 55296)) "SURROGATE" "encode surrogate rejected")
+(assert-eq (result-error-code (utf8-encode 1114112)) "INVALID_CODEPOINT" "encode out of range")
+
+(assert-eq (result-value (utf8-decode "A가😀")) [65 44032 128512] "decode mixed")
+(assert-eq (result-value (char-count "A가😀")) 3 "count unicode scalars")
+(assert-eq (result-value (char-slice "A가😀B" 1 3)) "가😀" "slice unicode scalars")
+(assert-eq (result-value (unicode-upper "abc")) "ABC" "ascii upper")
+(assert-eq (result-value (unicode-lower "ABC")) "abc" "ascii lower")
+(assert-eq (result-value (unicode-upper "가")) "가" "upper preserves non-ascii")
+
+(assert-eq (result-error-code (utf8-decode (result-value (char-from-byte 128)))) "INVALID_UTF8" "reject lone continuation")
+(assert-eq (result-error-code (utf8-decode (str (result-value (char-from-byte 192)) (result-value (char-from-byte 128))))) "INVALID_UTF8" "reject overlong")
+(assert-eq (result-error-code (utf8-decode (str (result-value (char-from-byte 226)) (result-value (char-from-byte 130))))) "INVALID_UTF8" "reject truncated")
+(assert-eq (result-error-code (utf8-decode (str (result-value (char-from-byte 237)) (result-value (char-from-byte 160)) (result-value (char-from-byte 128))))) "INVALID_UTF8" "reject encoded surrogate")
+(assert-eq (result-error-code (utf8-decode (result-value (char-from-byte 245)))) "INVALID_UTF8" "reject out of range lead")
+(assert-eq (hex-encode "A") "41" "hex encode ascii")
+(assert-eq (hex-encode "가") "eab080" "hex encode utf8 bytes")
+(assert-eq (hex-decode "4142") "AB" "hex decode ascii")
+
+(println "UNICODE_SUMMARY=26/26")

@@ -178,6 +178,7 @@ FLValue null_p(FLValue v);
 FLValue get(FLValue obj, FLValue key);
 FLValue length(FLValue obj);
 FLValue char_at(FLValue str, FLValue idx);
+FLValue char_from_byte(FLValue byte);
 
 /* ── S15: stdlib bridge ── */
 FLValue fl_floor(FLValue x);

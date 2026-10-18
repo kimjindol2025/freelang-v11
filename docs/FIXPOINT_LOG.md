@@ -492,3 +492,15 @@ e0eb4960665102ae806a243cbfe2c169b0794ecfb2a9a97aae514564e58b8010  result-4.c
 CMP_2_3_EXIT=0
 CMP_3_4_EXIT=0
 ```
+
+2026-10-19, TASK 9-2 ①에서 `char-from-byte`를 런타임에 연결했다. 문자열의 NUL 경계 시험은 `STORED_LEN=2`, `LENGTH_RESULT=0`으로 끝났으므로 JSON의 NUL escape는 `UNSUPPORTED_NUL`로 거부한다. 컴파일러는 새 바이트 호출을 생성하지만 시드는 수정하지 않았다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+5357a65c417218e5c2896772d4482b0046a4f1b69f095d5f8ad3166a1b3e1a39  stage2.c
+5357a65c417218e5c2896772d4482b0046a4f1b69f095d5f8ad3166a1b3e1a39  stage3.c
+5357a65c417218e5c2896772d4482b0046a4f1b69f095d5f8ad3166a1b3e1a39  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

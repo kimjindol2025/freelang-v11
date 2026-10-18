@@ -171,6 +171,36 @@ FLValue char_code_at(FLValue s, FLValue idx) {
     if (i<0||i>=len) return fl_nil();
     return fl_int((unsigned char)p[i]);
 }
+static FLValue char_byte_error(const char* code, const char* message) {
+    FLValue error = fl_map_new();
+    error = fl_map_set(error, fl_str_val("code"), fl_str_val(code));
+    error = fl_map_set(error, fl_str_val("message"), fl_str_val(message));
+    FLValue result = fl_map_new();
+    result = fl_map_set(result, fl_str_val("ok"), fl_bool(false));
+    result = fl_map_set(result, fl_str_val("error"), error);
+    return result;
+}
+FLValue char_from_byte(FLValue byte) {
+    int64_t n;
+    if (byte.tag == FL_INT) n = byte.i;
+    else if (byte.tag == FL_FLOAT && isfinite(byte.f) && byte.f >= 0 && byte.f <= 255 && floor(byte.f) == byte.f)
+        n = (int64_t)byte.f;
+    else
+        return char_byte_error("BYTE_RANGE", "expected integer byte in range 0..255");
+    if (n < 0 || n > 255)
+        return char_byte_error("BYTE_RANGE", "expected integer byte in range 0..255");
+    FLString* obj = malloc(sizeof(FLString) + 2);
+    obj->base.type = FL_STRING;
+    obj->base.rc = 1;
+    obj->len = 1;
+    obj->data[0] = (char)(unsigned char)n;
+    obj->data[1] = '\0';
+    FLValue value; value.tag = FL_STRING; value.obj = (FLObject*)obj;
+    FLValue result = fl_map_new();
+    result = fl_map_set(result, fl_str_val("ok"), fl_bool(true));
+    result = fl_map_set(result, fl_str_val("value"), value);
+    return result;
+}
 FLValue substring(FLValue s, FLValue start, FLValue end) {
     /* 벡터 슬라이스 지원: (slice vec i j) → substring(vec, i, j) */
     if (s.tag==FL_VECTOR) {

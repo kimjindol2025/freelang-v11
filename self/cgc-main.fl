@@ -944,6 +944,7 @@
   [(= $op "nil?")         (str "null_p(" (cgc (get $args 0)) ")")]
   ;; N-12: 미커버리지 완전 해소
   [(= $op "char-at")      (str "char_at(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "char-from-byte") (str "char_from_byte(" (cgc (get $args 0)) ")")]
   [(= $op "char-code-at") (str "char_code_at(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; S15: math/time — C stdlib 충돌 방지용 fl_ 접두사
   [(= $op "floor")       (str "fl_floor(" (cgc (get $args 0)) ")")]
