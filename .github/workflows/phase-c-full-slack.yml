@@ -1,4 +1,4 @@
-name: Phase C — Full Integration (Scan + Verify + Jest + Slack)
+name: Phase C — Full Integration (Native Fixed-Point + Jest + Slack)
 
 # Optional full suite and Slack notifications; run manually to avoid duplicate CI.
 on:
@@ -20,10 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
-      scan-status: ${{ steps.scan.outcome }}
+      fixedpoint-status: ${{ steps.verify.outcome }}
       verify-status: ${{ steps.verify.outcome }}
       ci-status: ${{ steps.aggregate.outcome }}
-      stage1-sha: ${{ steps.stage1.outputs.sha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -37,24 +36,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline
 
-      - name: Build bootstrap.js
+      - name: Build bootstrap for the legacy regression suite
         run: npm run build
         timeout-minutes: 5
 
-      - name: Generate stage1.js
-        id: stage1
-        run: |
-          bash scripts/build-stage1.sh
-          SHA=$(sha256sum stage1.js | cut -d' ' -f1)
-          echo "sha=${SHA:0:16}" >> $GITHUB_OUTPUT
-        timeout-minutes: 10
-
-      - name: "🔍 FL-Token Scan (Early-Fail)"
-        id: scan
-        run: bash scripts/ci-run-check.sh --name scan --output-dir ci-results --timeout-seconds 600 -- bash scripts/scan-for-fl-tokens.sh stage1.js
-        continue-on-error: false
-
-      - name: "🔗 Fixed-Point Verification (5-stage SHA)"
+      - name: "🔗 Native Fixed-Point Verification (stages 2-4)"
         id: verify
         if: always()
         run: bash scripts/ci-run-check.sh --name verify --output-dir ci-results --timeout-seconds 600 -- bash scripts/verify-fixed-point.sh
@@ -64,52 +50,48 @@ jobs:
         if: always()
         run: bash scripts/ci-run-check.sh --name regression --output-dir ci-results --timeout-seconds 600 -- node scripts/check-let-regressions.js
 
-      - name: "🔐 Validate scan and verify results"
+      - name: "🔐 Validate verification results"
         id: aggregate
         if: always()
-        run: node scripts/ci-aggregate.js --root . --expected scan,verify,regression
+        run: node scripts/ci-aggregate.js --root . --expected verify,regression
 
-      - name: "📦 Upload scan-verify artifacts"
+      - name: "📦 Upload verification artifacts"
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scan-verify-artifacts-${{ github.run_id }}
+          name: verification-artifacts-${{ github.run_id }}
           path: |
-            stage1.js
-            stage2.js
-            stage3.js
-            /tmp/build.log
             ci-results/
           retention-days: 7
 
-      - name: "🚨 Slack Notify — Scan Failed"
-        if: env.SLACK_WEBHOOK_URL != '' && steps.scan.outcome == 'failure'
+      - name: "🚨 Slack Notify — Fixed-Point Failed"
+        if: env.SLACK_WEBHOOK_URL != '' && steps.verify.outcome == 'failure'
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
             {
               "channel": "${{ env.SLACK_CHANNEL }}",
               "icon_emoji": ":x:",
-              "text": "❌ Phase C — Scan Failed",
+              "text": "❌ Phase C — Native Fixed-Point Failed",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*❌ FL-Token Scan Failed*\n_Branch:_ `${{ github.ref_name }}`\n_Run:_ <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Logs>"
+                    "text": "*❌ Native fixed-point verification failed*\n_Branch:_ `${{ github.ref_name }}`\n_Run:_ <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Logs>"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*Action Required:*\n1. Check artifact: `scan-verify-artifacts`\n2. Fix mapping in `src/codegen-js.ts`\n3. Re-submit PR"
+                    "text": "*Action Required:*\n1. Check the native fixed-point log artifact\n2. Review the stage hashes and compiler output\n3. Re-submit PR"
                   }
                 }
               ]
             }
 
-      - name: "✅ Slack Notify — Scan Passed"
+      - name: "✅ Slack Notify — Fixed-Point Passed"
         if: env.SLACK_WEBHOOK_URL != '' && steps.aggregate.outcome == 'success'
         uses: slackapi/slack-github-action@v1.24.0
         with:
@@ -117,13 +99,13 @@ jobs:
             {
               "channel": "${{ env.SLACK_CHANNEL }}",
               "icon_emoji": ":white_check_mark:",
-              "text": "✅ Phase C — Scan Passed",
+              "text": "✅ Phase C — Native Fixed-Point Passed",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*✅ Scan & Verify Status*\n_Branch:_ `${{ github.ref_name }}`\n_Stage1 SHA:_ `${{ steps.stage1.outputs.sha }}...`"
+                    "text": "*✅ Native Fixed-Point Status*\n_Branch:_ `${{ github.ref_name }}`"
                   }
                 },
                 {
@@ -133,7 +115,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*Results:*\n• Scan: ✅ PASS\n• Verify: ${{ steps.verify.outcome == 'success' && '✅ PASS' || '⚠️ WARN' }}\n• Regression: ${{ steps.regression.outcome == 'success' && '✅ PASS' || '⚠️ WARN' }}\n\n_Next: Regression tests + Full Jest..._"
+                    "text": "*Results:*\n• Fixed-point: ${{ steps.verify.outcome == 'success' && '✅ PASS' || '⚠️ WARN' }}\n• Regression: ${{ steps.regression.outcome == 'success' && '✅ PASS' || '⚠️ WARN' }}\n\n_Next: Regression tests + Full Jest..._"
                   }
                 }
               ]
@@ -146,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: scan-and-verify
-    if: ${{ needs.scan-and-verify.outputs.scan-status == 'success' }}
+    if: ${{ needs.scan-and-verify.outputs.fixedpoint-status == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +173,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: scan-and-verify
-    if: ${{ needs.scan-and-verify.outputs.scan-status == 'success' }}
+    if: ${{ needs.scan-and-verify.outputs.fixedpoint-status == 'success' }}
 
     strategy:
       fail-fast: false
@@ -257,7 +239,7 @@ jobs:
         id: summary
         run: |
           set +e
-          node scripts/ci-aggregate.js --root . --expected scan,verify,regression,regression-tests,jest-1,jest-2,jest-3
+          node scripts/ci-aggregate.js --root . --expected verify,regression,regression-tests,jest-1,jest-2,jest-3
           aggregate_status=$?
           if [ "$aggregate_status" -eq 0 ] && \
              [ "${{ needs.scan-and-verify.result }}" == "success" ] && \
@@ -358,21 +340,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline
-
-      - name: Build & Full Self-Hosting Chain
+      - name: Native Compiler Fixed-Point
         id: nightly
-        run: |
-          npm run build
-          bash scripts/build-stage1.sh
-          bash scripts/verify-fixed-point.sh
+        run: bash scripts/verify-fixed-point.sh
 
       - name: "✅ Slack Notify — Nightly Success"
         if: env.SLACK_WEBHOOK_URL != '' && steps.nightly.outcome == 'success'
@@ -427,14 +397,3 @@ jobs:
                 }
               ]
             }
-
-      - name: "📦 Archive Nightly Results"
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nightly-results-${{ github.run_id }}
-          path: |
-            stage1.js
-            stage2.js
-            stage3.js
-          retention-days: 30

@@ -1,4 +1,4 @@
-name: Phase C — Full Integration (Scan + Verify + Jest-Sharded)
+name: Phase C — Full Integration (Native Fixed-Point + Jest-Sharded)
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
-      scan-status: ${{ steps.scan.outcome }}
+      fixedpoint-status: ${{ steps.verify.outcome }}
       verify-status: ${{ steps.verify.outcome }}
 
     steps:
@@ -35,20 +35,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline
 
-      - name: Build bootstrap.js
+      - name: Build bootstrap for the legacy Jest/regression suite
         run: npm run build
         timeout-minutes: 5
 
-      - name: Generate stage1.js
-        run: bash scripts/build-stage1.sh
-        timeout-minutes: 10
-
-      - name: "🔍 FL-Token Scan (Early-Fail)"
-        id: scan
-        run: bash scripts/ci-run-check.sh --name scan --output-dir ci-results --timeout-seconds 600 -- bash scripts/scan-for-fl-tokens.sh stage1.js
-        continue-on-error: false
-
-      - name: "🔗 Fixed-Point Verification (5-stage SHA)"
+      - name: "🔗 Native Fixed-Point Verification (stages 2-4)"
         id: verify
         if: always()
         run: bash scripts/ci-run-check.sh --name verify --output-dir ci-results --timeout-seconds 600 -- bash scripts/verify-fixed-point.sh
@@ -58,29 +49,24 @@ jobs:
         if: always()
         run: bash scripts/ci-run-check.sh --name regression --output-dir ci-results --timeout-seconds 600 -- node scripts/check-let-regressions.js
 
-      - name: "🔐 Validate scan and verify results"
+      - name: "🔐 Validate verification results"
         id: aggregate
         if: always()
-        run: node scripts/ci-aggregate.js --root . --expected scan,verify,regression
+        run: node scripts/ci-aggregate.js --root . --expected verify,regression
 
-      - name: "📦 Upload scan/verify artifacts"
+      - name: "📦 Upload verification artifacts"
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scan-verify-artifacts
+          name: verification-artifacts
           path: |
-            stage1.js
-            stage2.js
-            stage3.js
-            /tmp/build.log
             ci-results/
           retention-days: 7
 
-      - name: "✅ Summary (Scan & Verify)"
+      - name: "✅ Summary (Native Verification)"
         run: |
-          echo "## 🔍 Scan & Verify Results"
+          echo "## 🔍 Native Verification Results"
           echo ""
-          echo "- FL-Token Scan: ${{ steps.scan.outcome }}"
           echo "- Fixed-Point: ${{ steps.verify.outcome }}"
           echo "- Regression: ${{ steps.regression.outcome }}"
 
@@ -91,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: scan-and-verify
-    if: ${{ needs.scan-and-verify.outputs.scan-status == 'success' }}
+    if: ${{ needs.scan-and-verify.outputs.fixedpoint-status == 'success' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -132,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: scan-and-verify
-    if: ${{ needs.scan-and-verify.outputs.scan-status == 'success' }}
+    if: ${{ needs.scan-and-verify.outputs.fixedpoint-status == 'success' }}
 
     strategy:
       fail-fast: false
@@ -203,7 +189,7 @@ jobs:
           echo "---"
           echo ""
           set +e
-          node scripts/ci-aggregate.js --root . --expected scan,verify,regression,regression-tests,jest-1,jest-2,jest-3
+          node scripts/ci-aggregate.js --root . --expected verify,regression,regression-tests,jest-1,jest-2,jest-3
           aggregate_status=$?
           if [ "$aggregate_status" -eq 0 ] && \
              [ "${{ needs.scan-and-verify.result }}" == "success" ] && \
@@ -243,23 +229,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline
 
-      - name: Build & Full Self-Hosting Chain
+      - name: Native Compiler Fixed-Point
         run: |
-          npm run build
-          bash scripts/build-stage1.sh
           bash scripts/verify-fixed-point.sh
 
       - name: "✅ Nightly Self-Hosting Complete"
         if: success()
         run: echo "✅ Nightly full chain verification passed"
-
-      - name: "📦 Archive Nightly Results"
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nightly-results-${{ github.run_id }}
-          path: |
-            stage1.js
-            stage2.js
-            stage3.js
-          retention-days: 30

@@ -4,7 +4,7 @@
 # 사용:
 #   make compile FILE=hello.fl OUT=h.js   # canonical FL→JS
 #   make verify-all                        # 모든 검증 통합
-#   make verify-fixed-point                # stage1~10 SHA256
+#   make verify-fixed-point                # native compiler stages 2~4
 #   make verify-build                      # TS→bootstrap 결정론
 #   make verify-self-host                  # tier2 (PASS≥91)
 #   make bench                             # FL-Bench 100 reference
@@ -21,7 +21,7 @@ help:
 	@echo "  make compile FILE=in.fl OUT=out.js  - stage1.js로 컴파일"
 	@echo "  make compile-self                   - stage1 self-host"
 	@echo "  make verify-all                     - 4개 검증 통합 대시보드"
-	@echo "  make verify-fixed-point             - stage1~10 SHA256 chain"
+	@echo "  make verify-fixed-point             - native compiler stages 2~4 SHA256 chain"
 	@echo "  make verify-build                   - TS→bootstrap 결정론"
 	@echo "  make verify-self-host               - tier2 (PASS≥91)"
 	@echo "  make bench                          - FL-Bench 100 reference"
@@ -64,13 +64,13 @@ verify-all:
 	@bash scripts/verify-all.sh
 
 verify-fixed-point:
-	@bash scripts/verify-fixed-point-deep.sh
+	@bash scripts/verify-native-fixed-point.sh
 
 verify-build:
 	@bash scripts/verify-build-deterministic.sh
 
 verify-self-host:
-	@bash scripts/verify-self-host.sh tier2
+	@bash scripts/verify-native-fixed-point.sh
 
 bench:
 	@$(NODE) benchmarks/fl-bench/run.js --reference --label=make-bench
