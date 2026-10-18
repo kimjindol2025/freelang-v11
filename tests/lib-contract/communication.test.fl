@@ -1,0 +1,15 @@
+(defn check [actual expected name]
+  (if (= actual expected) (println (str "PASS " name)) (throw (str "FAIL " name))))
+(let [[pid (process-pid)]
+      [cwd (process-cwd)]]
+  (check (number? pid) true "current pid is number")
+  (check (> pid 0) true "current pid positive")
+  (check (_fl_process_exists pid) true "current process exists")
+  (check (_fl_process_exists 2147483647) false "invalid process absent")
+  (check (string? cwd) true "working directory is string")
+  (check (> (length cwd) 0) true "working directory nonempty")
+  (check (_fl_process_run "/bin/echo native") "native\n" "run captures output")
+  (check (_fl_process_run "/bin/true") "" "run empty output")
+  (check (_fl_process_run_args "/bin/echo" ["args"]) "args\n" "run args captures output")
+  (check (number? (now-ms)) true "communication timing available"))
+(println "COMMUNICATION_SUMMARY=10/10")
