@@ -69,7 +69,11 @@ static FLValue json_parse_object(const char** pp) {
         if (*p == ',') p++;
         else break;
     }
-    if (*p == '}') p++;
+    if (*p != '}') {
+        fl_throw(fl_str_val("json-parse: invalid JSON"));
+        return fl_nil();
+    }
+    p++;
     *pp = p; return map;
 }
 
