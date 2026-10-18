@@ -696,15 +696,16 @@
       (let [[$name (get $n :name)]
             [$cn   (c-name $name)]
             [$line (get $n :line)]]
-        (if (includes-item @known-defns-atom $cn)
-          (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
-          ;; 알려진 함수/변수가 아니면 경고 출력 (컴파일 시점)
-          (if (not (includes-item @known-fncall-targets-atom $cn))
+        (if (or (includes-item @known-fncall-targets-atom $cn)
+                (includes-item @outer-params-atom $cn))
+          $cn
+          (if (includes-item @known-defns-atom $cn)
+            (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+            ;; 알려진 함수/변수가 아니면 경고 출력 (컴파일 시점)
             (do
               (println (str "[FL Warn] 정의되지 않은 이름: " $name
                             (if (null? $line) "" (str " (line " $line ")"))))
-              $cn)
-            $cn)))]
+              $cn))))]
     [(= (get $n :kind) "keyword")   (str "fl_str_val(\"" (c-esc (get $n :name)) "\")")]
     [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
     [(= (get $n :kind) "block")     (cgc-block $n)]
@@ -745,9 +746,12 @@
                         [(or (= $v "nil") (= $v "null")) "fl_nil()"]
                         [(= $v "json-parse") "fl_fn_new(json_parse_wrap, 0, NULL)"]
                         [true (let [[$cn (c-name $v)]]
-                                (if (includes-item @known-defns-atom $cn)
-                                  (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
-                                  $cn))])]
+                                (if (or (includes-item @known-fncall-targets-atom $cn)
+                                        (includes-item @outer-params-atom $cn))
+                                  $cn
+                                  (if (includes-item @known-defns-atom $cn)
+                                    (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+                                    $cn)))])]
     [true
      (do (println (str "[CGC-ERR] unsupported literal type=" (get $n :type) " line=" (get $n :line)))
          "fl_nil()")])))
@@ -1287,6 +1291,7 @@
         [$param-items (get-block-items (get $args 0))]
         [$param-names (cgc-fn-param-names $param-items 0 [])]
         [$saved @outer-params-atom]
+        [$saved-fncall-targets @known-fncall-targets-atom]
         [$_push (cgc-outer-push $param-names)]
         [$body-node (get $args 1)]
         [$all-vars (cgc-collect-vars $body-node [])]
@@ -1296,6 +1301,7 @@
         [$nenv (length $caps)]
         [$env-decls (cgc-fn-env-decls $caps 0 "")]
         [$body-c (cgc $body-node)]
+        [$_restore-fncall-targets (reset! known-fncall-targets-atom $saved-fncall-targets)]
         [$_restore (reset! outer-params-atom $saved)]
         [$decls (cgc-fn-argv-decls $param-items 0 "")]
         [$fn-name (str "__fl_anon_" $id)]]
@@ -1481,9 +1487,11 @@
 
 (defn cgc-defn [$args]
   (let [[$depth @cgc-defn-depth-atom]
-        [$saved-params @outer-params-atom]]
+        [$saved-params @outer-params-atom]
+        [$saved-fncall-targets @known-fncall-targets-atom]]
     (reset! cgc-defn-depth-atom (+ @cgc-defn-depth-atom 1))
-    (let [[$result (cgc-defn-impl $args)]]
+    (let [[$result (cgc-defn-impl $args)]
+          [$_restore-fncall-targets (reset! known-fncall-targets-atom $saved-fncall-targets)]]
       (reset! cgc-defn-depth-atom (- @cgc-defn-depth-atom 1))
       (reset! outer-params-atom $saved-params)
       (if (> $depth 0)

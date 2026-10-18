@@ -448,3 +448,25 @@ FX_OR_AFJ_OPENAT_COUNT=0
 CMP_2_3_EXIT=0
 CMP_3_4_EXIT=0
 ```
+
+2026-10-18, 8-44 수정 전 기준. cgc-main.fl을 기존 시드로 2·3·4단계 재생성했으며 세 출력 해시는 같고 두 cmp 종료 코드는 0이다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
+
+2026-10-18, 8-44 수정 후 고정점. 기존 시드로 cgc-main.fl을 2·3·4단계 빌드했고 세 결과 해시가 같으며 cmp 두 종료 코드는 0이다. 시드 교체 없음.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-2.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-3.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
