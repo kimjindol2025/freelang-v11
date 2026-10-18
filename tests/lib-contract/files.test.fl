@@ -1,0 +1,28 @@
+(defn check [actual expected name]
+  (if (= actual expected) (println (str "PASS " name)) (throw (str "FAIL " name))))
+(let [[root (str "/tmp/fl-stdlib-contract-" (process-pid))]
+      [path (str root "/a.txt")]
+      [copy (str root "/copy.txt")]
+      [moved (str root "/moved.txt")]]
+  (file-delete path)
+  (file-delete copy)
+  (file-delete moved)
+  (_fl_file_rmdir root)
+  (check (file-mkdir root) true "directory created")
+  (file-write path "alpha")
+  (check (file-read path) "alpha" "write then read")
+  (check (file-exists path) true "file exists")
+  (check (_fl_file_size path) 5 "file size")
+  (file-append path " beta")
+  (check (file-read path) "alpha beta" "append")
+  (_fl_file_copy path copy)
+  (check (file-read copy) "alpha beta" "copy")
+  (_fl_file_rename copy moved)
+  (check (file-read moved) "alpha beta" "rename")
+  (check (length (file-list root)) 2 "directory listing")
+  (file-delete path)
+  (check (file-exists path) false "delete")
+  (check (file-read (str root "/missing")) nil "missing read failure")
+  (file-delete moved)
+  (check (_fl_file_rmdir root) true "remove directory"))
+(println "FILES_SUMMARY=11/11")
