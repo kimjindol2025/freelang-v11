@@ -276,6 +276,130 @@ FLValue fl_vec_last(FLValue vec) {
     return v->len > 0 ? v->data[v->len-1] : fl_nil();
 }
 
+FLValue fl_vec_first(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_nil();
+    FLVector* v = (FLVector*)vec.obj;
+    return v->len > 0 ? v->data[0] : fl_nil();
+}
+
+FLValue fl_vec_rest(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    if (v->len == 0) return fl_vec_new();
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 1; i < v->len; i++) r = fl_vec_push(r, v->data[i]);
+    return r;
+}
+
+FLValue drop_while(FLValue pred, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    uint32_t i = 0;
+    while (i < v->len) {
+        FLValue elem = v->data[i];
+        if (!fl_truthy(fl_fn_call(pred, 1, &elem))) break;
+        i++;
+    }
+    FLValue r = fl_vec_new();
+    for (; i < v->len; i++) r = fl_vec_push(r, v->data[i]);
+    return r;
+}
+
+typedef struct { FLValue item; FLValue key; } FlSortPair;
+
+static int fl_sort_pair_cmp(const void *a, const void *b) {
+    const FlSortPair *pa = (const FlSortPair *)a;
+    const FlSortPair *pb = (const FlSortPair *)b;
+    FLValue ka = pa->key, kb = pb->key;
+    if (ka.tag == FL_INT && kb.tag == FL_INT) {
+        if (ka.i < kb.i) return -1;
+        if (ka.i > kb.i) return 1;
+        return 0;
+    }
+    if (ka.tag == FL_FLOAT || kb.tag == FL_FLOAT) {
+        double da = ka.tag == FL_FLOAT ? ka.f : (double)ka.i;
+        double db = kb.tag == FL_FLOAT ? kb.f : (double)kb.i;
+        if (da < db) return -1;
+        if (da > db) return 1;
+        return 0;
+    }
+    if (ka.tag == FL_STRING && kb.tag == FL_STRING && ka.obj && kb.obj) {
+        return strcmp(((FLString *)ka.obj)->data, ((FLString *)kb.obj)->data);
+    }
+    if (ka.tag < kb.tag) return -1;
+    if (ka.tag > kb.tag) return 1;
+    return 0;
+}
+
+FLValue fl_sort_by(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    if (v->len == 0) return fl_vec_new();
+    FlSortPair *pairs = (FlSortPair *)malloc(sizeof(FlSortPair) * v->len);
+    if (!pairs) return fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        pairs[i].item = v->data[i];
+        pairs[i].key = fl_fn_call(fn, 1, &v->data[i]);
+    }
+    qsort(pairs, v->len, sizeof(FlSortPair), fl_sort_pair_cmp);
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) r = fl_vec_push(r, pairs[i].item);
+    free(pairs);
+    return r;
+}
+
+FLValue reverse(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = v->len; i > 0; i--) r = fl_vec_push(r, v->data[i - 1]);
+    return r;
+}
+
+FLValue fl_mapcat(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj;
+    FLValue r = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue elem = v->data[i];
+        FLValue out = fl_fn_call(fn, 1, &elem);
+        if (out.tag == FL_VECTOR) r = fl_append(r, out);
+        else r = fl_vec_push(r, out);
+    }
+    return r;
+}
+
+FLValue fl_every_p(FLValue fn, FLValue vec) {
+    if (vec.tag == FL_NIL) return fl_bool(true);
+    if (vec.tag != FL_VECTOR) {
+        fl_throw(fl_str_val("every?: second argument must be an array"));
+        return fl_bool(false);
+    }
+    FLVector* v = (FLVector*)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue elem = v->data[i];
+        if (!fl_truthy(fl_fn_call(fn, 1, &elem))) return fl_bool(false);
+    }
+    return fl_bool(true);
+}
+
+FLValue contains_p(FLValue coll, FLValue item) {
+    if (coll.tag == FL_STRING && item.tag == FL_STRING) {
+        const char* s = ((FLString*)coll.obj)->data;
+        const char* p = ((FLString*)item.obj)->data;
+        return fl_bool(strstr(s, p) != NULL);
+    }
+    if (coll.tag == FL_VECTOR) {
+        FLVector* v = (FLVector*)coll.obj;
+        for (uint32_t i = 0; i < v->len; i++) {
+            if (fl_truthy(fl_eq(v->data[i], item))) return fl_bool(true);
+        }
+        return fl_bool(false);
+    }
+    if (coll.tag == FL_MAP) return json_has(coll, item);
+    return fl_bool(false);
+}
+
 FLValue fl_map_del(FLValue map, FLValue key) {
     if (map.tag != FL_MAP) return map;
     FLMap* m = (FLMap*)map.obj;

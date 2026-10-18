@@ -162,6 +162,8 @@ const char* fl_to_str(FLValue v, char* buf, size_t sz) {
 
 /* 문자열 display 변환 (따옴표 없이) — str/add 연결용 */
 static const char* fl_display(FLValue v, char* buf, size_t sz) {
+    /* bootstrap.js str: null/undefined 는 "null". repr 용 fl_to_str 은 "nil" 유지. */
+    if (v.tag == FL_NIL) return "null";
     if (v.tag == FL_STRING) return ((FLString*)v.obj)->data;
     return fl_to_str(v, buf, sz);
 }
@@ -261,6 +263,26 @@ FLValue fl_eq(FLValue a, FLValue b) {
             const char* sb = ((FLString*)b.obj)->data;
             return fl_bool(strcmp(sa, sb) == 0);
         }
+        case FL_VECTOR: {
+            if (!a.obj || !b.obj) return fl_bool(a.obj == b.obj);
+            FLVector* va = (FLVector*)a.obj;
+            FLVector* vb = (FLVector*)b.obj;
+            if (va->len != vb->len) return fl_bool(false);
+            for (uint32_t i = 0; i < va->len; i++)
+                if (!fl_truthy(fl_eq(va->data[i], vb->data[i]))) return fl_bool(false);
+            return fl_bool(true);
+        }
+        case FL_MAP: {
+            if (!a.obj || !b.obj) return fl_bool(a.obj == b.obj);
+            FLMap* ma = (FLMap*)a.obj;
+            FLMap* mb = (FLMap*)b.obj;
+            if (ma->len != mb->len) return fl_bool(false);
+            for (uint32_t i = 0; i < ma->len; i++) {
+                FLValue vb = fl_map_get(b, ma->entries[i].key);
+                if (!fl_truthy(fl_eq(ma->entries[i].val, vb))) return fl_bool(false);
+            }
+            return fl_bool(true);
+        }
         default:        return fl_bool(false);
     }
 }
@@ -330,7 +352,10 @@ FLValue fl_str_n(int count, ...) {
 /* ── I/O ── */
 
 FLValue fl_println(FLValue v) {
-    if (v.tag == FL_STRING) {
+    /* bootstrap.js toDisplayString: null/undefined 는 "null" */
+    if (v.tag == FL_NIL) {
+        puts("null");
+    } else if (v.tag == FL_STRING) {
         puts(((FLString*)v.obj)->data);
     } else {
         char buf[4096];
@@ -340,7 +365,9 @@ FLValue fl_println(FLValue v) {
 }
 
 FLValue fl_print(FLValue v) {
-    if (v.tag == FL_STRING) {
+    if (v.tag == FL_NIL) {
+        fputs("null", stdout);
+    } else if (v.tag == FL_STRING) {
         fputs(((FLString*)v.obj)->data, stdout);
     } else {
         char buf[4096];
@@ -371,13 +398,20 @@ FLValue fl_file_read(FLValue path) {
 }
 
 FLValue fl_file_write(FLValue path, FLValue content) {
-    if (path.tag != FL_STRING) return fl_nil();
+    /* bootstrap.js file-write 실패는 예외. 성공만 nil 을 돌려준다. */
+    if (path.tag != FL_STRING) {
+        fl_throw(fl_str_val("file-write-failed"));
+        return fl_nil();
+    }
     const char* p = ((FLString*)path.obj)->data;
     char buf[64];
     const char* s = fl_display(content, buf, sizeof(buf));
     FILE* f = fopen(p, "wb");
-    if (!f) return fl_nil();
+    if (!f) {
+        fl_throw(fl_str_val("file-write-failed"));
+        return fl_nil();
+    }
     fwrite(s, 1, strlen(s), f);
     fclose(f);
-    return fl_nil();
+    return fl_bool(true);
 }

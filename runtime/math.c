@@ -4,6 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <ctype.h>
 
 FLValue fl_floor(FLValue x) { return x.tag==FL_FLOAT ? fl_float(floor(x.f)) : x; }
 FLValue fl_ceil(FLValue x)  { return x.tag==FL_FLOAT ? fl_float(ceil(x.f))  : x; }
@@ -25,6 +26,7 @@ FLValue array_p(FLValue v)  { return fl_bool(v.tag==FL_VECTOR); }
 FLValue list_p(FLValue v)   { return fl_bool(v.tag==FL_VECTOR); }
 FLValue map_p(FLValue v)    { return fl_bool(v.tag==FL_MAP); }
 FLValue fn_p(FLValue v)     { return fl_bool(v.tag==FL_FN); }
+FLValue fl_fn_p(FLValue v)  { return fl_bool(v.tag==FL_FN); }
 FLValue type_of(FLValue v) {
     switch(v.tag) {
         case FL_NIL:    return fl_str_val("nil");
@@ -75,6 +77,68 @@ FLValue split(FLValue s, FLValue sep) {
         vec=fl_vec_push(vec,fl_str_val(buf)); free(buf); p=q+dlen;
     }
     return fl_vec_push(vec,fl_str_val(p));
+}
+FLValue fl_str_join(FLValue a, FLValue b) {
+    if (a.tag == FL_VECTOR) return join(a, b);
+    if (b.tag == FL_VECTOR) return join(b, a);
+    return fl_str_val("");
+}
+static FLValue _fl_template_fill(FLValue tmpl, FLValue env, int use_env) {
+    if (tmpl.tag != FL_STRING || !tmpl.obj) return fl_str_val("");
+    const char* s = ((FLString*)tmpl.obj)->data;
+    size_t n = strlen(s);
+    size_t cap = n + 1;
+    char* out = (char*)malloc(cap);
+    size_t w = 0;
+    for (size_t i = 0; i < n; ) {
+        if (s[i] == '$' && i + 1 < n && s[i + 1] == '{') {
+            i += 2;
+            size_t start = i;
+            while (i < n && s[i] != '}') i++;
+            size_t len = i - start;
+            if (i < n && s[i] == '}') i++;
+            if (use_env && env.tag == FL_MAP && len > 0) {
+                char ident[128];
+                if (len >= sizeof ident) len = sizeof ident - 1;
+                memcpy(ident, s + start, len);
+                ident[len] = '\0';
+                FLValue v = fl_map_get(env, fl_str_val(ident));
+                const char* ins = "";
+                char nbuf[64];
+                if (v.tag == FL_STRING && v.obj) ins = ((FLString*)v.obj)->data;
+                else if (v.tag == FL_INT) {
+                    snprintf(nbuf, sizeof nbuf, "%lld", (long long)v.i);
+                    ins = nbuf;
+                } else if (v.tag == FL_BOOL) ins = v.b ? "true" : "false";
+                else if (v.tag == FL_NIL) ins = "";
+                size_t il = strlen(ins);
+                if (w + il + 1 >= cap) {
+                    cap = (w + il + 1) * 2;
+                    out = (char*)realloc(out, cap);
+                }
+                memcpy(out + w, ins, il);
+                w += il;
+            }
+        } else {
+            if (w + 2 >= cap) {
+                cap *= 2;
+                out = (char*)realloc(out, cap);
+            }
+            out[w++] = s[i++];
+        }
+    }
+    out[w] = '\0';
+    FLValue r = fl_str_val(out);
+    free(out);
+    return r;
+}
+
+FLValue fl_template_interp(FLValue tmpl) {
+    return _fl_template_fill(tmpl, fl_nil(), 0);
+}
+
+FLValue fl_template_bound(FLValue tmpl, FLValue env) {
+    return _fl_template_fill(tmpl, env, 1);
 }
 FLValue join(FLValue vec, FLValue sep) {
     if (vec.tag!=FL_VECTOR) return fl_str_val("");
@@ -171,6 +235,23 @@ void fl_init_argv(int argc, char** argv) {
 FLValue fl_get_argv(void) {
     return _fl_argv_init ? _fl_argv : fl_vec_new();
 }
+FLValue process_argv(void) {
+    return fl_get_argv();
+}
+/* Script ABI: (get-arg n) / (sys:args). argv is program-name-stripped. */
+FLValue get_arg(FLValue index) {
+    if (index.tag != FL_INT) return fl_nil();
+    return fl_vec_get(fl_get_argv(), index);
+}
+FLValue sys_args(void) {
+    return fl_get_argv();
+}
+FLValue sys(FLValue key) {
+    if (key.tag == FL_STRING && key.obj &&
+        strcmp(((FLString*)key.obj)->data, "args") == 0)
+        return fl_get_argv();
+    return fl_nil();
+}
 
 /* ── S26: atom ── */
 FLValue fl_atom_new(FLValue init) { return fl_vec_from(&init, 1); }
@@ -193,7 +274,229 @@ FLValue fl_str_includes(FLValue s, FLValue sub) {
     return fl_bool(strstr(((FLString*)s.obj)->data, ((FLString*)sub.obj)->data) != NULL);
 }
 
+/* bootstrap.js str-contains-in: String(s).includes(String(pattern)) */
+static const char* fl_js_string(FLValue v, char* buf, size_t sz) {
+    if (v.tag == FL_STRING && v.obj) return ((FLString*)v.obj)->data;
+    if (v.tag == FL_NIL) return "null";
+    if (v.tag == FL_BOOL) return v.b ? "true" : "false";
+    if (v.tag == FL_INT) {
+        snprintf(buf, sz, "%lld", (long long)v.i);
+        return buf;
+    }
+    if (v.tag == FL_FLOAT) {
+        snprintf(buf, sz, "%g", v.f);
+        return buf;
+    }
+    return "";
+}
+
+FLValue str_contains_in(FLValue s, FLValue pattern) {
+    char a[4096], b[4096];
+    const char* ss = fl_js_string(s, a, sizeof a);
+    const char* pp = fl_js_string(pattern, b, sizeof b);
+    if (!ss) ss = "";
+    if (!pp) pp = "";
+    return fl_bool(strstr(ss, pp) != NULL);
+}
+
 FLValue fl_string_p(FLValue v) { return string_p(v); }
+
+/* bootstrap.js _fl_concat else: String(v || ""). 빈 배열은 truthy 이고 String([]) 은 "". */
+static int fl_js_falsy_text(FLValue v) {
+    if (v.tag == FL_NIL) return 1;
+    if (v.tag == FL_BOOL) return !v.b;
+    if (v.tag == FL_INT) return v.i == 0;
+    if (v.tag == FL_FLOAT) return v.f == 0.0 || v.f == -0.0;
+    if (v.tag == FL_STRING) {
+        FLString* s = (FLString*)v.obj;
+        return !s || s->len == 0;
+    }
+    return 0;
+}
+
+static FLValue fl_js_scalar_text(FLValue v) {
+    char b[64];
+    if (v.tag == FL_NIL || (v.tag == FL_BOOL && !v.b)) return fl_str_val("");
+    if (v.tag == FL_BOOL) return fl_str_val("true");
+    if (v.tag == FL_INT) {
+        if (v.i == 0) return fl_str_val("");
+        snprintf(b, sizeof b, "%lld", (long long)v.i);
+        return fl_str_val(b);
+    }
+    if (v.tag == FL_FLOAT) {
+        if (v.f == 0.0) return fl_str_val("");
+        snprintf(b, sizeof b, "%.15g", v.f);
+        return fl_str_val(b);
+    }
+    if (v.tag == FL_STRING) return v.obj ? v : fl_str_val("");
+    return fl_str_val("");
+}
+
+static FLValue fl_js_join_vec(FLValue v) {
+    FLVector* vec = (v.tag == FL_VECTOR) ? (FLVector*)v.obj : NULL;
+    uint32_t n = vec ? vec->len : 0;
+    if (!vec || n == 0) return fl_str_val("");
+    FLValue acc = fl_str_val("");
+    for (uint32_t i = 0; i < n; i++) {
+        if (i) acc = fl_add(acc, fl_str_val(","));
+        FLValue item = vec->data[i];
+        if (item.tag == FL_VECTOR) acc = fl_add(acc, fl_js_join_vec(item));
+        else acc = fl_add(acc, fl_js_scalar_text(item));
+    }
+    return acc;
+}
+
+static FLValue fl_js_text(FLValue v) {
+    if (v.tag == FL_VECTOR) return fl_js_join_vec(v);
+    if (v.tag == FL_MAP || v.tag == FL_FN) {
+        if (fl_js_falsy_text(v)) return fl_str_val("");
+        return fl_str_val("[object Object]");
+    }
+    if (fl_js_falsy_text(v)) return fl_str_val("");
+    if (v.tag == FL_STRING) return v;
+    return fl_js_scalar_text(v);
+}
+
+FLValue fl_text(FLValue v) { return fl_js_text(v); }
+
+FLValue fl_concat(FLValue a, FLValue b) {
+    if (a.tag == FL_VECTOR && b.tag == FL_VECTOR) return fl_append(a, b);
+    return fl_add(fl_js_text(a), fl_js_text(b));
+}
+
+/* bootstrap.js _fl_str_to_num: Number(s), NaN 이면 null */
+FLValue fl_str_to_num(FLValue s) {
+    if (s.tag == FL_NIL) return fl_int(0);
+    if (s.tag == FL_BOOL) return fl_int(s.b ? 1 : 0);
+    if (s.tag == FL_INT) return s;
+    if (s.tag == FL_FLOAT) {
+        if (isfinite(s.f) && s.f == floor(s.f) &&
+            s.f >= (double)INT64_MIN && s.f <= (double)INT64_MAX)
+            return fl_int((int64_t)s.f);
+        if (!isfinite(s.f)) return fl_nil();
+        return s;
+    }
+    if (s.tag != FL_STRING || !s.obj) return fl_nil();
+    const char* p = ((FLString*)s.obj)->data;
+    while (*p && isspace((unsigned char)*p)) p++;
+    if (*p == '\0') return fl_int(0);
+    char* end = NULL;
+    double n = strtod(p, &end);
+    if (end == p) return fl_nil();
+    while (end && *end && isspace((unsigned char)*end)) end++;
+    if (!end || *end != '\0' || !isfinite(n)) return fl_nil();
+    if (n == floor(n) && n >= (double)INT64_MIN && n <= (double)INT64_MAX)
+        return fl_int((int64_t)n);
+    return fl_float(n);
+}
+
+FLValue fl_now_iso(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    struct tm tm;
+    gmtime_r(&ts.tv_sec, &tm);
+    char b[80];
+    int ms = (int)(ts.tv_nsec / 1000000L);
+    if (ms < 0) ms = 0;
+    if (ms > 999) ms = 999;
+    snprintf(b, sizeof b, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
+             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+             tm.tm_hour, tm.tm_min, tm.tm_sec, ms);
+    return fl_str_val(b);
+}
+
+FLValue now_iso(void) { return fl_now_iso(); }
+
+FLValue fl_array_p(FLValue v) { return array_p(v); }
+FLValue fl_number_p(FLValue v) { return fl_bool(v.tag == FL_INT || v.tag == FL_FLOAT); }
+FLValue fl_integer_p(FLValue v) {
+    if (v.tag == FL_INT) return fl_bool(true);
+    if (v.tag == FL_FLOAT) return fl_bool(isfinite(v.f) && v.f == floor(v.f));
+    return fl_bool(false);
+}
+FLValue fl_boolean_p(FLValue v) { return fl_bool(v.tag == FL_BOOL); }
+
+FLValue str_split(FLValue s, FLValue sep) {
+    if (s.tag != FL_STRING || sep.tag != FL_STRING) return fl_vec_new();
+    const char* src = ((FLString*)s.obj)->data;
+    const char* d = ((FLString*)sep.obj)->data;
+    size_t dlen = strlen(d);
+    if (dlen == 0) {
+        FLValue vec = fl_vec_new();
+        for (const char* p = src; *p; p++) {
+            char buf[2] = { *p, 0 };
+            vec = fl_vec_push(vec, fl_str_val(buf));
+        }
+        return vec;
+    }
+    return split(s, sep);
+}
+
+FLValue str_trim(FLValue s) {
+    if (s.tag != FL_STRING) return s.tag == FL_NIL ? fl_nil() : fl_str_val("");
+    return trim(s);
+}
+
+FLValue str_lower(FLValue s) {
+    const char* p = "";
+    if (s.tag == FL_STRING && s.obj) p = ((FLString*)s.obj)->data;
+    size_t n = strlen(p);
+    char* buf = malloc(n + 1);
+    for (size_t i = 0; i < n; i++) buf[i] = (char)tolower((unsigned char)p[i]);
+    buf[n] = 0;
+    FLValue r = fl_str_val(buf);
+    free(buf);
+    return r;
+}
+
+static void fl_sort_key(FLValue v, char* buf, size_t sz) {
+    if (v.tag == FL_STRING && v.obj) {
+        snprintf(buf, sz, "%s", ((FLString*)v.obj)->data);
+        return;
+    }
+    if (v.tag == FL_INT) { snprintf(buf, sz, "%lld", (long long)v.i); return; }
+    if (v.tag == FL_FLOAT) { snprintf(buf, sz, "%.15g", v.f); return; }
+    if (v.tag == FL_BOOL) { snprintf(buf, sz, "%s", v.b ? "true" : "false"); return; }
+    buf[0] = 0;
+}
+
+static int fl_sort_cmp(const void* a, const void* b) {
+    FLValue x = *(const FLValue*)a;
+    FLValue y = *(const FLValue*)b;
+    int xn = (x.tag == FL_INT || x.tag == FL_FLOAT);
+    int yn = (y.tag == FL_INT || y.tag == FL_FLOAT);
+    if (xn && yn) {
+        double dx = x.tag == FL_INT ? (double)x.i : x.f;
+        double dy = y.tag == FL_INT ? (double)y.i : y.f;
+        if (dx < dy) return -1;
+        if (dx > dy) return 1;
+        return 0;
+    }
+    char ax[256], ay[256];
+    fl_sort_key(x, ax, sizeof ax);
+    fl_sort_key(y, ay, sizeof ay);
+    return strcmp(ax, ay);
+}
+
+FLValue sort(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* src = (FLVector*)vec.obj;
+    if (src->len == 0) return fl_vec_new();
+    FLValue* items = malloc(sizeof(FLValue) * src->len);
+    memcpy(items, src->data, sizeof(FLValue) * src->len);
+    qsort(items, src->len, sizeof(FLValue), fl_sort_cmp);
+    FLValue out = fl_vec_from(items, src->len);
+    free(items);
+    return out;
+}
+
+FLValue max(FLValue a, FLValue b) {
+    double da = a.tag == FL_FLOAT ? a.f : (double)a.i;
+    double db = b.tag == FL_FLOAT ? b.f : (double)b.i;
+    double m = da > db ? da : db;
+    if (a.tag == FL_INT && b.tag == FL_INT) return fl_int((int64_t)m);
+    return fl_float(m);
+}
 
 /* ── stdlib aliases — self/all.fl compatibility ── */
 

@@ -6,7 +6,12 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
+#include <netdb.h>
 #include <signal.h>
+#include <errno.h>
+#include <ctype.h>
+#include <sys/select.h>
 
 FLValue _fl_process_getcwd(void) {
     char buf[4096];
@@ -102,6 +107,271 @@ FLValue _fl_process_spawn(FLValue cmd, FLValue args) {
     }
     return fl_int((int64_t)pid);
 }
+
+/* ── capability registry (bootstrap.js defaults) ── */
+static struct { const char* name; int enabled; } fl_caps[] = {
+    {"tcp", 1}, {"file", 1}, {"http", 1}, {"db", 1}, {"process", 1}
+};
+static const int fl_caps_n = 5;
+
+static int fl_cap_find(const char* name) {
+    for (int i = 0; i < fl_caps_n; i++)
+        if (strcmp(fl_caps[i].name, name) == 0) return i;
+    return -1;
+}
+
+static const char* fl_cstr(FLValue v) {
+    if (v.tag == FL_STRING && v.obj) return ((FLString*)v.obj)->data;
+    return "";
+}
+
+FLValue capability_list(void) {
+    FLValue r = fl_vec_new();
+    for (int i = 0; i < fl_caps_n; i++) r = fl_vec_push(r, fl_str_val(fl_caps[i].name));
+    return r;
+}
+
+FLValue capability_enable(FLValue name) {
+    int i = fl_cap_find(fl_cstr(name));
+    if (i < 0) return fl_str_val("not-found");
+    fl_caps[i].enabled = 1;
+    return fl_str_val("ok");
+}
+
+FLValue capability_disable(FLValue name) {
+    int i = fl_cap_find(fl_cstr(name));
+    if (i < 0) return fl_str_val("not-found");
+    fl_caps[i].enabled = 0;
+    return fl_str_val("ok");
+}
+
+FLValue capability_enabled_p(FLValue name) {
+    int i = fl_cap_find(fl_cstr(name));
+    return fl_bool(i >= 0 && fl_caps[i].enabled);
+}
+
+static void fl_cap_require(const char* name) {
+    int i = fl_cap_find(name);
+    if (i < 0 || !fl_caps[i].enabled) {
+        char msg[128];
+        snprintf(msg, sizeof msg, "capability denied: %s", name);
+        fl_throw(fl_str_val(msg));
+    }
+}
+
+static FLValue fl_ok(FLValue value) {
+    FLValue kv[4] = { fl_str_val("_tag"), fl_str_val("Ok"), fl_str_val("value"), value };
+    return fl_map_from_pairs(kv, 2);
+}
+
+static FLValue fl_err(const char* code) {
+    FLValue kv[4] = { fl_str_val("_tag"), fl_str_val("Error"), fl_str_val("code"), fl_str_val(code) };
+    return fl_map_from_pairs(kv, 2);
+}
+
+static char* fl_read_fd(int fd) {
+    size_t n = 0, cap = 256;
+    char* buf = malloc(cap);
+    buf[0] = 0;
+    char tmp[512];
+    ssize_t r;
+    while ((r = read(fd, tmp, sizeof tmp)) > 0) {
+        if (n + (size_t)r + 1 > cap) { cap = (n + (size_t)r + 1) * 2; buf = realloc(buf, cap); }
+        memcpy(buf + n, tmp, (size_t)r); n += (size_t)r; buf[n] = 0;
+    }
+    return buf;
+}
+
+FLValue process_spawn(FLValue cmd, FLValue args) {
+    fl_cap_require("process");
+    const char* c = fl_cstr(cmd);
+    if (!c[0]) return fl_err("E_PROCESS_SPAWN");
+    char* argv[256];
+    int argc = 0;
+    argv[argc++] = (char*)c;
+    if (args.tag == FL_VECTOR) {
+        FLVector* v = (FLVector*)args.obj;
+        for (uint32_t i = 0; i < v->len && argc < 254; i++)
+            argv[argc++] = (char*)fl_cstr(v->data[i]);
+    }
+    argv[argc] = NULL;
+    int outp[2], errp[2];
+    if (pipe(outp) != 0 || pipe(errp) != 0) return fl_err("E_PROCESS_SPAWN");
+    pid_t pid = fork();
+    if (pid < 0) { close(outp[0]); close(outp[1]); close(errp[0]); close(errp[1]); return fl_err("E_PROCESS_SPAWN"); }
+    if (pid == 0) {
+        dup2(outp[1], 1); dup2(errp[1], 2);
+        close(outp[0]); close(outp[1]); close(errp[0]); close(errp[1]);
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+    close(outp[1]); close(errp[1]);
+    /* Drain stdout and stderr together so a child that fills stderr
+       (e.g. cat gcc.log) cannot deadlock against a parent that reads
+       stdout to EOF first. */
+    char *out = (char*)malloc(1); size_t olen = 0; out[0] = '\0';
+    char *err = (char*)malloc(1); size_t elen = 0; err[0] = '\0';
+    int oopen = 1, eopen = 1;
+    while (oopen || eopen) {
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        int maxfd = -1;
+        if (oopen) { FD_SET(outp[0], &rfds); maxfd = outp[0]; }
+        if (eopen) { FD_SET(errp[0], &rfds); if (errp[0] > maxfd) maxfd = errp[0]; }
+        if (select(maxfd + 1, &rfds, NULL, NULL, NULL) < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+        char buf[4096];
+        if (oopen && FD_ISSET(outp[0], &rfds)) {
+            ssize_t n = read(outp[0], buf, sizeof buf);
+            if (n <= 0) oopen = 0;
+            else {
+                char *p = (char*)realloc(out, olen + (size_t)n + 1);
+                if (!p) break;
+                out = p;
+                memcpy(out + olen, buf, (size_t)n);
+                olen += (size_t)n;
+                out[olen] = '\0';
+            }
+        }
+        if (eopen && FD_ISSET(errp[0], &rfds)) {
+            ssize_t n = read(errp[0], buf, sizeof buf);
+            if (n <= 0) eopen = 0;
+            else {
+                char *p = (char*)realloc(err, elen + (size_t)n + 1);
+                if (!p) break;
+                err = p;
+                memcpy(err + elen, buf, (size_t)n);
+                elen += (size_t)n;
+                err[elen] = '\0';
+            }
+        }
+    }
+    close(outp[0]); close(errp[0]);
+    int st = 0;
+    waitpid(pid, &st, 0);
+    int code = WIFEXITED(st) ? WEXITSTATUS(st) : 1;
+    FLValue kv[8] = {
+        fl_str_val("stdout"), fl_str_val(out),
+        fl_str_val("stderr"), fl_str_val(err),
+        fl_str_val("code"), fl_int(code),
+        fl_str_val("signal"), fl_nil()
+    };
+    free(out); free(err);
+    return fl_ok(fl_map_from_pairs(kv, 4));
+}
+
+static FLValue git_finish(FLValue spawned) {
+    if (spawned.tag != FL_MAP) return fl_err("E_GIT");
+    FLValue tag = fl_map_get(spawned, fl_str_val("_tag"));
+    if (!(tag.tag == FL_STRING && tag.obj && strcmp(((FLString*)tag.obj)->data, "Ok") == 0))
+        return spawned;
+    FLValue value = fl_map_get(spawned, fl_str_val("value"));
+    FLValue code = fl_map_get(value, fl_str_val("code"));
+    if (code.tag == FL_INT && code.i == 0) return spawned;
+    return fl_err("E_GIT");
+}
+
+static FLValue git_run(FLValue root, const char* a, const char* b) {
+    fl_cap_require("process");
+    FLValue args = fl_vec_new();
+    if (fl_cstr(root)[0]) {
+        args = fl_vec_push(args, fl_str_val("-C"));
+        args = fl_vec_push(args, root);
+    }
+    args = fl_vec_push(args, fl_str_val(a));
+    if (b) args = fl_vec_push(args, fl_str_val(b));
+    return git_finish(process_spawn(fl_str_val("git"), args));
+}
+
+FLValue git_status(FLValue root) { return git_run(root, "status", "--porcelain"); }
+FLValue git_head(FLValue root) { return git_run(root, "rev-parse", "HEAD"); }
+FLValue git_branch(FLValue root) {
+    FLValue args = fl_vec_new();
+    if (fl_cstr(root)[0]) {
+        args = fl_vec_push(args, fl_str_val("-C"));
+        args = fl_vec_push(args, root);
+    }
+    args = fl_vec_push(args, fl_str_val("rev-parse"));
+    args = fl_vec_push(args, fl_str_val("--abbrev-ref"));
+    args = fl_vec_push(args, fl_str_val("HEAD"));
+    return git_finish(process_spawn(fl_str_val("git"), args));
+}
+FLValue git_diff_name_only(FLValue root) { return git_run(root, "diff", "--name-only"); }
+
+FLValue shell_cwd(void) { return _fl_process_getcwd(); }
+
+static int fl_http_parse_url(const char* url, char* host, size_t hs, char* path, size_t ps, int* port) {
+    if (strncmp(url, "http://", 7) != 0) return -1;
+    const char* p = url + 7;
+    const char* slash = strchr(p, '/');
+    const char* colon = strchr(p, ':');
+    *port = 80;
+    if (colon && (!slash || colon < slash)) {
+        size_t n = (size_t)(colon - p);
+        if (n >= hs) n = hs - 1;
+        memcpy(host, p, n); host[n] = 0;
+        *port = atoi(colon + 1);
+    } else {
+        size_t n = slash ? (size_t)(slash - p) : strlen(p);
+        if (n >= hs) n = hs - 1;
+        memcpy(host, p, n); host[n] = 0;
+    }
+    if (slash) snprintf(path, ps, "%s", slash);
+    else snprintf(path, ps, "/");
+    return 0;
+}
+
+FLValue http_get(FLValue url) {
+    fl_cap_require("http");
+    const char* u = fl_cstr(url);
+    char host[256], path[1024];
+    int port = 80;
+    FLValue errm = fl_map_new();
+    errm = fl_map_set(errm, fl_str_val("status"), fl_int(0));
+    errm = fl_map_set(errm, fl_str_val("body"), fl_str_val(""));
+    if (fl_http_parse_url(u, host, sizeof host, path, sizeof path, &port) != 0) {
+        return fl_map_set(errm, fl_str_val("error"), fl_str_val("unsupported url"));
+    }
+    struct addrinfo hints, *res = NULL;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_family = AF_UNSPEC;
+    char portstr[16];
+    snprintf(portstr, sizeof portstr, "%d", port);
+    if (getaddrinfo(host, portstr, &hints, &res) != 0) {
+        return fl_map_set(errm, fl_str_val("error"), fl_str_val("getaddrinfo failed"));
+    }
+    int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (fd < 0) { freeaddrinfo(res); return fl_map_set(errm, fl_str_val("error"), fl_str_val("socket failed")); }
+    if (connect(fd, res->ai_addr, res->ai_addrlen) != 0) {
+        char em[128];
+        snprintf(em, sizeof em, "connect ECONNREFUSED %s:%d", host, port);
+        close(fd); freeaddrinfo(res);
+        return fl_map_set(errm, fl_str_val("error"), fl_str_val(em));
+    }
+    freeaddrinfo(res);
+    char req[1400];
+    snprintf(req, sizeof req, "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n", path, host);
+    if (write(fd, req, strlen(req)) < 0) { close(fd); return fl_map_set(errm, fl_str_val("error"), fl_str_val("write failed")); }
+    char* raw = fl_read_fd(fd);
+    close(fd);
+    char* hdrend = strstr(raw, "\r\n\r\n");
+    int status = 0;
+    const char* body = "";
+    if (hdrend) {
+        sscanf(raw, "HTTP/%*s %d", &status);
+        body = hdrend + 4;
+    } else body = raw;
+    FLValue out = fl_map_new();
+    out = fl_map_set(out, fl_str_val("status"), fl_int(status));
+    out = fl_map_set(out, fl_str_val("body"), fl_str_val(body));
+    free(raw);
+    return out;
+}
+
+FLValue fl_http_get(FLValue url) { return http_get(url); }
 
 /* ── try/catch 런타임 ── */
 extern FLTryFrame fl_try_stack[FL_TRY_MAX];

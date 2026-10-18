@@ -17,3 +17,12 @@ FLValue fl_str_starts_with(FLValue str, FLValue prefix) {
     size_t pl = strlen(p);
     return fl_bool(strncmp(s, p, pl) == 0);
 }
+
+FLValue fl_str_ends_with(FLValue str, FLValue suffix) {
+    if (str.tag != FL_STRING || suffix.tag != FL_STRING) return fl_bool(false);
+    const char* s = _cgcb_strval(str);
+    const char* p = _cgcb_strval(suffix);
+    size_t sl = strlen(s), pl = strlen(p);
+    if (pl > sl) return fl_bool(false);
+    return fl_bool(strcmp(s + sl - pl, p) == 0);
+}

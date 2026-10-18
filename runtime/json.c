@@ -92,10 +92,35 @@ static FLValue json_parse_value(const char** pp) {
 }
 
 FLValue fl_json_parse(FLValue src) {
-    if (src.tag != FL_STRING) return fl_nil();
+    if (src.tag != FL_STRING || !src.obj) {
+        fl_throw(fl_str_val("json-parse: invalid JSON"));
+        return fl_nil();
+    }
     FLString* s = (FLString*)src.obj;
     const char* p = s->data;
-    return json_parse_value(&p);
+    FLValue v = json_parse_value(&p);
+    p = json_skip_ws(p);
+    if (*p != '\0') {
+        fl_throw(fl_str_val("json-parse: invalid JSON"));
+        return fl_nil();
+    }
+    return v;
+}
+
+FLValue json_parse_wrap(FLClosure* self, int argc, FLValue* argv) {
+    (void)self;
+    if (argc < 1 || !argv) return fl_nil();
+    return fl_json_parse(argv[0]);
+}
+
+FLValue json_has(FLValue obj, FLValue key) {
+    if (obj.tag == FL_STRING) obj = fl_json_parse(obj);
+    if (obj.tag != FL_MAP) return fl_bool(false);
+    FLMap* m = (FLMap*)obj.obj;
+    for (uint32_t i = 0; i < m->len; i++) {
+        if (fl_truthy(fl_eq(m->entries[i].key, key))) return fl_bool(true);
+    }
+    return fl_bool(false);
 }
 
 static void json_stringify_buf(FLValue v, char* buf, size_t sz, size_t* pos) {

@@ -114,7 +114,7 @@
 
 (defn read-string-iter [$_cur $_res_acc $line $col]
   (loop [$cur $_cur $res_acc $_res_acc]
-    (if (at-end? $cur) (emit $cur "String" $res_acc $line $col)
+    (if (at-end? $cur) (emit $cur "UnclosedString" $res_acc $line $col)
       (let [[$c (peek $cur)]]
         (cond
           [(= $c "\"")
@@ -673,15 +673,17 @@
                   "bool" "true" "false"] $s))
 
 (defn c-name [$n]
-  ;; FL 식별자를 C 식별자로 변환 (-> → _to_ / - → _ / ? → _p / ! → _b)
+  ;; FL 식별자를 C 식별자로 변환 (-> → _to_ / - → _ / ? → _p / ! → _b / = → _eq)
   ;; C 예약어는 fl_ 접두사 추가
   (let [[$raw (str-replace
                 (str-replace
                   (str-replace
-                    (str-replace $n "->" "_to_")
-                    "-" "_")
-                  "?" "_p")
-                "!" "_b")]]
+                    (str-replace
+                      (str-replace $n "->" "_to_")
+                      "-" "_")
+                    "?" "_p")
+                  "!" "_b")
+                "=" "_eq")]]
     (if (c-reserved? $raw) (str "fl_" $raw) $raw)))
 
 ;; ── 메인 dispatch ──
@@ -708,8 +710,24 @@
     [(= (get $n :kind) "block")     (cgc-block $n)]
     [(= (get $n :kind) "and")       (cgc-and (get $n :args))]
     [(= (get $n :kind) "or")        (cgc-or (get $n :args))]
+    [(= (get $n :kind) "try")       (cgc-try $n)]
+    [(= (get $n :kind) "loop")
+     (do (println (str "[CGC-ERR] unsupported IR kind=loop line=" (get $n :line)))
+         (fl-cgc-halt)
+         "fl_nil()")]
+    [(= (get $n :kind) "template-string")
+     (cgc-template (get $n :parts))]
+    [(= (get $n :kind) "catch")
+     (do (println (str "[CGC-ERR] unsupported IR kind=catch line=" (get $n :line)))
+         (fl-cgc-halt)
+         "fl_nil()")]
+    [(= (get $n :kind) "throw")
+     (do (println (str "[CGC-ERR] unsupported IR kind=throw line=" (get $n :line)))
+         (fl-cgc-halt)
+         "fl_nil()")]
     [true
      (do (println (str "[CGC-ERR] unsupported IR kind=" (get $n :kind) " line=" (get $n :line)))
+         (fl-cgc-halt)
          "fl_nil()")]))
 
 ;; ── 리터럴 ──
@@ -725,6 +743,7 @@
                         [(= $v "true")  "fl_bool(true)"]
                         [(= $v "false") "fl_bool(false)"]
                         [(or (= $v "nil") (= $v "null")) "fl_nil()"]
+                        [(= $v "json-parse") "fl_fn_new(json_parse_wrap, 0, NULL)"]
                         [true (let [[$cn (c-name $v)]]
                                 (if (includes-item @known-defns-atom $cn)
                                   (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
@@ -791,6 +810,7 @@
 (defn cgc-dispatch [$op $args]
   (cond
   [(= $op "if")     (cgc-if $args)]
+  [(= $op "case")   (cgc-case $args)]
   [(= $op "cond")   (cgc-cond $args)]
   [(= $op "do")     (cgc-do $args)]
   [(= $op "let")    (cgc-let $args)]
@@ -805,6 +825,7 @@
   [(= $op "%")      (str "fl_mod(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "=")      (str "fl_eq(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "!=")     (str "fl_neq(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "not=")   (str "fl_neq(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "<")      (str "fl_lt(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op ">")      (str "fl_gt(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "<=")     (str "fl_lte(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -925,7 +946,7 @@
   [(= $op "math-sqrt")   (str "fl_math_sqrt(" (cgc (get $args 0)) ")")]
   [(= $op "now")         "fl_now()"]
   [(= $op "now-ms")      "fl_now_ms()"]
-  [(= $op "str-join")    (str "join(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-join")    (str "fl_str_join(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-replace") (str "str_replace(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "substring")   (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "trim")        (str "trim(" (cgc (get $args 0)) ")")]
@@ -969,6 +990,23 @@
   [(= $op "_fl_process_exec")      (str "_fl_process_exec(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_process_exec_args") (str "_fl_process_exec_args(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "_fl_process_spawn")     (str "_fl_process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "process_spawn")         (str "process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "process-spawn")         (str "process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "capability-list")       "capability_list()"]
+  [(= $op "capability-enable")     (str "capability_enable(" (cgc (get $args 0)) ")")]
+  [(= $op "capability-disable")    (str "capability_disable(" (cgc (get $args 0)) ")")]
+  [(= $op "capability-enabled?")   (str "capability_enabled_p(" (cgc (get $args 0)) ")")]
+  [(= $op "git_status")            (str "git_status(" (cgc (get $args 0)) ")")]
+  [(= $op "git-status")            (str "git_status(" (cgc (get $args 0)) ")")]
+  [(= $op "git_head")              (str "git_head(" (cgc (get $args 0)) ")")]
+  [(= $op "git-head")              (str "git_head(" (cgc (get $args 0)) ")")]
+  [(= $op "git_branch")            (str "git_branch(" (cgc (get $args 0)) ")")]
+  [(= $op "git-branch")            (str "git_branch(" (cgc (get $args 0)) ")")]
+  [(= $op "git_diff_name_only")    (str "git_diff_name_only(" (cgc (get $args 0)) ")")]
+  [(= $op "git-diff-name-only")    (str "git_diff_name_only(" (cgc (get $args 0)) ")")]
+  [(= $op "http_get")              (str "http_get(" (cgc (get $args 0)) ")")]
+  [(= $op "shell_cwd")             "shell_cwd()"]
+  [(= $op "shell-cwd")             "shell_cwd()"]
   [(= $op "_fl_process_kill")      (str "_fl_process_kill(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_process_wait")      (str "_fl_process_wait(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_process_exists")    (str "_fl_process_exists(" (cgc (get $args 0)) ")")]
@@ -981,6 +1019,10 @@
   [(= $op "_fl_run_inherit")       (str "_fl_run_inherit(" (cgc (get $args 0)) ")")]
   [(= $op "run-inherit")           (str "_fl_run_inherit(" (cgc (get $args 0)) ")")]
   [(= $op "cli-args")              "fl_get_argv()"]
+  [(= $op "get-arg")               (str "get_arg(" (cgc (get $args 0)) ")")]
+  [(= $op "get_arg")               (str "get_arg(" (cgc (get $args 0)) ")")]
+  [(= $op "sys:args")              "sys_args()"]
+  [(= $op "sys-args")              "sys_args()"]
   [(= $op "bit-xor") (str "fl_bit_xor(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "bit-and") (str "fl_bit_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "bit-or")  (str "fl_bit_or("  (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -1001,6 +1043,37 @@
   ;; 유틸 — sleep/now
   [(= $op "sleep")   (str "fl_sleep_ms(" (cgc (get $args 0)) ")")]
   [(= $op "now-ms")  "fl_now_ms()"]
+  [(= $op "now_iso") "fl_now_iso()"]
+  [(= $op "now-iso") "fl_now_iso()"]
+  [(= $op "text")
+   (if (>= (length $args) 1)
+     (str "fl_text(" (cgc (get $args 0)) ")")
+     "fl_str_val(\"\")")]
+  [(= $op "shell_env") (str "shell_env(" (cgc (get $args 0)) ")")]
+  [(= $op "throw")
+   (str "(__extension__ ({ fl_throw("
+        (if (>= (length $args) 1) (cgc (get $args 0)) "fl_nil()")
+        "); fl_nil(); }))")]
+  [(= $op "error")
+   (str "(__extension__ ({ fl_throw("
+        (if (>= (length $args) 1) (cgc (get $args 0)) "fl_str_val(\"error\")")
+        "); fl_nil(); }))")]
+  [(= $op "is")     (str "fl_is(" (cgc (get $args 0)) ")")]
+  [(= $op "is=")    (str "is_eq(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "deftest") (cgc-deftest $args)]
+  [(= $op "run-tests") "run_tests()"]
+  [(= $op "test-summary") "test_summary()"]
+  [(= $op "try-call") (str "try_call(" (cgc (get $args 0)) ")")]
+  [(= $op "try_call") (str "try_call(" (cgc (get $args 0)) ")")]
+  [(= $op "err?")    (str "err_p(" (cgc (get $args 0)) ")")]
+  [(= $op "ok?")     (str "ok_p(" (cgc (get $args 0)) ")")]
+  [(= $op "unwrap")  (str "unwrap_result(" (cgc (get $args 0)) ")")]
+  [(= $op "contains?") (str "contains_p(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "json_has") (str "json_has(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "catch")
+   (do (println "[CGC-ERR] catch outside try")
+       (fl-cgc-halt)
+       "fl_nil()")]
   ;; N-05: HTTP 서버
   [(= $op "server-start")       (str "fl_http_start(" (cgc (get $args 0)) ")")]
   [(= $op "server-stop")        "fl_http_stop()"]
@@ -1081,10 +1154,20 @@
     [(= (get $node :kind) "variable")
      (let [[$n (c-name (get $node :name))]]
        (if (includes-item $acc $n) $acc (push $acc $n)))]
+    [(= (get $node :kind) "try")
+     (cgc-collect-vars (get $node :finally)
+       (cgc-collect-vars (get $node :catch)
+         (cgc-collect-vars (get $node :body) $acc)))]
+    [(and (= (get $node :kind) "literal") (= (get $node :type) "symbol"))
+     (let [[$n (c-name (get $node :value))]]
+       (if (or (= $n "") (includes-item $acc $n)) $acc (push $acc $n)))]
     [(= (get $node :kind) "sexpr")
      (cgc-collect-vars-loop (get $node :args) 0 $acc)]
     [(= (get $node :kind) "block")
-     (cgc-collect-vars-loop (get-block-items $node) 0 $acc)]
+     (if (= (get $node :type) "Map")
+       (let [[$items (get (get $node :fields) :items)]]
+         (cgc-collect-vars-loop (if (null? $items) [] $items) 0 $acc))
+       (cgc-collect-vars-loop (get-block-items $node) 0 $acc))]
     [(= (get $node :kind) "and")
      (cgc-collect-vars-loop (get $node :args) 0 $acc)]
     [(= (get $node :kind) "or")
@@ -1121,32 +1204,114 @@
           (push $acc $v)
           $acc)))))
 
+(defn cgc-outer-push [$names]
+  (cgc-outer-push-loop $names 0))
+
+(defn cgc-outer-push-loop [$names $i]
+  (if (>= $i (length $names)) nil
+    (do
+      (swap! outer-params-atom push (get $names $i))
+      (cgc-outer-push-loop $names (+ $i 1)))))
+
+(defn cgc-try-catch-param [$catch]
+  (if (null? $catch) "error"
+    (if (= (get $catch :kind) "catch")
+      (c-name (get $catch :param))
+      (if (= (get $catch :kind) "sexpr")
+        (let [[$args (get $catch :args)]]
+          (if (>= (length $args) 1)
+            (let [[$p (get $args 0)]]
+              (if (= (get $p :kind) "variable") (c-name (get $p :name))
+                (if (= (get $p :kind) "literal") (c-name (get $p :value)) "error")))
+            "error"))
+        "error"))))
+
+(defn cgc-try-catch-body [$catch]
+  (if (null? $catch) "fl_nil()"
+    (if (= (get $catch :kind) "catch")
+      (cgc (get $catch :body))
+      (if (= (get $catch :kind) "sexpr")
+        (let [[$args (get $catch :args)]]
+          (if (>= (length $args) 2) (cgc (get $args 1)) "fl_nil()"))
+        "fl_nil()"))))
+
+(defn cgc-try [$n]
+  (let [[$id @lambda-id-atom]
+        [$body (get $n :body)]
+        [$catch (get $n :catch)]
+        [$finally (get $n :finally)]
+        [$pname (cgc-try-catch-param $catch)]
+        [$cbody (cgc-try-catch-body $catch)]
+        [$fbody (if (null? $finally) "" (str (cgc $finally) "; "))]
+        [$tbody (cgc $body)]]
+    (swap! lambda-id-atom + 1)
+    (str "(__extension__ ({ FLValue __fl_try_r_" $id ";"
+         " if (fl_try_top >= 64) { fl_throw(fl_str_val(\"try nest overflow\")); }"
+         " if (setjmp(fl_try_stack[fl_try_top].buf) == 0) {"
+         " fl_try_top++; __fl_try_r_" $id " = " $tbody "; fl_try_top--; }"
+         " else { fl_try_top--; FLValue " $pname " = fl_try_stack[fl_try_top].err;"
+         " __fl_try_r_" $id " = " $cbody "; }"
+         $fbody " __fl_try_r_" $id "; }))")))
+
+(defn cgc-tpl-env-loop [$names $i $acc]
+  (if (>= $i (length $names)) $acc
+    (let [[$n (get $names $i)]]
+      (cgc-tpl-env-loop $names (+ $i 1)
+        (str $acc " __fl_te = fl_map_set(__fl_te, fl_str_val(\"" $n "\"), " $n ");")))))
+
+(defn cgc-template [$raw]
+  (let [[$s (if (string? $raw) $raw "")]
+        [$names @outer-params-atom]
+        [$env (cgc-tpl-env-loop $names 0 "FLValue __fl_te = fl_map_new();")]]
+    (str "(__extension__ ({ " $env
+         " fl_template_bound(fl_str_val(\"" (c-esc $s) "\"), __fl_te); }))")))
+
+(defn cgc-deftest [$args]
+  (let [[$id @lambda-id-atom]
+        [$name (if (>= (length $args) 1) (cgc (get $args 0)) "fl_str_val(\"(anonymous)\")")]
+        [$body (if (>= (length $args) 2)
+                 (cgc-body (slice $args 1 (length $args)) 0 "")
+                 "fl_nil()")]]
+    (swap! lambda-id-atom + 1)
+    (str "(__extension__ ({ FLValue __fl_tname_" $id " = " $name ";"
+         " if (fl_try_top >= 64) { fl_throw(fl_str_val(\"try nest overflow\")); }"
+         " if (setjmp(fl_try_stack[fl_try_top].buf) == 0) {"
+         " fl_try_top++; " $body "; fl_try_top--;"
+         " fl_test_pass(__fl_tname_" $id "); }"
+         " else { fl_try_top--; fl_test_fail(__fl_tname_" $id ", fl_try_stack[fl_try_top].err); }"
+         " fl_nil(); }))")))
+
 (defn cgc-fn [$args]
   (let [[$id @lambda-id-atom]
+        [$_inc (swap! lambda-id-atom + 1)]
         [$param-items (get-block-items (get $args 0))]
         [$param-names (cgc-fn-param-names $param-items 0 [])]
+        [$saved @outer-params-atom]
+        [$_push (cgc-outer-push $param-names)]
         [$body-node (get $args 1)]
         [$all-vars (cgc-collect-vars $body-node [])]
+        [$bound (cgc-bind-names $param-names)]
         [$outer @outer-params-atom]
-        [$caps (cgc-fn-caps-filter $all-vars $param-names $outer 0 [])]
+        [$caps (cgc-fn-caps-filter $all-vars $param-names $saved 0 [])]
         [$nenv (length $caps)]
         [$env-decls (cgc-fn-env-decls $caps 0 "")]
         [$body-c (cgc $body-node)]
+        [$_restore (reset! outer-params-atom $saved)]
         [$decls (cgc-fn-argv-decls $param-items 0 "")]
         [$fn-name (str "__fl_anon_" $id)]]
-    (swap! lambda-id-atom + 1)
-    (swap! lambda-defs-atom push
-      (str "static FLValue " $fn-name
-           "(FLClosure* _self, int _argc, FLValue* argv) {\n"
-           "    (void)_self; (void)_argc;\n"
-           $env-decls
-           $decls
-           "    return " $body-c ";\n}"))
-    (if (= $nenv 0)
-      (str "fl_fn_new(" $fn-name ", 0, NULL)")
-      (str "(__extension__ ({ FLValue __env_" $id "[" $nenv "] = {"
-           (cgc-env-arr $caps 0 "") "};"
-           " fl_fn_new(" $fn-name ", " $nenv ", __env_" $id "); }))"))))
+    (do
+      (swap! lambda-defs-atom push
+        (str "static FLValue " $fn-name
+             "(FLClosure* _self, int _argc, FLValue* argv) {\n"
+             "    (void)_self; (void)_argc;\n"
+             $env-decls
+             $decls
+             "    return " $body-c ";\n}"))
+      (if (= $nenv 0)
+        (str "fl_fn_new(" $fn-name ", 0, NULL)")
+        (str "(__extension__ ({ FLValue __env_" $id "[" $nenv "] = {"
+             (cgc-env-arr $caps 0 "") "};"
+             " fl_fn_new(" $fn-name ", " $nenv ", __env_" $id "); }))")))))
 
 ;; ── list (vararg → fl_vec_from) ──
 
@@ -1170,6 +1335,47 @@
   (if (= (length $args) 1)
     (cgc (get $args 0))
     (cgc-str $args)))
+
+;; ── case ──
+;; bootstrap.js: 첫 인자를 한 번 평가하고, 짝을 === 로 비교한다.
+;; 맞는 본문만 평가한다. 짝이 끝난 뒤 인자가 하나 남으면 기본값이다.
+;; 맞지 않고 기본값도 없으면 null.
+
+(defn cgc-case-expr [$node $mode $vars]
+  (if (= $mode "wr")
+    (cgc-with-recur $node $vars)
+    (cgc $node)))
+
+(defn cgc-case-step [$args $i $id $mode $vars]
+  (let [[$n (length $args)]]
+    (if (>= $i $n) ""
+      (if (< $i (- $n 1))
+        (str "if (!__fl_case_hit_" $id ") { FLValue __fl_case_k_" $id "_" $i " = " (cgc (get $args $i)) "; "
+             "if (fl_truthy(fl_eq(__fl_case_v_" $id ", __fl_case_k_" $id "_" $i "))) { "
+             "__fl_case_r_" $id " = " (cgc-case-expr (get $args (+ $i 1)) $mode $vars) "; "
+             "__fl_case_hit_" $id " = 1; } } "
+             (cgc-case-step $args (+ $i 2) $id $mode $vars))
+        (if (= $i (- $n 1))
+          (str "if (!__fl_case_hit_" $id ") __fl_case_r_" $id " = "
+               (cgc-case-expr (get $args $i) $mode $vars) "; ")
+          "")))))
+
+(defn cgc-case-emit [$args $mode $vars]
+  (if (= (length $args) 0) "fl_nil()"
+    (let [[$id @lambda-id-atom]]
+      (swap! lambda-id-atom + 1)
+      (str "(__extension__ ({ FLValue __fl_case_v_" $id " = " (cgc (get $args 0)) ";"
+           " FLValue __fl_case_r_" $id " = fl_nil();"
+           " int __fl_case_hit_" $id " = 0; "
+           "(void)__fl_case_v_" $id "; (void)__fl_case_hit_" $id "; "
+           (cgc-case-step $args 1 $id $mode $vars)
+           " __fl_case_r_" $id "; }))"))))
+
+(defn cgc-case [$args]
+  (cgc-case-emit $args "plain" []))
+
+(defn cgc-case-wr [$args $vars]
+  (cgc-case-emit $args "wr" $vars))
 
 ;; ── if ──
 
@@ -1212,8 +1418,10 @@
   (let [[$items (get-block-items (get $args 0))]
         [$first (get $items 0)]
         [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]
+        [$saved @outer-params-atom]
         [$decls (if $nested (cgc-let-2d $items 0 "") (cgc-let-1d $items 0 ""))]
-        [$body (cgc-body (slice $args 1 (length $args)) 0 "")]]
+        [$body (cgc-body (slice $args 1 (length $args)) 0 "")]
+        [$_restore (reset! outer-params-atom $saved)]]
   (str "((__extension__ ({\n" $decls "    " $body ";\n})))")))
 
 (defn cgc-let-1d [$it $i $acc]
@@ -1243,12 +1451,22 @@
 
 ;; ── defn (최상위) ──
 
+(defn cgc-bind-names [$names]
+  (cgc-bind-names-loop $names 0))
+
+(defn cgc-bind-names-loop [$names $i]
+  (if (>= $i (length $names)) nil
+    (do
+      (swap! known-fncall-targets-atom push (get $names $i))
+      (cgc-bind-names-loop $names (+ $i 1)))))
+
 (defn cgc-defn-impl [$args]
   (let [[$name (c-name (cgc-extract-name (get $args 0)))]
         [$param-items (get-block-items (get $args 1))]
         [$ps (cgc-params $param-items)]
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
     (reset! outer-params-atom $pnames)
+    (cgc-bind-names $pnames)
     (let [[$call-args (cgc-wrapper-call-args $param-items 0 "")]]
       (swap! wrapper-defs-atom push
         (str "static FLValue __fl_wrap_" $name
@@ -1409,7 +1627,7 @@
 (defn cgc-join-hoisted []
   (cgc-join-lambda-loop @cgc-hoisted-fns-atom 0 ""))
 
-(defn generate-c [$nodes]
+(defn generate-c [$nodes $print-last]
   (let [[$fwd (cgc-forward-decls $nodes)]
         [$parts (cgc-top-level $nodes 0 "" "")]
         [$fns (get $parts :fns)]
@@ -1419,7 +1637,12 @@
         [$ldefs (cgc-join-lambdas)]
         [$wdefs (cgc-join-wrappers)]
         [$hfwd @cgc-hoisted-fwds-atom]
-        [$hfns (cgc-join-hoisted)]]
+        [$hfns (cgc-join-hoisted)]
+        [$body (if $print-last
+                 (str "    { FLValue __fl_last = (__extension__ ({\n"
+                      $stmts
+                      "    })); if (__fl_last.tag != FL_NIL) fl_println(__fl_last); }\n")
+                 $stmts)]]
   (str
     "#include \"runtime.h\"\n"
     "#pragma GCC diagnostic ignored \"-Wunused-function\"\n"
@@ -1434,7 +1657,7 @@
     $fns
     "int main(int argc, char** argv) {\n"
     "    fl_init_argv(argc, argv);\n"
-    $stmts
+    $body
     "    return 0;\n"
     "}\n")))
 
@@ -1508,6 +1731,7 @@
      (cond
        [(= $op "recur") (cgc-recur-stmt $args $vars)]
        [(= $op "if")    (cgc-if-wr $args $vars)]
+       [(= $op "case")  (cgc-case-wr $args $vars)]
        [(= $op "cond")  (cgc-cond-wr $args $vars)]
        [(= $op "do")    (cgc-do-wr $args $vars)]
        [(= $op "let")   (cgc-let-wr $args $vars)]
@@ -1556,8 +1780,10 @@
   (let [[$items (get-block-items (get $args 0))]
         [$first (get $items 0)]
         [$nested (and (= (get $first :kind) "block") (= (get $first :type) "Array"))]
+        [$saved @outer-params-atom]
         [$decls (if $nested (cgc-let-2d $items 0 "") (cgc-let-1d $items 0 ""))]
-        [$body-c (cgc-body-wr (slice $args 1 (length $args)) $vars 0 "")]]
+        [$body-c (cgc-body-wr (slice $args 1 (length $args)) $vars 0 "")]
+        [$_restore (reset! outer-params-atom $saved)]]
   (str "((__extension__ ({\n" $decls "    " $body-c ";\n})))")))
 
 (defn cgc-body-wr [$args $vars $i $acc]
@@ -1628,7 +1854,7 @@
 ;; ── IR Validator (S34-d) ────────────────────────────────────────────────────
 ;; shape 계약 gate: parse 직후, codegen 전에 실행
 
-(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or"])
+(define ir-kind-set  ["literal" "variable" "keyword" "sexpr" "block" "and" "or" "try"])
 (define ir-lit-types ["number" "string" "boolean" "nil" "symbol"])
 
 (defn ir-err [$msg $n]
@@ -1642,7 +1868,7 @@
     [(null? $k)
      (ir-err "missing :kind" $n)]
     [(not (includes-item ir-kind-set $k))
-     (println (str "[IR-WARN] unknown kind=" $k " line=" (get $n :line))) true]
+     (ir-err (str "unknown kind=" $k) $n)]
     [(= $k "literal")
      (let [[$t (get $n :type)] [$v (get $n :value)]]
      (cond
@@ -1689,7 +1915,9 @@
     (loop [$i 0]
       (if (>= $i (length $nodes)) true
         (do
-          (ir-chk (get $nodes $i))
+          (if (not (ir-chk (get $nodes $i)))
+            (do (println "[CGC-ERR] ir-validate failed") (fl-cgc-halt))
+            nil)
           (recur (+ $i 1)))))))
 
 ;; ── S27 entry point ──────────────────────────────────────────────────────────
@@ -1734,18 +1962,66 @@
                 (recur (+ $i 1) (append-all $acc $expanded)))))
           (recur (+ $i 1) (push $acc $node)))))))
 
+;; 괄호·문자열 균형. 맞는 소스는 null, 깨진 소스는 [CGC-ERR] 문구.
+(defn syntax-step [$st $k $line]
+  (cond
+    [(= $k "UnclosedString")
+     {:paren (get $st :paren) :bracket (get $st :bracket) :brace (get $st :brace)
+      :err (str "unclosed string line=" $line)}]
+    [(= $k "LParen")
+     {:paren (+ (get $st :paren) 1) :bracket (get $st :bracket) :brace (get $st :brace) :err null}]
+    [(= $k "RParen")
+     (if (= (get $st :paren) 0)
+       {:paren 0 :bracket (get $st :bracket) :brace (get $st :brace)
+        :err (str "extra closing parenthesis line=" $line)}
+       {:paren (- (get $st :paren) 1) :bracket (get $st :bracket) :brace (get $st :brace) :err null})]
+    [(= $k "LBracket")
+     {:paren (get $st :paren) :bracket (+ (get $st :bracket) 1) :brace (get $st :brace) :err null}]
+    [(= $k "RBracket")
+     (if (= (get $st :bracket) 0)
+       {:paren (get $st :paren) :bracket 0 :brace (get $st :brace)
+        :err (str "extra closing bracket line=" $line)}
+       {:paren (get $st :paren) :bracket (- (get $st :bracket) 1) :brace (get $st :brace) :err null})]
+    [(= $k "LBrace")
+     {:paren (get $st :paren) :bracket (get $st :bracket) :brace (+ (get $st :brace) 1) :err null}]
+    [(= $k "RBrace")
+     (if (= (get $st :brace) 0)
+       {:paren (get $st :paren) :bracket (get $st :bracket) :brace 0
+        :err (str "extra closing brace line=" $line)}
+       {:paren (get $st :paren) :bracket (get $st :bracket) :brace (- (get $st :brace) 1) :err null})]
+    [true $st]))
+
+(defn syntax-error-message [$tokens]
+  (loop [$i 0 $st {:paren 0 :bracket 0 :brace 0 :err null}]
+    (if (or (not (null? (get $st :err))) (>= $i (length $tokens)))
+      (if (not (null? (get $st :err)))
+        (get $st :err)
+        (if (not (= (get $st :paren) 0)) "unclosed parenthesis"
+          (if (not (= (get $st :bracket) 0)) "unclosed bracket"
+            (if (not (= (get $st :brace) 0)) "unclosed brace"
+              null))))
+      (let [[$t (get $tokens $i)]]
+        (recur (+ $i 1) (syntax-step $st (get $t :kind) (get $t :line)))))))
+
 (defn cgc-run [$argv]
   (let [[$input  (get $argv 0)]
-        [$output (get $argv 1)]]
+        [$output (get $argv 1)]
+        [$print-last (and (>= (length $argv) 3) (= (str (get $argv 2)) "--print-last"))]]
   (if (or (null? $input) (null? $output))
-    (println "usage: cgc-bin <input.fl> <output.c>")
+    (println "usage: cgc-bin <input.fl> <output.c> [--print-last]")
     (let [[$src      (file-read $input)]
           [$base-dir (path-dir $input)]
-          [$raw      (parse (lex $src))]
-          [$nodes    (expand-loads $raw $base-dir)]
-          [$_v      (ir-validate $nodes)]
-          [$c-code   (generate-c $nodes)]]
-      (file-write $output $c-code)
-      (println (str "Compiled " $input " -> " $output))))))
+          [$tokens   (lex $src)]
+          [$syn      (syntax-error-message $tokens)]]
+      (if (not (null? $syn))
+        (do
+          (println (str "[CGC-ERR] " $syn))
+          (fl-cgc-halt))
+        (let [[$raw      (parse $tokens)]
+              [$nodes    (expand-loads $raw $base-dir)]
+              [$_v      (ir-validate $nodes)]
+              [$c-code   (generate-c $nodes $print-last)]]
+          (file-write $output $c-code)
+          (println (str "Compiled " $input " -> " $output))))))))
 
 (cgc-run (cli-args))
