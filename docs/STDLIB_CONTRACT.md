@@ -18,6 +18,61 @@ Unicode character index. Public names are stable; helper names ending in
 
 ## ① Characters and Unicode
 
+TASK 9-6 adds Unicode scalar string operations and a FreeLang regex parser/VM.
+Load `lib/str/str.fl` or `lib/regex/regex.fl`; module-relative paths are supported
+from other working directories. Shared modules are expanded once by lexical
+path (symlink identities are not resolved). `lib/unicode/unicode.fl` reuses the
+existing `self/stdlib/encoding.fl` implementation.
+
+All new APIs below return `Result<T>`. Counts, widths, match start/end and
+indices use Unicode scalar values, not UTF-8 bytes or grapheme clusters.
+No normalization is performed. Invalid UTF-8 is rejected. NUL remains unsupported.
+Existing built-ins keep their old return contracts when the new module is absent.
+When loaded, the new same-named API takes precedence; HTTP/FS internal byte
+operations explicitly retain their legacy primitives.
+
+| New API | Arguments → Result value |
+|---|---|
+| `str-split` | text, separator → list; empty separator splits scalars; preserve trailing empties |
+| `str-join` | string list, separator → string |
+| `str-trim` | text, `left` / `right` / `both` → Unicode White_Space trimmed string |
+| `str-replace` | text, nonempty search, replacement, `all` / `first` → nonoverlapping literal replacement |
+| `str-starts?`, `str-ends?`, `str-contains?` | text, needle → boolean |
+| `str-index-of` | text, needle → scalar index or -1; empty needle → 0 |
+| `str-pad-left`, `str-pad-right` | text, width, nonempty padding → cyclic scalar padding, never truncate |
+| `str-repeat` | text, count → string; count/width integer 0..10000 |
+| `str-lines` | text → CRLF/CR/LF lines; empty input → []; preserve trailing empty line |
+| `str-format` | template, map of strings → literal `{name}` expansion |
+| `regex-match?` | pattern, text → any match boolean; use `^...$` for full match |
+| `regex-find` | pattern, text → `{start,end,text}` or nil; exclusive end |
+| `regex-find-all` | pattern, text → nonoverlapping match list |
+| `regex-replace` | pattern, text, literal replacement → replace all |
+| `regex-split` | pattern, text → intervening strings, preserve edge empties |
+| `regex-find-limit` | pattern, text, limit (integer 1..10000) → find with explicit budget |
+
+String errors: `INVALID_ARGUMENT`, `INVALID_UTF8`, `MISSING_KEY`, `INVALID_FORMAT`.
+Format values must be strings; format specifiers and brace escaping are unsupported.
+
+Regex supports literals, `. * + ? | () [a-z] [^...]`, `\d \w \s ^ $`,
+`{n}`, `{n,m}`, `{n,}`. Grouping has no capture API. Leftmost start, ordered
+alternatives and greedy repetition apply. Dot excludes LF/CR/U+2028/U+2029.
+Digit/word classes are ASCII; whitespace uses Unicode White_Space. Empty
+matches advance one scalar for the next search, retaining intervening text
+in replace/split. Replacement has no backreferences or interpolation.
+
+Lookbehind/lookahead, backreferences, named/noncapturing groups, flags, Unicode
+properties and lazy/possessive quantifiers are **unsupported**. Unsupported
+constructs return `UNSUPPORTED_SYNTAX`; malformed/duplicate quantifiers may
+return `INVALID_PATTERN`. Pattern error positions are scalar indices; inherited
+Unicode decoding errors retain their byte position.
+
+Every regex invocation has a shared 10000-transition VM budget across all
+search starts and matches, returning `STEP_LIMIT` without partial output on
+exhaustion. Parse limits: 256 scalars / 1024 bytes, nesting 32, repetition bound
+1000 (`PATTERN_LIMIT`). Input limit: 16384 bytes (`INPUT_LIMIT`). No host regex
+engine, JS or new encryption/external component is involved. See
+`lib/str/README.md` and `lib/regex/README.md` for examples and exact edge behavior.
+
 | Public function | State | Input → output | Failure |
 |---|---|---|---|
 | `char-at` | exists | string, byte index → one-byte string | `nil` for invalid index/type |
