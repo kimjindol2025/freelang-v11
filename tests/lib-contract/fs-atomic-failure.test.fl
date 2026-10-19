@@ -1,0 +1,13 @@
+(load "../../lib/fs/fs.fl")
+(define root (get (cli-args) 0))
+(define target (str root "/atomic-target"))
+(defn check [actual expected name]
+  (if (= actual expected) (println (str "PASS " name))
+    (throw (str "FAIL " name " actual=" actual))))
+(let [[large (get (file-read (str root "/large")) "value")]
+      [r (file-write-atomic target large)]]
+  (check (get (get r "error") "code") "FILE_TOO_LARGE" "atomic partial write failure")
+  (check (get (file-read target) "value") "old" "partial write original preserved")
+  (check (get (file-write-atomic target "recovered") "ok") true "atomic recovery")
+  (check (get (file-read target) "value") "recovered" "atomic recovery content"))
+(println "FS_ATOMIC_SUMMARY=4/4")

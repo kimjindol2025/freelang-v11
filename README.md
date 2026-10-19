@@ -6,8 +6,9 @@
 
 FreeLang 네이티브 컴파일러와 런타임의 기준 저장소입니다. 완료 검증에서 stage 2·3·4 고정점, 네이티브 시험과 감사, DB 및 HTTP 런타임을 확인했습니다.
 
-- 고정점: `bd271beee58ebeadf123907d3469cd158546f44142c2af734bcff02acc3f236e`
-- 고정점 변경 이유: TASK 9-4에서 FreeLang `http-get`·`http-post` 정의를 내장 호출보다 우선하고 `http-get`의 C 런타임 이름 충돌을 분리함. 씨앗은 유지.
+- 고정점: `3018a00633794c56ba2544db36f2f866446c55cf3c82f5605691690dfffe6d94`
+- 고정점 변경 이유: TASK 9-5의 로드된 파일 API 우선 호출과 `dir-list` C 이름 충돌 분리. 기존 내장 호출과 씨앗은 유지.
+- 파일·폴더 v0.1: [API·오류·원자적 쓰기 계약](lib/fs/README.md).
 - HTTP v0.1: [사용법·제한](lib/http/README.md), HTTPS 미지원.
 - 실행 경로에 Node 0 / JS 0 / AFJ 0, 옛 파일은 `legacy/`에 보관.
 - 전체 시험 41/41, 감사 44/44

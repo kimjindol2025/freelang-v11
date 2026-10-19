@@ -684,8 +684,9 @@
                     "?" "_p")
                   "!" "_b")
                 "=" "_eq")]]
+    (if (= $n "dir-list") "fl_library_dir_list"
     (if (= $n "http-get") "fl_library_http_get"
-      (if (c-reserved? $raw) (str "fl_" $raw) $raw))))
+      (if (c-reserved? $raw) (str "fl_" $raw) $raw)))))
 
 ;; ── 메인 dispatch ──
 
@@ -813,7 +814,7 @@
     (cgc-fncall (cgc $op) $args))))
 
 (defn cgc-dispatch [$op $args]
-  (if (and (includes-item ["json-parse" "json-stringify" "http-get" "http-post"] $op)
+  (if (and (includes-item ["json-parse" "json-stringify" "http-get" "http-post" "file-read" "file-write" "file-append" "file-exists?" "file-size" "dir-list"] $op)
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
     (cond
@@ -966,6 +967,7 @@
   [(= $op "list")        (cgc-list $args)]
   [(= $op "_fl_map_set") (str "fl_map_set(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   ;; S17: _fl_* dispatch 정규화 — file ops
+  [(= $op "dir-list")        (str "dir_list(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_file_read")    (str "fl_file_read(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_file_write")   (str "fl_file_write(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "file-read")        (str "fl_file_read(" (cgc (get $args 0)) ")")]

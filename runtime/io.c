@@ -24,6 +24,8 @@ const char* _strval(FLValue v) {
     return "";
 }
 
+#include "fs_io.inc"
+
 FLValue _fl_file_append(FLValue path, FLValue content) {
     FILE* f = fopen(_strval(path), "ab");
     if (!f) return fl_bool(false);

@@ -68,7 +68,39 @@ contract assertions. Map operations are implemented in FreeLang.
 
 | Public function | State | Input → output | Failure |
 |---|---|---|---|
-| `file-read`, `file-write`, `file-append`, `file-exists?`, `file-delete`, `file-copy`, `file-rename`, `file-size`, `file-modified`, `file-mkdir`, `file-rmdir`, `file-list`, `file-is-file?`, `file-is-dir?` | exists | path and optional content/path → string, boolean, integer, or path list | legacy builtins return `nil`/`false` on OS failure |
+| `file-read`, `file-write`, `file-append`, `file-exists?`, `file-delete`, `file-copy`, `file-rename`, `file-size`, `file-modified`, `file-mkdir`, `file-rmdir`, `file-list`, `file-is-file?`, `file-is-dir?` | exists | path and optional content/path → string, boolean, integer, or path list | legacy OS failures use `nil`, `false`, `-1`, `0`, or empty lists; some operations throw |
+
+The legacy table describes historical wrappers, some of which may throw on
+failure. TASK 9-5 adds a checked API by loading `lib/fs/fs.fl`; the two APIs are
+separate module choices and must not be loaded together. Existing JSON helpers
+`file-json`, `file-json-write`, and `file-lines` are also legacy wrappers; their
+native JSON/error behavior was not a checked filesystem contract.
+
+| Public function (`lib/fs/fs.fl`) | State | Success value inside `Result` | Failure |
+|---|---|---|---|
+| `file-read`, `file-write`, `file-append`, `file-exists?`, `file-size` | checked variants reusing public names | string, true, boolean, bytes | `{ok:false,error:{code,message,path}}` |
+| `file-read-lines`, `file-write-atomic` | new | line list, true | same checked error |
+| `dir-list`, `dir-walk`, `dir-make`, `dir-remove` | new checked folder API | immediate names, descendant paths, true, true | same checked error; remove requires empty directory |
+| `path-join`, `path-base`, `path-dir`, `path-ext`, `path-normalize` | new | normalized path/component/suffix | `INVALID_PATH` or `PATH_ESCAPE`, with message/path |
+| `file-mtime` | new | Unix epoch milliseconds | checked OS error |
+| `file-read-json`, `file-write-json` | new | JSON value, true | existing JSON error plus path, or checked I/O error |
+
+Missing before TASK 9-5: reliable code/message/path errors, atomic writes,
+recursive mkdir/walk, lexical path helpers, and checked line/JSON convenience
+functions. Existing native `dir-list` can throw and is preserved when the new
+module is not loaded. Low-level OS operations use a private checked primitive;
+FreeLang owns path processing, recursion, line splitting and JSON composition.
+`lib/json/json.fl` is the module entry for the existing FreeLang JSON code.
+
+`path-normalize` rejects leading `..` above the lexical root. Normalize an
+untrusted relative path before joining it to a trusted base. This is not symlink
+confinement. `dir-walk` includes directories and symlinks but does not descend
+into symlinks (maximum directory depth 128). `dir-list`/walk preserve OS order.
+Atomic writes use same-directory mkstemp/write/fsync/close/rename, returning an
+error on every checked failure, then attempt to clean up the private temporary
+file. Destination visibility is atomic; power-loss durability is not promised.
+New/replaced atomic files have mode 0600. No recursive deletion is provided.
+See [full API contract](../lib/fs/README.md).
 
 ## ⑤ Error handling
 

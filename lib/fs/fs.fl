@@ -1,0 +1,100 @@
+(load "../json/json.fl")
+
+(defn fs-ok [value] {"ok" true "value" value})
+(defn fs-error [code message path]
+  {"ok" false "error" {"code" code "message" message "path" path}})
+(defn fs-parts [parts index stack path]
+  (if (>= index (length parts)) (fs-ok stack)
+    (let [[part (get parts index)]]
+      (if (or (= part "") (= part ".")) (fs-parts parts (+ index 1) stack path)
+        (if (= part "..")
+          (if (= (length stack) 0) (fs-error "PATH_ESCAPE" "path escapes lexical root" path)
+            (fs-parts parts (+ index 1) (slice stack 0 (- (length stack) 1)) path))
+          (fs-parts parts (+ index 1) (push stack part) path))))))
+(defn path-normalize [path]
+  (if (not (string? path)) (fs-error "INVALID_PATH" "expected path string" path)
+    (if (= path "") (fs-error "INVALID_PATH" "empty path" path)
+      (let [[parts (fs-parts (str-split path "/") 0 [] path)]]
+        (if (not (get parts "ok")) parts
+          (let [[text (str-join (get parts "value") "/")]]
+            (fs-ok (if (str-starts-with path "/") (str "/" text)
+              (if (= text "") "." text)))))))))
+(defn path-join [parent child]
+  (if (or (not (string? parent)) (not (string? child)))
+    (fs-error "INVALID_PATH" "expected two path strings" parent)
+    (if (str-starts-with child "/") (fs-error "INVALID_PATH" "child must be relative" child)
+      (path-normalize (str parent "/" child)))))
+(defn fs-last-slash [text index found]
+  (if (>= index (length text)) found
+    (fs-last-slash text (+ index 1) (if (= (substring text index (+ index 1)) "/") index found))))
+(defn path-base [path]
+  (let [[normal (path-normalize path)]]
+    (if (not (get normal "ok")) normal
+      (let [[text (get normal "value")]]
+        (fs-ok (if (= text "/") "/" (substring text (+ (fs-last-slash text 0 -1) 1) (length text))))))))
+(defn path-dir [path]
+  (let [[normal (path-normalize path)]]
+    (if (not (get normal "ok")) normal
+      (let [[text (get normal "value")] [slash (fs-last-slash text 0 -1)]]
+        (fs-ok (if (< slash 0) "." (if (= slash 0) "/" (substring text 0 slash))))))))
+(defn fs-last-dot [text index found]
+  (if (>= index (length text)) found
+    (fs-last-dot text (+ index 1) (if (= (substring text index (+ index 1)) ".") index found))))
+(defn path-ext [path]
+  (let [[base (path-base path)]]
+    (if (not (get base "ok")) base
+      (let [[text (get base "value")] [dot (fs-last-dot text 0 -1)]]
+        (fs-ok (if (or (<= dot 0) (= text "..")) "" (substring text dot (length text))))))))
+(defn fs-call [op path content]
+  (if (not (string? path)) (fs-error "INVALID_PATH" "expected path string" path)
+    (if (= path "") (fs-error "INVALID_PATH" "empty path" path)
+      (_fl_fs_io op path content))))
+(defn file-read [path] (fs-call "read" path nil))
+(defn file-write [path content] (fs-call "write" path content))
+(defn file-append [path content] (fs-call "append" path content))
+(defn file-write-atomic [path content] (fs-call "atomic" path content))
+(defn file-exists? [path] (fs-call "exists" path nil))
+(defn file-size [path] (fs-call "size" path nil))
+(defn file-mtime [path] (fs-call "mtime" path nil))
+(defn dir-list [path] (fs-call "list" path nil))
+(defn dir-remove [path] (fs-call "rmdir" path nil))
+(defn file-read-lines [path]
+  (let [[r (file-read path)]]
+    (if (not (get r "ok")) r
+      (let [[text (get r "value")] [lines (str-split text "\n")]]
+        (fs-ok (if (= text "") []
+          (if (str-ends-with text "\n") (slice lines 0 (- (length lines) 1)) lines)))))))
+(defn fs-make-parts [parts index current]
+  (if (>= index (length parts)) (fs-ok true)
+    (let [[part (get parts index)] [next (str current (if (= current "/") "" "/") part)]]
+      (if (or (= part "") (= part ".")) (fs-make-parts parts (+ index 1) current)
+        (let [[r (fs-call "mkdir" next nil)]]
+          (if (get r "ok") (fs-make-parts parts (+ index 1) next) r))))))
+(defn dir-make [path]
+  (let [[normal (path-normalize path)]]
+    (if (not (get normal "ok")) normal
+      (fs-make-parts (str-split (get normal "value") "/") 0
+        (if (str-starts-with path "/") "/" ".")))))
+(defn fs-walk-items [root names index result depth]
+  (if (>= index (length names)) (fs-ok result)
+    (let [[path (str root "/" (get names index))] [info (fs-call "kind" path nil)]]
+      (if (not (get info "ok")) info
+        (if (= (get info "value") "directory")
+          (let [[nested (fs-walk path (+ depth 1))]]
+            (if (get nested "ok")
+              (fs-walk-items root names (+ index 1) (concat (push result path) (get nested "value")) depth)
+              nested))
+          (fs-walk-items root names (+ index 1) (push result path) depth))))))
+(defn fs-walk [root depth]
+  (if (> depth 128) (fs-error "DEPTH_LIMIT" "directory depth exceeds 128" root)
+    (let [[items (dir-list root)]]
+      (if (get items "ok") (fs-walk-items root (get items "value") 0 [] depth) items))))
+(defn dir-walk [path] (fs-walk path 0))
+(defn fs-json-error [r path]
+  (if (get r "ok") r (assoc r "error" (assoc (get r "error") "path" path))))
+(defn file-read-json [path]
+  (let [[r (file-read path)]]
+    (if (get r "ok") (fs-json-error (json-parse (get r "value")) path) r)))
+(defn file-write-json [path value]
+  (let [[r (json-stringify value)]]
+    (if (get r "ok") (file-write path (get r "value")) (fs-json-error r path))))
