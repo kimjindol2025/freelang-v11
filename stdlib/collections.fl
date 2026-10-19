@@ -1,5 +1,5 @@
 ;; Public collection operations. Map updates preserve their inputs and key order.
-(load "stdlib/native-compat.fl")
+(load "native-compat.fl")
 
 (defn values-loop [items names index result]
   (if (>= index (length names)) result

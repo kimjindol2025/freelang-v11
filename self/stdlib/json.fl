@@ -1,6 +1,6 @@
 ;; Strict JSON standard library. Public API: json-parse, json-stringify,
 ;; json-get, json-valid?. All parser/serializer helpers are internal.
-(load "self/stdlib/encoding.fl")
+(load "encoding.fl")
 
 [FUNC json-internal-ok :params [value index]
   :body {:ok true :value value :index index}]
