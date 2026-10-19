@@ -52,11 +52,17 @@ truncates strings at NUL.
 
 | Public function | State | Input → output | Failure |
 |---|---|---|---|
-| `length`, `get`, `first`, `last`, `rest`, `push`, `pop`, `take`, `drop` | exists | collection and operation arguments → collection/value | existing type behavior (`0`, `nil`, or empty list) |
-| `keys`, `values`, `entries`, `has-key?`, `map-set`, `map-delete`, `merge` | exists | map and key/value arguments → list/map/boolean | existing type behavior (`nil`, `false`, or empty map) |
+| `length`, `get`, `first`, `last`, `rest`, `push`, `pop` | exists | collection and operation arguments → collection/value | existing type behavior (`0`, `nil`, or empty list) |
+| `keys`, `entries` | exists | map → list | existing type behavior |
+| `take`, `drop` | new | integer count, list → list; negative counts clamp to zero | invalid collection → empty list; reuse native-compat wrappers |
+| `values` | new | map → values in insertion order | invalid map → empty list |
+| `has-key?` | new | map, key → boolean; nil/false values still count as present | invalid map → false |
+| `map-set`, `map-delete` | new | map, key[, value] → new map; source is unchanged | invalid map → empty map |
+| `merge` | new | left map, right map → new map; right wins, key order retained | invalid operands treated as empty maps |
 
-No additional collection API is marked new in v1; the existing operations above
-are sufficient for the current library work.
+Load `stdlib/collections.fl` for the seven new public operations. `take` and
+`drop` reuse the existing `native-compat.fl` implementations and have separate
+contract assertions. Map operations are implemented in FreeLang.
 
 ## ④ Files and directories
 
@@ -94,7 +100,7 @@ are sufficient for the current library work.
 - FreeLang implementations are preferred. `char-from-byte` is the sole C
   addition in area ① because the runtime can read an existing byte but cannot
   construct a one-byte string from an integer.
-- Areas ③–⑧ add no new public functions in v1; their existing functions are
-  documented here without introducing compatibility wrappers.
+- Area ③ adds the seven collection operations above; areas ④–⑧ document
+  existing public functions.
 - The test suite records supported behavior. An unsupported capability is
   reported as such and is never represented by a passing placeholder test.
