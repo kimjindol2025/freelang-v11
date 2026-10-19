@@ -14,9 +14,9 @@
 (defn path-normalize [path]
   (if (not (string? path)) (fs-error "INVALID_PATH" "expected path string" path)
     (if (= path "") (fs-error "INVALID_PATH" "empty path" path)
-      (let [[parts (fs-parts (str-split path "/") 0 [] path)]]
+      (let [[parts (fs-parts (_fl_str_split path "/") 0 [] path)]]
         (if (not (get parts "ok")) parts
-          (let [[text (str-join (get parts "value") "/")]]
+          (let [[text (_fl_str_join (get parts "value") "/")]]
             (fs-ok (if (str-starts-with path "/") (str "/" text)
               (if (= text "") "." text)))))))))
 (defn path-join [parent child]
@@ -61,7 +61,7 @@
 (defn file-read-lines [path]
   (let [[r (file-read path)]]
     (if (not (get r "ok")) r
-      (let [[text (get r "value")] [lines (str-split text "\n")]]
+      (let [[text (get r "value")] [lines (_fl_str_split text "\n")]]
         (fs-ok (if (= text "") []
           (if (str-ends-with text "\n") (slice lines 0 (- (length lines) 1)) lines)))))))
 (defn fs-make-parts [parts index current]
@@ -73,7 +73,7 @@
 (defn dir-make [path]
   (let [[normal (path-normalize path)]]
     (if (not (get normal "ok")) normal
-      (fs-make-parts (str-split (get normal "value") "/") 0
+      (fs-make-parts (_fl_str_split (get normal "value") "/") 0
         (if (str-starts-with path "/") "/" ".")))))
 (defn fs-walk-items [root names index result depth]
   (if (>= index (length names)) (fs-ok result)

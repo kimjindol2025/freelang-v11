@@ -684,9 +684,10 @@
                     "?" "_p")
                   "!" "_b")
                 "=" "_eq")]]
+    (if (includes-item ["str-split" "str-join" "str-trim" "str-replace" "str-index-of"] $n) (str "fl_library_" $raw)
     (if (= $n "dir-list") "fl_library_dir_list"
     (if (= $n "http-get") "fl_library_http_get"
-      (if (c-reserved? $raw) (str "fl_" $raw) $raw)))))
+      (if (c-reserved? $raw) (str "fl_" $raw) $raw))))))
 
 ;; ── 메인 dispatch ──
 
@@ -814,7 +815,7 @@
     (cgc-fncall (cgc $op) $args))))
 
 (defn cgc-dispatch [$op $args]
-  (if (and (includes-item ["json-parse" "json-stringify" "http-get" "http-post" "file-read" "file-write" "file-append" "file-exists?" "file-size" "dir-list"] $op)
+  (if (and (includes-item ["str-index-of" "str-split" "str-join" "str-trim" "str-replace" "json-parse" "json-stringify" "http-get" "http-post" "file-read" "file-write" "file-append" "file-exists?" "file-size" "dir-list"] $op)
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
     (cond
@@ -888,14 +889,14 @@
   [(= $op "get-in")      (str "fl_get_in(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "map-vals")    (str "fl_map_vals_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; 문자열 ops
-  [(= $op "str-split")    (str "str_split(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(or (= $op "str-split") (= $op "_fl_str_split"))    (str "str_split(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-slice")    (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "str-to-upper") (str "str_to_upper(" (cgc (get $args 0)) ")")]
   [(= $op "str-to-lower") (str "str_to_lower(" (cgc (get $args 0)) ")")]
-  [(= $op "str-trim")     (str "str_trim(" (cgc (get $args 0)) ")")]
+  [(or (= $op "str-trim") (= $op "_fl_str_trim"))     (str "str_trim(" (cgc (get $args 0)) ")")]
   [(= $op "str-pad-left") (str "str_pad_left(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "str-pad-right")(str "str_pad_right(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "str-index-of") (str "str_index_of(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(or (= $op "str-index-of") (= $op "_fl_str_index_of")) (str "str_index_of(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-repeat")   (str "str_repeat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-length")   (str "length(" (cgc (get $args 0)) ")")]
   [(= $op "str-to-num")   (str "fl_str_to_num(" (cgc (get $args 0)) ")")]
@@ -958,7 +959,7 @@
   [(= $op "math-sqrt")   (str "fl_math_sqrt(" (cgc (get $args 0)) ")")]
   [(= $op "now")         "fl_now()"]
   [(= $op "now-ms")      "fl_now_ms()"]
-  [(= $op "str-join")    (str "fl_str_join(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(or (= $op "str-join") (= $op "_fl_str_join"))    (str "fl_str_join(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-replace") (str "str_replace(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "substring")   (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "trim")        (str "trim(" (cgc (get $args 0)) ")")]
@@ -1989,6 +1990,18 @@
       (recur (+ $i 1) (push $a (get $items $i))))))
 
 ;; (load "file.fl") 를 컴파일 타임에 인라인 — 재귀적으로 처리
+(define cgc-loaded-paths (atom []))
+(defn cgc-load-parts [$parts $i $stack]
+  (if (>= $i (length $parts)) $stack
+    (let [[$part (get $parts $i)] [$n (length $stack)]]
+      (cgc-load-parts $parts (+ $i 1)
+        (cond
+          [(or (= $part "") (= $part ".")) $stack]
+          [(and (= $part "..") (> $n 0) (not (= (get $stack (- $n 1)) ".."))) (slice $stack 0 (- $n 1))]
+          [true (push $stack $part)])))))
+(defn cgc-load-key [$path]
+  (str (if (str-starts-with $path "/") "/" "")
+    (str-join (cgc-load-parts (str-split $path "/") 0 []) "/")))
 (defn expand-loads [$nodes $base-dir]
   (loop [$i 0 $acc []]
     (if (>= $i (length $nodes))
@@ -2007,10 +2020,13 @@
             (if (null? $src)
               (do (println (str "[load] 파일 없음: " $rel-path))
                   (recur (+ $i 1) $acc))
+              (if (includes-item @cgc-loaded-paths (cgc-load-key $abs-path))
+                (recur (+ $i 1) $acc)
+                (do (swap! cgc-loaded-paths push (cgc-load-key $abs-path))
               (let [[$sub-dir  (path-dir $abs-path)]
                     [$sub-raw  (parse (lex $src))]
                     [$expanded (expand-loads $sub-raw $sub-dir)]]
-                (recur (+ $i 1) (append-all $acc $expanded)))))
+                (recur (+ $i 1) (append-all $acc $expanded)))))))
           (recur (+ $i 1) (push $acc $node)))))))
 
 ;; 괄호·문자열 균형. 맞는 소스는 null, 깨진 소스는 [CGC-ERR] 문구.

@@ -1,0 +1,183 @@
+(load "../str/str.fl")
+;; Unicode scalar parser and ordered, explicit-stack VM. No host regex engine.
+;; Parser state and execution budget belong to one invocation.
+(defn rx-error [code pos] {"ok" false "error" {"code" code "message" code "position" pos}})
+(defn rx-fail [state code]
+  (do (if (= @(get state "error") nil)
+    (reset! (get state "error") (rx-error code @(get state "pos"))) nil) ["empty"]))
+(defn rx-peek [state] (get (get state "chars") @(get state "pos")))
+(defn rx-next [state]
+  (let [[cp (rx-peek state)]] (do (swap! (get state "pos") + 1) cp)))
+(defn rx-digit? [cp] (and (not (= cp nil)) (>= cp 48) (<= cp 57)))
+(defn rx-escape [state]
+  (let [[cp (rx-next state)]]
+    (cond
+      [(= cp nil) (rx-fail state "INVALID_PATTERN")]
+      [(includes-item [100 119 115] cp) ["kind" cp]]
+      [(= cp 110) ["lit" 10]] [(= cp 114) ["lit" 13]] [(= cp 116) ["lit" 9]]
+      [(includes-item [46 42 43 63 124 40 41 91 93 123 125 94 36 92 45] cp) ["lit" cp]]
+      [true (rx-fail state "UNSUPPORTED_SYNTAX")])))
+(defn rx-class-part [state]
+  (let [[cp (rx-next state)]]
+    (if (= cp 92) (rx-escape state)
+      (if (= cp nil) (rx-fail state "INVALID_PATTERN") ["lit" cp]))))
+(defn rx-class [state parts]
+  (cond
+    [(not (= @(get state "error") nil)) ["empty"]]
+    [(= (rx-peek state) nil) (rx-fail state "INVALID_PATTERN")]
+    [(= (rx-peek state) 93)
+      (do (rx-next state) (if (= (length parts) 0) (rx-fail state "INVALID_PATTERN") parts))]
+    [true
+      (let [[a (rx-class-part state)]]
+        (if (and (= (rx-peek state) 45)
+                 (not (= (get (get state "chars") (+ @(get state "pos") 1)) 93)))
+          (do (rx-next state)
+            (let [[b (rx-class-part state)]]
+              (if (and (= (get a 0) "lit") (= (get b 0) "lit") (<= (get a 1) (get b 1)))
+                (rx-class state (push parts ["range" (get a 1) (get b 1)]))
+                (rx-fail state "INVALID_PATTERN"))))
+          (rx-class state (push parts a))))]))
+(defn rx-number [state acc seen]
+  (if (rx-digit? (rx-peek state))
+    (let [[n (+ (* acc 10) (- (rx-next state) 48))]]
+      (if (> n 1000) (do (rx-fail state "PATTERN_LIMIT") -1) (rx-number state n true)))
+    (if seen acc (do (rx-fail state "INVALID_PATTERN") -1))))
+(defn rx-atom [state depth]
+  (let [[cp (rx-next state)]]
+    (cond
+      [(= cp 40)
+        (if (= (rx-peek state) 63) (rx-fail state "UNSUPPORTED_SYNTAX")
+          (if (>= depth 32) (rx-fail state "PATTERN_LIMIT")
+            (let [[node (rx-alt state (+ depth 1))]]
+              (if (= (rx-peek state) 41) (do (rx-next state) node) (rx-fail state "INVALID_PATTERN")))))]
+      [(= cp 91)
+        (let [[neg (= (rx-peek state) 94)]]
+          (do (if neg (rx-next state) nil) ["class" (rx-class state []) neg]))]
+      [(= cp 92) (rx-escape state)]
+      [(= cp 46) ["dot"]] [(= cp 94) ["start"]] [(= cp 36) ["end"]]
+      [(or (= cp nil) (includes-item [42 43 63 123 125 93] cp)) (rx-fail state "INVALID_PATTERN")]
+      [true ["lit" cp]])))
+(defn rx-quantify [state node]
+  (let [[cp (rx-peek state)]
+        [result
+          (if (and (includes-item ["start" "end"] (get node 0)) (includes-item [42 43 63 123] cp))
+            (rx-fail state "INVALID_PATTERN")
+          (cond
+            [(includes-item [42 43 63] cp)
+              (do (rx-next state) ["repeat" node (if (= cp 43) 1 0) (if (= cp 63) 1 -1)])]
+            [(= cp 123)
+              (do (rx-next state)
+                (let [[lo (rx-number state 0 false)]
+                      [hi (if (= (rx-peek state) 44)
+                        (do (rx-next state) (if (= (rx-peek state) 125) -1 (rx-number state 0 false))) lo)]]
+                  (if (and (= (rx-peek state) 125) (or (= hi -1) (>= hi lo)))
+                    (do (rx-next state) ["repeat" node lo hi])
+                    (rx-fail state "INVALID_PATTERN"))))]
+            [true node]))]]
+    (if (and (not (= result node)) (includes-item [42 43 63 123] (rx-peek state)))
+      (rx-fail state (if (= (rx-peek state) 63) "UNSUPPORTED_SYNTAX" "INVALID_PATTERN")) result)))
+(defn rx-seq [state depth nodes]
+  (if (or (not (= @(get state "error") nil)) (= (rx-peek state) nil) (includes-item [41 124] (rx-peek state)))
+    ["seq" nodes]
+    (let [[node (rx-quantify state (rx-atom state depth))]]
+      (rx-seq state depth (push nodes node)))))
+(defn rx-alt [state depth]
+  (let [[left (rx-seq state depth [])]]
+    (if (and (= @(get state "error") nil) (= (rx-peek state) 124))
+      (do (rx-next state) ["alt" left (rx-alt state depth)]) left)))
+(defn rx-parse [pattern]
+  (let [[r (if (and (string? pattern) (> (length pattern) 1024)) (rx-error "PATTERN_LIMIT" 0) (utf8-decode pattern))]]
+    (if (not (get r "ok")) r
+      (if (> (length (get r "value")) 256) (rx-error "PATTERN_LIMIT" 0)
+        (let [[state {"chars" (get r "value") "pos" (atom 0) "error" (atom nil)}]
+              [node (rx-alt state 0)]]
+          (if (not (= @(get state "error") nil)) @(get state "error")
+            (if (not (= (rx-peek state) nil)) (rx-error "INVALID_PATTERN" @(get state "pos")) (st-ok node))))))))
+(defn rx-kind? [kind cp]
+  (if (= cp nil) false
+    (cond
+      [(= kind 100) (rx-digit? cp)]
+      [(= kind 119) (or (rx-digit? cp) (and (>= cp 65) (<= cp 90)) (and (>= cp 97) (<= cp 122)) (= cp 95))]
+      [true (st-space? cp)])))
+(defn rx-member? [parts cp i]
+  (if (>= i (length parts)) false
+    (let [[part (get parts i)] [tag (get part 0)]]
+      (if (cond
+        [(= tag "lit") (= cp (get part 1))]
+        [(= tag "kind") (rx-kind? (get part 1) cp)]
+        [true (and (>= cp (get part 1)) (<= cp (get part 2)))]) true
+        (rx-member? parts cp (+ i 1))))))
+(defn rx-consumes? [node cp]
+  (if (= cp nil) false
+    (cond
+      [(= (get node 0) "lit") (= cp (get node 1))]
+      [(= (get node 0) "dot") (not (includes-item [10 13 8232 8233] cp))]
+      [(= (get node 0) "kind") (rx-kind? (get node 1) cp)]
+      [true (not (= (rx-member? (get node 1) cp 0) (get node 2)))])))
+;; Each pending item is [tasks scalar-position]. First item has highest priority.
+;; Repetition schedules the consuming branch first, then its exit (greedy).
+(defn rx-vm [xs pending budget]
+  (if (= (length pending) 0) (st-ok nil)
+    (if (<= @budget 0) (rx-error "STEP_LIMIT" 0)
+      (do (swap! budget - 1)
+        (let [[state (get pending 0)] [others (slice pending 1 (length pending))]
+              [tasks (get state 0)] [pos (get state 1)]]
+          (if (= (length tasks) 0) (st-ok pos)
+            (let [[node (get tasks 0)] [rest (slice tasks 1 (length tasks))] [tag (get node 0)]]
+              (cond
+                [(= tag "seq") (rx-vm xs (concat [[(concat (get node 1) rest) pos]] others) budget)]
+                [(= tag "alt") (rx-vm xs (concat [[(concat [(get node 1)] rest) pos] [(concat [(get node 2)] rest) pos]] others) budget)]
+                [(= tag "repeat")
+                  (rx-vm xs (concat [[(concat [["rep" (get node 1) (get node 2) (get node 3) 0 -1]] rest) pos]] others) budget)]
+                [(= tag "rep")
+                  (let [[n (get node 4)] [lo (get node 2)] [hi (get node 3)]
+                        [exit (if (>= n lo) [[rest pos]] [])]
+                        [more (and (or (= hi -1) (< n hi)) (or (< n lo) (not (= pos (get node 5)))))]
+                        [next ["rep" (get node 1) lo hi (+ n 1) pos]]]
+                    (rx-vm xs (concat (if more (concat [[(concat [(get node 1) next] rest) pos]] exit) exit) others) budget))]
+                [(= tag "start") (rx-vm xs (if (= pos 0) (concat [[rest pos]] others) others) budget)]
+                [(= tag "end") (rx-vm xs (if (= pos (length xs)) (concat [[rest pos]] others) others) budget)]
+                [true (rx-vm xs (if (rx-consumes? node (get xs pos)) (concat [[rest (+ pos 1)]] others) others) budget)]))))))))
+(defn rx-search [node xs start budget]
+  (if (> start (length xs)) (st-ok nil)
+    (let [[r (rx-vm xs [[[node] start]] budget)]]
+      (if (not (get r "ok")) r
+        (if (= (get r "value") nil) (rx-search node xs (+ start 1) budget)
+          (st-ok {"start" start "end" (get r "value") "text" (st-text (slice xs start (get r "value")))}))))))
+(defn regex-find-limit [pattern text limit]
+  (let [[p (rx-parse pattern)] [s (rx-input text)]]
+    (if (not (get p "ok")) p (if (not (get s "ok")) s
+      (if (or (not (integer? limit)) (< limit 1) (> limit 10000)) (rx-error "INVALID_ARGUMENT" 0)
+        (rx-search (get p "value") (get s "value") 0 (atom limit)))))))
+(defn regex-find [pattern text] (regex-find-limit pattern text 10000))
+(defn regex-match? [pattern text]
+  (let [[r (regex-find pattern text)]]
+    (if (get r "ok") (st-ok (not (= (get r "value") nil))) r)))
+(defn rx-all [node xs start budget acc]
+  (let [[r (rx-search node xs start budget)]]
+    (if (not (get r "ok")) r
+      (let [[m (get r "value")]]
+        (if (= m nil) (st-ok acc)
+          (rx-all node xs (if (= (get m "start") (get m "end")) (+ (get m "end") 1) (get m "end")) budget (push acc m)))))))
+(defn regex-find-all [pattern text]
+  (let [[p (rx-parse pattern)] [s (rx-input text)]]
+    (if (not (get p "ok")) p (if (not (get s "ok")) s
+      (rx-all (get p "value") (get s "value") 0 (atom 10000) [])))))
+(defn rx-input [text]
+  (if (and (string? text) (> (length text) 16384)) (rx-error "INPUT_LIMIT" 0) (utf8-decode text)))
+(defn rx-replace [xs matches replacement i last acc]
+  (if (>= i (length matches)) (str acc (st-text (slice xs last (length xs))))
+    (let [[m (get matches i)]]
+      (rx-replace xs matches replacement (+ i 1) (get m "end")
+        (str acc (st-text (slice xs last (get m "start"))) replacement)))))
+(defn regex-replace [pattern text replacement]
+  (let [[v (utf8-decode replacement)] [r (regex-find-all pattern text)]]
+    (if (not (get v "ok")) v (if (not (get r "ok")) r
+      (st-ok (rx-replace (get (utf8-decode text) "value") (get r "value") replacement 0 0 ""))))))
+(defn rx-split [xs matches i last acc]
+  (if (>= i (length matches)) (push acc (st-text (slice xs last (length xs))))
+    (let [[m (get matches i)]]
+      (rx-split xs matches (+ i 1) (get m "end") (push acc (st-text (slice xs last (get m "start"))))))))
+(defn regex-split [pattern text]
+  (let [[r (regex-find-all pattern text)]]
+    (if (not (get r "ok")) r (st-ok (rx-split (get (utf8-decode text) "value") (get r "value") 0 0 [])))))

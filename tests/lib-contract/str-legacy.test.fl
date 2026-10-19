@@ -1,0 +1,10 @@
+;; No new string module: preserve the existing built-in contracts.
+(defn legacy-check [actual expected]
+  (if (= actual expected) true (throw (str "FAIL legacy " actual " != " expected))))
+(legacy-check (str-split "a,b" ",") ["a" "b"])
+(legacy-check (str-join ["a" "b"] ",") "a,b")
+(legacy-check (str-trim " x ") "x")
+(legacy-check (str-replace "aba" "a" "x") "xbx")
+(legacy-check (str-index-of "가나" "나") 3)
+(legacy-check (list? (dir-list ".")) true)
+(println "LEGACY_STR_SUMMARY=6/6")

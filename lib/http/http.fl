@@ -14,7 +14,7 @@
       (if (or (and (>= code 65) (<= code 90))
               (or (and (>= code 97) (<= code 122))
                   (or (and (>= code 48) (<= code 57))
-                      (>= (str-index-of "!#$%&'*+-.^_`|~" (substring text index (+ index 1))) 0))))
+                      (>= (_fl_str_index_of "!#$%&'*+-.^_`|~" (substring text index (+ index 1))) 0))))
         (http-token? text (+ index 1)) false))))
 (defn http-digits? [text index]
   (if (>= index (length text)) (> index 0)
@@ -26,19 +26,19 @@
       (if (or (not (str-starts-with url "http://")) (http-control? url 0))
         (http-error "INVALID_URL" "expected HTTP URL without spaces or controls")
         (let [[rest (substring url 7 (length url))]
-              [slash (str-index-of rest "/")]
-              [query (str-index-of rest "?")]
+              [slash (_fl_str_index_of rest "/")]
+              [query (_fl_str_index_of rest "?")]
               [slash-end (if (< slash 0) (length rest) slash)]
               [end (if (and (>= query 0) (< query slash-end)) query slash-end)]
               [authority (substring rest 0 end)]
               [tail (substring rest end (length rest))]
               [path (if (= tail "") "/" (if (str-starts-with tail "?") (str "/" tail) tail))]
-              [parts (str-split authority ":")]
+              [parts (_fl_str_split authority ":")]
               [host (get parts 0)]
               [port-text (if (= (length parts) 1) "80" (get parts 1))]]
           (if (or (= host "") (or (> (length parts) 2)
-              (or (>= (str-index-of authority "@") 0)
-              (or (>= (str-index-of url "#") 0) (not (http-digits? port-text 0))))))
+              (or (>= (_fl_str_index_of authority "@") 0)
+              (or (>= (_fl_str_index_of url "#") 0) (not (http-digits? port-text 0))))))
             (http-error "INVALID_URL" "invalid host, port or fragment")
             (let [[port (str-to-num port-text)]]
               (if (or (= port nil) (or (< port 1) (> port 65535)))
@@ -51,7 +51,7 @@
         (http-error "INVALID_REQUEST" "headers must be strings")
         (let [[lower (str-lower name)]]
           (if (or (not (http-token? name 0))
-                  (or (>= (str-index-of value "\r") 0) (>= (str-index-of value "\n") 0)))
+                  (or (>= (_fl_str_index_of value "\r") 0) (>= (_fl_str_index_of value "\n") 0)))
             (http-error "INVALID_REQUEST" "invalid header")
             (if (or (= lower "host") (or (= lower "connection")
                   (or (= lower "content-length") (= lower "transfer-encoding"))))
@@ -59,16 +59,16 @@
               (http-header-wire headers names (+ index 1) (str wire name ": " value "\r\n")))))))))
 (defn http-parse-headers [lines index headers]
   (if (>= index (length lines)) {"ok" true "value" headers}
-    (let [[line (get lines index)] [colon (str-index-of line ":")]]
+    (let [[line (get lines index)] [colon (_fl_str_index_of line ":")]]
       (if (<= colon 0) (http-error "HTTP_PROTOCOL" "malformed response header")
         (http-parse-headers lines (+ index 1)
           (assoc headers (str-lower (substring line 0 colon))
-            (str-trim (substring line (+ colon 1) (length line)))))))))
+            (_fl_str_trim (substring line (+ colon 1) (length line)))))))))
 (defn http-response [method raw]
-  (let [[boundary (str-index-of raw "\r\n\r\n")]]
+  (let [[boundary (_fl_str_index_of raw "\r\n\r\n")]]
     (if (< boundary 0) (http-error "HTTP_PROTOCOL" "missing response headers")
-      (let [[lines (str-split (substring raw 0 boundary) "\r\n")]
-            [status-line (str-split (get lines 0) " ")]
+      (let [[lines (_fl_str_split (substring raw 0 boundary) "\r\n")]
+            [status-line (_fl_str_split (get lines 0) " ")]
             [status-text (get status-line 1)]
             [parsed (http-parse-headers lines 1 {})]
             [body (substring raw (+ boundary 4) (length raw))]]

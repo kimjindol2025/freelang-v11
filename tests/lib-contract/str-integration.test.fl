@@ -1,0 +1,10 @@
+(load "../../lib/regex/regex.fl")
+(load "../../lib/http/http.fl")
+(load "../../lib/fs/fs.fl")
+(defn integration-check [actual expected]
+  (if (= actual expected) true (throw (str "FAIL integration " actual " != " expected))))
+(integration-check (get (path-normalize "a//b/../가") "value") "a/가")
+(integration-check (get (http-url "http://example.test/a") "host") "example.test")
+(integration-check (get (str-split "가😀" "") "value") ["가" "😀"])
+(integration-check (get (regex-match? "^😀$" "😀") "value") true)
+(println "STR_INTEGRATION_SUMMARY=4/4")
