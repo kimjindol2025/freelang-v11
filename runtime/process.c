@@ -159,6 +159,8 @@ static void fl_cap_require(const char* name) {
     }
 }
 
+#include "http_transport.inc"
+
 static FLValue fl_ok(FLValue value) {
     FLValue kv[4] = { fl_str_val("_tag"), fl_str_val("Ok"), fl_str_val("value"), value };
     return fl_map_from_pairs(kv, 2);

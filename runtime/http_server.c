@@ -137,7 +137,8 @@ FLValue server_req_json(FLValue request) {
 static void http_send_all(int fd, const char *buffer, size_t length) {
     size_t sent = 0;
     while (sent < length) {
-        ssize_t n = send(fd, buffer + sent, length - sent, 0);
+        /* A timed-out client can close before its handler finishes. */
+        ssize_t n = send(fd, buffer + sent, length - sent, MSG_NOSIGNAL);
         if (n < 0 && errno == EINTR) continue;
         if (n <= 0) return;
         sent += (size_t)n;

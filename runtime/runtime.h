@@ -291,6 +291,7 @@ FLValue git_branch(FLValue root);
 FLValue git_diff_name_only(FLValue root);
 FLValue http_get(FLValue url);
 FLValue fl_http_get(FLValue url);
+FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit);
 FLValue shell_cwd(void);
 
 /* ── _fl_file_* / _fl_env_* / str_join ── */

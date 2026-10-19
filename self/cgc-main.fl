@@ -684,7 +684,8 @@
                     "?" "_p")
                   "!" "_b")
                 "=" "_eq")]]
-    (if (c-reserved? $raw) (str "fl_" $raw) $raw)))
+    (if (= $n "http-get") "fl_library_http_get"
+      (if (c-reserved? $raw) (str "fl_" $raw) $raw))))
 
 ;; ── 메인 dispatch ──
 
@@ -812,7 +813,7 @@
     (cgc-fncall (cgc $op) $args))))
 
 (defn cgc-dispatch [$op $args]
-  (if (and (or (= $op "json-parse") (= $op "json-stringify"))
+  (if (and (includes-item ["json-parse" "json-stringify" "http-get" "http-post"] $op)
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
     (cond

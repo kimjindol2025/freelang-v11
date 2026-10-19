@@ -80,8 +80,26 @@ contract assertions. Map operations are implemented in FreeLang.
 
 | Public function | State | Input → output | Failure |
 |---|---|---|---|
-| `http-get`, `http-post`, `http-put`, `http-patch`, `http-delete`, `http-head`, `http-status`, `http-header`, `http-post-json`, `http-put-json` | exists | URL and optional body/header → response text/status/header | legacy HTTP error value |
+| `http-get`, `http-post`, `http-request`, `http-json` (`lib/http/http.fl`) | new in TASK 9-4 | URL/method/header/body/options → `{ok,status,headers,body}`; JSON body is decoded with FreeLang JSON | `{ok:false,error:{code,message}}`; JSON errors retain the JSON contract |
+| Other wrappers in `self/stdlib/http.fl` | legacy, not the v0.1 native client | historical builtin wrappers; not validated as native v0.1 APIs | legacy behavior |
 | `process-run`, `process-run-args`, `process-exec`, `process-exec-args`, `process-spawn`, `process-kill`, `process-exists?`, `process-wait`, `shell-run`, `shell-pipe` | exists | command/arguments/process id → result/output/id/boolean | legacy process error value |
+
+HTTP v0.1: **HTTPS 미지원**. Default deadline is 5000 ms, including DNS,
+connect, send and receive. Request and response limits default to 1048576 bytes
+each, including headers. Options `timeout-ms` (1–60000), `max-request-bytes`
+and `max-response-bytes` (1–16777216) are integers. 404/500 are responses with
+`ok=false`, preserving status/headers/body. Redirects, IPv6, binary NUL and
+transfer encodings (including chunked) are unsupported. See
+[`lib/http/README.md`](../lib/http/README.md) for signatures and limits.
+
+Native communication research: `runtime/process.c` previously exposed only
+unbounded plain-HTTP GET, plus process execution. `runtime/http_server.c` owns
+the private POSIX socket/listen/accept/recv/send/close calls for the loopback
+server; those are not public FreeLang socket functions. Compiler references to
+`fxb-net-*` do not supply a linked implementation in this runtime. There is no
+TLS implementation or TLS link dependency. The sole new C primitive
+`_fl_http_exchange` supplies bounded raw socket I/O, which FreeLang cannot do;
+HTTP and JSON logic remain in FreeLang.
 
 ## ⑦ Time
 
