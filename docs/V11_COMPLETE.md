@@ -19,6 +19,7 @@
 | `b530b16ddf8f8cb2450686976a874d869ff919a153cb6b1f2ab13a7662333567` | `cf5d682c` (`lib: str and regex v0.1`) | 문자열 API 우선 호출·내부 기본 함수·C 심볼 분리, 정규화한 모듈 경로의 중복 확장 방지 |
 | `3db27042fe5c2d7c4cc60229f171667cfc81d9455b2d9a62ffd5c468d81e9a14` | `6c577f12` (`lib: time v0.1`) | now-iso 라이브러리 API를 우선 연결하고 기존 C 심볼과 분리; 모듈 없는 기존 내장 호출은 유지 |
 | `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-8 (`lib: test/evidence v0.1`) | 시험 프로세스 격리와 종료 기본 함수를 실제 네이티브 진입점에 연결 |
+| `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-9 (`test: fl runner, C minimal audit`) | C 최소 추가 근거 점검과 시험 감독 실행기의 FreeLang 전환; C·컴파일러 변경 없이 씨앗 부트스트랩 후 stage2·3·4 일치 재확인 |
 
 `git log -- self/cgc-main.fl docs/V11_COMPLETE.md`와 각 커밋의 실제 차이를
 대조했다. `dd552873…`의 기록 갱신 커밋 자체는 컴파일러 변경 커밋이 아니다.
@@ -56,3 +57,17 @@ stopwatch는 기존 실시간 시계 기반이며 단조 시계가 아니다. �
 씨앗 유지, stage2·3·4 SHA-256 일치와 두 cmp 종료값 0.
 도구 추적 컴파일러·레지스트리는 현재 코드와 런타임으로 재빌드했다.
 도구 저장소의 기존 미추적 57개는 목록·내용 해시를 유지했다.
+
+## TASK 9-9 검증
+
+C 최소 추가 목록과 OS 경계 근거를 계약 문서에 기록했다. C·컴파일러는 변경하지 않았다.
+시험 감독 실행기를 FreeLang으로 전환하고 test-run/evidence-run을 재사용했다.
+Python/FreeLang 실행기 모두 새 시험 53/53, 보고 사례 종료 0·0·1, 실행기 종료 0이며
+원본 표준출력 cmp 종료 0을 확인한 후 기존 Python 실행기를 삭제했다.
+기존 41/41, 감사 44/44, 전체 라이브러리 재시험과 심층 검증 TRUSTED/종료 0 통과.
+완료된 execve 감시에서 새 실행기는 node/npm/npx/.js/python 각각 0회다.
+전체 라이브러리·기존 시험·심층 검증은 node/npm/npx/.js 각각 0회, python 4회다.
+이는 이번에 수정하지 않은 기존 Python 라이브러리 실행기 네 개의 실행이다.
+씨앗 유지, 부트스트랩 후 stage2·3·4 동일 해시와 cmp 두 건 0,
+도구 저장소 기존 미추적 57개 목록·내용 해시 보존을 확인했다.
+AFJ 전용 capability probe의 PARTIAL 제한은 그대로 남는다.

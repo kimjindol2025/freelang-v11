@@ -284,6 +284,25 @@ stopwatch는 기존 실시간 시계를 재사용한다. 단조 시계는 아니
 자식 메모리 변경은 부모와 공유하지 않으며 파일 등 외부 부작용은 되돌리지 않는다.
 결과 전송 한도는 1MiB다. C 추가는 프로세스 격리·종료와 signal 보존에 한정한다.
 
+### 최소 C 추가 — TASK 9-9 점검
+
+9-8의 `runtime/process.c` 변경은 신규 함수 두 개와 기존 함수 한 개의
+종료 상태 처리 보강이다. `runtime/runtime.h`의 두 줄은 신규 함수 선언이다.
+
+| 함수 | 한 줄 설명 | C에 남기는 이유 |
+|---|---|---|
+| `_fl_test_isolate(callback)` (신규) | 현재 메모리의 closure를 격리된 자식에서 실행하고 제한된 문자열 결과를 회수한다. | `fork`, `pipe`, `read/write`, `select`, `alarm`, `kill`, `waitpid`, `_exit`가 필요하다. 기존 FreeLang `process-spawn`은 `execvp`로 새 실행 파일을 시작하므로 현재 closure를 전달하지 못한다. EINTR 재시도·부분 전송·1MiB 제한·자식 회수는 IPC와 프로세스 자원 관리다. |
+| `_fl_exit(code)` (신규) | 현재 프로세스를 지정한 정수 종료 코드로 끝낸다. | C `exit`로 실제 셸 종료 상태와 버퍼 flush를 전달한다. FreeLang의 단순 반환이나 예외는 현재 실행 파일의 셸 종료 코드를 지정하지 못한다. |
+| `process_spawn(cmd,args)` (기존 보강) | 자식의 signal과 실제 종료 코드를 보존한다. | `waitpid`의 EINTR 재시도와 `WIFEXITED/WIFSIGNALED/WEXITSTATUS/WTERMSIG`는 OS wait 상태 해석이다. 손실된 signal 정보는 FreeLang에서 복원할 수 없다. |
+
+FreeLang으로 옮길 시험 의미·집계·직렬화 로직은 이 C 추가분에 없다.
+assertion 판정·예외 변환·JSON 인코딩/디코딩·실패 이름·PASS 집계·보고와
+성공/실패 종료 코드 선택은 이미 `lib/test/test.fl`이 담당한다.
+명령 인자 검증·실행 시간·해시 형식·가림·증거 JSON은
+`lib/evidence/evidence.fl`이 담당한다. C의 문자열/크기 검사는 잘못된
+callback 반환값이 IPC를 깨뜨리지 않도록 하는 전송 경계 검사로 유지한다.
+이번 점검은 기존 C 및 컴파일러 코드를 바꾸지 않는다.
+
 evidence-run은 셸을 자동으로 끼우지 않고 argv를 전달한다. 인자는 최대 253개다.
 없는 실행 파일은 code=127, signal 종료는 code=128+signal이다.
 실행 시작 실패는 PROCESS_START, 잘못된 인자는 INVALID_ARGUMENT이다.
