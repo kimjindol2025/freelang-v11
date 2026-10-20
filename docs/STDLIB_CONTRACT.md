@@ -284,6 +284,30 @@ stopwatch는 기존 실시간 시계를 재사용한다. 단조 시계는 아니
 자식 메모리 변경은 부모와 공유하지 않으며 파일 등 외부 부작용은 되돌리지 않는다.
 결과 전송 한도는 1MiB다. C 추가는 프로세스 격리·종료와 signal 보존에 한정한다.
 
+### 최소 C 추가 — TASK 9-11 서버 소켓
+
+`tcp-bind(address, port)`와 `tcp-listen(address, port)`는 정수 소켓 핸들,
+`tcp-accept(handle, timeout-ms)`는 연결 핸들, `tcp-local-port(handle)`는
+실제 포트, `tcp-close(handle)`는 true를 반환한다. 실패는
+`{"ok": false, "error": {"code": CODE}}`다. 핸들은 OS fd와 다르고 닫은
+핸들을 재사용하지 않는다. 주소는 문자열 `127.0.0.1`만, 포트는 정수
+0..65535, 대기는 정수 0..60000ms만 허용한다. 기본 tcp capability를 따른다.
+
+| 함수 | C에 남기는 OS 기능과 이유 |
+|---|---|
+| `fl_tcp_bind` / `tcp-bind` | socket·bind·CLOEXEC: listen하지 않은 소켓을 유지해 원래 HTTP 연결 거부 시험의 포트 경쟁을 방지한다. FreeLang에 bind 원시 기능이 없다. |
+| `fl_tcp_listen` / `tcp-listen` | 기존 tcp-bind 다음 OS listen만 실행한다. FreeLang에 listen 원시 기능이 없다. |
+| `fl_tcp_accept` / `tcp-accept` | poll·단조 시계·accept·CLOEXEC: OS 연결 수락과 EINTR 이후 남은 대기 시간 보존이 필요하다. |
+| `fl_tcp_close` / `tcp-close` | close와 핸들 폐기: 다른 fd나 닫힌 핸들을 닫지 않도록 소유권을 확인한다. |
+| `fl_tcp_local_port` / `tcp-local-port` | getsockname: 포트 0에 OS가 배정한 실제 포트를 얻는다. |
+
+오류 코드는 INVALID_ARGUMENT(형식·범위), ADDRESS(외부·별칭 주소),
+INVALID_SOCKET(닫힘·잘못된 핸들·bind-only accept), TIMEOUT(대기 만료),
+SOCKET/BIND/LISTEN/ACCEPT/CLOSE/RESOURCE(OS·자원 오류)다.
+새 읽기·쓰기 구현은 추가하지 않았다. HTTP 실행기는 FreeLang에서 원래
+서버·클라이언트를 컴파일하고 bind-only guard를 유지하며 test-run과
+evidence-run으로 출력·종료 코드·서버 생존을 판정한다.
+
 ### 최소 C 추가 — TASK 9-9 점검
 
 9-8의 `runtime/process.c` 변경은 신규 함수 두 개와 기존 함수 한 개의

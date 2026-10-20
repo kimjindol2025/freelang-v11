@@ -29,11 +29,19 @@ manages Host, Connection and Content-Length; callers cannot override those or
 Transfer-Encoding. Header/method injection is rejected.
 
 The only new C primitive, `_fl_http_exchange`, is needed because the native
-runtime exposes no FreeLang socket operations. It exchanges bounded raw bytes;
+runtime exposes no FreeLang socket byte I/O operations. It exchanges bounded raw bytes;
 URL parsing, request formatting, response parsing and JSON stay in FreeLang.
 The existing server also suppresses SIGPIPE so a timed-out client cannot kill it.
 
-Run `python3 tests/lib-contract/run-http.py --compiler <native-compiler>`.
+Compile `tests/lib-contract/run-http.fl` with the current native compiler and
+runtime, then run the executable with `--compiler <native-compiler>` (and
+`--root <repository>` when running outside the repository).
 It compiles both FreeLang files, runs 26 assertions against the existing native
 FreeLang server on 127.0.0.1, and checks server survival. It never sends test
 requests to the external Internet.
+
+TASK 9-11 adds loopback-only `tcp-bind`, `tcp-listen`, `tcp-accept`,
+`tcp-local-port`, and `tcp-close`. The supervisor holds a bind-only socket
+until the client exits, preserving the original connection refusal test.
+The Python supervisor was removed after byte-for-byte stdout/stderr comparison
+and equal exit codes. See `docs/STDLIB_CONTRACT.md` for socket errors and limits.

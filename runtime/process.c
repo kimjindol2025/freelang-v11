@@ -7,6 +7,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
+#include <poll.h>
+#include <fcntl.h>
+#include <time.h>
+#include <limits.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <signal.h>
 #include <errno.h>
@@ -436,6 +442,91 @@ FLValue http_get(FLValue url) {
 }
 
 FLValue fl_http_get(FLValue url) { return http_get(url); }
+
+/* Loopback test sockets use monotonically increasing handles, never raw fds.
+ * Closed handles cannot accidentally close a subsequently reused descriptor. */
+typedef struct FLTcpSocket { int64_t id; int fd, listening; struct FLTcpSocket *next; } FLTcpSocket;
+static FLTcpSocket *tcp_sockets;
+static int64_t tcp_next_id = 1;
+static FLValue tcp_error(const char *code) {
+    FLValue error = fl_map_set(fl_map_new(), fl_str_val("code"), fl_str_val(code));
+    return fl_map_set(fl_map_set(fl_map_new(), fl_str_val("ok"), fl_bool(false)), fl_str_val("error"), error);
+}
+static FLTcpSocket *tcp_lookup(FLValue handle) {
+    if (handle.tag != FL_INT) return NULL;
+    for (FLTcpSocket *s = tcp_sockets; s; s = s->next) if (s->id == handle.i) return s;
+    return NULL;
+}
+static FLValue tcp_register(int fd, int listening) {
+    FLTcpSocket *s = malloc(sizeof(*s));
+    if (!s || tcp_next_id == INT64_MAX) { free(s); close(fd); return tcp_error("RESOURCE"); }
+    s->id = tcp_next_id++; s->fd = fd; s->listening = listening;
+    s->next = tcp_sockets; tcp_sockets = s;
+    return fl_int(s->id);
+}
+FLValue fl_tcp_bind(FLValue address, FLValue port) {
+    fl_cap_require("tcp");
+    if (address.tag != FL_STRING || !address.obj || port.tag != FL_INT || port.i < 0 || port.i > 65535)
+        return tcp_error("INVALID_ARGUMENT");
+    FLString *text = (FLString *)address.obj;
+    if (strcmp(text->data, "127.0.0.1") != 0 || length(address).i != 9) return tcp_error("ADDRESS");
+    int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    if (fd < 0) return tcp_error("SOCKET");
+    struct sockaddr_in target = {0};
+    target.sin_family = AF_INET; target.sin_port = htons((uint16_t)port.i);
+    target.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(fd, (struct sockaddr *)&target, sizeof target) != 0) { close(fd); return tcp_error("BIND"); }
+    return tcp_register(fd, 0);
+}
+FLValue fl_tcp_close(FLValue handle) {
+    FLTcpSocket *s = tcp_lookup(handle);
+    if (!s) return tcp_error("INVALID_SOCKET");
+    FLTcpSocket **link = &tcp_sockets;
+    while (*link != s) link = &(*link)->next;
+    *link = s->next;
+    int result = close(s->fd); free(s);
+    return result == 0 ? fl_bool(true) : tcp_error("CLOSE");
+}
+FLValue fl_tcp_listen(FLValue address, FLValue port) {
+    FLValue handle = fl_tcp_bind(address, port);
+    FLTcpSocket *s = tcp_lookup(handle);
+    if (!s) return handle;
+    if (listen(s->fd, 32) != 0) { fl_tcp_close(handle); return tcp_error("LISTEN"); }
+    s->listening = 1;
+    return handle;
+}
+FLValue fl_tcp_local_port(FLValue handle) {
+    FLTcpSocket *s = tcp_lookup(handle);
+    if (!s) return tcp_error("INVALID_SOCKET");
+    struct sockaddr_in address; socklen_t size = sizeof address;
+    if (getsockname(s->fd, (struct sockaddr *)&address, &size) != 0) return tcp_error("SOCKET");
+    return fl_int(ntohs(address.sin_port));
+}
+FLValue fl_tcp_accept(FLValue handle, FLValue timeout) {
+    FLTcpSocket *s = tcp_lookup(handle);
+    if (!s || !s->listening) return tcp_error("INVALID_SOCKET");
+    if (timeout.tag != FL_INT || timeout.i < 0 || timeout.i > 60000) return tcp_error("INVALID_ARGUMENT");
+    /* Monotonic deadline preserves the upper bound across interrupted polls. */
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return tcp_error("SOCKET");
+    int64_t deadline = now.tv_sec * 1000LL + now.tv_nsec / 1000000 + timeout.i;
+    int remaining = (int)timeout.i;
+    struct pollfd p = {s->fd, POLLIN, 0};
+    for (;;) {
+        int result = poll(&p, 1, remaining);
+        if (result == 0) return tcp_error("TIMEOUT");
+        if (result > 0) break;
+        if (errno != EINTR || clock_gettime(CLOCK_MONOTONIC, &now) != 0) return tcp_error("ACCEPT");
+        int64_t left = deadline - (now.tv_sec * 1000LL + now.tv_nsec / 1000000);
+        if (left <= 0) return tcp_error("TIMEOUT");
+        remaining = (int)left;
+    }
+    if (!(p.revents & POLLIN)) return tcp_error("ACCEPT");
+    int fd = accept(s->fd, NULL, NULL);
+    if (fd < 0) return tcp_error(errno == EAGAIN || errno == EWOULDBLOCK ? "TIMEOUT" : "ACCEPT");
+    if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) { close(fd); return tcp_error("ACCEPT"); }
+    return tcp_register(fd, 0);
+}
 
 /* ── try/catch 런타임 ── */
 extern FLTryFrame fl_try_stack[FL_TRY_MAX];

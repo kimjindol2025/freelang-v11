@@ -1,7 +1,7 @@
 # FreeLang v11 완료 기록
 
-- 고정점: stage 2 = stage 3 = stage 4, `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6`
-- 고정점 변경 이유: TASK 9-8 시험 프로세스 격리·종료 기본 함수 연결. 씨앗은 유지.
+- 고정점: stage 2 = stage 3 = stage 4, `8b116c9e025517dbb6bf70a5629bf4172533fde3289b98c13674166148c0bd1c`
+- 고정점 변경 이유: TASK 9-11 loopback 서버 소켓 5개를 실제 네이티브 진입점에 연결. 씨앗은 유지.
 - 시드 SHA-256: `36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2`
 - 실행 경로에 Node 0 / JS 0 / AFJ 0, 옛 파일은 `legacy/`에 보관.
 - 측정 도구 SHA-256: `fed5fa7db902e6eb1e72d0215ca76c31dc6da37ae110e89c565df1a4530618ca`
@@ -21,6 +21,7 @@
 | `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-8 (`lib: test/evidence v0.1`) | 시험 프로세스 격리와 종료 기본 함수를 실제 네이티브 진입점에 연결 |
 | `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-9 (`test: fl runner, C minimal audit`) | C 최소 추가 근거 점검과 시험 감독 실행기의 FreeLang 전환; C·컴파일러 변경 없이 씨앗 부트스트랩 후 stage2·3·4 일치 재확인 |
 | `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-10 (`test: all runners in fl`) — 부분 완료 | 시간·문자열/정규식·FS 실행기 FreeLang 전환; 기존 stage2·3·4 해시와 cmp 재확인. C·컴파일러·씨앗 변경 없음. HTTP bind 전용 소켓 API 부재로 해당 실행기는 BLOCKED·Python 보존; 전체 Python 0회 미달성 |
+| `8b116c9e025517dbb6bf70a5629bf4172533fde3289b98c13674166148c0bd1c` | TASK 9-11 (`runtime: tcp listen, test: http runner in fl`) — 부분 완료 | tcp-bind/listen/accept/close/local-port와 FreeLang HTTP 실행기. 새 부트스트랩 stage2·3·4 일치, cmp 두 건 0. http-serve-once는 기존 HTTP 내부 static I/O 함수의 FreeLang 노출 여부 결정 대기(BLOCKED); 새 읽기·쓰기 구현은 추가하지 않음 |
 
 `git log -- self/cgc-main.fl docs/V11_COMPLETE.md`와 각 커밋의 실제 차이를
 대조했다. `dd552873…`의 기록 갱신 커밋 자체는 컴파일러 변경 커밋이 아니다.
