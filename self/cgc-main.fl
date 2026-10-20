@@ -684,7 +684,7 @@
                     "?" "_p")
                   "!" "_b")
                 "=" "_eq")]]
-    (if (includes-item ["str-split" "str-join" "str-trim" "str-replace" "str-index-of"] $n) (str "fl_library_" $raw)
+    (if (includes-item ["now-iso" "str-split" "str-join" "str-trim" "str-replace" "str-index-of"] $n) (str "fl_library_" $raw)
     (if (= $n "dir-list") "fl_library_dir_list"
     (if (= $n "http-get") "fl_library_http_get"
       (if (c-reserved? $raw) (str "fl_" $raw) $raw))))))
@@ -815,7 +815,7 @@
     (cgc-fncall (cgc $op) $args))))
 
 (defn cgc-dispatch [$op $args]
-  (if (and (includes-item ["str-index-of" "str-split" "str-join" "str-trim" "str-replace" "json-parse" "json-stringify" "http-get" "http-post" "file-read" "file-write" "file-append" "file-exists?" "file-size" "dir-list"] $op)
+  (if (and (includes-item ["now-iso" "str-index-of" "str-split" "str-join" "str-trim" "str-replace" "json-parse" "json-stringify" "http-get" "http-post" "file-read" "file-write" "file-append" "file-exists?" "file-size" "dir-list"] $op)
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
     (cond

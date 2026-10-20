@@ -190,9 +190,70 @@ HTTP and JSON logic remain in FreeLang.
 
 ## ⑦ Time
 
-| Public function | State | Input → output | Failure |
-|---|---|---|---|
-| `now`, `now-ms`, `now-s`, `time-diff-ms`, `time-elapsed`, `date-parts`, `ts-to-s`, `s-to-ts`, `time-ago` | exists | no input or timestamp(s) → number/map/string | invalid timestamps return `nil` or `INVALID_TIME` in result wrappers |
+- 시각의 내부 값 = 유닉스 밀리초 정수(UTC 기준).
+- now-ms: 유닉스 밀리초, now-s: 유닉스 초(소수점 버림), now-iso: UTC ISO 문자열(…Z).
+- time-format 형식 지정자: YYYY 연, MM 월, DD 일, HH 시(00~23), mm 분, ss 초, SSS 밀리초, Z 시차(+09:00). 그 밖의 글자는 그대로 출력.
+- time-parse: ISO 8601(날짜만, 날짜+시각, Z 또는 ±HH:MM 시차). 시차가 없으면 UTC로 본다.
+- 시간대: UTC와 고정 시차만. 지역 이름 시간대는 미지원.
+- time-add(시각, 수, 단위): 단위는 "s" "m" "h" "d" "month" "year".
+  - month/year 덧셈의 월말 규칙: 결과 달에 그 날짜가 없으면 그 달 마지막 날로 맞춘다(1월 31일 + 1달 = 2월 28일 또는 29일).
+- time-diff(a, b): a − b, 밀리초 정수(음수 가능).
+- weekday(시각): 0=일요일 … 6=토요일, UTC 기준. leap-year?(연): 참/거짓. days-in-month(연, 월).
+- duration-format(밀리초, 모양): "ko" → "1시간 2분 3초", "short" → "1h2m3s". 0인 단위는 뺀다.
+- stopwatch-start → 시작 값, stopwatch-elapsed(시작 값) → 지난 밀리초 정수.
+- 실패 시 code·message·위치 정보를 담은 오류값을 돌려주고, 프로그램이 비정상 종료하지 않을 것.
+
+
+### 공개 API와 실패 계약
+
+| 함수 | 반환값 |
+|---|---|
+| `now-ms()` | 유닉스 밀리초 정수, 기존 기본 함수 |
+| `now-s()` | 현재 유닉스 초 정수, 소수점 버림 |
+| `now-iso()` | UTC `YYYY-MM-DDTHH:mm:ss.SSSZ` 문자열 |
+| `time-parse(text)` | Result(UTC 밀리초) |
+| `time-format(t, pattern, offsetMinutes)` | Result(문자열) |
+| `time-add(t, n, unit)` | Result(밀리초), n은 -1000000000..1000000000 정수 |
+| `time-diff(a, b)` | Result(a − b 밀리초), 음수 허용 |
+| `weekday(t)` | Result(0=일요일 … 6=토요일), UTC |
+| `leap-year?(year)` | Result(참/거짓) |
+| `days-in-month(year, month)` | Result(해당 월의 일수) |
+| `duration-format(ms, style)` | Result(문자열) |
+| `stopwatch-start()` | 현재 밀리초 시작 값 |
+| `stopwatch-elapsed(start)` | Result(지난 밀리초 정수) |
+
+Result는 `{"ok" true "value" 값}` 또는
+`{"ok" false "error" {"code" 코드 "message" 설명 "position" 0}}`다.
+`INVALID_ARGUMENT`는 연산 인자·단위·형식 오류, `INVALID_TIME`은 잘못된 시각·달력 값(시각 타입 오류 포함)이다.
+위치는 현재 전체 입력/호출을 뜻하는 0이며 문자별 진단 위치는 제공하지 않는다.
+오류 뒤에도 다음 호출을 실행할 수 있다.
+
+파싱 문법: `YYYY-MM-DD` 또는 `YYYY-MM-DDTHH:mm:ss[.S|.SS|.SSS]`에
+선택적으로 `Z` 또는 `±HH:MM`을 붙인다. 시차가 없으면 UTC다.
+날짜만 있는 입력에도 시차 접미사를 허용한다. 대문자 T/Z, 고정 폭 날짜·시각만
+지원하며 분수 초가 3자리를 넘거나 윤초·잘못된 날짜가 있으면 오류다.
+
+형식 지정자: `YYYY` 연, `MM` 월, `DD` 일, `HH` 시(00~23), `mm` 분,
+`ss` 초, `SSS` 밀리초, `Z` 시차(`+09:00`). 다른 글자는 그대로 출력한다.
+pattern은 최대 1024바이트다. offsetMinutes=540이면 UTC+09:00이다.
+
+time-add 단위는 `s`, `m`, `h`, `d`, `month`, `year`다.
+month/year 덧셈에서 해당 날짜가 없으면 결과 달의 마지막 날로 맞춘다.
+예: 2024-01-31 + 1 month = 2024-02-29.
+일 덧셈은 86400000밀리초이며 UTC에서 달·해를 넘긴다.
+
+duration-format은 0..253402300799999밀리초를 허용한다. `ko`는
+`1시간 2분 3초`, `short`는 `1h2m3s`다. 시간은 24 이상 누적할 수 있다.
+0인 단위는 생략하며 모두 0이면 `0초`/`0s`다. 1초 미만은 버린다.
+
+stopwatch는 기존 실시간 시계를 재사용한다. 단조 시계는 아니며 시스템 시계가
+뒤로 조정되어 시작 값보다 작아지면 INVALID_TIME을 반환한다.
+기존 `self/stdlib/time.fl`의 `now`·`time-diff-ms` 계약은 변경하지 않는다.
+같은 공개 이름(now-s)을 정의하므로 두 시간 모듈을 한 파일에 함께 load하지 않는다.
+
+
+기존 공개 함수 `now`, `time-diff-ms`, `time-elapsed`, `date-parts`, `ts-to-s`, `s-to-ts`, `time-ago`는 `self/stdlib/time.fl`의 기존 계약을 유지한다.
+자세한 사용법: [lib/time](../lib/time/README.md).
 
 ## ⑧ Modules
 
@@ -205,7 +266,7 @@ HTTP and JSON logic remain in FreeLang.
 - FreeLang implementations are preferred. `char-from-byte` is the sole C
   addition in area ① because the runtime can read an existing byte but cannot
   construct a one-byte string from an integer.
-- Area ③ adds the seven collection operations above; areas ④–⑧ document
-  existing public functions.
+- Area ③ adds the seven collection operations above. Area ⑦ adds the
+  `lib/time/` calendar and formatting API while preserving the legacy module.
 - The test suite records supported behavior. An unsupported capability is
   reported as such and is never represented by a passing placeholder test.
