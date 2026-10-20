@@ -1,0 +1,54 @@
+(load "../json/json.fl")
+(defn te-failure [code name expected actual]
+  {"ok" false "error" {"code" code "name" name "expected" expected "actual" actual}})
+(defn assert-eq [expected actual name]
+  (if (= expected actual) {"ok" true}
+    (te-failure "ASSERT_EQ" name expected actual)))
+(defn assert-true [actual name]
+  (if (= actual true) {"ok" true}
+    (te-failure "ASSERT_TRUE" name true actual)))
+(defn te-error-code [value]
+  (if (map? value)
+    (if (get value "code") (get value "code") (get (get value "error") "code")) nil))
+(defn assert-error [code callback name]
+  (let [[observed (try
+    (let [[result (callback)]]
+      (if (and (map? result) (= (get result "ok") false)) (te-error-code result) nil))
+    (catch e (te-error-code e)))]]
+    (if (and (string? code) (= code observed)) {"ok" true}
+      (te-failure "ASSERT_ERROR" name code observed))))
+(defn te-evaluate [callback name]
+  (try
+    (let [[r (callback)]]
+      (if (and (map? r) (= (get r "ok") true)) {"ok" true}
+        (if (and (map? r) (= (get r "ok") false) (map? (get r "error")))
+          (assoc r "error" (assoc (get r "error") "name" name))
+          (te-failure "INVALID_RESULT" name "assertion result" r))))
+    (catch e (te-failure "EXCEPTION" name "no exception" e))))
+(defn te-isolated [item]
+  (let [[name (get item "name")] [callback (get item "run")]
+        [raw (_fl_test_isolate (fn [] (get (json-stringify (te-evaluate callback name)) "value")))]]
+    (if (= (get raw "_tag") "Ok")
+      (let [[decoded (json-parse (get raw "value"))]]
+        (if (get decoded "ok") (get decoded "value")
+          (te-failure "TEST_PROCESS" name "valid result" "invalid JSON")))
+      (te-failure "TEST_PROCESS" name "normal completion" "exit, signal, timeout or missing result"))))
+(defn te-run-items [items index passed failures]
+  (if (>= index (length items))
+    {"passed" passed "failed" (length failures) "failed-names" (map (fn [e] (get e "name")) failures) "failures" failures}
+    (let [[r (te-isolated (get items index))]]
+      (if (= (get r "ok") true) (te-run-items items (+ index 1) (+ passed 1) failures)
+        (te-run-items items (+ index 1) passed (push failures (get r "error")))))))
+(defn test-run [items]
+  (if (and (list? items) (> (length items) 0)) (te-run-items items 0 0 [])
+    {"passed" 0 "failed" 1 "failed-names" ["<suite>"]
+      "failures" [{"code" "INVALID_SUITE" "name" "<suite>" "expected" "test list" "actual" items}]}))
+(defn te-print-failures [items index]
+  (if (< index (length items))
+    (do (println (str "FAIL " (get (get items index) "name")
+      " expected=" (get (get items index) "expected") " actual=" (get (get items index) "actual")))
+      (te-print-failures items (+ index 1))) nil))
+(defn test-report [summary]
+  (do (println (str "PASS " (get summary "passed") "/" (+ (get summary "passed") (get summary "failed"))))
+    (te-print-failures (get summary "failures") 0)
+    (_fl_exit (if (= (get summary "failed") 0) 0 1))))

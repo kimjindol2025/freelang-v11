@@ -261,6 +261,44 @@ stopwatch는 기존 실시간 시계를 재사용한다. 단조 시계는 아니
 |---|---|---|---|
 | `load` directive | exists | source module path → declarations in current compilation unit | compiler diagnostic with source position |
 
+## ⑨ Test and execution evidence (TASK 9-8)
+
+`load "lib/test/test.fl"` / `load "lib/evidence/evidence.fl"` 경로는 호출
+모듈 기준으로 지정한다. assertion·집계·JSON·가림 처리는 FreeLang이 담당한다.
+
+| 함수 | 입력 → 출력 |
+|---|---|
+| `assert-eq` | expected, actual, name → `{ok:true}` 또는 오류값 |
+| `assert-true` | actual, name → 정확히 true일 때만 통과 |
+| `assert-error` | code, callback, name → callback의 throw/Result 오류 코드 대조 |
+| `test-run` | `[{name,run:callback},…]` → passed, failed, failed-names, failures |
+| `test-report` | summary → `PASS n/m` 한 줄과 실패 상세 출력, 전체 통과 0 / 실패 1로 종료 |
+| `evidence-run` | command, 문자열 인자 목록 → code, stdout, stderr, signal, duration-ms, command, args |
+| `evidence-hash` | path → `{ok:true,value:sha256}` 또는 오류값 |
+| `evidence-mask` | value, 민감 문자열 목록 → 중첩 기록을 가림 처리한 값 |
+| `evidence-write` | path, record → now-iso timestamp와 가린 record를 JSON 원자 쓰기 |
+
+실패 assertion은 `{ok:false,error:{code,name,expected,actual}}`이다.
+빈 시험 목록도 실패다. 각 시험은 별도 자식 프로세스에서 실행하며 throw,
+치명 오류·signal·exit·10초 제한·결과 누락을 실패로 집계하고 다음 시험을 계속한다.
+자식 메모리 변경은 부모와 공유하지 않으며 파일 등 외부 부작용은 되돌리지 않는다.
+결과 전송 한도는 1MiB다. C 추가는 프로세스 격리·종료와 signal 보존에 한정한다.
+
+evidence-run은 셸을 자동으로 끼우지 않고 argv를 전달한다. 인자는 최대 253개다.
+없는 실행 파일은 code=127, signal 종료는 code=128+signal이다.
+실행 시작 실패는 PROCESS_START, 잘못된 인자는 INVALID_ARGUMENT이다.
+출력은 현재 런타임의 텍스트 문자열이며 NUL을 포함한 바이너리 캡처는 지원하지 않는다.
+duration-ms는 기존 실시간 시계 차이이며 음수면 0으로 제한한다.
+hash는 시스템 sha256sum의 소문자 64자리 값을 그대로 반환하며 실패는 HASH_FAILED다.
+
+가림은 경로·URL·이메일·IP 토큰과 path/account/user 등의 필드를 `<가림>`으로
+바꾼다. 일반 문장 속 단독 계정명은 자동 식별할 수 없으므로 민감 문자열 목록으로
+지정하거나 account/user 필드로 기록한다. 호스트명도 host 필드로 지정한다.
+임의 문자열·키에서 개인정보를 완전 탐지하는 기능은 아니다.
+숫자·해시·PASS 3/4 같은 계수는 유지한다. 원본 evidence-run 결과는 자동 가리지
+않으므로 외부 보고 전 evidence-mask를 사용한다. evidence-write는 자동 가림 후
+9-3 file-write-atomic을 재사용하고 해당 함수의 실패·복구 계약을 유지한다.
+
 ## Compatibility and implementation notes
 
 - FreeLang implementations are preferred. `char-from-byte` is the sole C

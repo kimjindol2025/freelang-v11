@@ -1006,6 +1006,8 @@
   [(= $op "_fl_process_spawn")     (str "_fl_process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "process_spawn")         (str "process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "process-spawn")         (str "process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_test_isolate")       (str "_fl_test_isolate(" (cgc (get $args 0)) ")")]
+  [(= $op "_fl_exit")               (str "_fl_exit(" (cgc (get $args 0)) ")")]
   [(= $op "capability-list")       "capability_list()"]
   [(= $op "capability-enable")     (str "capability_enable(" (cgc (get $args 0)) ")")]
   [(= $op "capability-disable")    (str "capability_disable(" (cgc (get $args 0)) ")")]

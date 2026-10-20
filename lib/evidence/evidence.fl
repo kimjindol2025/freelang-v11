@@ -1,0 +1,82 @@
+(load "../fs/fs.fl")
+(load "../time/time.fl")
+(defn ev-error [code] {"ok" false "error" {"code" code "message" code}})
+(defn ev-strings? [items index]
+  (if (>= index (length items)) true
+    (and (string? (get items index)) (ev-strings? items (+ index 1)))))
+(defn evidence-run [command args]
+  (if (not (and (string? command) (not (= command "")) (list? args)
+    (<= (length args) 253) (ev-strings? args 0))) (ev-error "INVALID_ARGUMENT")
+    (let [[started (now-ms)] [r (process-spawn command args)] [elapsed (max 0 (- (now-ms) started))]]
+      (if (= (get r "_tag") "Ok")
+        (assoc (assoc (assoc (get r "value") "duration-ms" elapsed) "command" command) "args" args)
+        (ev-error "PROCESS_START")))))
+(defn ev-hex? [s index]
+  (if (>= index (length s)) true
+    (and (str-includes "0123456789abcdef" (substring s index (+ index 1))) (ev-hex? s (+ index 1)))))
+(defn evidence-hash [path]
+  (if (not (and (string? path) (not (= path "")))) (ev-error "INVALID_ARGUMENT")
+    (let [[r (evidence-run "sha256sum" ["--zero" "--" path])]]
+      (if (not (= (get r "code") 0)) (ev-error "HASH_FAILED")
+        (let [[hash (substring (get r "stdout") 0 64)]]
+          (if (and (= (length hash) 64) (ev-hex? hash 0)) {"ok" true "value" hash}
+            (ev-error "HASH_FAILED")))))))
+;; Redaction is deliberately conservative. Plain account names must be supplied
+;; as sensitive strings or stored under an account/user field.
+(defn ev-digits? [s index]
+  (if (>= index (length s)) true
+    (and (str-includes "0123456789" (substring s index (+ index 1))) (ev-digits? s (+ index 1)))))
+(defn ev-fraction? [s]
+  (let [[parts (_fl_str_split s "/")]]
+    (and (= (length parts) 2) (> (length (get parts 0)) 0) (> (length (get parts 1)) 0)
+      (ev-digits? (get parts 0) 0) (ev-digits? (get parts 1) 0))))
+(defn ev-ipv4-parts? [parts index]
+  (if (>= index (length parts)) true
+    (let [[part (get parts index)]]
+      (and (> (length part) 0) (ev-digits? part 0) (<= (str-to-num part) 255)
+        (ev-ipv4-parts? parts (+ index 1))))))
+(defn ev-ipv4? [s]
+  (let [[host (get (_fl_str_split s ":") 0)] [parts (_fl_str_split host ".")]]
+    (and (= (length parts) 4) (ev-ipv4-parts? parts 0))))
+(defn ev-ipv6? [s]
+  (let [[parts (_fl_str_split s ":")]]
+    (and (>= (length parts) 3) (ev-ipv6-chars? s 0))))
+(defn ev-ipv6-chars? [s index]
+  (if (>= index (length s)) true
+    (and (str-includes "0123456789abcdefABCDEF:." (substring s index (+ index 1)))
+      (ev-ipv6-chars? s (+ index 1)))))
+(defn ev-private-token? [s]
+  (or (str-includes s "@") (str-includes s "\\") (str-includes s "://")
+    (and (str-includes s "/") (not (ev-fraction? s)))
+    (ev-ipv4? s) (ev-ipv6? s)))
+(defn ev-delimiter? [c] (str-includes " \n\r\t\"'()[]{}<>,;=" c))
+(defn ev-mask-text [s index token result]
+  (loop [i index word token out result]
+    (if (>= i (length s)) (str out (if (ev-private-token? word) "<가림>" word))
+      (let [[c (substring s i (+ i 1))]]
+        (if (ev-delimiter? c)
+          (recur (+ i 1) "" (str out (if (ev-private-token? word) "<가림>" word) c))
+          (recur (+ i 1) (str word c) out))))))
+(defn ev-replace-sensitive [text sensitive index]
+  (if (>= index (length sensitive)) text
+    (let [[s (get sensitive index)]]
+      (ev-replace-sensitive
+        (if (and (string? s) (not (= s ""))) (_fl_str_join (_fl_str_split text s) "<가림>") text)
+        sensitive (+ index 1)))))
+(defn ev-mask-list [items sensitive index result]
+  (if (>= index (length items)) result
+    (ev-mask-list items sensitive (+ index 1) (push result (evidence-mask (get items index) sensitive)))))
+(defn ev-sensitive-key? [key]
+  (includes-item ["path" "root" "cwd" "address" "host" "hostname" "ip" "url" "account" "user" "username" "email"] key))
+(defn ev-mask-map [value names sensitive index result]
+  (if (>= index (length names)) result
+    (let [[key (get names index)]]
+      (ev-mask-map value names sensitive (+ index 1)
+        (assoc result key (if (ev-sensitive-key? key) "<가림>" (evidence-mask (get value key) sensitive)))))))
+(defn evidence-mask [value sensitive]
+  (if (string? value) (ev-mask-text (ev-replace-sensitive value sensitive 0) 0 "" "")
+    (if (list? value) (ev-mask-list value sensitive 0 [])
+      (if (map? value) (ev-mask-map value (keys value) sensitive 0 {}) value))))
+(defn evidence-write [path record]
+  (let [[encoded (json-stringify {"timestamp" (now-iso) "record" (evidence-mask record [])})]]
+    (if (get encoded "ok") (file-write-atomic path (get encoded "value")) encoded)))

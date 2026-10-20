@@ -252,16 +252,78 @@ FLValue process_spawn(FLValue cmd, FLValue args) {
     }
     close(outp[0]); close(errp[0]);
     int st = 0;
-    waitpid(pid, &st, 0);
-    int code = WIFEXITED(st) ? WEXITSTATUS(st) : 1;
+    pid_t waited;
+    do { waited = waitpid(pid, &st, 0); } while (waited < 0 && errno == EINTR);
+    int sig = waited >= 0 && WIFSIGNALED(st) ? WTERMSIG(st) : 0;
+    int code = waited < 0 ? 1 : (WIFEXITED(st) ? WEXITSTATUS(st) : 128 + sig);
     FLValue kv[8] = {
         fl_str_val("stdout"), fl_str_val(out),
         fl_str_val("stderr"), fl_str_val(err),
         fl_str_val("code"), fl_int(code),
-        fl_str_val("signal"), fl_nil()
+        fl_str_val("signal"), sig ? fl_int(sig) : fl_nil()
     };
     free(out); free(err);
     return fl_ok(fl_map_from_pairs(kv, 4));
+}
+
+/* OS boundary only: the FreeLang callback owns assertions and JSON encoding.
+   A fatal runtime error, signal, missing payload or timeout cannot become PASS. */
+FLValue _fl_test_isolate(FLValue callback) {
+    int fds[2];
+    if (callback.tag != FL_FN || pipe(fds) != 0) return fl_err("TEST_PROCESS");
+    fflush(NULL);
+    pid_t pid = fork();
+    if (pid < 0) { close(fds[0]); close(fds[1]); return fl_err("TEST_PROCESS"); }
+    if (pid == 0) {
+        close(fds[0]);
+        alarm(10);
+        FLValue result = fl_fn_call(callback, 0, NULL);
+        if (result.tag != FL_STRING || !result.obj) _exit(2);
+        const char *p = fl_cstr(result);
+        size_t left = strlen(p);
+        if (!left || left > 1048576) _exit(2);
+        while (left) {
+            ssize_t n = write(fds[1], p, left);
+            if (n < 0 && errno == EINTR) continue;
+            if (n <= 0) _exit(2);
+            left -= (size_t)n; p += n;
+        }
+        close(fds[1]);
+        _exit(0);
+    }
+    close(fds[1]);
+    char *buf = malloc(1048577);
+    size_t used = 0;
+    int failed = !buf;
+    while (!failed) {
+        fd_set set; FD_ZERO(&set); FD_SET(fds[0], &set);
+        struct timeval tv = {10, 0};
+        int ready = select(fds[0] + 1, &set, NULL, NULL, &tv);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready <= 0) { failed = 1; break; }
+        char part[4096];
+        ssize_t n = read(fds[0], part, sizeof part);
+        if (n < 0 && errno == EINTR) continue;
+        if (n < 0 || used + (size_t)n > 1048576) { failed = 1; break; }
+        if (n == 0) break;
+        memcpy(buf + used, part, (size_t)n); used += (size_t)n;
+    }
+    close(fds[0]);
+    if (failed) kill(pid, SIGKILL);
+    int status = 0;
+    pid_t waited;
+    do { waited = waitpid(pid, &status, 0); } while (waited < 0 && errno == EINTR);
+    FLValue result = fl_err("TEST_PROCESS");
+    if (!failed && waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0 && used) {
+        buf[used] = '\0'; result = fl_ok(fl_str_val(buf));
+    }
+    free(buf);
+    return result;
+}
+
+FLValue _fl_exit(FLValue code) {
+    exit(code.tag == FL_INT ? (int)code.i : 1);
+    return fl_nil();
 }
 
 static FLValue git_finish(FLValue spawned) {

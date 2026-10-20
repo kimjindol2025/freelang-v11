@@ -1,0 +1,2 @@
+(load "../../lib/test/test.fl")
+(test-report (test-run [{"name" "works" "run" (fn [] (assert-eq 1 1 "works"))}]))
