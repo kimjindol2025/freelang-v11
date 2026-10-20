@@ -34,4 +34,4 @@ width/count는 정수 0..10000이다. 자동 문자열 변환·서식 지정자�
 HTTP·FS 내부의 기존 문자열 연산은 명시적 내부 기본 함수로 연결해 함께 사용할 수 있다.
 공유 모듈은 정규화한 상대 경로 기준 한 번만 확장한다. 심볼릭 링크의 동일성 판정은 하지 않는다.
 
-시험: `python3 tests/lib-contract/run-str-regex.py --compiler <native-compiler>`.
+시험 실행기: `tests/lib-contract/run-str-regex.fl`. `lib/test/README.md`의 네이티브 감독 실행기 빌드 예제에서 소스를 이 파일로 바꿔 빌드하고, `--compiler <native-compiler> --root <repository>`로 실행한다.

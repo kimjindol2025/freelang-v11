@@ -35,4 +35,4 @@ find-all/replace/split의 모든 일치가 같은 예산을 공유한다. 초과
 이는 시간 제한이나 스트리밍 엔진이 아니며 큰 입력의 별도 분할 처리를 제공하지 않는다.
 오류 후 다음 호출의 예산·파서 상태는 독립적이다.
 
-시험: `python3 tests/lib-contract/run-str-regex.py --compiler <native-compiler>`.
+시험 실행기: `tests/lib-contract/run-str-regex.fl`. `lib/test/README.md`의 네이티브 감독 실행기 빌드 예제에서 소스를 이 파일로 바꿔 빌드하고, `--compiler <native-compiler> --root <repository>`로 실행한다.

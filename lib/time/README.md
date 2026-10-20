@@ -59,5 +59,5 @@ stopwatch는 기존 실시간 시계를 재사용한다. 단조 시계는 아니
 (println (time-format (get parsed "value") "YYYY-MM-DD HH:mm:ss Z" 540))
 ```
 
-시험: `python3 tests/lib-contract/run-time.py --compiler <현재 네이티브 컴파일러>`.
-assertion·집계는 FreeLang이 수행하며 Python은 컴파일·링크·실행 감독만 맡는다.
+시험 실행기: `tests/lib-contract/run-time.fl`. `lib/test/README.md`의 네이티브 감독 실행기 빌드 예제에서 소스를 이 파일로 바꿔 빌드하고, `--compiler <현재 네이티브 컴파일러> --root <저장소>`로 실행한다.
+assertion·집계와 컴파일·링크·실행 감독은 FreeLang이 수행한다.

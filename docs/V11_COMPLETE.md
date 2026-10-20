@@ -20,6 +20,7 @@
 | `3db27042fe5c2d7c4cc60229f171667cfc81d9455b2d9a62ffd5c468d81e9a14` | `6c577f12` (`lib: time v0.1`) | now-iso 라이브러리 API를 우선 연결하고 기존 C 심볼과 분리; 모듈 없는 기존 내장 호출은 유지 |
 | `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-8 (`lib: test/evidence v0.1`) | 시험 프로세스 격리와 종료 기본 함수를 실제 네이티브 진입점에 연결 |
 | `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-9 (`test: fl runner, C minimal audit`) | C 최소 추가 근거 점검과 시험 감독 실행기의 FreeLang 전환; C·컴파일러 변경 없이 씨앗 부트스트랩 후 stage2·3·4 일치 재확인 |
+| `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6` | TASK 9-10 (`test: all runners in fl`) — 부분 완료 | 시간·문자열/정규식·FS 실행기 FreeLang 전환; 기존 stage2·3·4 해시와 cmp 재확인. C·컴파일러·씨앗 변경 없음. HTTP bind 전용 소켓 API 부재로 해당 실행기는 BLOCKED·Python 보존; 전체 Python 0회 미달성 |
 
 `git log -- self/cgc-main.fl docs/V11_COMPLETE.md`와 각 커밋의 실제 차이를
 대조했다. `dd552873…`의 기록 갱신 커밋 자체는 컴파일러 변경 커밋이 아니다.

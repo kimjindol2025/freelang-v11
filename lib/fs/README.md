@@ -49,6 +49,8 @@ can also leave temporary files. Ordinary writes/appends may leave partial data
 on I/O failure. Reads accept regular files only. There is no recursive deletion
 API; existing file deletion remains available through the legacy API.
 
-Run `python3 tests/lib-contract/run-fs.py --compiler /path/to/cgc`. The runner
+Build `tests/lib-contract/run-fs.fl` using the native supervisor build example in
+`lib/test/README.md`, substituting this source. Run the executable with
+`--compiler /path/to/cgc --root /path/to/repository`. The runner
 uses disposable fixtures, real mode permissions, a symlink loop and an actual
 1024-byte child file-size limit for partial atomic-write failure and recovery.
