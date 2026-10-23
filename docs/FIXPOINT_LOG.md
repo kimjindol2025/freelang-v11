@@ -542,3 +542,27 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-23, TASK 9-13에서 native 저장소 패키지 호환에 필요한 `when`, `??`, `empty?`, 기존 문자열 술어 코드 생성을 바로잡고 회귀 시험을 추가했다. 이전 고정점 `3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132`, 새 고정점 `6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d  stage2.c
+6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d  stage3.c
+6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+같은 TASK 9-13의 추가 검토에서 `empty?`와 `str-blank?`의 입력을 한 번만 평가하도록 lowering을 보완했다. 직전 고정점 `6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d`, 새 고정점 `b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b`.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b  stage2.c
+b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b  stage3.c
+b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

@@ -30,4 +30,13 @@ fi
 grep -q 'generated C failed gcc -fsyntax-only' "$WORK/invalid.log"
 grep -q 'error:' "$WORK/invalid.log"
 printf 'PASS invalid generated C rejected\n'
+
+"$WORK/cgc" "$ROOT/tests/cgc-native-forms.fl" "$WORK/native-forms.c"
+gcc -Wall -Wextra -I "$ROOT/runtime" -o "$WORK/native-forms" "$WORK/native-forms.c" \
+  "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
+  "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
+  "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm
+test "$("$WORK/native-forms")" = 'NATIVE_FORMS=PASS'
+printf 'PASS when, ??, and empty? native lowering\n'
+printf 'NATIVE_FORMS_SUMMARY=18/18\n'
 printf 'CGC_SYMBOL_SUMMARY=5/5\n'

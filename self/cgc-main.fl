@@ -846,6 +846,8 @@
     (cgc-dispatch-fallback $op $args)
     (cond
   [(= $op "if")     (cgc-if $args)]
+  [(= $op "when")   (cgc-if $args)]
+  [(= $op "??")      (cgc-null-coalesce $args)]
   [(= $op "case")   (cgc-case $args)]
   [(= $op "cond")   (cgc-cond $args)]
   [(= $op "do")     (cgc-do $args)]
@@ -881,7 +883,8 @@
   [(= $op "swap!")         (cgc-swap! $args)]
   ;; S26: stdlib 매핑
   [(= $op "includes-item")  (str "fl_includes_item(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "str-includes")    (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(or (= $op "str-includes") (= $op "str-contains")) (str "fl_str_includes(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-blank?") (cgc-str-blank? $args)]
   [(= $op "str-starts-with") (str "fl_str_starts_with(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-ends-with")   (str "fl_str_ends_with(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "string?")         (str "fl_string_p(" (cgc (get $args 0)) ")")]
@@ -937,7 +940,7 @@
   [(= $op "map?")         (str "fl_map_p(" (cgc (get $args 0)) ")")]
   [(= $op "fn?")          (str "fl_fn_p(" (cgc (get $args 0)) ")")]
   [(= $op "type-of")      (str "type_of(" (cgc (get $args 0)) ")")]
-  [(= $op "empty?")       (str "fl_empty_p(" (cgc (get $args 0)) ")")]
+  [(= $op "empty?")       (cgc-empty? $args)]
   [(= $op "not-empty?")   (str "fl_not_empty_p(" (cgc (get $args 0)) ")")]
   [(= $op "nil-or-empty?") (str "fl_nil_or_empty_p(" (cgc (get $args 0)) ")")]
   [(= $op "loop")   (cgc-loop $args)]
@@ -1439,6 +1442,28 @@
         [$then (cgc (get $args 1))]
         [$else (if (>= (length $args) 3) (cgc (get $args 2)) "fl_nil()")]]
   (str "(fl_truthy(" $cond ") ? " $then " : " $else ")")))
+
+(defn cgc-null-coalesce [$args]
+  (let [[$id @lambda-id-atom]
+        [$left (cgc (get $args 0))]
+        [$right (cgc (get $args 1))]
+        [$temp (str "__fl_coalesce_" $id)]]
+    (swap! lambda-id-atom + 1)
+    (str "(__extension__ ({ FLValue " $temp " = " $left "; fl_truthy(null_p(" $temp ")) ? " $right " : " $temp "; }))")))
+
+(defn cgc-empty? [$args]
+  (let [[$id @lambda-id-atom]
+        [$value (cgc (get $args 0))]
+        [$temp (str "__fl_empty_" $id)]]
+    (swap! lambda-id-atom + 1)
+    (str "(__extension__ ({ FLValue " $temp " = " $value "; fl_truthy(fl_map_p(" $temp ")) ? fl_eq(length(fl_map_keys(" $temp ")), fl_int(0)) : fl_eq(length(" $temp "), fl_int(0)); }))")))
+
+(defn cgc-str-blank? [$args]
+  (let [[$id @lambda-id-atom]
+        [$value (cgc (get $args 0))]
+        [$temp (str "__fl_blank_" $id)]]
+    (swap! lambda-id-atom + 1)
+    (str "(__extension__ ({ FLValue " $temp " = " $value "; fl_or(null_p(" $temp "), fl_eq(str_trim(" $temp "), fl_str_val(\"\"))); }))")))
 
 ;; ── cond ──
 
