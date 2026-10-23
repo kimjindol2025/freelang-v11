@@ -1,8 +1,10 @@
 #include "runtime.h"
 #include <sqlite3.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static const char *db_string(FLValue value, const char *operation) {
     if (value.tag != FL_STRING || !value.obj) {
@@ -18,6 +20,16 @@ typedef struct {
     bool owned;
 } FLDbLease;
 
+typedef struct FLDbEntry {
+    int64_t id;
+    sqlite3 *db;
+    char *path;
+    pid_t pid;
+    struct FLDbEntry *next;
+} FLDbEntry;
+
+static FLDbEntry *db_entries;
+
 static sqlite3 *db_open_path(const char *path) {
     sqlite3 *db = NULL;
     int code = sqlite3_open_v2(path, &db,
@@ -30,13 +42,31 @@ static sqlite3 *db_open_path(const char *path) {
         if (db) sqlite3_close(db);
         fl_throw(fl_str_val(message));
     }
+    (void)sqlite3_busy_timeout(db, 5000);
+    (void)sqlite3_exec(db, "PRAGMA foreign_keys = ON", NULL, NULL, NULL);
     return db;
+}
+
+static FLDbEntry *db_entry(int64_t id) {
+    for (FLDbEntry *entry = db_entries; entry; entry = entry->next)
+        if (entry->id == id) return entry;
+    return NULL;
+}
+
+static sqlite3 *db_reopen_after_fork(FLDbEntry *entry) {
+    if (entry->pid != getpid()) {
+        entry->db = db_open_path(entry->path);
+        entry->pid = getpid();
+    }
+    return entry->db;
 }
 
 static FLDbLease db_acquire(FLValue value) {
     FLDbLease lease;
     if (value.tag == FL_INT && value.i != 0) {
-        lease.handle = (sqlite3 *)(uintptr_t)(uint64_t)value.i;
+        FLDbEntry *entry = db_entry(value.i);
+        lease.handle = entry ? db_reopen_after_fork(entry)
+                             : (sqlite3 *)(uintptr_t)(uint64_t)value.i;
         lease.owned = false;
         return lease;
     }
@@ -134,14 +164,34 @@ static FLValue db_column(sqlite3_stmt *statement, int column) {
 FLValue fl_db_open(FLValue path_value) {
     const char *path = db_string(path_value, "db-open");
     sqlite3 *db = db_open_path(path);
-    return fl_int((int64_t)(uintptr_t)db);
+    FLDbEntry *entry = calloc(1, sizeof(*entry));
+    if (!entry || !(entry->path = strdup(path))) {
+        free(entry);
+        sqlite3_close(db);
+        fl_throw(fl_str_val("db-open: handle allocation failed"));
+    }
+    entry->id = (int64_t)(uintptr_t)db;
+    entry->db = db;
+    entry->pid = getpid();
+    entry->next = db_entries;
+    db_entries = entry;
+    return fl_int(entry->id);
 }
 
 FLValue fl_db_close(FLValue handle) {
     if (handle.tag != FL_INT || handle.i == 0) return fl_bool(true);
-    sqlite3 *db = (sqlite3 *)(uintptr_t)(uint64_t)handle.i;
+    FLDbEntry **cursor = &db_entries;
+    while (*cursor && (*cursor)->id != handle.i) cursor = &(*cursor)->next;
+    FLDbEntry *entry = *cursor;
+    sqlite3 *db = entry ? db_reopen_after_fork(entry)
+                       : (sqlite3 *)(uintptr_t)(uint64_t)handle.i;
     int code = sqlite3_close(db);
     if (code != SQLITE_OK) db_error(db, "db-close", code);
+    if (entry) {
+        *cursor = entry->next;
+        free(entry->path);
+        free(entry);
+    }
     return fl_bool(true);
 }
 

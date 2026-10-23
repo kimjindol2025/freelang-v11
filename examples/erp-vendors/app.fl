@@ -218,6 +218,12 @@
                   (db_execute DB "COMMIT" [])
                   (server-redirect (str "/items/" id)))))))))))
 
+;; This route exists only in isolated concurrency tests.
+(defn handle-test-slow [request]
+  (do (_fl_process_run_args "/bin/sleep" ["2"]) (server-html "slow")))
+(if (= (_fl_env_get "FL_HTTP_TEST_SLOW") "1")
+  (server-get "/__slow" handle-test-slow))
+
 (server-get "/items" handle-items)
 (server-get "/items/new" handle-new-item)
 (server-post "/items" handle-create-item)
@@ -230,4 +236,5 @@
 (server-get "/vendors/:id/edit" handle-edit)
 (server-post "/vendors/:id" handle-update)
 (server-post "/vendors/:id/delete" handle-delete)
+(server-workers 16)
 (server-start 0)

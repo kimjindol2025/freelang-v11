@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include "runtime.h"
 #include <arpa/inet.h>
@@ -9,12 +10,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
 #define HTTP_ROUTE_MAX 128
 #define HTTP_HEADER_MAX 65536
 #define HTTP_DEFAULT_BODY_LIMIT (1024 * 1024)
+#define HTTP_MAX_WORKERS 128
 
 typedef struct {
     char method[16];
@@ -30,6 +34,103 @@ static int64_t http_rate_window_ms = 0;
 static int64_t http_rate_window_start = 0;
 static int http_rate_count = 0;
 static volatile sig_atomic_t http_stopping = 0;
+static volatile sig_atomic_t http_child_changed = 0;
+static int http_worker_limit = 8;
+static pid_t http_workers[HTTP_MAX_WORKERS];
+static size_t http_worker_count = 0;
+typedef struct {
+    volatile int lock;
+    int64_t window_start;
+    int count;
+} FLHttpRateState;
+static FLHttpRateState *http_rate_shared;
+static int64_t http_now_ms(void);
+
+static void http_stop_signal(int signal_number) {
+    (void)signal_number;
+    http_stopping = 1;
+}
+
+static void http_child_signal(int signal_number) {
+    (void)signal_number;
+    http_child_changed = 1;
+}
+
+static void http_reap_workers(void) {
+    http_child_changed = 0;
+    for (size_t i = 0; i < http_worker_count;) {
+        pid_t result = waitpid(http_workers[i], NULL, WNOHANG);
+        if (result == http_workers[i] || (result < 0 && errno == ECHILD)) {
+            http_workers[i] = http_workers[--http_worker_count];
+        } else {
+            i++;
+        }
+    }
+}
+
+static void http_wait_for_worker_slot(void) {
+    while (http_worker_count >= (size_t)http_worker_limit && !http_stopping) {
+        http_child_changed = 0;
+        int status;
+        pid_t result = waitpid(-1, &status, 0);
+        if (result > 0) {
+            for (size_t i = 0; i < http_worker_count; i++) {
+                if (http_workers[i] == result) {
+                    http_workers[i] = http_workers[--http_worker_count];
+                    break;
+                }
+            }
+        } else if (errno != EINTR && errno != ECHILD) {
+            break;
+        } else {
+            http_reap_workers();
+        }
+    }
+}
+
+static void http_stop_workers(void) {
+    for (size_t i = 0; i < http_worker_count; i++) {
+        (void)kill(-http_workers[i], SIGTERM);
+        (void)kill(http_workers[i], SIGTERM);
+    }
+    while (http_worker_count > 0) {
+        int status;
+        pid_t result = waitpid(-1, &status, 0);
+        if (result > 0) {
+            for (size_t i = 0; i < http_worker_count; i++) {
+                if (http_workers[i] == result) {
+                    http_workers[i] = http_workers[--http_worker_count];
+                    break;
+                }
+            }
+        } else if (errno != EINTR && errno != ECHILD) {
+            break;
+        } else if (errno == ECHILD) {
+            http_worker_count = 0;
+        }
+    }
+}
+
+static int http_rate_limited(void) {
+    if (http_rate_max <= 0) return 0;
+    if (!http_rate_shared) {
+        int64_t now = http_now_ms();
+        if (now - http_rate_window_start >= http_rate_window_ms) {
+            http_rate_window_start = now;
+            http_rate_count = 0;
+        }
+        return ++http_rate_count > http_rate_max;
+    }
+    while (__sync_lock_test_and_set(&http_rate_shared->lock, 1)) { }
+    int64_t now = http_now_ms();
+    if (now - http_rate_shared->window_start >= http_rate_window_ms) {
+        http_rate_shared->window_start = now;
+        http_rate_shared->count = 0;
+    }
+    int limited = ++http_rate_shared->count > http_rate_max;
+    __sync_lock_release(&http_rate_shared->lock);
+    return limited;
+}
 
 static const char *http_value_string(FLValue value, const char *what) {
     if (value.tag != FL_STRING || !value.obj) {
@@ -105,6 +206,13 @@ FLValue server_delete(FLValue path, FLValue handler) {
     return fl_http_route(fl_str_val("DELETE"), path, handler);
 }
 
+FLValue server_workers(FLValue count) {
+    if (count.tag != FL_INT || count.i < 1 || count.i > HTTP_MAX_WORKERS)
+        fl_throw(fl_str_val("HTTP worker count must be between 1 and 128"));
+    http_worker_limit = (int)count.i;
+    return fl_int(http_worker_limit);
+}
+
 FLValue server_body_limit(FLValue bytes) {
     if (bytes.tag != FL_INT || bytes.i < 1 || bytes.i > 64 * 1024 * 1024)
         fl_throw(fl_str_val("HTTP body limit must be between 1 and 67108864 bytes"));
@@ -169,6 +277,7 @@ static const char *http_reason(int status) {
         case 413: return "Payload Too Large";
         case 429: return "Too Many Requests";
         case 500: return "Internal Server Error";
+        case 503: return "Service Unavailable";
         default: return "Response";
     }
 }
@@ -360,17 +469,9 @@ static void http_handle_client(int fd) {
         http_send_status(fd, status, status == 413 ? "payload too large" : "bad request");
         return;
     }
-    int64_t now = http_now_ms();
-    if (http_rate_max > 0) {
-        if (now - http_rate_window_start >= http_rate_window_ms) {
-            http_rate_window_start = now;
-            http_rate_count = 0;
-        }
-        http_rate_count++;
-        if (http_rate_count > http_rate_max) {
-            http_send_status(fd, 429, "rate limit exceeded");
-            return;
-        }
+    if (http_rate_limited()) {
+        http_send_status(fd, 429, "rate limit exceeded");
+        return;
     }
     FLValue response = http_dispatch(request, &status);
     FLValue body = fl_map_get(response, fl_str_val("body"));
@@ -425,21 +526,68 @@ FLValue fl_http_start(FLValue port_value) {
         close(server);
         return fl_nil();
     }
+    http_rate_shared = mmap(NULL, sizeof(*http_rate_shared), PROT_READ | PROT_WRITE,
+                            MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (http_rate_shared == MAP_FAILED) {
+        http_rate_shared = NULL;
+        close(server);
+        return fl_nil();
+    }
+    memset(http_rate_shared, 0, sizeof(*http_rate_shared));
+    http_rate_shared->window_start = http_rate_window_start;
     printf("HTTP_LISTENING=127.0.0.1:%u\n", (unsigned)ntohs(address.sin_port));
     fflush(stdout);
+    struct sigaction stop_action, child_action, old_int, old_term, old_child;
+    memset(&stop_action, 0, sizeof(stop_action));
+    stop_action.sa_handler = http_stop_signal;
+    sigemptyset(&stop_action.sa_mask);
+    memset(&child_action, 0, sizeof(child_action));
+    child_action.sa_handler = http_child_signal;
+    sigemptyset(&child_action.sa_mask);
     http_stopping = 0;
+    http_child_changed = 0;
+    http_worker_count = 0;
+    (void)sigaction(SIGINT, &stop_action, &old_int);
+    (void)sigaction(SIGTERM, &stop_action, &old_term);
+    (void)sigaction(SIGCHLD, &child_action, &old_child);
     int served = 0;
     while (!http_stopping && (max_requests == 0 || served < max_requests)) {
+        if (http_child_changed) http_reap_workers();
+        http_wait_for_worker_slot();
+        if (http_stopping) break;
         int client = accept(server, NULL, NULL);
         if (client < 0) {
             if (errno == EINTR) continue;
             break;
         }
-        http_handle_client(client);
-        close(client);
+        pid_t worker = fork();
+        if (worker == 0) {
+            (void)setpgid(0, 0);
+            close(server);
+            (void)signal(SIGINT, SIG_DFL);
+            (void)signal(SIGTERM, SIG_DFL);
+            (void)signal(SIGCHLD, SIG_DFL);
+            http_handle_client(client);
+            close(client);
+            _exit(0);
+        }
+        if (worker < 0) {
+            http_send_status(client, 503, "server busy");
+            close(client);
+        } else {
+            (void)setpgid(worker, worker);
+            http_workers[http_worker_count++] = worker;
+            close(client);
+        }
         served++;
     }
     close(server);
+    http_stop_workers();
+    (void)sigaction(SIGINT, &old_int, NULL);
+    (void)sigaction(SIGTERM, &old_term, NULL);
+    (void)sigaction(SIGCHLD, &old_child, NULL);
+    (void)munmap(http_rate_shared, sizeof(*http_rate_shared));
+    http_rate_shared = NULL;
     printf("HTTP_SERVER_STOPPED requests=%d\n", served);
     fflush(stdout);
     return fl_int(served);

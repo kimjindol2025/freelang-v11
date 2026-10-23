@@ -139,6 +139,7 @@ FLValue fl_resp_redirect(FLValue location);
 FLValue fl_resp_html(FLValue body);
 FLValue server_put(FLValue path, FLValue handler);
 FLValue server_delete(FLValue path, FLValue handler);
+FLValue server_workers(FLValue count);
 FLValue server_body_limit(FLValue bytes);
 FLValue server_rate_limit(FLValue count, FLValue window_ms);
 FLValue server_req_header(FLValue request, FLValue name);

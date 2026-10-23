@@ -1,0 +1,76 @@
+(load "../../lib/evidence/evidence.fl")
+
+(defn out [command args]
+  (let [[r (evidence-run command args)]]
+    (if (= (get r "code") 0) (get r "stdout")
+      (throw (str "command failed: " command " " (get r "stderr"))))))
+(defn check [condition name]
+  (if condition (do (println (str "PASS " name)) true)
+    (do (println (str "FAIL " name)) false)))
+(defn start-server [work port binary]
+  (out "sh" ["-c" "ERP_DB_PATH=\"$1/erp.sqlite\" FL_HTTP_TEST_SLOW=1 FL_HTTP_PORT=\"$2\" \"$3\" >\"$1/server.out\" 2>\"$1/server.err\" & echo $!" "erp-concurrency" work (str port) binary]))
+(defn request [url path args]
+  (out "curl" (concat ["--silent" "--show-error" "--include" (str url path)] args)))
+(defn stock-query [database name]
+  (out "sqlite3" [database (str "SELECT i.name||'|'||COALESCE(SUM(CASE WHEN m.kind='in' THEN m.qty WHEN m.kind='out' THEN -m.qty ELSE 0 END),0) FROM items i LEFT JOIN stock_moves m ON m.item_id=i.id WHERE i.name='" name "' GROUP BY i.id;")]))
+(defn count-query [database table]
+  (out "sqlite3" [database (str "SELECT count(*) FROM " table ";")]))
+(defn count-text [text needle index total]
+  (let [[found (_fl_str_index_of (substring text index (length text)) needle)]]
+    (if (< found 0) total
+      (count-text text needle (+ index found (length needle)) (+ total 1)))))
+(defn has [text needle] (>= (_fl_str_index_of text needle) 0))
+
+(let [[work (get (cli-args) 0)] [binary (get (cli-args) 1)]
+      [listener (tcp-listen "127.0.0.1" 0)] [port (tcp-local-port listener)]]
+  (tcp-close listener)
+  (let [[pid (str-trim (start-server work port binary))]
+        [url (str "http://127.0.0.1:" port)] [database (str work "/erp.sqlite")]]
+    (do
+      (evidence-run "sleep" ["0.1"])
+      (let [[probe (out "curl" ["--silent" "--show-error" "--output" "/dev/null" "--write-out" "%{http_code}" (str url "/items")])]
+            [baseline-count (count-query database "items")]
+            [timings (out "sh" ["-c"
+              "work=$1; base=$2; curl --silent --show-error --output /dev/null --write-out 'SLOW=%{time_total}s HTTP=%{http_code}\\n' \"$base/__slow\" >\"$work/slow.time\" & slow=$!; sleep 0.1; for i in 1 2 3 4 5; do curl --silent --show-error --output /dev/null --write-out \"FAST_$i=%{time_total}s HTTP=%{http_code}\\n\" \"$base/items\" >\"$work/fast-$i.time\" & done; wait \"$slow\"; for i in 1 2 3 4 5; do wait; done; cat \"$work/fast-1.time\" \"$work/fast-2.time\" \"$work/fast-3.time\" \"$work/fast-4.time\" \"$work/fast-5.time\" \"$work/slow.time\"; awk -F'[ =]' '$2 < 1 && $4 == 200 {n++} END {printf \"FAST_UNDER_1S=%d/5\\n\", n+0}' \"$work/fast-1.time\" \"$work/fast-2.time\" \"$work/fast-3.time\" \"$work/fast-4.time\" \"$work/fast-5.time\""
+              "conc-fast" work url])]
+            [vendor-response (request url "/vendors" ["--data-urlencode" "name=Concurrency Supplier" "--data-urlencode" "phone=000" "--data-urlencode" "memo=example"])]
+            [vendor-id (str-trim (out "sqlite3" [database "SELECT id FROM vendors WHERE name='Concurrency Supplier';"]))]
+            [bulk-codes (out "sh" ["-c"
+              "work=$1; base=$2; vendor=$3; for i in $(seq 1 50); do curl --silent --show-error --output /dev/null --write-out '%{http_code}' \"$base/items\" >\"$work/list-$i.code\" & done; for i in $(seq 1 20); do curl --silent --show-error --output /dev/null --write-out '%{http_code}' --data-urlencode \"name=Bulk-$i\" --data-urlencode 'unit=ea' --data-urlencode \"vendor_id=$vendor\" \"$base/items\" >\"$work/add-$i.code\" & done; wait; printf 'BULK_STATUS_BEGIN\\n'; for i in $(seq 1 50); do cat \"$work/list-$i.code\"; printf '\\n'; done; for i in $(seq 1 20); do cat \"$work/add-$i.code\"; printf '\\n'; done; printf 'BULK_STATUS_END\\n'"
+              "conc-bulk" work url vendor-id])]
+            [after-bulk (count-query database "items")]
+            [bulk-delta (- (str-to-num (str-trim after-bulk)) (str-to-num (str-trim baseline-count)))]
+            [created (request url "/items" ["--data-urlencode" "name=Concurrent Stock" "--data-urlencode" "unit=ea" "--data-urlencode" (str "vendor_id=" vendor-id)])]
+            [item-id (str-trim (out "sqlite3" [database "SELECT id FROM items WHERE name='Concurrent Stock';"]))]
+            [inbound (request url (str "/items/" item-id "/moves") ["--data-urlencode" "qty=10" "--data-urlencode" "kind=in" "--data-urlencode" "memo=opening"])]
+            [move-codes (out "sh" ["-c"
+              "work=$1; base=$2; id=$3; for i in $(seq 1 10); do curl --silent --show-error --output /dev/null --write-out '%{http_code}' --data-urlencode 'qty=3' --data-urlencode 'kind=out' --data-urlencode \"memo=issue-$i\" \"$base/items/$id/moves\" >\"$work/move-$i.code\" & done; wait; printf 'MOVE_STATUS_BEGIN\\n'; for i in $(seq 1 10); do cat \"$work/move-$i.code\"; printf '\\n'; done; printf 'MOVE_STATUS_END\\n'"
+              "conc-stock" work url item-id])]
+            [stock (stock-query database "Concurrent Stock")]
+            [zombies (out "sh" ["-c" "ps -o pid,ppid,stat --ppid \"$1\" 2>/dev/null || true" "conc-ps" pid])]
+            [shutdown-result (out "sh" ["-c"
+              "work=$1; base=$2; server=$3; curl --silent --show-error --output /dev/null \"$base/__slow\" & request=$!; sleep 0.2; child=$(ps -o pid= --ppid \"$server\" | head -1); kill -TERM \"$server\"; for i in $(seq 1 250); do if ! kill -0 \"$child\" 2>/dev/null; then break; fi; state=$(ps -o stat= -p \"$child\" 2>/dev/null); case \"$state\" in Z*) break;; esac; sleep 0.02; done; wait \"$request\" 2>/dev/null || true; state=$(ps -o stat= -p \"$child\" 2>/dev/null); if test -z \"$state\"; then echo CHILD_GONE=1; else echo CHILD_STATE=$state; fi; for i in $(seq 1 250); do if ! kill -0 \"$server\" 2>/dev/null; then echo SERVER_GONE=1; exit 0; fi; sleep 0.02; done; echo SERVER_GONE=0; exit 1"
+              "conc-stop" work url pid])]
+            [move-successes (count-text move-codes "303" 0 0)]
+            [move-conflicts (count-text move-codes "409" 0 0)]
+            [checks [
+              (check (and (= probe "200") (has timings "SLOW=") (has timings "HTTP=200")) "slow endpoint and baseline requests respond")
+              (check (has timings "FAST_UNDER_1S=5/5") "five fast responses arrive under one second")
+              (check (and (has vendor-response "HTTP/1.1 303") (has bulk-codes "BULK_STATUS_BEGIN") (= (count-text bulk-codes "200\n" 0 0) 50) (= (count-text bulk-codes "303\n" 0 0) 20)) "50 reads and 20 creates return all responses")
+              (check (= bulk-delta 20) "concurrent creates add exactly twenty SQLite items")
+              (check (and (has created "HTTP/1.1 303") (has inbound "HTTP/1.1 303") (= move-successes 3) (= move-conflicts 7)) "ten simultaneous issues accept only three")
+              (check (= stock "Concurrent Stock|1\n") "concurrent stock never drops below zero")
+              (check (not (includes-item zombies "Z")) "no worker zombies remain after requests")
+              (check (and (has shutdown-result "CHILD_GONE=1") (has shutdown-result "SERVER_GONE=1")) "server shutdown ends active worker")
+            ]]
+            [passed (length (filter (fn [result] result) checks))]]
+        (do
+          (println "FAST_AND_SLOW_TIMINGS_BEGIN") (print timings) (println "FAST_AND_SLOW_TIMINGS_END")
+          (println (str "BULK_RESPONSES=GET_50/" (count-text bulk-codes "200\n" 0 0) " POST_20/" (count-text bulk-codes "303\n" 0 0)))
+          (println (str "SQLITE_ITEM_COUNT_BEFORE=" (str-trim baseline-count) " AFTER=" (str-trim after-bulk) " DELTA=" bulk-delta))
+          (println "MOVE_RESPONSES_BEGIN") (print move-codes) (println "MOVE_RESPONSES_END")
+          (println (str "MOVE_SUCCESS=" move-successes " MOVE_REJECTED=" move-conflicts))
+          (println "SQLITE_CONCURRENT_STOCK:") (print stock)
+          (println (str "ZOMBIE_PS_RAW_BEGIN\n" zombies "ZOMBIE_PS_RAW_END"))
+          (println (str "SHUTDOWN_CHILD_RESULT=" shutdown-result))
+          (println (str "CONC_SUMMARY=" passed "/" (length checks))))))))
