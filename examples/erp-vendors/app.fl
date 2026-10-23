@@ -1,7 +1,10 @@
 ;; Small loopback-only vendor screen. Set ERP_DB_PATH and FL_HTTP_PORT to isolate a run.
 (load "../../lib/db/db.fl")
 (define DB (db-open (or (_fl_env_get "ERP_DB_PATH") "vendors.sqlite3")))
+(db_execute DB "PRAGMA foreign_keys = ON" [])
 (db_create DB "CREATE TABLE IF NOT EXISTS vendors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL, memo TEXT NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, unit TEXT NOT NULL, vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE RESTRICT, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS stock_moves (id INTEGER PRIMARY KEY AUTOINCREMENT, item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE RESTRICT, qty INTEGER NOT NULL CHECK(typeof(qty) = 'integer' AND qty >= 1), kind TEXT NOT NULL CHECK(kind IN ('in', 'out')), memo TEXT NOT NULL, created_at TEXT NOT NULL)")
 
 (defn escapehtml [value]
   (str-replace (str-replace (str-replace (str-replace (str-replace value "&" "&amp;") "<" "&lt;") ">" "&gt;") "\"" "&quot;") "'" "&#39;"))
@@ -100,9 +103,126 @@
           (server-redirect "/vendors"))))))
 
 (defn handle-delete [request]
-  (let [[id (str-to-num (get (get request "params") "id"))]]
-    (db_delete_row DB "vendors" {"id" id})
-    (server-redirect "/vendors")))
+  (let [[id (str-to-num (get (get request "params") "id"))]
+        [items (db-query DB "SELECT id FROM items WHERE vendor_id = ?" [id])]]
+    (if (> (length items) 0)
+      (server-status 409 "품목이 연결된 거래처는 삭제할 수 없습니다.")
+      (do
+        (db_delete_row DB "vendors" {"id" id})
+        (server-redirect "/vendors")))))
+
+(defn item-record [id]
+  (first (db-query DB "SELECT i.id, i.name, i.unit, i.vendor_id, v.name AS vendor_name, COALESCE(SUM(CASE WHEN m.kind = 'in' THEN m.qty WHEN m.kind = 'out' THEN -m.qty ELSE 0 END), 0) AS stock FROM items i JOIN vendors v ON v.id = i.vendor_id LEFT JOIN stock_moves m ON m.item_id = i.id WHERE i.id = ? GROUP BY i.id, i.name, i.unit, i.vendor_id, v.name" [id])))
+
+(defn item-list-rows []
+  (db-query DB "SELECT i.id, i.name, i.unit, i.vendor_id, v.name AS vendor_name, COALESCE(SUM(CASE WHEN m.kind = 'in' THEN m.qty WHEN m.kind = 'out' THEN -m.qty ELSE 0 END), 0) AS stock FROM items i JOIN vendors v ON v.id = i.vendor_id LEFT JOIN stock_moves m ON m.item_id = i.id GROUP BY i.id, i.name, i.unit, i.vendor_id, v.name ORDER BY i.id" []))
+
+(defn item-moves [id]
+  (db-query DB "SELECT id, kind, qty, memo, created_at FROM stock_moves WHERE item_id = ? ORDER BY id DESC" [id]))
+
+(defn item-stock [id]
+  (get (item-record id) "stock"))
+
+(defn item-rows-html [rows index html]
+  (if (>= index (length rows)) html
+    (let [[row (get rows index)] [id (str (get row "id"))]]
+      (item-rows-html rows (+ index 1)
+        (str html "<tr><td><a href=\"/items/" id "\">" id "</a></td><td>" (escapehtml (get row "name"))
+          "</td><td>" (escapehtml (get row "unit")) "</td><td>" (escapehtml (get row "vendor_name"))
+          "</td><td>" (str (get row "stock")) "</td></tr>\n")))))
+
+(defn vendor-options [rows index selected html]
+  (if (>= index (length rows)) html
+    (let [[row (get rows index)] [id (str (get row "id"))]]
+      (vendor-options rows (+ index 1) selected
+        (str html "<option value=\"" id "\"" (if (= id selected) " selected" "") ">"
+          (escapehtml (get row "name")) "</option>")))))
+
+(defn item-form [name unit vendor-id message]
+  (let [[vendors (db-query DB "SELECT id, name FROM vendors ORDER BY name" [])]]
+    (server-html (page "품목 추가"
+      (str (if (= message "") "" (str "<p role=\"alert\">" (escapehtml message) "</p>"))
+        "<form method=\"post\" action=\"/items\"><label>품목명<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
+        "<label>단위<input name=\"unit\" value=\"" (escapehtml unit) "\"></label><label>거래처<select name=\"vendor_id\" required><option value=\"\">선택</option>"
+        (vendor-options vendors 0 vendor-id "") "</select></label><button>저장</button></form><p><a href=\"/items\">목록</a></p>")))))
+
+(defn item-moves-html [rows index html]
+  (if (>= index (length rows)) html
+    (let [[row (get rows index)]]
+      (item-moves-html rows (+ index 1)
+        (str html "<tr><td>" (escapehtml (get row "kind")) "</td><td>" (str (get row "qty"))
+          "</td><td>" (escapehtml (get row "memo")) "</td><td>" (escapehtml (get row "created_at")) "</td></tr>\n")))))
+
+(defn item-detail-page [item message qty kind memo]
+  (let [[id (str (get item "id"))] [moves (item-moves (get item "id"))]]
+    (server-html (page "품목 상세"
+      (str "<p><a href=\"/items\">품목 목록</a></p><p>품목: " (escapehtml (get item "name"))
+        " / 단위: " (escapehtml (get item "unit")) " / 거래처: " (escapehtml (get item "vendor_name"))
+        " / 현재 재고: " (str (get item "stock")) "</p>"
+        (if (= message "") "" (str "<p role=\"alert\">" (escapehtml message) "</p>"))
+        "<form method=\"post\" action=\"/items/" id "/moves\"><label>구분<select name=\"kind\"><option value=\"in\"" (if (= kind "in") " selected" "") ">입고</option><option value=\"out\"" (if (= kind "out") " selected" "") ">출고</option></select></label>"
+        "<label>수량<input type=\"number\" name=\"qty\" min=\"1\" step=\"1\" value=\"" (escapehtml qty) "\"></label>"
+        "<label>메모<textarea name=\"memo\">" (escapehtml memo) "</textarea></label><button>기록</button></form>"
+        "<h2>입출고 기록</h2><table><thead><tr><th>구분</th><th>수량</th><th>메모</th><th>시간</th></tr></thead><tbody>"
+        (item-moves-html moves 0 "") "</tbody></table>")))))
+
+(defn handle-items [request]
+  (server-html (page "품목 목록"
+    (str "<p><a href=\"/items/new\">품목 추가</a></p><table><thead><tr><th>ID</th><th>품목명</th><th>단위</th><th>거래처</th><th>재고</th></tr></thead><tbody>"
+      (item-rows-html (item-list-rows) 0 "") "</tbody></table>"))))
+
+(defn handle-new-item [request]
+  (item-form "" "" "" ""))
+
+(defn handle-create-item [request]
+  (let [[form (request-form request)] [name (formvalue form "name")] [unit (formvalue form "unit")]
+        [vendor-text (formvalue form "vendor_id")] [vendor-id (str-to-num vendor-text)]
+        [vendor (first (db-query DB "SELECT id FROM vendors WHERE id = ?" [vendor-id]))]]
+    (if (= (trim name) "")
+      (item-form name unit vendor-text "품목명을 입력하세요.")
+      (if (= vendor nil)
+        (item-form name unit vendor-text "거래처를 선택하세요.")
+        (do
+          (db_insert DB "items" {"name" name "unit" unit "vendor_id" vendor-id "created_at" (now-iso)})
+          (server-redirect "/items"))))))
+
+(defn digits-only? [text index]
+  (if (= (length text) 0) false
+    (if (>= index (length text)) true
+      (let [[code (char-code-at text index)]]
+        (and (>= code 48) (<= code 57) (digits-only? text (+ index 1)))))))
+
+(defn handle-item-detail [request]
+  (let [[id (str-to-num (get (get request "params") "id"))] [item (item-record id)]]
+    (if (= item nil) (server-status 404 "품목을 찾을 수 없습니다.")
+      (item-detail-page item "" "" "in" ""))))
+
+(defn handle-stock-move [request]
+  (let [[id (str-to-num (get (get request "params") "id"))] [item (item-record id)]
+        [form (request-form request)] [raw-qty (formvalue form "qty")] [qty (str-to-num raw-qty)]
+        [kind (formvalue form "kind")] [memo (formvalue form "memo")]]
+    (if (= item nil) (server-status 404 "품목을 찾을 수 없습니다.")
+      (if (not (and (digits-only? raw-qty 0) (number? qty) (integer? qty) (> qty 0)))
+        (server-status 400 "수량은 1 이상의 정수여야 합니다.")
+        (if (not (or (= kind "in") (= kind "out")))
+          (server-status 400 "입출고 구분이 올바르지 않습니다.")
+          (do
+            (db_execute DB "BEGIN IMMEDIATE" [])
+            (let [[current (item-stock id)]]
+              (if (and (= kind "out") (< current qty))
+                (do
+                  (db_execute DB "ROLLBACK" [])
+                  (server-status 409 "재고가 부족합니다."))
+                (do
+                  (db_insert DB "stock_moves" {"item_id" id "qty" qty "kind" kind "memo" memo "created_at" (now-iso)})
+                  (db_execute DB "COMMIT" [])
+                  (server-redirect (str "/items/" id)))))))))))
+
+(server-get "/items" handle-items)
+(server-get "/items/new" handle-new-item)
+(server-post "/items" handle-create-item)
+(server-get "/items/:id" handle-item-detail)
+(server-post "/items/:id/moves" handle-stock-move)
 
 (server-get "/vendors" handle-list)
 (server-get "/vendors/new" handle-new)

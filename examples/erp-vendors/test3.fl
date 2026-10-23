@@ -1,0 +1,123 @@
+(load "../../lib/evidence/evidence.fl")
+
+(defn out [command args]
+  (let [[r (evidence-run command args)]]
+    (if (= (get r "code") 0) (get r "stdout")
+      (throw (str "command failed: " command " " (get r "stderr"))))))
+(defn has [text needle] (>= (_fl_str_index_of text needle) 0))
+(defn count-text [text needle index total]
+  (let [[found (_fl_str_index_of (substring text index (length text)) needle)]]
+    (if (< found 0) total
+      (count-text text needle (+ index found (length needle)) (+ total 1)))))
+(defn check [condition name]
+  (if condition (do (println (str "PASS " name)) true)
+    (do (println (str "FAIL " name)) false)))
+(defn start-server [work port binary]
+  (out "sh" ["-c" "ERP_DB_PATH=\"$1/erp.sqlite\" FL_HTTP_PORT=\"$2\" \"$3\" >\"$1/server.out\" 2>\"$1/server.err\" & echo $!" "erp-test" work (str port) binary]))
+(defn request [url path args]
+  (out "curl" (concat ["--silent" "--show-error" "--include" (str url path)] args)))
+(defn post-vendor [url name]
+  (request url "/vendors" ["--data-urlencode" (str "name=" name) "--data-urlencode" "phone=000" "--data-urlencode" "memo=example"]))
+(defn post-item [url name unit vendor]
+  (request url "/items" ["--data-urlencode" (str "name=" name) "--data-urlencode" (str "unit=" unit) "--data-urlencode" (str "vendor_id=" vendor)]))
+(defn move [url id qty kind memo]
+  (request url (str "/items/" id "/moves") ["--data-urlencode" (str "qty=" qty) "--data-urlencode" (str "kind=" kind) "--data-urlencode" (str "memo=" memo)]))
+(defn count-query [database table]
+  (out "sqlite3" [database (str "SELECT count(*) FROM " table ";")]))
+(defn stock-query [database name]
+  (out "sqlite3" [database (str "SELECT i.name||'|'||COALESCE(SUM(CASE WHEN m.kind='in' THEN m.qty WHEN m.kind='out' THEN -m.qty ELSE 0 END),0) FROM items i LEFT JOIN stock_moves m ON m.item_id=i.id WHERE i.name='" name "' GROUP BY i.id;")]))
+(defn list-html [url]
+  (out "curl" ["--silent" "--show-error" (str url "/items")]))
+
+(let [[work (get (cli-args) 0)] [binary (get (cli-args) 1)]
+      [listener (tcp-listen "127.0.0.1" 0)] [port (tcp-local-port listener)]]
+  (tcp-close listener)
+  (let [[pid (str-trim (start-server work port binary))]
+        [url (str "http://127.0.0.1:" port)] [database (str work "/erp.sqlite")]]
+    (do
+      (evidence-run "sleep" ["0.1"])
+      (let [[vendor1 (post-vendor url "Example Supplier")]
+            [vendor2 (post-vendor url "Unused Supplier")]
+            [vendor-id (str-trim (out "sqlite3" [database "SELECT id FROM vendors WHERE name='Example Supplier';"]))]
+            [unused-id (str-trim (out "sqlite3" [database "SELECT id FROM vendors WHERE name='Unused Supplier';"]))]
+            [empty-list (list-html url)]
+            [new-form (out "curl" ["--silent" "--show-error" (str url "/items/new")])]
+            [blank-item (post-item url "" "ea" vendor-id)]
+            [after-blank (count-query database "items")]
+            [bad-vendor (post-item url "Bad Vendor Item" "ea" "999")]
+            [after-bad-vendor (count-query database "items")]
+            [created (post-item url "Widget" "ea" vendor-id)]
+            [widget-id (str-trim (out "sqlite3" [database "SELECT id FROM items WHERE name='Widget';"]))]
+            [received (move url widget-id "10" "in" "opening stock")]
+            [issued (move url widget-id "3" "out" "sample issue")]
+            [item-list (list-html url)]
+            [stock-seven (stock-query database "Widget")]
+            [detail (out "curl" ["--silent" "--show-error" (str url "/items/" widget-id)])]
+            [oversell (move url widget-id "8" "out" "too many")]
+            [stock-after-oversell (stock-query database "Widget")]
+            [moves-after-oversell (out "sqlite3" [database (str "SELECT kind||'|'||qty||'|'||memo FROM stock_moves WHERE item_id=" widget-id " ORDER BY id;")])]
+            [zero-qty (move url widget-id "0" "in" "invalid zero")]
+            [negative-qty (move url widget-id "-1" "in" "invalid negative")]
+            [text-qty (move url widget-id "abc" "in" "invalid text")]
+            [bad-kind (move url widget-id "1" "sideways" "invalid kind")]
+            [stock-after-invalid (stock-query database "Widget")]
+            [linked-delete (request url (str "/vendors/" vendor-id "/delete") ["--request" "POST"])]
+            [linked-vendor-count (out "sqlite3" [database (str "SELECT count(*) FROM vendors WHERE id=" vendor-id ";")])]
+            [unused-delete (request url (str "/vendors/" unused-id "/delete") ["--request" "POST"])]
+            [unused-vendor-count (out "sqlite3" [database (str "SELECT count(*) FROM vendors WHERE id=" unused-id ";")])]
+            [missing-item (out "curl" ["--silent" "--show-error" "--include" (str url "/items/999")])]
+            [parallel-item (post-item url "Concurrent Widget" "ea" vendor-id)]
+            [parallel-id (str-trim (out "sqlite3" [database "SELECT id FROM items WHERE name='Concurrent Widget';"]))]
+            [parallel-in (move url parallel-id "10" "in" "parallel opening")]
+            [parallel-codes (out "sh" ["-c" "work=$1; base=$2; id=$3; for i in $(seq 1 5); do curl --silent --show-error --output \"$work/move-$i.body\" --write-out '%{http_code}' --data-urlencode 'qty=3' --data-urlencode 'kind=out' --data-urlencode \"memo=parallel-$i\" \"$base/items/$id/moves\" >\"$work/move-$i.code\" & done; wait; printf 'PARALLEL_CODES_BEGIN\\n'; for i in $(seq 1 5); do cat \"$work/move-$i.code\"; printf '\\n'; done; printf 'PARALLEL_CODES_END\\n'" "erp-parallel" work url parallel-id])]
+            [parallel-stock (stock-query database "Concurrent Widget")]
+            [parallel-moves (out "sqlite3" [database (str "SELECT count(*) FROM stock_moves WHERE item_id=" parallel-id ";")])]
+            [xss-item (post-item url "<script>'" "ea" vendor-id)]
+            [xss-item-row (out "sh" ["-c" "curl --silent --show-error \"$1/items\" | grep '&lt;script&gt;&#39;'" "erp-test" url])]
+            [xss-db (out "sqlite3" [database "SELECT name FROM items WHERE name='<script>''';"])]
+            [missing-after-xss (out "curl" ["--silent" "--show-error" "--include" (str url "/items/99999")])]
+            [alive (out "curl" ["--silent" "--show-error" "--output" "/dev/null" "--write-out" "%{http_code}" (str url "/items")])]
+            [items-html-first-30 (out "sh" ["-c" "curl --silent --show-error \"$1/items\" | head -30" "erp-test" url])]
+            [checks [
+              (check (and (has empty-list "<tbody>") (not (has empty-list "<td><a href=\"/items/"))) "empty item list renders")
+              (check (and (has new-form "<select name=\"vendor_id\"") (has new-form "Example Supplier")) "new item form lists vendors")
+              (check (and (has blank-item "품목명을 입력하세요.") (= after-blank "0\n")) "empty item name rejected")
+              (check (and (has bad-vendor "거래처를 선택하세요.") (= after-bad-vendor "0\n")) "unknown vendor rejected")
+              (check (and (has created "303") (has received "303") (has issued "303")) "item creation and valid stock moves redirect")
+              (check (and (has item-list "Widget") (has item-list "Example Supplier") (has item-list ">7</td>") (= stock-seven "Widget|7\n")) "list and SQLite show stock seven")
+              (check (and (has detail "현재 재고: 7") (has detail "opening stock") (has detail "sample issue")) "item detail shows balance and move history")
+              (check (and (has oversell "HTTP/1.1 409") (has oversell "재고가 부족합니다.") (= stock-after-oversell "Widget|7\n") (= (count-text moves-after-oversell "\n" 0 0) 2)) "oversell rejected without recording a move")
+              (check (and (has zero-qty "HTTP/1.1 400") (has negative-qty "HTTP/1.1 400") (has text-qty "HTTP/1.1 400")) "zero negative and nonnumeric quantities rejected")
+              (check (has bad-kind "HTTP/1.1 400") "unknown move kind rejected")
+              (check (= stock-after-invalid "Widget|7\n") "invalid moves leave stock unchanged")
+              (check (and (has linked-delete "HTTP/1.1 409") (has linked-delete "품목이 연결된 거래처") (= linked-vendor-count "1\n")) "vendor with attached item cannot be deleted")
+              (check (and (has unused-delete "303") (= unused-vendor-count "0\n")) "vendor without items can be deleted")
+              (check (has missing-item "HTTP/1.1 404") "missing item returns 404")
+              (check (and (has parallel-item "303") (has parallel-in "303") (= (count-text parallel-codes "303\n" 0 0) 3) (= (count-text parallel-codes "409\n" 0 0) 2)) "five concurrent issues accept only three")
+              (check (and (= parallel-stock "Concurrent Widget|1\n") (= parallel-moves "4\n")) "concurrent stock remains one with four total movements")
+              (check (and (has xss-item "303") (has xss-item-row "&lt;script&gt;&#39;") (= xss-db "<script>'\n")) "item name is stored literally and escaped in HTML")
+              (check (has missing-after-xss "HTTP/1.1 404") "unknown item detail returns 404")
+              (check (= alive "200") "server remains alive")
+            ]]
+            [passed (length (filter (fn [result] result) checks))]]
+        (do
+          (println "SQLITE_WIDGET_STOCK:")
+          (print stock-seven)
+          (println "SQLITE_WIDGET_MOVES:")
+          (print moves-after-oversell)
+          (println "SQLITE_STOCK_AFTER_INVALID:")
+          (print stock-after-invalid)
+          (println "SQLITE_VENDOR_DELETE_COUNTS:")
+          (print (str "attached=" linked-vendor-count "unattached=" unused-vendor-count))
+          (println "PARALLEL_MOVE_RESPONSE_CODES:")
+          (print parallel-codes)
+          (println "SQLITE_PARALLEL_STOCK:")
+          (print parallel-stock)
+          (println "SQLITE_PARALLEL_MOVE_COUNT:")
+          (print parallel-moves)
+          (println "SQLITE_XSS_ITEM_NAME:")
+          (print xss-db)
+          (println "ITEM_LIST_HTML_FIRST_30_LINES:")
+          (print items-html-first-30)
+          (out "sh" ["-c" "kill \"$1\" 2>/dev/null || true" "erp-test" pid])
+          (println (str "ERP3_SUMMARY=" passed "/" (length checks))))))))
