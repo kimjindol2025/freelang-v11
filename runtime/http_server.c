@@ -65,6 +65,18 @@ FLValue fl_resp_status(FLValue status, FLValue body) {
     return http_response(code, "application/json", encoded);
 }
 
+FLValue fl_resp_redirect(FLValue location) {
+    if (location.tag != FL_STRING || !location.obj)
+        fl_throw(fl_str_val("server-redirect expects a string location"));
+    const char *target = ((FLString *)location.obj)->data;
+    if (target[0] != '/' || target[1] == '/' || strlen(target) > 240)
+        fl_throw(fl_str_val("server-redirect expects a safe relative path"));
+    for (const unsigned char *p = (const unsigned char *)target; *p; p++)
+        if (iscntrl(*p)) fl_throw(fl_str_val("server-redirect expects a safe relative path"));
+    FLValue response = http_response(303, "text/plain; charset=utf-8", fl_str_val(""));
+    return fl_map_set(response, fl_str_val("location"), location);
+}
+
 FLValue fl_resp_html(FLValue body) {
     FLValue text = body.tag == FL_STRING ? body : fl_text(body);
     return http_response(200, "text/html; charset=utf-8", text);
@@ -150,6 +162,7 @@ static const char *http_reason(int status) {
         case 200: return "OK";
         case 201: return "Created";
         case 204: return "No Content";
+        case 303: return "See Other";
         case 400: return "Bad Request";
         case 401: return "Unauthorized";
         case 404: return "Not Found";
@@ -161,12 +174,15 @@ static const char *http_reason(int status) {
 }
 
 static void http_send_raw(int fd, int status, const char *content_type,
-                          const char *body, size_t body_length) {
+                          const char *location, const char *body, size_t body_length) {
     char header[512];
+    char location_header[256] = "";
+    if (location) snprintf(location_header, sizeof(location_header), "Location: %s\r\n", location);
     int length = snprintf(header, sizeof(header),
-        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n"
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n%s"
         "Connection: close\r\nX-Freelang: native\r\n\r\n",
-        status, http_reason(status), content_type, body_length);
+        status, http_reason(status), content_type, body_length, location_header);
+    if (length < 0 || (size_t)length >= sizeof(header)) return;
     if (length > 0) http_send_all(fd, header, (size_t)length);
     if (body_length) http_send_all(fd, body, body_length);
 }
@@ -175,7 +191,7 @@ static void http_send_status(int fd, int status, const char *message) {
     char body[256];
     int length = snprintf(body, sizeof(body), "{\"error\":\"%s\"}", message);
     if (length < 0) return;
-    http_send_raw(fd, status, "application/json", body, (size_t)length);
+    http_send_raw(fd, status, "application/json", NULL, body, (size_t)length);
 }
 
 static char *http_trim(char *value) {
@@ -354,11 +370,14 @@ static void http_handle_client(int fd) {
     FLValue response = http_dispatch(request, &status);
     FLValue body = fl_map_get(response, fl_str_val("body"));
     FLValue type = fl_map_get(response, fl_str_val("content_type"));
+    FLValue location_value = fl_map_get(response, fl_str_val("location"));
     const char *body_text = body.tag == FL_STRING && body.obj ? ((FLString *)body.obj)->data : "";
     const char *content_type = type.tag == FL_STRING && type.obj ? ((FLString *)type.obj)->data : "application/octet-stream";
+    const char *location = location_value.tag == FL_STRING && location_value.obj
+        ? ((FLString *)location_value.obj)->data : NULL;
     int response_status = fl_map_get(response, fl_str_val("status")).tag == FL_INT
         ? (int)fl_map_get(response, fl_str_val("status")).i : status;
-    http_send_raw(fd, response_status, content_type, body_text, strlen(body_text));
+    http_send_raw(fd, response_status, content_type, location, body_text, strlen(body_text));
 }
 
 FLValue fl_http_start(FLValue port_value) {

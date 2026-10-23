@@ -1,0 +1,104 @@
+;; Small loopback-only vendor screen. Set ERP_DB_PATH and FL_HTTP_PORT to isolate a run.
+(load "../../lib/db/db.fl")
+(define DB (db-open (or (_fl_env_get "ERP_DB_PATH") "vendors.sqlite3")))
+(db_create DB "CREATE TABLE IF NOT EXISTS vendors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL, memo TEXT NOT NULL, created_at TEXT NOT NULL)")
+
+(defn escapehtml [value]
+  (str-replace (str-replace (str-replace (str-replace (str-replace value "&" "&amp;") "<" "&lt;") ">" "&gt;") "\"" "&quot;") "'" "&#39;"))
+
+(defn hexdigit [code]
+  (if (and (>= code 48) (<= code 57)) (- code 48)
+    (if (and (>= code 65) (<= code 70)) (+ 10 (- code 65))
+      (if (and (>= code 97) (<= code 102)) (+ 10 (- code 97)) -1))))
+
+(defn formdecode [text index result]
+  (if (>= index (length text)) result
+    (let [[char (substring text index (+ index 1))]]
+      (if (= char "+") (formdecode text (+ index 1) (str result " "))
+        (if (= char "%")
+          (if (>= (+ index 2) (length text)) ""
+            (let [[a (hexdigit (char-code-at text (+ index 1)))] [b (hexdigit (char-code-at text (+ index 2)))]]
+              (if (or (< a 0) (< b 0)) ""
+                (let [[byte (char-from-byte (+ (* a 16) b))]]
+                  (if (get byte "ok") (formdecode text (+ index 3) (str result (get byte "value"))) "")))))
+          (formdecode text (+ index 1) (str result char)))))))
+
+(defn formfields [parts index result]
+  (if (>= index (length parts)) result
+    (let [[part (get parts index)] [equal (str-index-of part "=")]]
+      (if (< equal 0) (formfields parts (+ index 1) result)
+        (formfields parts (+ index 1)
+          (assoc result (formdecode (substring part 0 equal) 0 "")
+            (formdecode (substring part (+ equal 1) (length part)) 0 "")))))))
+
+(defn request-form [request]
+  (formfields (_fl_str_split (get request "body") "&") 0 {}))
+(defn formvalue [form key]
+  (let [[value (get form key)]] (if (= value nil) "" value)))
+
+(defn page [title content]
+  (str "<!doctype html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"utf-8\">\n<title>"
+    title "</title>\n<style>body{font:16px sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.5rem;text-align:left}label{display:block;margin:.8rem 0}input,textarea{display:block;width:100%;padding:.4rem}form.inline{display:inline}</style>\n</head>\n<body>\n<h1>"
+    title "</h1>\n" content "\n</body>\n</html>\n"))
+
+(defn vendorrow [rows index html]
+  (if (>= index (length rows)) html
+    (let [[row (get rows index)] [id (str (get row "id"))]]
+      (vendorrow rows (+ index 1)
+        (str html "<tr><td>" id "</td><td>" (escapehtml (get row "name"))
+          "</td><td>" (escapehtml (get row "phone")) "</td><td>" (escapehtml (get row "memo"))
+          "</td><td><a href=\"/vendors/" id "/edit\">수정</a> <form class=\"inline\" method=\"post\" action=\"/vendors/" id "/delete\"><button>삭제</button></form></td></tr>")))))
+
+(defn handle-list [request]
+  (let [[rows (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors ORDER BY id" [])]]
+    (server-html (page "거래처 관리"
+    (str "<p><a href=\"/vendors/new\">추가</a></p>\n<table>\n<thead><tr><th>ID</th><th>이름</th><th>전화</th><th>메모</th><th>동작</th></tr></thead>\n<tbody>\n"
+        (vendorrow rows 0 "") "\n</tbody>\n</table>")))))
+
+(defn vendor-form [action name phone memo message]
+  (page "거래처 입력"
+    (str (if (= message "") "" (str "<p role=\"alert\">" message "</p>"))
+      "<form method=\"post\" action=\"" action "\"><label>이름<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
+      "<label>전화<input name=\"phone\" value=\"" (escapehtml phone) "\"></label>"
+      "<label>메모<textarea name=\"memo\">" (escapehtml memo) "</textarea></label><button>저장</button></form><p><a href=\"/vendors\">목록</a></p>")))
+
+(defn handle-new [request]
+  (server-html (vendor-form "/vendors" "" "" "" "")))
+
+(defn handle-create [request]
+  (let [[form (request-form request)] [name (formvalue form "name")] [phone (formvalue form "phone")] [memo (formvalue form "memo")]]
+    (if (= (trim name) "")
+      (server-html (vendor-form "/vendors" name phone memo "이름을 입력하세요."))
+      (do
+        (db_insert DB "vendors" {"name" name "phone" phone "memo" memo "created_at" (now-iso)})
+        (server-redirect "/vendors")))))
+
+(defn handle-edit [request]
+  (let [[id (str-to-num (get (get request "params") "id"))]
+        [row (first (db-query DB "SELECT id, name, phone, memo FROM vendors WHERE id = ?" [id]))]]
+    (if (= row nil) (server-status 404 "거래처를 찾을 수 없습니다.")
+      (server-html (vendor-form (str "/vendors/" id) (get row "name") (get row "phone") (get row "memo") "")))))
+
+(defn handle-update [request]
+  (let [[id (str-to-num (get (get request "params") "id"))]
+        [row (first (db-query DB "SELECT id FROM vendors WHERE id = ?" [id]))]
+        [form (request-form request)] [name (formvalue form "name")] [phone (formvalue form "phone")] [memo (formvalue form "memo")]]
+    (if (= row nil) (server-status 404 "거래처를 찾을 수 없습니다.")
+      (if (= (trim name) "")
+        (server-html (vendor-form (str "/vendors/" id) name phone memo "이름을 입력하세요."))
+        (do
+          (db_update DB "vendors" {"name" name "phone" phone "memo" memo} {"id" id})
+          (server-redirect "/vendors"))))))
+
+(defn handle-delete [request]
+  (let [[id (str-to-num (get (get request "params") "id"))]]
+    (db_delete_row DB "vendors" {"id" id})
+    (server-redirect "/vendors")))
+
+(server-get "/vendors" handle-list)
+(server-get "/vendors/new" handle-new)
+(server-post "/vendors" handle-create)
+(server-get "/vendors/:id/edit" handle-edit)
+(server-post "/vendors/:id" handle-update)
+(server-post "/vendors/:id/delete" handle-delete)
+(server-start 0)

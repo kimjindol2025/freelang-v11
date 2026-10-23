@@ -33,6 +33,9 @@ runtime exposes no FreeLang socket byte I/O operations. It exchanges bounded raw
 URL parsing, request formatting, response parsing and JSON stay in FreeLang.
 The existing server also suppresses SIGPIPE so a timed-out client cannot kill it.
 
+Server handlers use `server-redirect` for a 303 response. Its location must be
+a same-origin absolute path beginning with one `/`; control characters are rejected.
+
 Compile `tests/lib-contract/run-http.fl` with the current native compiler and
 runtime, then run the executable with `--compiler <native-compiler>` (and
 `--root <repository>` when running outside the repository).

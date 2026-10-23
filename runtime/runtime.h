@@ -135,6 +135,7 @@ FLValue fl_http_stop(void);
 FLValue fl_http_route(FLValue method, FLValue path, FLValue handler);
 FLValue fl_resp_json(FLValue value);
 FLValue fl_resp_status(FLValue status, FLValue body);
+FLValue fl_resp_redirect(FLValue location);
 FLValue fl_resp_html(FLValue body);
 FLValue server_put(FLValue path, FLValue handler);
 FLValue server_delete(FLValue path, FLValue handler);
