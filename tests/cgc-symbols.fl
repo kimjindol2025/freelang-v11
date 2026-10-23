@@ -1,0 +1,8 @@
+(defn store/define [] "slash-1")
+(defn user/ok? [] "slash-2")
+(defn tx/commit! [] "slash-3")
+(defn literal/underscore [] "underscore")
+(defn user-ok? [] "question")
+(defn tx-commit! [] "bang")
+(println (str "SYMBOL_RESULTS=" (store/define) "," (user/ok?) "," (tx/commit!) ","
+  (literal/underscore) "," (user-ok?) "," (tx-commit!)))

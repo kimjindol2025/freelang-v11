@@ -518,3 +518,27 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-23, TASK 9-13에서 C 심볼 이름 충돌을 막고 생성 C의 GCC 문법 검사를 성공 조건에 포함했다. DB FreeLang 헬퍼는 기존 SQLite 런타임 함수만 사용한다. 이전 고정점 `1114b23942fc8239ad78e32a47df79c12f519310101dca25d600b723403efc32`, 새 고정점 `55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f`.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f  stage2.c
+55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f  stage3.c
+55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-23, 중복으로 등록된 DB 기본 연산 분기 3개를 정리한 뒤 다시 부트스트랩했다. 이전 고정점 `55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f`, 새 고정점 `3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132`.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132  stage2.c
+3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132  stage3.c
+3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

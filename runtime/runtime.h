@@ -282,6 +282,7 @@ FLValue fl_tcp_close(FLValue socket);
 FLValue fl_tcp_local_port(FLValue socket);
 FLValue _fl_process_run_args(FLValue cmd, FLValue args);
 FLValue _fl_run_inherit(FLValue cmd);
+FLValue fl_gcc_syntax_check(FLValue source, FLValue include_dir);
 FLValue _fl_process_exec(FLValue cmd);
 FLValue _fl_process_exec_args(FLValue cmd, FLValue args);
 FLValue _fl_process_spawn(FLValue cmd, FLValue args);

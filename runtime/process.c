@@ -72,6 +72,41 @@ FLValue _fl_run_inherit(FLValue cmd) {
     return fl_int((int64_t)(r >= 0 ? WEXITSTATUS(r) : -1));
 }
 
+/* Keep the compiler's syntax gate on argv so output paths never pass through a shell. */
+FLValue fl_gcc_syntax_check(FLValue source, FLValue include_dir) {
+    if (source.tag != FL_STRING || include_dir.tag != FL_STRING)
+        return fl_int(-1);
+    char runtime_include[PATH_MAX];
+    const char *include = _strval(include_dir);
+    char header_path[PATH_MAX];
+    snprintf(header_path, sizeof(header_path), "%s/runtime.h", include);
+    if (access(header_path, R_OK) != 0) {
+        const char *slash = strrchr(__FILE__, '/');
+        size_t dir_len = slash ? (size_t)(slash - __FILE__) : 0;
+        if (!dir_len || dir_len >= sizeof(runtime_include)) return fl_int(-1);
+        memcpy(runtime_include, __FILE__, dir_len);
+        runtime_include[dir_len] = '\0';
+        snprintf(header_path, sizeof(header_path), "%s/runtime.h", runtime_include);
+        if (access(header_path, R_OK) != 0) return fl_int(-1);
+        include = runtime_include;
+    }
+    pid_t pid = fork();
+    if (pid < 0) return fl_int(-1);
+    if (pid == 0) {
+        char *const argv[] = {
+            (char *)"gcc", (char *)"-fsyntax-only", (char *)"-I", (char *)include,
+            (char *)_strval(source), NULL
+        };
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+    int status = 0;
+    pid_t waited;
+    do { waited = waitpid(pid, &status, 0); } while (waited < 0 && errno == EINTR);
+    if (waited != pid || !WIFEXITED(status)) return fl_int(-1);
+    return fl_int(WEXITSTATUS(status));
+}
+
 /* process-exec: 현재 프로세스를 cmd로 교체 (execvp) */
 FLValue _fl_process_exec(FLValue cmd) {
     char buf[4096]; strncpy(buf, _strval(cmd), sizeof(buf)-1); buf[4095]='\0';

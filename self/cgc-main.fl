@@ -637,6 +637,7 @@
 ;; S24: defn 이름 목록 (forward pass) + wrapper 구현 목록
 (define known-defns-atom   (atom []))
 (define wrapper-defs-atom  (atom []))
+(define function-c-symbols-atom (atom []))
 ;; S24: define 전역 선언 목록 ("static FLValue name;")
 (define global-decls-atom  (atom []))
 
@@ -673,21 +674,40 @@
                   "bool" "true" "false"] $s))
 
 (defn c-name [$n]
-  ;; FL 식별자를 C 식별자로 변환 (-> → _to_ / - → _ / ? → _p / ! → _b / = → _eq)
-  ;; C 예약어는 fl_ 접두사 추가
-  (let [[$raw (str-replace
-                (str-replace
-                  (str-replace
-                    (str-replace
-                      (str-replace $n "->" "_to_")
-                      "-" "_")
-                    "?" "_p")
-                  "!" "_b")
-                "=" "_eq")]]
+  ;; Preserve native C underscores; the registration pass rejects mangling collisions.
+  (let [[$a (str-replace $n "->" "_to_")]
+        [$b (str-replace $a "-" "_")]
+        [$c (str-replace $b "/" "__")]
+        [$d (str-replace $c "?" "_p")]
+        [$e (str-replace $d "!" "_b")]
+        [$f (str-replace $e "=" "_eq")]
+        [$g (str-replace $f "." "_dot")]
+        [$h (str-replace $g "<" "_lt")]
+        [$i (str-replace $h ">" "_gt")]
+        [$j (str-replace $i "+" "_plus")]
+        [$k (str-replace $j "*" "_star")]
+        [$l (str-replace $k "%" "_pct")]
+        [$m (str-replace $l "&" "_and")]
+        [$o (str-replace $m "|" "_or")]
+        [$p (str-replace $o "^" "_xor")]
+        [$raw (str-replace $p "~" "_not")]]
     (if (includes-item ["now-iso" "str-split" "str-join" "str-trim" "str-replace" "str-index-of"] $n) (str "fl_library_" $raw)
     (if (= $n "dir-list") "fl_library_dir_list"
     (if (= $n "http-get") "fl_library_http_get"
       (if (c-reserved? $raw) (str "fl_" $raw) $raw))))))
+
+(defn cgc-register-function [$raw]
+  (let [[$name (c-name $raw)]
+        [$entries @function-c-symbols-atom]]
+    (loop [$i 0]
+      (if (>= $i (length $entries))
+        (do (swap! function-c-symbols-atom push [$name $raw]) $name)
+        (let [[$entry (get $entries $i)]]
+          (if (= (get $entry 0) $name)
+            (do
+              (println (str "[CGC-ERR] C symbol collision: " (get $entry 1) " and " $raw " -> " $name))
+              (_fl_exit 1))
+            (recur (+ $i 1))))))))
 
 ;; ── 메인 dispatch ──
 
@@ -793,6 +813,12 @@
   (cond
     [(= (get $node :kind) "variable") (c-name (get $node :name))]
     [(= (get $node :kind) "literal")  (c-name (str (get $node :value)))]
+    [true "_anon"]))
+
+(defn cgc-extract-raw-name [$node]
+  (cond
+    [(= (get $node :kind) "variable") (get $node :name)]
+    [(= (get $node :kind) "literal") (str (get $node :value))]
     [true "_anon"]))
 
 ;; ── sexpr ──
@@ -1164,7 +1190,7 @@
 ;; argv[i] 선언 구문
 (defn cgc-fn-argv-decls [$items $i $acc]
   (if (>= $i (length $items)) $acc
-  (let [[$name (c-name (cgc-extract-name (get $items $i)))]]
+  (let [[$name (c-name (cgc-extract-raw-name (get $items $i)))]]
     (cgc-fn-argv-decls $items (+ $i 1)
       (str $acc "    FLValue " $name " __attribute__((unused)) = argv[" $i "];\n")))))
 
@@ -1172,7 +1198,7 @@
 (defn cgc-fn-param-names [$items $i $acc]
   (if (>= $i (length $items)) $acc
   (cgc-fn-param-names $items (+ $i 1)
-    (push $acc (c-name (cgc-extract-name (get $items $i)))))))
+    (push $acc (c-name (cgc-extract-raw-name (get $items $i)))))))
 
 ;; body AST에서 variable 이름 수집 (중복 제거)
 (defn cgc-collect-vars [$node $acc]
@@ -1490,7 +1516,7 @@
       (cgc-bind-names-loop $names (+ $i 1)))))
 
 (defn cgc-defn-impl [$args]
-  (let [[$name (c-name (cgc-extract-name (get $args 0)))]
+  (let [[$name (c-name (cgc-extract-raw-name (get $args 0)))]
         [$param-items (get-block-items (get $args 1))]
         [$ps (cgc-params $param-items)]
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
@@ -1518,7 +1544,7 @@
       (reset! cgc-defn-depth-atom (- @cgc-defn-depth-atom 1))
       (reset! outer-params-atom $saved-params)
       (if (> $depth 0)
-        (let [[$name (c-name (cgc-extract-name (get $args 0)))]
+        (let [[$name (cgc-register-function (cgc-extract-raw-name (get $args 0)))]
               [$param-items (get-block-items (get $args 1))]
               [$ps (cgc-params $param-items)]]
           (swap! cgc-hoisted-fns-atom push $result)
@@ -1533,7 +1559,7 @@
 ;; ── define (전역 변수) ──
 
 (defn cgc-define [$args]
-  (let [[$name (c-name (cgc-extract-name (get $args 0)))]
+  (let [[$name (c-name (cgc-extract-raw-name (get $args 0)))]
         [$val (cgc (get $args 1))]]
     (swap! known-fncall-targets-atom push $name)
     (swap! global-decls-atom push (str "static FLValue " $name ";"))
@@ -1622,9 +1648,10 @@
           [$is-block-func (and (= $kind "block") (= (get $n :type) "FUNC"))]]
     (recur (+ $i 1)
       (if (or $is-defn $is-block-func)
-        (let [[$name (if $is-defn
-                       (c-name (cgc-extract-name (get (get $n :args) 0)))
-                       (c-name (get $n :name)))]
+        (let [[$raw-name (if $is-defn
+                           (cgc-extract-raw-name (get (get $n :args) 0))
+                           (get $n :name))]
+              [$name (cgc-register-function $raw-name)]
               [$params (if $is-defn
                          (get-block-items (get (get $n :args) 1))
                          (get-block-items (get (get $n :fields) :params)))]
@@ -2097,6 +2124,9 @@
               [$_v      (ir-validate $nodes)]
               [$c-code   (generate-c $nodes $print-last)]]
           (file-write $output $c-code)
-          (println (str "Compiled " $input " -> " $output))))))))
+          (if (= (fl_gcc_syntax_check $output "runtime") 0)
+            (println (str "Compiled " $input " -> " $output))
+            (do (println (str "[CGC-ERR] generated C failed gcc -fsyntax-only: " $output))
+                (_fl_exit 1)))))))))
 
 (cgc-run (cli-args))
