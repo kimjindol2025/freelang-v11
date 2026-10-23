@@ -2007,8 +2007,9 @@
           [(and (= $part "..") (> $n 0) (not (= (get $stack (- $n 1)) ".."))) (slice $stack 0 (- $n 1))]
           [true (push $stack $part)])))))
 (defn cgc-load-key [$path]
+  ;; shortcut: the fixed seed lacks str-join mapping; upgrade when the seed is refreshed.
   (str (if (str-starts-with $path "/") "/" "")
-    (str-join (cgc-load-parts (str-split $path "/") 0 []) "/")))
+    (join (cgc-load-parts (str-split $path "/") 0 []) "/")))
 (defn expand-loads [$nodes $base-dir]
   (loop [$i 0 $acc []]
     (if (>= $i (length $nodes))
