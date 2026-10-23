@@ -33,8 +33,12 @@
 
 (defn request-form [request]
   (formfields (_fl_str_split (get request "body") "&") 0 {}))
+(defn request-query [request]
+  (formfields (_fl_str_split (get request "query") "&") 0 {}))
 (defn formvalue [form key]
   (let [[value (get form key)]] (if (= value nil) "" value)))
+(defn like-literal [text]
+  (str-replace (str-replace (str-replace text "\\" "\\\\") "%" "\\%") "_" "\\_"))
 
 (defn page [title content]
   (str "<!doctype html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"utf-8\">\n<title>"
@@ -47,12 +51,17 @@
       (vendorrow rows (+ index 1)
         (str html "<tr><td>" id "</td><td>" (escapehtml (get row "name"))
           "</td><td>" (escapehtml (get row "phone")) "</td><td>" (escapehtml (get row "memo"))
-          "</td><td><a href=\"/vendors/" id "/edit\">수정</a> <form class=\"inline\" method=\"post\" action=\"/vendors/" id "/delete\"><button>삭제</button></form></td></tr>")))))
+          "</td><td><a href=\"/vendors/" id "/edit\">수정</a> <form class=\"inline\" method=\"post\" action=\"/vendors/" id "/delete\"><button>삭제</button></form></td></tr>\n")))))
 
 (defn handle-list [request]
-  (let [[rows (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors ORDER BY id" [])]]
+  (let [[q (formvalue (request-query request) "q")]
+        [rows (if (= q "")
+          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors ORDER BY id" [])
+          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors WHERE name LIKE ? ESCAPE '\\' OR memo LIKE ? ESCAPE '\\' ORDER BY id"
+            [(str "%" (like-literal q) "%") (str "%" (like-literal q) "%")]))]]
     (server-html (page "거래처 관리"
-    (str "<p><a href=\"/vendors/new\">추가</a></p>\n<table>\n<thead><tr><th>ID</th><th>이름</th><th>전화</th><th>메모</th><th>동작</th></tr></thead>\n<tbody>\n"
+    (str "<form method=\"get\" action=\"/vendors\"><label>검색<input name=\"q\" value=\"" (escapehtml q) "\"></label><button>검색</button></form>\n"
+        "<p><a href=\"/vendors/new\">추가</a></p>\n<table>\n<thead><tr><th>ID</th><th>이름</th><th>전화</th><th>메모</th><th>동작</th></tr></thead>\n<tbody>\n"
         (vendorrow rows 0 "") "\n</tbody>\n</table>")))))
 
 (defn vendor-form [action name phone memo message]

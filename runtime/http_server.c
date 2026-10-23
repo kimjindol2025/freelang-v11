@@ -286,10 +286,15 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
     body[body_length] = '\0';
 
     char *query = strchr(target, '?');
-    if (query) *query = '\0';
+    const char *query_text = "";
+    if (query) {
+        *query = '\0';
+        query_text = query + 1;
+    }
     FLValue request = fl_map_new();
     request = fl_map_set(request, fl_str_val("method"), fl_str_val(method));
     request = fl_map_set(request, fl_str_val("path"), fl_str_val(target));
+    request = fl_map_set(request, fl_str_val("query"), fl_str_val(query_text));
     request = fl_map_set(request, fl_str_val("headers"), headers);
     request = fl_map_set(request, fl_str_val("body"), fl_str_val(body));
     free(body);
