@@ -443,6 +443,7 @@ FLValue now_iso(void) { return fl_now_iso(); }
 
 FLValue fl_array_p(FLValue v) { return array_p(v); }
 FLValue fl_number_p(FLValue v) { return fl_bool(v.tag == FL_INT || v.tag == FL_FLOAT); }
+FLValue fl_float_p(FLValue v) { return fl_bool(v.tag == FL_FLOAT); }
 FLValue fl_integer_p(FLValue v) {
     if (v.tag == FL_INT) return fl_bool(true);
     if (v.tag == FL_FLOAT) return fl_bool(isfinite(v.f) && v.f == floor(v.f));

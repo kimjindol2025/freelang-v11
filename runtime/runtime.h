@@ -115,6 +115,8 @@ FLValue fl_vec_set(FLValue vec, FLValue idx, FLValue val);
 FLValue fl_vec_push(FLValue vec, FLValue val);
 FLValue fl_append(FLValue left, FLValue right);
 FLValue fl_vec_len(FLValue vec);
+FLValue fl_vec_take(FLValue count, FLValue vec);
+FLValue fl_vec_drop(FLValue count, FLValue vec);
 
 /* ── Map ── */
 FLValue fl_map_new(void);
@@ -243,6 +245,7 @@ FLValue fl_str_starts_with(FLValue str, FLValue prefix);
 FLValue fl_str_ends_with(FLValue str, FLValue suffix);
 FLValue fl_array_p(FLValue v);
 FLValue fl_number_p(FLValue v);
+FLValue fl_float_p(FLValue v);
 FLValue fl_integer_p(FLValue v);
 FLValue fl_boolean_p(FLValue v);
 FLValue fl_every_p(FLValue fn, FLValue vec);

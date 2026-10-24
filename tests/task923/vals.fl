@@ -1,0 +1,3 @@
+(if (= (get (vals {"a" 9}) 0) 9)
+  (println "PASS vals")
+  (throw "FAIL vals"))

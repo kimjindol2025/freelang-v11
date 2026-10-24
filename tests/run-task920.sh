@@ -100,6 +100,9 @@ grep -q '\[CGC-ERR\] generated C failed gcc -fsyntax-only:' "$WORK/undefined-nam
 WARN_COUNT=$((WARN_COUNT + 1))
 printf 'WARN_SUMMARY=%s/4\n' "$WARN_COUNT"
 
+"$ROOT/tests/run-cgc-builtin-abi.sh" "$COMPILER" "$WORK/abi" >"$WORK/abi.log" 2>&1
+grep -E '^(BUILTINS_TOTAL|MATCHED|MISSING_IN_RUNTIME|UNUSED_RUNTIME|ABI_MAPPED|COMPILER_LOWERED|ABI_HOLD|MISSING_IN_RUNTIME_ITEMS|ABI_SUMMARY)=' "$WORK/abi.log"
+
 grep -E '^FL_TEST_SUMMARY ' "$WORK/existing41.log"
 grep -hE '^TEST_EVIDENCE_SUMMARY=|^TCP_SUMMARY=|^HTTP_SUMMARY=' "$WORK/test-evidence.log" "$WORK/tcp.log" "$WORK/http.log"
 sed -n 's/.*"expectedCount":\([0-9]*\),"resultCount":\([0-9]*\).*/AUDIT_SUMMARY=\1\/\2/p' "$WORK/audit.log"

@@ -1,0 +1,3 @@
+(if (and (float? 1.5) (not (float? 1)))
+  (println "PASS float?")
+  (throw "FAIL float?"))

@@ -602,3 +602,15 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-24, TASK 9-23에서 `c-runtime-name`에 실제 정의가 있는 컬렉션·문자열 내장 심볼을 추가하고, 누락된 실수 판별 및 take/drop 런타임 함수를 구현했다. 누락 구현은 보류 목록과 dispatch 자동 대조 시험으로 추적한다. 이전 고정점 `c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93`, 새 고정점 `b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f  stage2.c
+b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f  stage3.c
+b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

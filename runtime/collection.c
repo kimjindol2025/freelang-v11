@@ -270,6 +270,18 @@ FLValue fl_vec_slice(FLValue vec, FLValue start, FLValue end) {
     return r;
 }
 
+FLValue fl_vec_take(FLValue count, FLValue vec) {
+    int64_t n = count.tag == FL_INT ? count.i : 0;
+    if (n < 0) n = 0;
+    return fl_vec_slice(vec, fl_int(0), fl_int(n));
+}
+
+FLValue fl_vec_drop(FLValue count, FLValue vec) {
+    int64_t n = count.tag == FL_INT ? count.i : 0;
+    if (n < 0) n = 0;
+    return fl_vec_slice(vec, fl_int(n), fl_vec_len(vec));
+}
+
 FLValue fl_vec_last(FLValue vec) {
     if (vec.tag != FL_VECTOR) return fl_nil();
     FLVector* v = (FLVector*)vec.obj;

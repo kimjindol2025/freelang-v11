@@ -1,0 +1,5 @@
+(define pairs (entries {"a" 1}))
+(if (and (= (get (get pairs 0) 0) "a")
+         (= (get (get pairs 0) 1) 1))
+  (println "PASS entries")
+  (throw "FAIL entries"))

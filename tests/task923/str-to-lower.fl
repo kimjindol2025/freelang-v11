@@ -1,0 +1,3 @@
+(if (= (str-to-lower "AbC") "abc")
+  (println "PASS str-to-lower")
+  (throw "FAIL str-to-lower"))
