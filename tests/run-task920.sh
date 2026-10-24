@@ -79,7 +79,7 @@ for source in auth-random-token auth-pbkdf2 auth-constant-time-equal tcp-bind tc
 done
 printf 'NAME_SUMMARY=%s/9\n' "$NAME_COUNT"
 alias_prefix='-D'
-if rg -n -- "$alias_prefix"'(auth_|tcp_)[A-Za-z0-9_]+=fl_' "$ROOT" --glob '*.sh'; then
+if rg -n --glob '*.sh' -- "$alias_prefix"'(auth_|tcp_)[A-Za-z0-9_]+=fl_' "$ROOT"; then
   echo 'compiler alias remains in build scripts' >&2
   exit 1
 fi
