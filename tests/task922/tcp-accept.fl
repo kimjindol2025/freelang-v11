@@ -1,0 +1,5 @@
+(define socket (tcp-listen "127.0.0.1" 0))
+(define result (tcp-accept socket 0))
+(define code (get (get result "error") "code"))
+(tcp-close socket)
+(if (= code "TIMEOUT") (println "PASS tcp-accept") (throw "FAIL tcp-accept"))

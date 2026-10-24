@@ -1,0 +1,2 @@
+(define token (auth-random-token 16))
+(if (= (length token) 32) (println "PASS auth-random-token") (throw "FAIL auth-random-token"))

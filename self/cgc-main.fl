@@ -696,6 +696,23 @@
     (if (= $n "http-get") "fl_library_http_get"
       (if (c-reserved? $raw) (str "fl_" $raw) $raw))))))
 
+(defn c-runtime-name [$op]
+  (cond
+    [(= $op "vec-push") "fl_vec_push"]
+    [(= $op "tcp-bind") "fl_tcp_bind"]
+    [(= $op "tcp-listen") "fl_tcp_listen"]
+    [(= $op "tcp-accept") "fl_tcp_accept"]
+    [(= $op "tcp-close") "fl_tcp_close"]
+    [(= $op "tcp-local-port") "fl_tcp_local_port"]
+    [(= $op "auth-random-token") "fl_auth_random_token"]
+    [(= $op "auth-pbkdf2") "fl_auth_pbkdf2"]
+    [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
+    [true nil]))
+
+(defn cgc-runtime-call [$op $args]
+  (let [[$name (c-runtime-name $op)]]
+    (str $name "(" (cgc-args $args) ")")))
+
 (defn cgc-register-function [$raw]
   (let [[$name (c-name $raw)]
         [$entries @function-c-symbols-atom]]
@@ -841,6 +858,8 @@
     (cgc-fncall (cgc $op) $args))))
 
 (defn cgc-dispatch [$op $args]
+  (if (not (null? (c-runtime-name $op)))
+    (cgc-runtime-call $op $args)
   (if (and (includes-item ["now-iso" "str-index-of" "str-split" "str-join" "str-trim" "str-replace" "json-parse" "json-stringify" "http-get" "http-post" "file-read" "file-write" "file-append" "file-exists?" "file-size" "dir-list"] $op)
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
@@ -1036,11 +1055,6 @@
   [(= $op "process_spawn")         (str "process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "process-spawn")         (str "process_spawn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "_fl_test_isolate")       (str "_fl_test_isolate(" (cgc (get $args 0)) ")")]
-  [(= $op "tcp-bind") (str "fl_tcp_bind(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "tcp-listen") (str "fl_tcp_listen(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "tcp-accept") (str "fl_tcp_accept(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "tcp-close") (str "fl_tcp_close(" (cgc (get $args 0)) ")")]
-  [(= $op "tcp-local-port") (str "fl_tcp_local_port(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_exit")               (str "_fl_exit(" (cgc (get $args 0)) ")")]
   [(= $op "capability-list")       "capability_list()"]
   [(= $op "capability-enable")     (str "capability_enable(" (cgc (get $args 0)) ")")]
@@ -1153,16 +1167,13 @@
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
   ;; N-09: 암호화 / JWT / 비밀번호
-  [(= $op "auth-random-token") (str "fl_auth_random_token(" (cgc (get $args 0)) ")")]
-  [(= $op "auth-pbkdf2")       (str "fl_auth_pbkdf2(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "auth-constant-time-equal") (str "fl_auth_constant_time_equal(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "auth-jwt-sign")       (str "fl_jwt_sign(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "auth-jwt-verify")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "auth-jwt-expired")    (str "fl_jwt_expired(" (cgc (get $args 0)) ")")]
   [(= $op "auth-jwt-decode")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", fl_str_val(\"\"))")]
   [(= $op "auth-hash-password")  (str "fl_hash_password(" (cgc (get $args 0)) ")")]
   [(= $op "auth-verify-password")(str "fl_verify_password(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [true             (cgc-dispatch-fallback $op $args)])))
+  [true             (cgc-dispatch-fallback $op $args)]))))
 
 (defn cgc-swap! [$args]
   (let [[$atom-c  (cgc (get $args 0))]

@@ -52,9 +52,9 @@ bash "$ROOT/tests/run-cgc-symbol-contract.sh" >"$WORK/symbol.log" 2>&1
 sources=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c db.c http_server.c auth.c)
 link_sources=(); for name in "${sources[@]}"; do link_sources+=("$RUNTIME/$name"); done
 "$COMPILER" "$ROOT/examples/erp-vendors/app.fl" "$WORK/app.c" >"$WORK/app.compile" 2>&1
-gcc -w -Dauth_random_token=fl_auth_random_token -Dauth_pbkdf2=fl_auth_pbkdf2 -Dauth_constant_time_equal=fl_auth_constant_time_equal -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
 "$COMPILER" "$ROOT/examples/erp-vendors/create-user.fl" "$WORK/create-user.c" >"$WORK/create-user.compile" 2>&1
-gcc -w -Dauth_random_token=fl_auth_random_token -Dauth_pbkdf2=fl_auth_pbkdf2 -Dauth_constant_time_equal=fl_auth_constant_time_equal -I "$RUNTIME" -o "$WORK/create-user" "$WORK/create-user.c" \
+gcc -w -I "$RUNTIME" -o "$WORK/create-user" "$WORK/create-user.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" \
   "$RUNTIME/db.c" "$RUNTIME/auth.c" -lsqlite3 -lcrypto -lm
@@ -62,12 +62,27 @@ gcc -w -Dauth_random_token=fl_auth_random_token -Dauth_pbkdf2=fl_auth_pbkdf2 -Da
 for spec in 'erp test.fl' 'erp2 test2.fl' 'erp3 test3.fl' 'conc test-concurrency.fl' 'auth test-auth.fl'; do
   read -r label source <<<"$spec"
   "$COMPILER" "$ROOT/examples/erp-vendors/$source" "$WORK/$label.c" >"$WORK/$label.compile" 2>&1
-  gcc -w -Dtcp_bind=fl_tcp_bind -Dtcp_listen=fl_tcp_listen -Dtcp_close=fl_tcp_close -Dtcp_local_port=fl_tcp_local_port -I "$RUNTIME" -o "$WORK/$label" "$WORK/$label.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  gcc -w -I "$RUNTIME" -o "$WORK/$label" "$WORK/$label.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
   mkdir -p "$WORK/$label-run"
   "$WORK/$label" "$WORK/$label-run" "$WORK/app" "$WORK/create-user" >"$WORK/$label.log" 2>&1
 done
 
 bash "$ROOT/examples/erp-vendors/test-pages.sh" "$WORK/app" "$WORK/create-user" >"$WORK/pages.log" 2>&1
+
+NAME_COUNT=0
+for source in auth-random-token auth-pbkdf2 auth-constant-time-equal tcp-bind tcp-listen tcp-accept tcp-close tcp-local-port vec-push; do
+  "$COMPILER" "$ROOT/tests/task922/$source.fl" "$WORK/$source.c" >"$WORK/$source.compile" 2>&1
+  gcc -w -I "$RUNTIME" -o "$WORK/$source" "$WORK/$source.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  "$WORK/$source" >"$WORK/$source.log" 2>&1
+  grep -q "^PASS $source$" "$WORK/$source.log"
+  NAME_COUNT=$((NAME_COUNT + 1))
+done
+printf 'NAME_SUMMARY=%s/9\n' "$NAME_COUNT"
+alias_prefix='-D'
+if rg -n -- "$alias_prefix"'(auth_|tcp_)[A-Za-z0-9_]+=fl_' "$ROOT" --glob '*.sh'; then
+  echo 'compiler alias remains in build scripts' >&2
+  exit 1
+fi
 
 WARN_COUNT=0
 for name in loop-binding function-parameter let-local; do

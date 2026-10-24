@@ -590,3 +590,15 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-24, TASK 9-22에서 TCP·인증 내장 함수의 런타임 심볼 선택을 `c-runtime-name` 한 곳으로 모으고 `vec-push`를 `fl_vec_push`에 연결했다. 시험 빌드의 `-D` 별칭은 제거했다. 이전 고정점 `5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32`, 새 고정점 `c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93  stage2.c
+c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93  stage3.c
+c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

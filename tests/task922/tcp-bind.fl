@@ -1,0 +1,4 @@
+(define socket (tcp-bind "127.0.0.1" 0))
+(define port (tcp-local-port socket))
+(tcp-close socket)
+(if (> port 0) (println "PASS tcp-bind") (throw "FAIL tcp-bind"))
