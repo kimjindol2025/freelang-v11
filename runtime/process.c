@@ -603,7 +603,7 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
         free(wire); return http_client_error("REQUEST_TOO_LARGE", "request overflow");
     }
     wire[used] = '\0';
-    FLValue exchange = _fl_http_exchange(fl_str_val(host), fl_int(port), fl_str_val(wire), fl_int(5000), fl_int(2097152));
+    FLValue exchange = _fl_http_exchange(fl_str_val(host), fl_int(port), fl_str_val(wire), fl_int(5000), fl_int(2097152), callback);
     free(wire);
     if (!fl_truthy(fl_map_get(exchange, fl_str_val("ok")))) return exchange;
     FLValue raw_value = fl_map_get(exchange, fl_str_val("value"));
@@ -652,15 +652,10 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
     char *decoded = malloc(2097153);
     if (!decoded) return http_client_error("IO", "response allocation failed");
     size_t body_len = 0, offset = 0;
-    int callback_open = callback.tag == FL_FN;
     if (!chunked) {
         if (wire_body_len > 2097152) { free(decoded); return http_client_error("RESPONSE_TOO_LARGE", "response body exceeds 2097152 bytes"); }
         memcpy(decoded, body_start, wire_body_len); body_len = wire_body_len;
         decoded[body_len] = '\0';
-        if (callback_open && body_len) {
-            FLValue part = fl_str_val(decoded);
-            if (!fl_truthy(fl_fn_call(callback, 1, &part))) callback_open = 0;
-        }
     } else {
         int final_seen = 0;
         while (offset < wire_body_len) {
@@ -705,13 +700,6 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
                                                         "invalid or oversized chunk data");
             }
             memcpy(decoded + body_len, body_start + offset, chunk_size);
-            if (callback_open && chunk_size) {
-                char *part_text = malloc(chunk_size + 1);
-                if (!part_text) { free(decoded); return http_client_error("IO", "chunk allocation failed"); }
-                memcpy(part_text, body_start + offset, chunk_size); part_text[chunk_size] = '\0';
-                FLValue part = fl_str_val(part_text); free(part_text);
-                if (!fl_truthy(fl_fn_call(callback, 1, &part))) callback_open = 0;
-            }
             body_len += chunk_size; offset += chunk_size + 2;
         }
         if (!wire_body_len || !final_seen || offset != wire_body_len) { free(decoded); return http_client_error("HTTP_PROTOCOL", "missing final chunk"); }
