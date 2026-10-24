@@ -124,16 +124,32 @@
           "</td><td>" (escapehtml (get row "phone")) "</td><td>" (escapehtml (get row "memo"))
           "</td><td><a href=\"/vendors/" id "/edit\">수정</a> <form class=\"inline\" method=\"post\" action=\"/vendors/" id "/delete\">" (csrf-input csrf) "<button>삭제</button></form></td></tr>\n") csrf))))
 
+(defn page-number [text]
+  (let [[value (str-to-num text)]]
+    (if (and (digits-only? text 0) (number? value) (integer? value) (> value 0)) value 1)))
+(defn query-value [text]
+  (str-replace (str-replace (str-replace (str-replace (str-replace (str-replace text "%" "%25") "&" "%26") "#" "%23") "+" "%2B") " " "%20") "?" "%3F"))
+(defn page-links [path page total q]
+  (let [[prev (if (> page 1) (- page 1) 1)] [next (if (< (* page 50) total) (+ page 1) page)]
+        [search (if (= q "") "" (str "&amp;q=" (escapehtml (query-value q))))]]
+    (str "<p>전체 " (str total) "건 | <a href=\"" path "?page=" (str prev) search "\">이전</a> | "
+      (str page) "쪽 | <a href=\"" path "?page=" (str next) search "\">다음</a></p>")))
+
 (defn handle-list [request]
-  (let [[q (formvalue (request-query request) "q")]
+  (let [[query (request-query request)] [q (formvalue query "q")] [page-no (page-number (formvalue query "page"))]
+        [offset (* (- page-no 1) 50)] [pattern (str "%" (like-literal q) "%")]
         [rows (if (= q "")
-          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors ORDER BY id" [])
-          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors WHERE name LIKE ? ESCAPE '\\' OR memo LIKE ? ESCAPE '\\' ORDER BY id"
-            [(str "%" (like-literal q) "%") (str "%" (like-literal q) "%")]))]]
+          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors ORDER BY id LIMIT ? OFFSET ?" [50 offset])
+          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors WHERE name LIKE ? ESCAPE '\\' OR memo LIKE ? ESCAPE '\\' ORDER BY id LIMIT ? OFFSET ?"
+            [pattern pattern 50 offset]))]
+        [count-row (if (= q "") (first (db-query DB "SELECT count(*) AS count FROM vendors" []))
+          (first (db-query DB "SELECT count(*) AS count FROM vendors WHERE name LIKE ? ESCAPE '\\' OR memo LIKE ? ESCAPE '\\'" [pattern pattern])))]
+        [total (get count-row "count")]]
     (server-html (page "거래처 관리"
     (str "<form method=\"post\" action=\"/logout\">" (csrf-input (cookie-value request "erp_session")) "<button>로그아웃</button></form><form method=\"get\" action=\"/vendors\"><label>검색<input name=\"q\" value=\"" (escapehtml q) "\"></label><button>검색</button></form>\n"
         "<p><a href=\"/vendors/new\">추가</a></p>\n<table>\n<thead><tr><th>ID</th><th>이름</th><th>전화</th><th>메모</th><th>동작</th></tr></thead>\n<tbody>\n"
-        (vendorrow rows 0 "" (cookie-value request "erp_session")) "\n</tbody>\n</table>")))))
+        (vendorrow rows 0 "" (cookie-value request "erp_session")) "\n</tbody>\n</table>"
+        (page-links "/vendors" page-no total q))))))
 
 (defn vendor-form [action name phone memo message csrf]
   (page "거래처 입력"
@@ -182,8 +198,8 @@
 (defn item-record [id]
   (first (db-query DB "SELECT i.id, i.name, i.unit, i.vendor_id, v.name AS vendor_name, COALESCE(SUM(CASE WHEN m.kind = 'in' THEN m.qty WHEN m.kind = 'out' THEN -m.qty ELSE 0 END), 0) AS stock FROM items i JOIN vendors v ON v.id = i.vendor_id LEFT JOIN stock_moves m ON m.item_id = i.id WHERE i.id = ? GROUP BY i.id, i.name, i.unit, i.vendor_id, v.name" [id])))
 
-(defn item-list-rows []
-  (db-query DB "SELECT i.id, i.name, i.unit, i.vendor_id, v.name AS vendor_name, COALESCE(SUM(CASE WHEN m.kind = 'in' THEN m.qty WHEN m.kind = 'out' THEN -m.qty ELSE 0 END), 0) AS stock FROM items i JOIN vendors v ON v.id = i.vendor_id LEFT JOIN stock_moves m ON m.item_id = i.id GROUP BY i.id, i.name, i.unit, i.vendor_id, v.name ORDER BY i.id" []))
+(defn item-list-rows [limit offset]
+  (db-query DB "SELECT i.id, i.name, i.unit, i.vendor_id, v.name AS vendor_name, COALESCE(SUM(CASE WHEN m.kind = 'in' THEN m.qty WHEN m.kind = 'out' THEN -m.qty ELSE 0 END), 0) AS stock FROM items i JOIN vendors v ON v.id = i.vendor_id LEFT JOIN stock_moves m ON m.item_id = i.id GROUP BY i.id, i.name, i.unit, i.vendor_id, v.name ORDER BY i.id LIMIT ? OFFSET ?" [limit offset]))
 
 (defn item-moves [id]
   (db-query DB "SELECT id, kind, qty, memo, created_at FROM stock_moves WHERE item_id = ? ORDER BY id DESC" [id]))
@@ -233,9 +249,20 @@
         (item-moves-html moves 0 "") "</tbody></table>")))))
 
 (defn handle-items [request]
-  (server-html (page "품목 목록"
-    (str "<form method=\"post\" action=\"/logout\">" (csrf-input (cookie-value request "erp_session")) "<button>로그아웃</button></form><p><a href=\"/items/new\">품목 추가</a></p><table><thead><tr><th>ID</th><th>품목명</th><th>단위</th><th>거래처</th><th>재고</th></tr></thead><tbody>"
-      (str-join (map item-row-html (item-list-rows)) "") "</tbody></table>"))))
+  (let [[query (request-query request)] [page-no (page-number (formvalue query "page"))]
+        [rows (item-list-rows 50 (* (- page-no 1) 50))]
+        [count-row (first (db-query DB "SELECT count(*) AS count FROM items" []))]
+        [total (get count-row "count")]]
+    (server-html (page "품목 목록"
+      (str "<form method=\"post\" action=\"/logout\">" (csrf-input (cookie-value request "erp_session")) "<button>로그아웃</button></form><p><a href=\"/items/new\">품목 추가</a></p><table><thead><tr><th>ID</th><th>품목명</th><th>단위</th><th>거래처</th><th>재고</th></tr></thead><tbody>"
+        (str-join (map item-row-html rows) "") "</tbody></table>" (page-links "/items" page-no total ""))))))
+
+(defn item-all-html [offset chunks]
+  (let [[rows (item-list-rows 50 offset)]]
+(if (= (length rows) 0) (str-join chunks "")
+      (item-all-html (+ offset 50) (append chunks (str-join (map item-row-html rows) ""))))))
+(defn handle-test-items-all [request]
+  (server-html (page "품목 목록 시험" (str "<table><tbody>" (item-all-html 0 []) "</tbody></table>"))))
 
 (defn handle-new-item [request]
   (item-form "" "" "" "" (cookie-value request "erp_session")))
@@ -289,6 +316,8 @@
   (do (_fl_process_run_args "/bin/sleep" ["2"]) (server-html "slow")))
 (if (= (_fl_env_get "FL_HTTP_TEST_SLOW") "1")
   (server-get "/__slow" handle-test-slow))
+(if (= (_fl_env_get "FL_HTTP_TEST_FULL_ITEMS") "1")
+  (server-get "/__test/items-all" (fn [request] (protected-get handle-test-items-all request))))
 
 (server-get "/items/new" (fn [request] (protected-get handle-new-item request)))
 (server-post "/items" (fn [request] (protected-post handle-create-item request)))

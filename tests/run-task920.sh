@@ -52,9 +52,9 @@ bash "$ROOT/tests/run-cgc-symbol-contract.sh" >"$WORK/symbol.log" 2>&1
 sources=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c db.c http_server.c auth.c)
 link_sources=(); for name in "${sources[@]}"; do link_sources+=("$RUNTIME/$name"); done
 "$COMPILER" "$ROOT/examples/erp-vendors/app.fl" "$WORK/app.c" >"$WORK/app.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -Dauth_random_token=fl_auth_random_token -Dauth_pbkdf2=fl_auth_pbkdf2 -Dauth_constant_time_equal=fl_auth_constant_time_equal -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
 "$COMPILER" "$ROOT/examples/erp-vendors/create-user.fl" "$WORK/create-user.c" >"$WORK/create-user.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/create-user" "$WORK/create-user.c" \
+gcc -w -Dauth_random_token=fl_auth_random_token -Dauth_pbkdf2=fl_auth_pbkdf2 -Dauth_constant_time_equal=fl_auth_constant_time_equal -I "$RUNTIME" -o "$WORK/create-user" "$WORK/create-user.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" \
   "$RUNTIME/db.c" "$RUNTIME/auth.c" -lsqlite3 -lcrypto -lm
@@ -66,6 +66,8 @@ for spec in 'erp test.fl' 'erp2 test2.fl' 'erp3 test3.fl' 'conc test-concurrency
   mkdir -p "$WORK/$label-run"
   "$WORK/$label" "$WORK/$label-run" "$WORK/app" "$WORK/create-user" >"$WORK/$label.log" 2>&1
 done
+
+bash "$ROOT/examples/erp-vendors/test-pages.sh" "$WORK/app" "$WORK/create-user" >"$WORK/pages.log" 2>&1
 
 WARN_COUNT=0
 for name in loop-binding function-parameter let-local; do
@@ -88,3 +90,4 @@ grep -hE '^TEST_EVIDENCE_SUMMARY=|^TCP_SUMMARY=|^HTTP_SUMMARY=' "$WORK/test-evid
 sed -n 's/.*"expectedCount":\([0-9]*\),"resultCount":\([0-9]*\).*/AUDIT_SUMMARY=\1\/\2/p' "$WORK/audit.log"
 grep -E '^NATIVE_FORMS_SUMMARY=|^CGC_SYMBOL_SUMMARY=' "$WORK/symbol.log"
 grep -hE '^(ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|AUTH_SUMMARY)=' "$WORK"/{erp,erp2,erp3,conc,auth}.log
+grep -E '^PAGE_SUMMARY=' "$WORK/pages.log"
