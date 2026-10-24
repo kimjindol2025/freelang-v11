@@ -707,6 +707,10 @@
     [(= $op "auth-random-token") "fl_auth_random_token"]
     [(= $op "auth-pbkdf2") "fl_auth_pbkdf2"]
     [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
+    [(= $op "http-get-headers") "fl_http_get_headers"]
+    [(= $op "http-post") "fl_http_post"]
+    [(= $op "http-post-headers") "fl_http_post_headers"]
+    [(= $op "uuid") "fl_uuid"]
     [(= $op "any?") "fl_any_p"]
     [(= $op "none?") "fl_none_p"]
     [(= $op "count-if") "fl_count_if"]
@@ -978,7 +982,6 @@
   [(= $op "last")        (str "fl_vec_last(" (cgc (get $args 0)) ")")]
   [(= $op "nth")         (str "get(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "concat")      (str "fl_concat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "uuid")        "uuid()"]
   ;; 맵 ops
   [(= $op "obj-merge")   (str "fl_map_merge(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "obj-pick")    (str "fl_obj_pick(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -1152,9 +1155,6 @@
   [(= $op "run-parallel")      (str "fl_run_parallel(" (cgc (get $args 0)) ", " (if (>= (length $args) 2) (cgc (get $args 1)) "fl_int(0)") ")")]
   ;; HTTP 클라이언트 (libcurl) — {:status N :body "..." :headers {}}
   [(= $op "http-get")          (str "fl_http_get(" (cgc (get $args 0)) ")")]
-  [(= $op "http-post")         (str "fl_http_post(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "http-get-headers")  (str "fl_http_get_headers(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "http-post-headers") (str "fl_http_post_headers(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "http-post-stream")     (str "fl_http_post_stream(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ", " (cgc (get $args 3)) ")")]
   [(= $op "http-stream-collect") (str "fl_http_stream_collect(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   ;; 유틸 — sleep/now

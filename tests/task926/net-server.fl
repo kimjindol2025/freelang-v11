@@ -1,0 +1,27 @@
+(defn raw-request [request]
+  (let [[method (get request "method")]
+        [path (get request "path")]
+        [headers (get request "headers")]
+        [body (get request "body")]
+        [probe (get headers "x-probe")]]
+    (fl-resp-html
+      (str method " " path " HTTP/1.0\r\n"
+           "Host: " (get headers "host") "\r\n"
+           "Connection: close\r\n"
+           "Content-Length: " (get headers "content-length") "\r\n"
+           (if probe (str "X-Probe: " probe "\r\n") "")
+           "\r\n" body))))
+(defn measure-request [request]
+  (fl-resp-html
+    (str "CL=" (get (get request "headers") "content-length")
+         ";RX=" (length (get request "body")))))
+(defn slow-request [request]
+  (do (sleep 6000) (fl-resp-html "late")))
+(defn not-found [request]
+  (fl-resp-status 404 "missing"))
+(fl-http-route "POST" "/inspect" raw-request)
+(fl-http-route "GET" "/inspect" raw-request)
+(fl-http-route "POST" "/measure" measure-request)
+(fl-http-route "GET" "/slow" slow-request)
+(fl-http-route "GET" "/missing" not-found)
+(fl-http-start 0)

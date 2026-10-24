@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <sys/select.h>
+#include <sys/random.h>
 
 FLValue _fl_process_getcwd(void) {
     char buf[4096];
@@ -477,6 +478,217 @@ FLValue http_get(FLValue url) {
 }
 
 FLValue fl_http_get(FLValue url) { return http_get(url); }
+
+static FLValue http_client_error(const char *code, const char *message) {
+    FLValue error = fl_map_new();
+    error = fl_map_set(error, fl_str_val("code"), fl_str_val(code));
+    error = fl_map_set(error, fl_str_val("message"), fl_str_val(message));
+    FLValue result = fl_map_set(fl_map_new(), fl_str_val("ok"), fl_bool(false));
+    return fl_map_set(result, fl_str_val("error"), error);
+}
+
+static int http_client_parse_url(FLValue value, char *host, size_t host_cap,
+                                 char *authority, size_t authority_cap,
+                                 char *path, size_t path_cap, int64_t *port) {
+    if (value.tag != FL_STRING || !value.obj) return -1;
+    const char *url = ((FLString *)value.obj)->data;
+    if (strncmp(url, "http://", 7) != 0) return -1;
+    const char *begin = url + 7, *end = begin;
+    while (*end && *end != '/' && *end != '?') {
+        if ((unsigned char)*end <= 32 || *end == '#' || *end == '@') return -1;
+        end++;
+    }
+    size_t authority_len = (size_t)(end - begin);
+    if (!authority_len || authority_len >= authority_cap) return -1;
+    memcpy(authority, begin, authority_len); authority[authority_len] = '\0';
+    const char *colon = memchr(begin, ':', authority_len);
+    size_t host_len = colon ? (size_t)(colon - begin) : authority_len;
+    if (!host_len || host_len >= host_cap || memchr(begin, '[', authority_len) ||
+        memchr(begin, ']', authority_len) || (colon && memchr(colon + 1, ':', (size_t)(end - colon - 1)))) return -1;
+    memcpy(host, begin, host_len); host[host_len] = '\0';
+    *port = 80;
+    if (colon) {
+        const char *p = colon + 1;
+        if (p == end) return -1;
+        int64_t n = 0;
+        for (; p < end; p++) {
+            if (*p < '0' || *p > '9') return -1;
+            n = n * 10 + (*p - '0');
+            if (n > 65535) return -1;
+        }
+        if (n < 1) return -1;
+        *port = n;
+    }
+    if (*end == '?') {
+        if (snprintf(path, path_cap, "/%s", end) >= (int)path_cap) return -1;
+    } else if (snprintf(path, path_cap, "%s", *end ? end : "/") >= (int)path_cap) return -1;
+    for (const unsigned char *p = (const unsigned char *)path; *p; p++)
+        if (*p <= 32 || *p == 127 || *p == '#') return -1;
+    return 0;
+}
+
+static int http_header_token(const char *name, size_t length) {
+    if (!length) return 0;
+    for (size_t i = 0; i < length; i++) {
+        unsigned char c = (unsigned char)name[i];
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+              (c >= '0' && c <= '9') || strchr("!#$%&'*+-.^_`|~", c))) return 0;
+    }
+    return 1;
+}
+
+static int http_header_forbidden(const char *name, size_t length) {
+    char lower[64];
+    if (!length || length >= sizeof lower) return 1;
+    for (size_t i = 0; i < length; i++) lower[i] = (char)tolower((unsigned char)name[i]);
+    lower[length] = '\0';
+    return !strcmp(lower, "host") || !strcmp(lower, "connection") ||
+           !strcmp(lower, "content-length") || !strcmp(lower, "transfer-encoding");
+}
+
+static int http_wire_append(char *wire, size_t capacity, size_t *used,
+                            const char *text, size_t length) {
+    if (length > capacity - *used) return -1;
+    memcpy(wire + *used, text, length); *used += length;
+    return 0;
+}
+
+static FLValue http_client_request(const char *method, FLValue url, FLValue headers, FLValue body) {
+    char host[256], authority[320], path[2048];
+    int64_t port;
+    if (http_client_parse_url(url, host, sizeof host, authority, sizeof authority,
+                              path, sizeof path, &port) != 0)
+        return http_client_error("INVALID_URL", "expected a valid plain HTTP URL");
+    if (headers.tag != FL_MAP || body.tag != FL_STRING || !body.obj)
+        return http_client_error("INVALID_REQUEST", "headers must be a map and body a string");
+    FLString *payload = (FLString *)body.obj;
+    if (payload->len > 1048576) return http_client_error("REQUEST_TOO_LARGE", "request body exceeds 1048576 bytes");
+    FLMap *map = (FLMap *)headers.obj;
+    size_t capacity = strlen(path) + strlen(authority) + payload->len + 512;
+    for (uint32_t i = 0; i < map->len; i++) {
+        FLValue key = map->entries[i].key, val = map->entries[i].val;
+        if (key.tag != FL_STRING || !key.obj || val.tag != FL_STRING || !val.obj)
+            return http_client_error("INVALID_REQUEST", "header names and values must be strings");
+        FLString *k = (FLString *)key.obj, *v = (FLString *)val.obj;
+        if (!http_header_token(k->data, k->len) || http_header_forbidden(k->data, k->len))
+            return http_client_error("INVALID_REQUEST", "invalid or reserved header name");
+        for (uint32_t j = 0; j < v->len; j++)
+            if (v->data[j] == '\r' || v->data[j] == '\n')
+                return http_client_error("INVALID_REQUEST", "header values cannot contain CR or LF");
+        if ((size_t)k->len + (size_t)v->len + 4 > SIZE_MAX - capacity)
+            return http_client_error("REQUEST_TOO_LARGE", "request size overflow");
+        capacity += (size_t)k->len + (size_t)v->len + 4;
+    }
+    if (capacity > 2097152) return http_client_error("REQUEST_TOO_LARGE", "request exceeds 2097152 bytes");
+    char *wire = (char *)malloc(capacity);
+    if (!wire) return http_client_error("IO", "request allocation failed");
+    size_t used = 0; char line[512];
+    int n = snprintf(line, sizeof line, "%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\nContent-Length: %u\r\n",
+                     method, path, authority, payload->len);
+    if (n < 0 || (size_t)n >= sizeof line || http_wire_append(wire, capacity, &used, line, (size_t)n) != 0) {
+        free(wire); return http_client_error("REQUEST_TOO_LARGE", "request header overflow");
+    }
+    for (uint32_t i = 0; i < map->len; i++) {
+        FLString *key = (FLString *)map->entries[i].key.obj;
+        FLString *value = (FLString *)map->entries[i].val.obj;
+        if (http_wire_append(wire, capacity, &used, key->data, key->len) != 0 ||
+            http_wire_append(wire, capacity, &used, ": ", 2) != 0 ||
+            http_wire_append(wire, capacity, &used, value->data, value->len) != 0 ||
+            http_wire_append(wire, capacity, &used, "\r\n", 2) != 0) {
+            free(wire); return http_client_error("REQUEST_TOO_LARGE", "request header overflow");
+        }
+    }
+    if (http_wire_append(wire, capacity, &used, "\r\n", 2) != 0 ||
+        http_wire_append(wire, capacity, &used, payload->data, payload->len) != 0) {
+        free(wire); return http_client_error("REQUEST_TOO_LARGE", "request overflow");
+    }
+    wire[used] = '\0';
+    FLValue exchange = _fl_http_exchange(fl_str_val(host), fl_int(port), fl_str_val(wire), fl_int(5000), fl_int(2097152));
+    free(wire);
+    if (!fl_truthy(fl_map_get(exchange, fl_str_val("ok")))) return exchange;
+    FLValue raw_value = fl_map_get(exchange, fl_str_val("value"));
+    if (raw_value.tag != FL_STRING || !raw_value.obj) return http_client_error("HTTP_PROTOCOL", "missing response data");
+    FLString *raw = (FLString *)raw_value.obj;
+    const char *split = strstr(raw->data, "\r\n\r\n");
+    int status = 0;
+    if (!split || sscanf(raw->data, "HTTP/%*u.%*u %d", &status) != 1 || status < 100 || status > 599 ||
+        (size_t)(split - raw->data) > 65536)
+        return http_client_error("HTTP_PROTOCOL", "malformed response");
+    FLValue response_headers = fl_map_new();
+    const char *cursor = strstr(raw->data, "\r\n");
+    if (!cursor || cursor >= split) return http_client_error("HTTP_PROTOCOL", "missing status line");
+    cursor += 2;
+    while (cursor < split) {
+        const char *end = strstr(cursor, "\r\n");
+        if (!end || end > split) return http_client_error("HTTP_PROTOCOL", "malformed response header");
+        const char *colon = memchr(cursor, ':', (size_t)(end - cursor));
+        if (!colon || colon == cursor) return http_client_error("HTTP_PROTOCOL", "malformed response header");
+        size_t key_len = (size_t)(colon - cursor), value_len = (size_t)(end - colon - 1);
+        char key[256];
+        if (key_len >= sizeof key) return http_client_error("HTTP_PROTOCOL", "response header name too long");
+        memcpy(key, cursor, key_len); key[key_len] = '\0';
+        for (size_t i = 0; i < key_len; i++) key[i] = (char)tolower((unsigned char)key[i]);
+        const char *value = colon + 1;
+        while (value_len && (*value == ' ' || *value == '\t')) { value++; value_len--; }
+        while (value_len && (value[value_len - 1] == ' ' || value[value_len - 1] == '\t')) value_len--;
+        char *copy = (char *)malloc(value_len + 1);
+        if (!copy) return http_client_error("IO", "response allocation failed");
+        memcpy(copy, value, value_len); copy[value_len] = '\0';
+        response_headers = fl_map_set(response_headers, fl_str_val(key), fl_str_val(copy));
+        free(copy); cursor = end + 2;
+    }
+    if (fl_map_get(response_headers, fl_str_val("transfer-encoding")).tag != FL_NIL)
+        return http_client_error("HTTP_PROTOCOL", "transfer encoding is unsupported");
+    const char *body_start = split + 4;
+    size_t body_len = raw->len - (size_t)(body_start - raw->data);
+    FLValue content_length = fl_map_get(response_headers, fl_str_val("content-length"));
+    if (content_length.tag != FL_NIL) {
+        if (content_length.tag != FL_STRING || !content_length.obj) return http_client_error("HTTP_PROTOCOL", "invalid content length");
+        const char *text = ((FLString *)content_length.obj)->data; char *end = NULL;
+        for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+            if (*p < '0' || *p > '9') return http_client_error("HTTP_PROTOCOL", "invalid content length");
+        errno = 0;
+        unsigned long long expected = strtoull(text, &end, 10);
+        if (!text[0] || errno == ERANGE || !end || *end || expected != body_len)
+            return http_client_error("HTTP_PROTOCOL", "content length mismatch");
+    }
+    FLValue result = fl_map_new();
+    result = fl_map_set(result, fl_str_val("ok"), fl_bool(status >= 200 && status < 300));
+    result = fl_map_set(result, fl_str_val("status"), fl_int(status));
+    result = fl_map_set(result, fl_str_val("headers"), response_headers);
+    result = fl_map_set(result, fl_str_val("body"), fl_str_val(body_start));
+    return result;
+}
+
+FLValue fl_http_get_headers(FLValue url, FLValue headers) {
+    return http_client_request("GET", url, headers, fl_str_val(""));
+}
+FLValue fl_http_post(FLValue url, FLValue body) {
+    return http_client_request("POST", url, fl_map_new(), body);
+}
+FLValue fl_http_post_headers(FLValue url, FLValue headers, FLValue body) {
+    return http_client_request("POST", url, headers, body);
+}
+
+FLValue fl_uuid(void) {
+    unsigned char bytes[16]; size_t left = sizeof bytes; unsigned char *p = bytes;
+    while (left) {
+        ssize_t n = getrandom(p, left, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) fl_throw(fl_str_val("getrandom failed for uuid"));
+        p += n; left -= (size_t)n;
+    }
+    bytes[6] = (unsigned char)((bytes[6] & 0x0f) | 0x40);
+    bytes[8] = (unsigned char)((bytes[8] & 0x3f) | 0x80);
+    char text[37]; static const char hex[] = "0123456789abcdef";
+    size_t at = 0;
+    for (size_t i = 0; i < sizeof bytes; i++) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) text[at++] = '-';
+        text[at++] = hex[bytes[i] >> 4]; text[at++] = hex[bytes[i] & 15];
+    }
+    text[at] = '\0';
+    return fl_str_val(text);
+}
 
 /* Loopback test sockets use monotonically increasing handles, never raw fds.
  * Closed handles cannot accidentally close a subsequently reused descriptor. */
