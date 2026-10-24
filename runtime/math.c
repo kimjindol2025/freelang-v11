@@ -5,6 +5,7 @@
 #include <math.h>
 #include <time.h>
 #include <ctype.h>
+#include <errno.h>
 
 FLValue fl_floor(FLValue x) { return x.tag==FL_FLOAT ? fl_float(floor(x.f)) : x; }
 FLValue fl_ceil(FLValue x)  { return x.tag==FL_FLOAT ? fl_float(ceil(x.f))  : x; }
@@ -543,6 +544,133 @@ FLValue max(FLValue a, FLValue b) {
     double m = da > db ? da : db;
     if (a.tag == FL_INT && b.tag == FL_INT) return fl_int((int64_t)m);
     return fl_float(m);
+}
+
+FLValue fl_html_escape(FLValue value) {
+    char value_buf[128];
+    const char *src = value.tag == FL_STRING && value.obj ? ((FLString*)value.obj)->data :
+        value.tag == FL_NIL ? "" : fl_to_str(value, value_buf, sizeof value_buf);
+    size_t cap = strlen(src) * 6 + 1, used = 0;
+    char *out = malloc(cap);
+    if (!out) return fl_str_val("");
+    for (const char *p = src; *p; p++) {
+        const char *rep = NULL;
+        switch (*p) {
+            case '&': rep = "&amp;"; break;
+            case '<': rep = "&lt;"; break;
+            case '>': rep = "&gt;"; break;
+            case '"': rep = "&quot;"; break;
+            case '\'': rep = "&#x27;"; break;
+        }
+        if (rep) { size_t n = strlen(rep); memcpy(out + used, rep, n); used += n; }
+        else out[used++] = *p;
+    }
+    out[used] = '\0';
+    FLValue result = fl_str_val(out); free(out); return result;
+}
+
+static FLValue fl_pad(FLValue value, FLValue width, FLValue pad, int left) {
+    char value_buf[128];
+    const char *src = value.tag == FL_STRING && value.obj ? ((FLString*)value.obj)->data :
+        value.tag == FL_NIL ? "" : fl_to_str(value, value_buf, sizeof value_buf);
+    const char *fill = pad.tag == FL_STRING && pad.obj ? ((FLString*)pad.obj)->data : " ";
+    size_t len = strlen(src), fill_len = strlen(fill);
+    int64_t target = width.tag == FL_FLOAT ? (int64_t)width.f : width.tag == FL_INT ? width.i : 0;
+    if (target <= 0 || (uint64_t)target <= len || fill_len == 0) return fl_str_val(src);
+    size_t total = (size_t)target, missing = total - len;
+    char *out = malloc(total + 1);
+    if (!out) return fl_str_val(src);
+    size_t off = left ? missing : 0;
+    memcpy(out + off, src, len);
+    for (size_t i = 0; i < missing; i++) out[(left ? 0 : len) + i] = fill[i % fill_len];
+    out[total] = '\0';
+    FLValue result = fl_str_val(out); free(out); return result;
+}
+FLValue fl_str_pad_left(FLValue s, FLValue width, FLValue pad) { return fl_pad(s, width, pad, 1); }
+FLValue fl_str_pad_right(FLValue s, FLValue width, FLValue pad) { return fl_pad(s, width, pad, 0); }
+
+FLValue fl_str_repeat(FLValue value, FLValue count) {
+    if (value.tag != FL_STRING || !value.obj) return fl_str_val("");
+    int64_t n = count.tag == FL_FLOAT ? (int64_t)count.f : count.tag == FL_INT ? count.i : 0;
+    const char *src = ((FLString*)value.obj)->data; size_t len = strlen(src);
+    if (n <= 0 || len == 0) return fl_str_val("");
+    if ((uint64_t)n > (SIZE_MAX - 1) / (len ? len : 1)) return fl_str_val("");
+    size_t total = len * (size_t)n; char *out = malloc(total + 1);
+    if (!out) return fl_str_val("");
+    for (int64_t i = 0; i < n; i++) memcpy(out + (size_t)i * len, src, len);
+    out[total] = '\0'; FLValue result = fl_str_val(out); free(out); return result;
+}
+
+static int fl_value_empty(FLValue v) {
+    if (v.tag == FL_NIL) return 1;
+    if (v.tag == FL_STRING) return !v.obj || ((FLString*)v.obj)->len == 0;
+    if (v.tag == FL_VECTOR) return !v.obj || ((FLVector*)v.obj)->len == 0;
+    if (v.tag == FL_MAP) return !v.obj || ((FLMap*)v.obj)->len == 0;
+    return 0;
+}
+FLValue fl_not_empty_p(FLValue v) { return fl_bool(!fl_value_empty(v)); }
+FLValue fl_nil_or_empty_p(FLValue v) {
+    if (v.tag == FL_NIL) return fl_bool(true);
+    if (v.tag == FL_STRING) return fl_bool(!v.obj || ((FLString*)v.obj)->len == 0);
+    if (v.tag == FL_VECTOR) return fl_bool(!v.obj || ((FLVector*)v.obj)->len == 0);
+    return fl_bool(false);
+}
+
+FLValue fl_distinct(FLValue vec) {
+    if (vec.tag != FL_VECTOR || !vec.obj) return fl_vec_new();
+    FLVector *src = (FLVector*)vec.obj; FLValue out = fl_vec_new();
+    for (uint32_t i = 0; i < src->len; i++) {
+        int seen = 0; FLVector *items = (FLVector*)out.obj;
+        for (uint32_t j = 0; j < items->len; j++) if (fl_truthy(fl_eq(items->data[j], src->data[i]))) { seen = 1; break; }
+        if (!seen) out = fl_vec_push(out, src->data[i]);
+    }
+    return out;
+}
+static FLValue fl_flatten_into(FLValue out, FLValue value) {
+    if (value.tag != FL_VECTOR || !value.obj) return fl_vec_push(out, value);
+    FLVector *v = (FLVector*)value.obj;
+    for (uint32_t i = 0; i < v->len; i++) out = fl_flatten_into(out, v->data[i]);
+    return out;
+}
+FLValue fl_flatten(FLValue vec) {
+    if (vec.tag != FL_VECTOR || !vec.obj) return fl_vec_new();
+    FLValue out = fl_vec_new(); FLVector *v = (FLVector*)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) out = fl_flatten_into(out, v->data[i]);
+    return out;
+}
+FLValue fl_flatten_1(FLValue vec) {
+    if (vec.tag != FL_VECTOR || !vec.obj) return fl_vec_new();
+    FLValue out = fl_vec_new(); FLVector *v = (FLVector*)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        if (v->data[i].tag == FL_VECTOR && v->data[i].obj) {
+            FLVector *inner = (FLVector*)v->data[i].obj;
+            for (uint32_t j = 0; j < inner->len; j++) out = fl_vec_push(out, inner->data[j]);
+        } else out = fl_vec_push(out, v->data[i]);
+    }
+    return out;
+}
+FLValue fl_zip(FLValue left, FLValue right) {
+    if (left.tag != FL_VECTOR || right.tag != FL_VECTOR || !left.obj || !right.obj) return fl_vec_new();
+    FLVector *a = (FLVector*)left.obj, *b = (FLVector*)right.obj; uint32_t n = a->len < b->len ? a->len : b->len;
+    FLValue out = fl_vec_new();
+    for (uint32_t i = 0; i < n; i++) { FLValue pair[2] = {a->data[i], b->data[i]}; out = fl_vec_push(out, fl_vec_from(pair, 2)); }
+    return out;
+}
+FLValue fl_repeat(FLValue count, FLValue value) {
+    if (count.tag == FL_STRING && (value.tag == FL_INT || value.tag == FL_FLOAT)) return fl_str_repeat(count, value);
+    int64_t n = count.tag == FL_FLOAT ? (int64_t)count.f : count.tag == FL_INT ? count.i : 0;
+    if (n <= 0 || (uint64_t)n > UINT32_MAX || (uint64_t)n > SIZE_MAX / sizeof(FLValue)) return fl_vec_new();
+    FLValue *items = malloc(sizeof(FLValue) * (size_t)n);
+    if (!items) return fl_vec_new();
+    for (int64_t i = 0; i < n; i++) items[i] = value;
+    FLValue out = fl_vec_from(items, (uint32_t)n); free(items); return out;
+}
+FLValue fl_sleep_ms(FLValue ms) {
+    int64_t value = ms.tag == FL_FLOAT ? (int64_t)ms.f : ms.tag == FL_INT ? ms.i : 0;
+    if (value < 0) value = 0;
+    struct timespec req = { value / 1000, (value % 1000) * 1000000L };
+    while (nanosleep(&req, &req) != 0 && errno == EINTR) {}
+    return fl_nil();
 }
 
 /* ── stdlib aliases — self/all.fl compatibility ── */

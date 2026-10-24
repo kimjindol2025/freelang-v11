@@ -103,9 +103,23 @@ printf 'WARN_SUMMARY=%s/4\n' "$WARN_COUNT"
 "$ROOT/tests/run-cgc-builtin-abi.sh" "$COMPILER" "$WORK/abi" >"$WORK/abi.log" 2>&1
 grep -E '^(BUILTINS_TOTAL|MATCHED|MISSING_IN_RUNTIME|UNUSED_RUNTIME|ABI_MAPPED|COMPILER_LOWERED|ABI_HOLD|MISSING_IN_RUNTIME_ITEMS|ABI_SUMMARY)=' "$WORK/abi.log"
 
+"$COMPILER" "$ROOT/tests/task924/builtins.fl" "$WORK/builtins2.c" >"$WORK/builtins2.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/builtins2" "$WORK/builtins2.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/builtins2" >"$WORK/builtins2.log" 2>&1
+BUILTIN2_COUNT="$(grep -c '^PASS ' "$WORK/builtins2.log")"
+test "$BUILTIN2_COUNT" -eq 14
+grep -Fx '&lt;script&gt;&quot;&#x27;&amp;' "$WORK/builtins2.log"
+if "$COMPILER" "$ROOT/tests/task924/held-auth.fl" "$WORK/held-auth.c" >"$WORK/held-auth.log" 2>&1; then
+  echo 'held builtin unexpectedly compiled' >&2; exit 1
+fi
+grep -E '^\[FL Error\] 아직 네이티브로 구현되지 않은 내장 함수: auth-jwt-sign \(line [0-9]+\)$' "$WORK/held-auth.log"
+BUILTIN2_COUNT=$((BUILTIN2_COUNT + 2))
+printf 'BUILTIN2_SUMMARY=%s/16\n' "$BUILTIN2_COUNT"
+
 grep -E '^FL_TEST_SUMMARY ' "$WORK/existing41.log"
 grep -hE '^TEST_EVIDENCE_SUMMARY=|^TCP_SUMMARY=|^HTTP_SUMMARY=' "$WORK/test-evidence.log" "$WORK/tcp.log" "$WORK/http.log"
 sed -n 's/.*"expectedCount":\([0-9]*\),"resultCount":\([0-9]*\).*/AUDIT_SUMMARY=\1\/\2/p' "$WORK/audit.log"
 grep -E '^NATIVE_FORMS_SUMMARY=|^CGC_SYMBOL_SUMMARY=' "$WORK/symbol.log"
 grep -hE '^(ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|AUTH_SUMMARY)=' "$WORK"/{erp,erp2,erp3,conc,auth}.log
 grep -E '^PAGE_SUMMARY=' "$WORK/pages.log"
+grep '^PASS ' "$WORK/builtins2.log"

@@ -68,6 +68,7 @@ typedef struct {
 FLValue fl_int(int64_t v);
 FLValue fl_float(double v);
 FLValue fl_str_val(const char* s);
+const char* fl_to_str(FLValue v, char* buf, size_t sz);
 FLValue fl_bool(bool v);
 FLValue fl_nil(void);
 
@@ -264,6 +265,18 @@ FLValue file_is_file(FLValue path);
 FLValue json_has(FLValue obj, FLValue key);
 FLValue json_parse_wrap(FLClosure* self, int argc, FLValue* argv);
 FLValue max(FLValue a, FLValue b);
+FLValue fl_html_escape(FLValue s);
+FLValue fl_str_pad_left(FLValue s, FLValue width, FLValue pad);
+FLValue fl_str_pad_right(FLValue s, FLValue width, FLValue pad);
+FLValue fl_str_repeat(FLValue s, FLValue count);
+FLValue fl_not_empty_p(FLValue v);
+FLValue fl_nil_or_empty_p(FLValue v);
+FLValue fl_distinct(FLValue vec);
+FLValue fl_flatten(FLValue vec);
+FLValue fl_flatten_1(FLValue vec);
+FLValue fl_zip(FLValue left, FLValue right);
+FLValue fl_repeat(FLValue count, FLValue value);
+FLValue fl_sleep_ms(FLValue ms);
 
 /* ── JSON ── */
 FLValue fl_json_parse(FLValue src);

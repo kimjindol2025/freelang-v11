@@ -707,6 +707,18 @@
     [(= $op "auth-random-token") "fl_auth_random_token"]
     [(= $op "auth-pbkdf2") "fl_auth_pbkdf2"]
     [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
+    [(= $op "html-escape") "fl_html_escape"]
+    [(= $op "str-pad-left") "fl_str_pad_left"]
+    [(= $op "str-pad-right") "fl_str_pad_right"]
+    [(= $op "str-repeat") "fl_str_repeat"]
+    [(= $op "not-empty?") "fl_not_empty_p"]
+    [(= $op "nil-or-empty?") "fl_nil_or_empty_p"]
+    [(= $op "distinct") "fl_distinct"]
+    [(= $op "flatten") "fl_flatten"]
+    [(= $op "flatten-1") "fl_flatten_1"]
+    [(= $op "zip") "fl_zip"]
+    [(= $op "repeat") "fl_repeat"]
+    [(= $op "sleep") "fl_sleep_ms"]
     [(= $op "dissoc") "fl_map_del"]
     [(= $op "entries") "fl_map_entries"]
     [(or (= $op "obj-values") (= $op "vals")) "fl_map_vals"]
@@ -861,12 +873,25 @@
 (defn cgc-sexpr [$n]
   (let [[$op (get $n :op)] [$args (get $n :args)]]
   (if (string? $op)
-    (cgc-dispatch $op $args)
+    (cgc-dispatch $op $args (get $n :line))
     (cgc-fncall (cgc $op) $args))))
 
-(defn cgc-dispatch [$op $args]
+(defn cgc-held-builtin? [$op]
+  (let [[$lines (str-split (file-read "tests/task923/abi-hold.tsv") "\n")]]
+    (loop [$i 1]
+      (if (>= $i (length $lines)) false
+        (let [[$cols (str-split (get $lines $i) "\t")]]
+          (if (= (get $cols 0) $op) true
+            (recur (+ $i 1))))))))
+
+(defn cgc-dispatch [$op $args $line]
   (if (not (null? (c-runtime-name $op)))
     (cgc-runtime-call $op $args)
+  (if (cgc-held-builtin? $op)
+    (do
+      (println (str "[FL Error] 아직 네이티브로 구현되지 않은 내장 함수: " $op (str " (line " $line ")")))
+      (fl-cgc-halt)
+      "fl_nil()")
   (if (and (includes-item ["now-iso" "str-index-of" "str-split" "str-join" "str-trim" "str-replace" "json-parse" "json-stringify" "http-get" "http-post" "file-read" "file-write" "file-append" "file-exists?" "file-size" "dir-list"] $op)
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
@@ -942,10 +967,10 @@
   [(= $op "str-slice")    (str "substring(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "str-to-upper") (str "str_to_upper(" (cgc (get $args 0)) ")")]
   [(or (= $op "str-trim") (= $op "_fl_str_trim"))     (str "str_trim(" (cgc (get $args 0)) ")")]
-  [(= $op "str-pad-left") (str "str_pad_left(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "str-pad-right")(str "str_pad_right(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-pad-left") (str "fl_str_pad_left(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "str-pad-right")(str "fl_str_pad_right(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(or (= $op "str-index-of") (= $op "_fl_str_index_of")) (str "str_index_of(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "str-repeat")   (str "str_repeat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "str-repeat")   (str "fl_str_repeat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "str-length")   (str "length(" (cgc (get $args 0)) ")")]
   [(= $op "str-to-num")   (str "fl_str_to_num(" (cgc (get $args 0)) ")")]
   [(= $op "html-escape")  (str "fl_html_escape(" (cgc (get $args 0)) ")")]
@@ -970,11 +995,11 @@
   [(= $op "append")      (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "push")        (str "fl_vec_push(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   ;; task-native-stdlib-gap P1: 기존 C 구현 dispatch 연결
-  [(= $op "flatten")     (str "flatten(" (cgc (get $args 0)) ")")]
-  [(= $op "flatten-1")   (str "flatten(" (cgc (get $args 0)) ")")]
-  [(= $op "distinct")    (str "distinct(" (cgc (get $args 0)) ")")]
-  [(= $op "zip")         (str "zip(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "zip-with")    (str "zip(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "flatten")     (str "fl_flatten(" (cgc (get $args 0)) ")")]
+  [(= $op "flatten-1")   (str "fl_flatten_1(" (cgc (get $args 0)) ")")]
+  [(= $op "distinct")    (str "fl_distinct(" (cgc (get $args 0)) ")")]
+  [(= $op "zip")         (str "fl_zip(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "zip-with")    (str "fl_zip_with(" (cgc-args $args) ")")]
   [(= $op "group-by")    (str "group_by(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "frequencies") (str "frequencies(" (cgc (get $args 0)) ")")]
   ;; P1: 신규 C 구현 함수
@@ -1172,7 +1197,7 @@
   [(= $op "auth-jwt-decode")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", fl_str_val(\"\"))")]
   [(= $op "auth-hash-password")  (str "fl_hash_password(" (cgc (get $args 0)) ")")]
   [(= $op "auth-verify-password")(str "fl_verify_password(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [true             (cgc-dispatch-fallback $op $args)]))))
+  [true             (cgc-dispatch-fallback $op $args)])))))
 
 (defn cgc-swap! [$args]
   (let [[$atom-c  (cgc (get $args 0))]

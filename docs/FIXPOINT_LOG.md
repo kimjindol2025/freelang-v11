@@ -613,4 +613,16 @@ b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f  stage4.c
 CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
+
+2026-10-24, TASK 9-24에서 ABI 보류 목록을 컴파일러 오류 처리와 ABI 시험이 함께 읽게 하고, HTML 이스케이프·패딩·반복·빈 값 판별·중복 제거·flatten·zip·sleep 런타임 구현을 추가했다. 컴파일 오류에 호출 줄 정보가 포함되고 새 내장 심볼은 `fl_` 접두어를 쓴다. 이전 고정점 `b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f`, 새 고정점 `ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682  stage2.c
+ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682  stage3.c
+ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
 ```

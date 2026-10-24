@@ -35,7 +35,7 @@ in_map && /\[\(or/ {
     }
   }
 }
-/^\(defn cgc-dispatch \[\$op \$args\]/ { in_dispatch=1; next }
+/^\(defn cgc-dispatch \[/ { in_dispatch=1; next }
 in_dispatch && /^\(defn cgc-swap!/ { in_dispatch=0 }
 in_dispatch && /\[\(= \$op/ {
   line=$0; op=line; sub(/^.*\$op "/,"",op); sub(/".*$/, "", op)
@@ -56,7 +56,7 @@ in_dispatch && /\[\(or/ {
 }
 ' "$ROOT/self/cgc-main.fl" | sort -u >"$WORK/abi-builtins.tsv"
 
-awk '/^\(defn cgc-dispatch \[\$op \$args\]/{in_dispatch=1;next} /^\(defn cgc-swap!/{in_dispatch=0} in_dispatch {line=$0; while (match(line, /\$op "[^"]+"/)) {op=substr(line,RSTART,RLENGTH); sub(/^\$op "/,"",op); sub(/"$/,"",op); print op; line=substr(line,RSTART+RLENGTH)}}' \
+awk '/^\(defn cgc-dispatch \[/{in_dispatch=1;next} /^\(defn cgc-swap!/{in_dispatch=0} in_dispatch {line=$0; while (match(line, /\$op "[^"]+"/)) {op=substr(line,RSTART,RLENGTH); sub(/^\$op "/,"",op); sub(/"$/,"",op); print op; line=substr(line,RSTART+RLENGTH)}}' \
   "$ROOT/self/cgc-main.fl" | sort -u >"$WORK/abi-dispatch-ops"
 awk -F '\t' '$1 !~ /^#/ {print $1}' "$ROOT/tests/task923/abi-lowered.tsv" | sort -u >"$WORK/abi-lowered-ops"
 cut -f1 "$WORK/abi-builtins.tsv" | sort -u >"$WORK/abi-mapped-ops"
