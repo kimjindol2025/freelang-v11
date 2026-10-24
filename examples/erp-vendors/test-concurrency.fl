@@ -1,4 +1,4 @@
-(load "../../lib/evidence/evidence.fl")
+(load "test-auth-helper.fl")
 
 (defn out [command args]
   (let [[r (evidence-run command args)]]
@@ -8,9 +8,14 @@
   (if condition (do (println (str "PASS " name)) true)
     (do (println (str "FAIL " name)) false)))
 (defn start-server [work port binary]
-  (out "sh" ["-c" "ERP_DB_PATH=\"$1/erp.sqlite\" FL_HTTP_TEST_SLOW=1 FL_HTTP_PORT=\"$2\" \"$3\" >\"$1/server.out\" 2>\"$1/server.err\" & echo $!" "erp-concurrency" work (str port) binary]))
+  (erp-start-auth-server work port binary (get (cli-args) 2) "erp.sqlite" "1"))
 (defn request [url path args]
-  (out "curl" (concat ["--silent" "--show-error" "--include" (str url path)] args)))
+  (out "curl" (concat
+    (concat (concat ["--silent" "--show-error" "--include"] args)
+      (if (> (length args) 0)
+        ["--cookie" (erp-test-cookie-jar url) "--data-urlencode" (str "_csrf=" (out "cat" [(str (erp-test-cookie-jar url) ".csrf")]))]
+        ["--cookie" (erp-test-cookie-jar url)]))
+    [(str url path)])))
 (defn stock-query [database name]
   (out "sqlite3" [database (str "SELECT i.name||'|'||COALESCE(SUM(CASE WHEN m.kind='in' THEN m.qty WHEN m.kind='out' THEN -m.qty ELSE 0 END),0) FROM items i LEFT JOIN stock_moves m ON m.item_id=i.id WHERE i.name='" name "' GROUP BY i.id;")]))
 (defn count-query [database table]
@@ -28,24 +33,24 @@
         [url (str "http://127.0.0.1:" port)] [database (str work "/erp.sqlite")]]
     (do
       (evidence-run "sleep" ["0.1"])
-      (let [[probe (out "curl" ["--silent" "--show-error" "--output" "/dev/null" "--write-out" "%{http_code}" (str url "/items")])]
+      (let [[probe (out "curl" ["--silent" "--show-error" "--output" "/dev/null" "--write-out" "%{http_code}" (str url "/items") "--cookie" (erp-test-cookie-jar url)])]
             [baseline-count (count-query database "items")]
             [timings (out "sh" ["-c"
-              "work=$1; base=$2; curl --silent --show-error --output /dev/null --write-out 'SLOW=%{time_total}s HTTP=%{http_code}\\n' \"$base/__slow\" >\"$work/slow.time\" & slow=$!; sleep 0.1; for i in 1 2 3 4 5; do curl --silent --show-error --output /dev/null --write-out \"FAST_$i=%{time_total}s HTTP=%{http_code}\\n\" \"$base/items\" >\"$work/fast-$i.time\" & done; wait \"$slow\"; for i in 1 2 3 4 5; do wait; done; cat \"$work/fast-1.time\" \"$work/fast-2.time\" \"$work/fast-3.time\" \"$work/fast-4.time\" \"$work/fast-5.time\" \"$work/slow.time\"; awk -F'[ =]' '$2 < 1 && $4 == 200 {n++} END {printf \"FAST_UNDER_1S=%d/5\\n\", n+0}' \"$work/fast-1.time\" \"$work/fast-2.time\" \"$work/fast-3.time\" \"$work/fast-4.time\" \"$work/fast-5.time\""
-              "conc-fast" work url])]
+              "work=$1; base=$2; jar=$3; curl --silent --show-error --output /dev/null --write-out 'SLOW=%{time_total}s HTTP=%{http_code}\\n' \"$base/__slow\" >\"$work/slow.time\" & slow=$!; sleep 0.1; for i in 1 2 3 4 5; do curl --silent --show-error --cookie \"$jar\" --output /dev/null --write-out \"FAST_$i=%{time_total}s HTTP=%{http_code}\\n\" \"$base/items\" >\"$work/fast-$i.time\" & done; wait \"$slow\"; for i in 1 2 3 4 5; do wait; done; cat \"$work/fast-1.time\" \"$work/fast-2.time\" \"$work/fast-3.time\" \"$work/fast-4.time\" \"$work/fast-5.time\" \"$work/slow.time\"; awk -F'[ =]' '$2 < 1 && $4 == 200 {n++} END {printf \"FAST_UNDER_1S=%d/5\\n\", n+0}' \"$work/fast-1.time\" \"$work/fast-2.time\" \"$work/fast-3.time\" \"$work/fast-4.time\" \"$work/fast-5.time\""
+              "conc-fast" work url (erp-test-cookie-jar url)])]
             [vendor-response (request url "/vendors" ["--data-urlencode" "name=Concurrency Supplier" "--data-urlencode" "phone=000" "--data-urlencode" "memo=example"])]
             [vendor-id (str-trim (out "sqlite3" [database "SELECT id FROM vendors WHERE name='Concurrency Supplier';"]))]
             [bulk-codes (out "sh" ["-c"
-              "work=$1; base=$2; vendor=$3; for i in $(seq 1 50); do curl --silent --show-error --output /dev/null --write-out '%{http_code}' \"$base/items\" >\"$work/list-$i.code\" & done; for i in $(seq 1 20); do curl --silent --show-error --output /dev/null --write-out '%{http_code}' --data-urlencode \"name=Bulk-$i\" --data-urlencode 'unit=ea' --data-urlencode \"vendor_id=$vendor\" \"$base/items\" >\"$work/add-$i.code\" & done; wait; printf 'BULK_STATUS_BEGIN\\n'; for i in $(seq 1 50); do cat \"$work/list-$i.code\"; printf '\\n'; done; for i in $(seq 1 20); do cat \"$work/add-$i.code\"; printf '\\n'; done; printf 'BULK_STATUS_END\\n'"
-              "conc-bulk" work url vendor-id])]
+              "work=$1; base=$2; vendor=$3; jar=$4; csrf=$5; for i in $(seq 1 50); do curl --silent --show-error --cookie \"$jar\" --output /dev/null --write-out '%{http_code}' \"$base/items\" >\"$work/list-$i.code\" & done; for i in $(seq 1 20); do curl --silent --show-error --cookie \"$jar\" --output /dev/null --write-out '%{http_code}' --data-urlencode \"_csrf=$csrf\" --data-urlencode \"name=Bulk-$i\" --data-urlencode 'unit=ea' --data-urlencode \"vendor_id=$vendor\" \"$base/items\" >\"$work/add-$i.code\" & done; wait; printf 'BULK_STATUS_BEGIN\\n'; for i in $(seq 1 50); do cat \"$work/list-$i.code\"; printf '\\n'; done; for i in $(seq 1 20); do cat \"$work/add-$i.code\"; printf '\\n'; done; printf 'BULK_STATUS_END\\n'"
+              "conc-bulk" work url vendor-id (erp-test-cookie-jar url) (out "cat" [(str (erp-test-cookie-jar url) ".csrf")])])]
             [after-bulk (count-query database "items")]
             [bulk-delta (- (str-to-num (str-trim after-bulk)) (str-to-num (str-trim baseline-count)))]
             [created (request url "/items" ["--data-urlencode" "name=Concurrent Stock" "--data-urlencode" "unit=ea" "--data-urlencode" (str "vendor_id=" vendor-id)])]
             [item-id (str-trim (out "sqlite3" [database "SELECT id FROM items WHERE name='Concurrent Stock';"]))]
             [inbound (request url (str "/items/" item-id "/moves") ["--data-urlencode" "qty=10" "--data-urlencode" "kind=in" "--data-urlencode" "memo=opening"])]
             [move-codes (out "sh" ["-c"
-              "work=$1; base=$2; id=$3; for i in $(seq 1 10); do curl --silent --show-error --output /dev/null --write-out '%{http_code}' --data-urlencode 'qty=3' --data-urlencode 'kind=out' --data-urlencode \"memo=issue-$i\" \"$base/items/$id/moves\" >\"$work/move-$i.code\" & done; wait; printf 'MOVE_STATUS_BEGIN\\n'; for i in $(seq 1 10); do cat \"$work/move-$i.code\"; printf '\\n'; done; printf 'MOVE_STATUS_END\\n'"
-              "conc-stock" work url item-id])]
+              "work=$1; base=$2; id=$3; jar=$4; csrf=$5; for i in $(seq 1 10); do curl --silent --show-error --cookie \"$jar\" --output /dev/null --write-out '%{http_code}' --data-urlencode \"_csrf=$csrf\" --data-urlencode 'qty=3' --data-urlencode 'kind=out' --data-urlencode \"memo=issue-$i\" \"$base/items/$id/moves\" >\"$work/move-$i.code\" & done; wait; printf 'MOVE_STATUS_BEGIN\\n'; for i in $(seq 1 10); do cat \"$work/move-$i.code\"; printf '\\n'; done; printf 'MOVE_STATUS_END\\n'"
+              "conc-stock" work url item-id (erp-test-cookie-jar url) (out "cat" [(str (erp-test-cookie-jar url) ".csrf")])])]
             [stock (stock-query database "Concurrent Stock")]
             [zombies (out "sh" ["-c" "ps -o pid,ppid,stat --ppid \"$1\" 2>/dev/null || true" "conc-ps" pid])]
             [shutdown-result (out "sh" ["-c"

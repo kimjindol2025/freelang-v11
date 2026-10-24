@@ -1,0 +1,16 @@
+(load "../../lib/evidence/evidence.fl")
+
+(defn erp-last-colon [text index found]
+  (if (>= index (length text)) found
+    (erp-last-colon text (+ index 1)
+      (if (= (substring text index (+ index 1)) ":") index found))))
+(defn erp-url-port [url]
+  (let [[start (+ (erp-last-colon url 0 0) 1)]
+        [end (_fl_str_index_of (substring url start (length url)) "/")]]
+    (substring url start (if (< end 0) (length url) (+ start end)))))
+(defn erp-test-cookie-jar [url]
+  (str "/tmp/erp-auth-" (erp-url-port url) ".cookies"))
+(defn erp-start-auth-server [work port binary creator database slow]
+  (out "sh" ["-c"
+    "work=$1; port=$2; app=$3; creator=$4; db=$5; slow=$6; password=$(openssl rand -hex 32); ERP_DB_PATH=\"$work/$db\" ERP_NEW_USERNAME=example-user ERP_NEW_PASSWORD=\"$password\" \"$creator\" >/dev/null || exit 1; FL_HTTP_TEST_SLOW=\"$slow\" ERP_DB_PATH=\"$work/$db\" FL_HTTP_PORT=\"$port\" \"$app\" >\"$work/server.out\" 2>\"$work/server.err\" & pid=$!; base=\"http://127.0.0.1:$port\"; jar=\"/tmp/erp-auth-$port.cookies\"; for i in $(seq 1 100); do curl --silent --show-error --cookie-jar \"$jar\" --output \"$work/login.html\" \"$base/login\" && break; sleep 0.05; done; csrf=$(sed -n 's/.*name=\"_csrf\" value=\"\\([^\"]*\\)\".*/\\1/p' \"$work/login.html\"); code=$(curl --silent --show-error --cookie \"$jar\" --cookie-jar \"$jar\" --output /dev/null --write-out '%{http_code}' --data-urlencode \"_csrf=$csrf\" --data-urlencode username=example-user --data-urlencode \"password=$password\" \"$base/login\"); test \"$code\" = 303 || { kill \"$pid\" 2>/dev/null || true; exit 1; }; token=$(awk '$6==\"erp_session\" {print $7}' \"$jar\"); printf '%s' \"$token\" >\"$jar.csrf\"; echo \"$pid\""
+    "erp-test-auth" work (str port) binary creator database slow]))

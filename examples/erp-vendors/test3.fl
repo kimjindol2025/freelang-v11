@@ -1,4 +1,4 @@
-(load "../../lib/evidence/evidence.fl")
+(load "test-auth-helper.fl")
 
 (defn out [command args]
   (let [[r (evidence-run command args)]]
@@ -13,9 +13,14 @@
   (if condition (do (println (str "PASS " name)) true)
     (do (println (str "FAIL " name)) false)))
 (defn start-server [work port binary]
-  (out "sh" ["-c" "ERP_DB_PATH=\"$1/erp.sqlite\" FL_HTTP_PORT=\"$2\" \"$3\" >\"$1/server.out\" 2>\"$1/server.err\" & echo $!" "erp-test" work (str port) binary]))
+  (erp-start-auth-server work port binary (get (cli-args) 2) "erp.sqlite" "0"))
 (defn request [url path args]
-  (out "curl" (concat ["--silent" "--show-error" "--include" (str url path)] args)))
+  (out "curl" (concat
+    (concat (concat ["--silent" "--show-error" "--include"] args)
+      (if (> (length args) 0)
+        ["--cookie" (erp-test-cookie-jar url) "--data-urlencode" (str "_csrf=" (out "cat" [(str (erp-test-cookie-jar url) ".csrf")]))]
+        ["--cookie" (erp-test-cookie-jar url)]))
+    [(str url path)])))
 (defn post-vendor [url name]
   (request url "/vendors" ["--data-urlencode" (str "name=" name) "--data-urlencode" "phone=000" "--data-urlencode" "memo=example"]))
 (defn post-item [url name unit vendor]
@@ -27,7 +32,7 @@
 (defn stock-query [database name]
   (out "sqlite3" [database (str "SELECT i.name||'|'||COALESCE(SUM(CASE WHEN m.kind='in' THEN m.qty WHEN m.kind='out' THEN -m.qty ELSE 0 END),0) FROM items i LEFT JOIN stock_moves m ON m.item_id=i.id WHERE i.name='" name "' GROUP BY i.id;")]))
 (defn list-html [url]
-  (out "curl" ["--silent" "--show-error" (str url "/items")]))
+  (request url "/items" []))
 
 (let [[work (get (cli-args) 0)] [binary (get (cli-args) 1)]
       [listener (tcp-listen "127.0.0.1" 0)] [port (tcp-local-port listener)]]
@@ -41,7 +46,7 @@
             [vendor-id (str-trim (out "sqlite3" [database "SELECT id FROM vendors WHERE name='Example Supplier';"]))]
             [unused-id (str-trim (out "sqlite3" [database "SELECT id FROM vendors WHERE name='Unused Supplier';"]))]
             [empty-list (list-html url)]
-            [new-form (out "curl" ["--silent" "--show-error" (str url "/items/new")])]
+            [new-form (request url "/items/new" [])]
             [blank-item (post-item url "" "ea" vendor-id)]
             [after-blank (count-query database "items")]
             [bad-vendor (post-item url "Bad Vendor Item" "ea" "999")]
@@ -52,7 +57,7 @@
             [issued (move url widget-id "3" "out" "sample issue")]
             [item-list (list-html url)]
             [stock-seven (stock-query database "Widget")]
-            [detail (out "curl" ["--silent" "--show-error" (str url "/items/" widget-id)])]
+            [detail (request url (str "/items/" widget-id) [])]
             [oversell (move url widget-id "8" "out" "too many")]
             [stock-after-oversell (stock-query database "Widget")]
             [moves-after-oversell (out "sqlite3" [database (str "SELECT kind||'|'||qty||'|'||memo FROM stock_moves WHERE item_id=" widget-id " ORDER BY id;")])]
@@ -65,19 +70,19 @@
             [linked-vendor-count (out "sqlite3" [database (str "SELECT count(*) FROM vendors WHERE id=" vendor-id ";")])]
             [unused-delete (request url (str "/vendors/" unused-id "/delete") ["--request" "POST"])]
             [unused-vendor-count (out "sqlite3" [database (str "SELECT count(*) FROM vendors WHERE id=" unused-id ";")])]
-            [missing-item (out "curl" ["--silent" "--show-error" "--include" (str url "/items/999")])]
+            [missing-item (request url "/items/999" [])]
             [parallel-item (post-item url "Concurrent Widget" "ea" vendor-id)]
             [parallel-id (str-trim (out "sqlite3" [database "SELECT id FROM items WHERE name='Concurrent Widget';"]))]
             [parallel-in (move url parallel-id "10" "in" "parallel opening")]
-            [parallel-codes (out "sh" ["-c" "work=$1; base=$2; id=$3; for i in $(seq 1 5); do curl --silent --show-error --output \"$work/move-$i.body\" --write-out '%{http_code}' --data-urlencode 'qty=3' --data-urlencode 'kind=out' --data-urlencode \"memo=parallel-$i\" \"$base/items/$id/moves\" >\"$work/move-$i.code\" & done; wait; printf 'PARALLEL_CODES_BEGIN\\n'; for i in $(seq 1 5); do cat \"$work/move-$i.code\"; printf '\\n'; done; printf 'PARALLEL_CODES_END\\n'" "erp-parallel" work url parallel-id])]
+            [parallel-codes (out "sh" ["-c" "work=$1; base=$2; id=$3; jar=$4; csrf=$5; for i in $(seq 1 5); do curl --silent --show-error --cookie \"$jar\" --output \"$work/move-$i.body\" --write-out '%{http_code}' --data-urlencode \"_csrf=$csrf\" --data-urlencode 'qty=3' --data-urlencode 'kind=out' --data-urlencode \"memo=parallel-$i\" \"$base/items/$id/moves\" >\"$work/move-$i.code\" & done; wait; printf 'PARALLEL_CODES_BEGIN\\n'; for i in 1 2 3 4 5; do cat \"$work/move-$i.code\"; printf '\\n'; done; printf 'PARALLEL_CODES_END\\n'" "erp-parallel" work url parallel-id (erp-test-cookie-jar url) (out "cat" [(str (erp-test-cookie-jar url) ".csrf")])])]
             [parallel-stock (stock-query database "Concurrent Widget")]
             [parallel-moves (out "sqlite3" [database (str "SELECT count(*) FROM stock_moves WHERE item_id=" parallel-id ";")])]
             [xss-item (post-item url "<script>'" "ea" vendor-id)]
-            [xss-item-row (out "sh" ["-c" "curl --silent --show-error \"$1/items\" | grep '&lt;script&gt;&#39;'" "erp-test" url])]
+            [xss-item-row (out "sh" ["-c" "curl --silent --show-error --cookie \"$2\" \"$1/items\" | grep '&lt;script&gt;&#39;'" "erp-test" url (erp-test-cookie-jar url)])]
             [xss-db (out "sqlite3" [database "SELECT name FROM items WHERE name='<script>''';"])]
-            [missing-after-xss (out "curl" ["--silent" "--show-error" "--include" (str url "/items/99999")])]
-            [alive (out "curl" ["--silent" "--show-error" "--output" "/dev/null" "--write-out" "%{http_code}" (str url "/items")])]
-            [items-html-first-30 (out "sh" ["-c" "curl --silent --show-error \"$1/items\" | head -30" "erp-test" url])]
+            [missing-after-xss (request url "/items/99999" [])]
+            [alive (out "curl" ["--silent" "--show-error" "--output" "/dev/null" "--write-out" "%{http_code}" (str url "/items") "--cookie" (erp-test-cookie-jar url)])]
+            [items-html-first-30 (out "sh" ["-c" "curl --silent --show-error --cookie \"$2\" \"$1/items\" | head -30" "erp-test" url (erp-test-cookie-jar url)])]
             [checks [
               (check (and (has empty-list "<tbody>") (not (has empty-list "<td><a href=\"/items/"))) "empty item list renders")
               (check (and (has new-form "<select name=\"vendor_id\"") (has new-form "Example Supplier")) "new item form lists vendors")

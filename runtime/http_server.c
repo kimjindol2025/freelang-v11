@@ -183,6 +183,36 @@ FLValue fl_resp_html(FLValue body) {
     return http_response(200, "text/html; charset=utf-8", text);
 }
 
+static int http_safe_header_value(const char *text) {
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+        if (*p == '\r' || *p == '\n') return 0;
+    return 1;
+}
+
+FLValue fl_resp_html_cookie(FLValue cookie, FLValue body) {
+    const char *value = http_value_string(cookie, "server-html-cookie");
+    if (!http_safe_header_value(value) || strlen(value) > 400)
+        fl_throw(fl_str_val("server-html-cookie expects a safe cookie"));
+    return fl_map_set(fl_resp_html(body), fl_str_val("set_cookie"), cookie);
+}
+
+FLValue fl_resp_set_cookie(FLValue response, FLValue name, FLValue value) {
+    const char *key = http_value_string(name, "server-set-cookie");
+    const char *text = http_value_string(value, "server-set-cookie");
+    char cookie[512];
+    if (response.tag != FL_MAP || strlen(key) > 64 || strlen(text) > 256)
+        fl_throw(fl_str_val("server-set-cookie expects response and short values"));
+    for (const unsigned char *p = (const unsigned char *)key; *p; p++)
+        if (!(isalnum(*p) || *p == '_' || *p == '-'))
+            fl_throw(fl_str_val("server-set-cookie expects a safe cookie name"));
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+        if (!(isalnum(*p) || *p == '_' || *p == '-' || *p == '.'))
+            fl_throw(fl_str_val("server-set-cookie expects a safe cookie value"));
+    snprintf(cookie, sizeof(cookie), "%s=%s; Path=/; HttpOnly; SameSite=Strict%s",
+             key, text, *text ? "" : "; Max-Age=0");
+    return fl_map_set(response, fl_str_val("set_cookie"), fl_str_val(cookie));
+}
+
 FLValue fl_http_route(FLValue method_value, FLValue path_value, FLValue handler) {
     const char *method = http_value_string(method_value, "server route method");
     const char *path = http_value_string(path_value, "server route path");
@@ -273,6 +303,7 @@ static const char *http_reason(int status) {
         case 303: return "See Other";
         case 400: return "Bad Request";
         case 401: return "Unauthorized";
+        case 403: return "Forbidden";
         case 404: return "Not Found";
         case 413: return "Payload Too Large";
         case 429: return "Too Many Requests";
@@ -283,14 +314,17 @@ static const char *http_reason(int status) {
 }
 
 static void http_send_raw(int fd, int status, const char *content_type,
-                          const char *location, const char *body, size_t body_length) {
-    char header[512];
+                          const char *location, const char *set_cookie,
+                          const char *body, size_t body_length) {
+    char header[1024];
     char location_header[256] = "";
+    char cookie_header[512] = "";
     if (location) snprintf(location_header, sizeof(location_header), "Location: %s\r\n", location);
+    if (set_cookie) snprintf(cookie_header, sizeof(cookie_header), "Set-Cookie: %s\r\n", set_cookie);
     int length = snprintf(header, sizeof(header),
-        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n%s"
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n%s%s"
         "Connection: close\r\nX-Freelang: native\r\n\r\n",
-        status, http_reason(status), content_type, body_length, location_header);
+        status, http_reason(status), content_type, body_length, location_header, cookie_header);
     if (length < 0 || (size_t)length >= sizeof(header)) return;
     if (length > 0) http_send_all(fd, header, (size_t)length);
     if (body_length) http_send_all(fd, body, body_length);
@@ -300,7 +334,7 @@ static void http_send_status(int fd, int status, const char *message) {
     char body[256];
     int length = snprintf(body, sizeof(body), "{\"error\":\"%s\"}", message);
     if (length < 0) return;
-    http_send_raw(fd, status, "application/json", NULL, body, (size_t)length);
+    http_send_raw(fd, status, "application/json", NULL, NULL, body, (size_t)length);
 }
 
 static char *http_trim(char *value) {
@@ -477,13 +511,16 @@ static void http_handle_client(int fd) {
     FLValue body = fl_map_get(response, fl_str_val("body"));
     FLValue type = fl_map_get(response, fl_str_val("content_type"));
     FLValue location_value = fl_map_get(response, fl_str_val("location"));
+    FLValue cookie_value = fl_map_get(response, fl_str_val("set_cookie"));
     const char *body_text = body.tag == FL_STRING && body.obj ? ((FLString *)body.obj)->data : "";
     const char *content_type = type.tag == FL_STRING && type.obj ? ((FLString *)type.obj)->data : "application/octet-stream";
     const char *location = location_value.tag == FL_STRING && location_value.obj
         ? ((FLString *)location_value.obj)->data : NULL;
+    const char *cookie = cookie_value.tag == FL_STRING && cookie_value.obj
+        ? ((FLString *)cookie_value.obj)->data : NULL;
     int response_status = fl_map_get(response, fl_str_val("status")).tag == FL_INT
         ? (int)fl_map_get(response, fl_str_val("status")).i : status;
-    http_send_raw(fd, response_status, content_type, location, body_text, strlen(body_text));
+    http_send_raw(fd, response_status, content_type, location, cookie, body_text, strlen(body_text));
 }
 
 FLValue fl_http_start(FLValue port_value) {

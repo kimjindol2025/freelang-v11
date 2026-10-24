@@ -1153,6 +1153,9 @@
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
   ;; N-09: 암호화 / JWT / 비밀번호
+  [(= $op "auth-random-token") (str "fl_auth_random_token(" (cgc (get $args 0)) ")")]
+  [(= $op "auth-pbkdf2")       (str "fl_auth_pbkdf2(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "auth-constant-time-equal") (str "fl_auth_constant_time_equal(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "auth-jwt-sign")       (str "fl_jwt_sign(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
   [(= $op "auth-jwt-verify")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "auth-jwt-expired")    (str "fl_jwt_expired(" (cgc (get $args 0)) ")")]

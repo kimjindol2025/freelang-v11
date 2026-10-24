@@ -1,4 +1,4 @@
-(load "../../lib/evidence/evidence.fl")
+(load "test-auth-helper.fl")
 (load "../../lib/http/http.fl")
 
 (defn out [command args]
@@ -18,14 +18,19 @@
 (defn show-sqlite [label result]
   (do (println label) (print result) result))
 (defn start-server [work port binary]
-  (out "sh" ["-c" "ERP_DB_PATH=\"$1/vendors.sqlite\" FL_HTTP_PORT=\"$2\" \"$3\" >\"$1/server.out\" 2>\"$1/server.err\" & echo $!" "erp-test" work (str port) binary]))
+  (erp-start-auth-server work port binary (get (cli-args) 2) "vendors.sqlite" "0"))
 (defn wait-server [url attempts]
   (if (= attempts 0) false
     (let [[r (evidence-run "curl" ["--silent" "--show-error" url])]]
       (if (= (get r "code") 0) true
         (do (evidence-run "sleep" ["0.05"]) (wait-server url (- attempts 1)))))))
 (defn request [url path args]
-  (out "curl" (concat ["--silent" "--show-error" "--include" (str url path)] args)))
+  (out "curl" (concat
+    (concat (concat ["--silent" "--show-error" "--include"] args)
+      (if (> (length args) 0)
+        ["--cookie" (erp-test-cookie-jar url) "--data-urlencode" (str "_csrf=" (out "cat" [(str (erp-test-cookie-jar url) ".csrf")]))]
+        ["--cookie" (erp-test-cookie-jar url)]))
+    [(str url path)])))
 (defn count-output [database]
   (out "sqlite3" [database "select count(*) from vendors;"]))
 
@@ -49,7 +54,7 @@
             [created3 (request url "/vendors" ["--data-urlencode" "name=Cedar" "--data-urlencode" "phone=333" "--data-urlencode" "memo=third"])]
             [rows3 (show-sqlite "SQLITE_AFTER_CREATE_3:" (sqlite-rows database))]
             [list3 (request url "/vendors" [])]
-            [html-list3 (out "curl" ["--silent" "--show-error" (str url "/vendors")])]
+            [html-list3 (request url "/vendors" [])]
             [edit-form (request url "/vendors/2/edit" [])]
             [updated (request url "/vendors/2" ["--data-urlencode" "name=Beta Updated" "--data-urlencode" "phone=222" "--data-urlencode" "memo=second"])]
             [rows-updated (show-sqlite "SQLITE_AFTER_UPDATE:" (sqlite-rows database))]

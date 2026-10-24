@@ -5,6 +5,74 @@
 (db_create DB "CREATE TABLE IF NOT EXISTS vendors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL, memo TEXT NOT NULL, created_at TEXT NOT NULL)")
 (db_create DB "CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, unit TEXT NOT NULL, vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE RESTRICT, created_at TEXT NOT NULL)")
 (db_create DB "CREATE TABLE IF NOT EXISTS stock_moves (id INTEGER PRIMARY KEY AUTOINCREMENT, item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE RESTRICT, qty INTEGER NOT NULL CHECK(typeof(qty) = 'integer' AND qty >= 1), kind TEXT NOT NULL CHECK(kind IN ('in', 'out')), memo TEXT NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, pw_hash TEXT NOT NULL, pw_salt TEXT NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS login_attempts (username TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked_until INTEGER NOT NULL)")
+
+(defn cookie-value [request wanted]
+  (let [[parts (_fl_str_split (get (get request "headers") "cookie") ";")]]
+    (cookie-value-parts parts 0 wanted)))
+(defn cookie-value-parts [parts index wanted]
+  (if (>= index (length parts)) ""
+    (let [[part (trim (get parts index))] [equal (str-index-of part "=")]]
+      (if (and (>= equal 0) (= (substring part 0 equal) wanted))
+        (substring part (+ equal 1) (length part))
+        (cookie-value-parts parts (+ index 1) wanted)))))
+(defn session-row [request]
+  (let [[token (cookie-value request "erp_session")]]
+    (if (= token "") nil
+      (first (db-query DB "SELECT user_id, token FROM sessions WHERE token = ? AND expires_at > CAST(strftime('%s','now') AS INTEGER)" [token])))))
+(defn csrf-input [token]
+  (str "<input type=\"hidden\" name=\"_csrf\" value=\"" (escapehtml token) "\">"))
+(defn protected-get [handler request]
+  (if (= (session-row request) nil) (server-redirect "/login") (handler request)))
+(defn protected-post [handler request]
+  (let [[session (session-row request)] [form (request-form request)]
+        [cookie (cookie-value request "erp_session")] [token (formvalue form "_csrf")]]
+    (if (= session nil) (server-redirect "/login")
+      (if (not (auth-constant-time-equal cookie token)) (server-status 403 "CSRF token이 올바르지 않습니다.")
+        (handler request)))))
+(defn login-page [message csrf]
+  (server-html (page "로그인"
+    (str (if (= message "") "" (str "<p role=\"alert\">" message "</p>"))
+      "<form method=\"post\" action=\"/login\">" (csrf-input csrf)
+      "<label>아이디<input name=\"username\" autocomplete=\"username\" required></label>"
+      "<label>비밀번호<input type=\"password\" name=\"password\" autocomplete=\"current-password\" required></label><button>로그인</button></form>"))))
+(defn login-get [request]
+  (let [[csrf (auth-random-token 32)]]
+    (server-html-cookie (str "erp_csrf=" csrf "; Path=/; HttpOnly; SameSite=Strict")
+      (page "로그인" (str "<form method=\"post\" action=\"/login\">" (csrf-input csrf)
+        "<label>아이디<input name=\"username\" autocomplete=\"username\" required></label>"
+        "<label>비밀번호<input type=\"password\" name=\"password\" autocomplete=\"current-password\" required></label><button>로그인</button></form>")))))
+(defn auth-positive-env [key fallback]
+  (let [[raw (_fl_env_get key)] [value (str-to-num raw)]]
+    (if (and (number? value) (integer? value) (> value 0) (<= value 86400)) value fallback)))
+(defn login-failed [username]
+  (db_execute DB "INSERT INTO login_attempts(username,failures,locked_until) VALUES(?,1,0) ON CONFLICT(username) DO UPDATE SET failures=CASE WHEN locked_until<=CAST(strftime('%s','now') AS INTEGER) THEN 1 ELSE failures+1 END, locked_until=CASE WHEN (CASE WHEN locked_until<=CAST(strftime('%s','now') AS INTEGER) THEN 1 ELSE failures+1 END)>=5 THEN CAST(strftime('%s','now') AS INTEGER)+? ELSE 0 END" [username (auth-positive-env "ERP_LOCK_SECONDS" 30)]))
+(defn login-post [request]
+  (let [[form (request-form request)] [username (formvalue form "username")]
+        [password (formvalue form "password")] [csrf-cookie (cookie-value request "erp_csrf")]
+        [csrf-form (formvalue form "_csrf")]
+        [row (first (db-query DB "SELECT id, pw_hash, pw_salt FROM users WHERE username = ?" [username]))]
+        [salt (if (= row nil) "00000000000000000000000000000000" (get row "pw_salt"))]
+        [expected (if (= row nil) "0000000000000000000000000000000000000000000000000000000000000000" (get row "pw_hash"))]
+        [matches (auth-constant-time-equal (auth-pbkdf2 password salt) expected)]
+        [attempt (first (db-query DB "SELECT locked_until > CAST(strftime('%s','now') AS INTEGER) AS blocked FROM login_attempts WHERE username = ?" [username]))]
+        [blocked (if (= attempt nil) false (= (get attempt "blocked") 1))]]
+    (if (not (auth-constant-time-equal csrf-cookie csrf-form))
+      (server-status 403 "CSRF token이 올바르지 않습니다.")
+      (if (or blocked (= row nil) (not matches))
+        (do (login-failed username) (login-page "아이디 또는 비밀번호가 틀립니다" csrf-cookie))
+        (do
+          (db_execute DB "DELETE FROM login_attempts WHERE username = ?" [username])
+          (let [[token (auth-random-token 32)]]
+            (db_execute DB "INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES(?,?,CAST(strftime('%s','now') AS INTEGER)+?,?)"
+              [token (get row "id") (auth-positive-env "ERP_SESSION_SECONDS" 28800) (now-iso)])
+            (server-set-cookie (server-redirect "/vendors") "erp_session" token)))))))
+(defn logout-post [request]
+  (let [[token (cookie-value request "erp_session")]]
+    (do (db_execute DB "DELETE FROM sessions WHERE token = ?" [token])
+      (server-set-cookie (server-redirect "/login") "erp_session" ""))))
 
 (defn escapehtml [value]
   (str-replace (str-replace (str-replace (str-replace (str-replace value "&" "&amp;") "<" "&lt;") ">" "&gt;") "\"" "&quot;") "'" "&#39;"))
@@ -48,13 +116,13 @@
     title "</title>\n<style>body{font:16px sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.5rem;text-align:left}label{display:block;margin:.8rem 0}input,textarea{display:block;width:100%;padding:.4rem}form.inline{display:inline}</style>\n</head>\n<body>\n<h1>"
     title "</h1>\n" content "\n</body>\n</html>\n"))
 
-(defn vendorrow [rows index html]
+(defn vendorrow [rows index html csrf]
   (if (>= index (length rows)) html
     (let [[row (get rows index)] [id (str (get row "id"))]]
       (vendorrow rows (+ index 1)
         (str html "<tr><td>" id "</td><td>" (escapehtml (get row "name"))
           "</td><td>" (escapehtml (get row "phone")) "</td><td>" (escapehtml (get row "memo"))
-          "</td><td><a href=\"/vendors/" id "/edit\">수정</a> <form class=\"inline\" method=\"post\" action=\"/vendors/" id "/delete\"><button>삭제</button></form></td></tr>\n")))))
+          "</td><td><a href=\"/vendors/" id "/edit\">수정</a> <form class=\"inline\" method=\"post\" action=\"/vendors/" id "/delete\">" (csrf-input csrf) "<button>삭제</button></form></td></tr>\n") csrf))))
 
 (defn handle-list [request]
   (let [[q (formvalue (request-query request) "q")]
@@ -63,24 +131,24 @@
           (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors WHERE name LIKE ? ESCAPE '\\' OR memo LIKE ? ESCAPE '\\' ORDER BY id"
             [(str "%" (like-literal q) "%") (str "%" (like-literal q) "%")]))]]
     (server-html (page "거래처 관리"
-    (str "<form method=\"get\" action=\"/vendors\"><label>검색<input name=\"q\" value=\"" (escapehtml q) "\"></label><button>검색</button></form>\n"
+    (str "<form method=\"post\" action=\"/logout\">" (csrf-input (cookie-value request "erp_session")) "<button>로그아웃</button></form><form method=\"get\" action=\"/vendors\"><label>검색<input name=\"q\" value=\"" (escapehtml q) "\"></label><button>검색</button></form>\n"
         "<p><a href=\"/vendors/new\">추가</a></p>\n<table>\n<thead><tr><th>ID</th><th>이름</th><th>전화</th><th>메모</th><th>동작</th></tr></thead>\n<tbody>\n"
-        (vendorrow rows 0 "") "\n</tbody>\n</table>")))))
+        (vendorrow rows 0 "" (cookie-value request "erp_session")) "\n</tbody>\n</table>")))))
 
-(defn vendor-form [action name phone memo message]
+(defn vendor-form [action name phone memo message csrf]
   (page "거래처 입력"
     (str (if (= message "") "" (str "<p role=\"alert\">" message "</p>"))
-      "<form method=\"post\" action=\"" action "\"><label>이름<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
+      "<form method=\"post\" action=\"" action "\">" (csrf-input csrf) "<label>이름<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
       "<label>전화<input name=\"phone\" value=\"" (escapehtml phone) "\"></label>"
       "<label>메모<textarea name=\"memo\">" (escapehtml memo) "</textarea></label><button>저장</button></form><p><a href=\"/vendors\">목록</a></p>")))
 
 (defn handle-new [request]
-  (server-html (vendor-form "/vendors" "" "" "" "")))
+  (server-html (vendor-form "/vendors" "" "" "" "" (cookie-value request "erp_session"))))
 
 (defn handle-create [request]
   (let [[form (request-form request)] [name (formvalue form "name")] [phone (formvalue form "phone")] [memo (formvalue form "memo")]]
     (if (= (trim name) "")
-      (server-html (vendor-form "/vendors" name phone memo "이름을 입력하세요."))
+      (server-html (vendor-form "/vendors" name phone memo "이름을 입력하세요." (cookie-value request "erp_session")))
       (do
         (db_insert DB "vendors" {"name" name "phone" phone "memo" memo "created_at" (now-iso)})
         (server-redirect "/vendors")))))
@@ -89,7 +157,7 @@
   (let [[id (str-to-num (get (get request "params") "id"))]
         [row (first (db-query DB "SELECT id, name, phone, memo FROM vendors WHERE id = ?" [id]))]]
     (if (= row nil) (server-status 404 "거래처를 찾을 수 없습니다.")
-      (server-html (vendor-form (str "/vendors/" id) (get row "name") (get row "phone") (get row "memo") "")))))
+      (server-html (vendor-form (str "/vendors/" id) (get row "name") (get row "phone") (get row "memo") "" (cookie-value request "erp_session"))))))
 
 (defn handle-update [request]
   (let [[id (str-to-num (get (get request "params") "id"))]
@@ -97,7 +165,7 @@
         [form (request-form request)] [name (formvalue form "name")] [phone (formvalue form "phone")] [memo (formvalue form "memo")]]
     (if (= row nil) (server-status 404 "거래처를 찾을 수 없습니다.")
       (if (= (trim name) "")
-        (server-html (vendor-form (str "/vendors/" id) name phone memo "이름을 입력하세요."))
+        (server-html (vendor-form (str "/vendors/" id) name phone memo "이름을 입력하세요." (cookie-value request "erp_session")))
         (do
           (db_update DB "vendors" {"name" name "phone" phone "memo" memo} {"id" id})
           (server-redirect "/vendors"))))))
@@ -138,11 +206,11 @@
         (str html "<option value=\"" id "\"" (if (= id selected) " selected" "") ">"
           (escapehtml (get row "name")) "</option>")))))
 
-(defn item-form [name unit vendor-id message]
+(defn item-form [name unit vendor-id message csrf]
   (let [[vendors (db-query DB "SELECT id, name FROM vendors ORDER BY name" [])]]
     (server-html (page "품목 추가"
       (str (if (= message "") "" (str "<p role=\"alert\">" (escapehtml message) "</p>"))
-        "<form method=\"post\" action=\"/items\"><label>품목명<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
+        "<form method=\"post\" action=\"/items\">" (csrf-input csrf) "<label>품목명<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
         "<label>단위<input name=\"unit\" value=\"" (escapehtml unit) "\"></label><label>거래처<select name=\"vendor_id\" required><option value=\"\">선택</option>"
         (vendor-options vendors 0 vendor-id "") "</select></label><button>저장</button></form><p><a href=\"/items\">목록</a></p>")))))
 
@@ -153,14 +221,14 @@
         (str html "<tr><td>" (escapehtml (get row "kind")) "</td><td>" (str (get row "qty"))
           "</td><td>" (escapehtml (get row "memo")) "</td><td>" (escapehtml (get row "created_at")) "</td></tr>\n")))))
 
-(defn item-detail-page [item message qty kind memo]
+(defn item-detail-page [item message qty kind memo csrf]
   (let [[id (str (get item "id"))] [moves (item-moves (get item "id"))]]
     (server-html (page "품목 상세"
       (str "<p><a href=\"/items\">품목 목록</a></p><p>품목: " (escapehtml (get item "name"))
         " / 단위: " (escapehtml (get item "unit")) " / 거래처: " (escapehtml (get item "vendor_name"))
         " / 현재 재고: " (str (get item "stock")) "</p>"
         (if (= message "") "" (str "<p role=\"alert\">" (escapehtml message) "</p>"))
-        "<form method=\"post\" action=\"/items/" id "/moves\"><label>구분<select name=\"kind\"><option value=\"in\"" (if (= kind "in") " selected" "") ">입고</option><option value=\"out\"" (if (= kind "out") " selected" "") ">출고</option></select></label>"
+        "<form method=\"post\" action=\"/items/" id "/moves\">" (csrf-input csrf) "<label>구분<select name=\"kind\"><option value=\"in\"" (if (= kind "in") " selected" "") ">입고</option><option value=\"out\"" (if (= kind "out") " selected" "") ">출고</option></select></label>"
         "<label>수량<input type=\"number\" name=\"qty\" min=\"1\" step=\"1\" value=\"" (escapehtml qty) "\"></label>"
         "<label>메모<textarea name=\"memo\">" (escapehtml memo) "</textarea></label><button>기록</button></form>"
         "<h2>입출고 기록</h2><table><thead><tr><th>구분</th><th>수량</th><th>메모</th><th>시간</th></tr></thead><tbody>"
@@ -168,20 +236,20 @@
 
 (defn handle-items [request]
   (server-html (page "품목 목록"
-    (str "<p><a href=\"/items/new\">품목 추가</a></p><table><thead><tr><th>ID</th><th>품목명</th><th>단위</th><th>거래처</th><th>재고</th></tr></thead><tbody>"
+    (str "<form method=\"post\" action=\"/logout\">" (csrf-input (cookie-value request "erp_session")) "<button>로그아웃</button></form><p><a href=\"/items/new\">품목 추가</a></p><table><thead><tr><th>ID</th><th>품목명</th><th>단위</th><th>거래처</th><th>재고</th></tr></thead><tbody>"
       (item-rows-html (item-list-rows) 0 "") "</tbody></table>"))))
 
 (defn handle-new-item [request]
-  (item-form "" "" "" ""))
+  (item-form "" "" "" "" (cookie-value request "erp_session")))
 
 (defn handle-create-item [request]
   (let [[form (request-form request)] [name (formvalue form "name")] [unit (formvalue form "unit")]
         [vendor-text (formvalue form "vendor_id")] [vendor-id (str-to-num vendor-text)]
         [vendor (first (db-query DB "SELECT id FROM vendors WHERE id = ?" [vendor-id]))]]
     (if (= (trim name) "")
-      (item-form name unit vendor-text "품목명을 입력하세요.")
+      (item-form name unit vendor-text "품목명을 입력하세요." (cookie-value request "erp_session"))
       (if (= vendor nil)
-        (item-form name unit vendor-text "거래처를 선택하세요.")
+        (item-form name unit vendor-text "거래처를 선택하세요." (cookie-value request "erp_session"))
         (do
           (db_insert DB "items" {"name" name "unit" unit "vendor_id" vendor-id "created_at" (now-iso)})
           (server-redirect "/items"))))))
@@ -195,7 +263,7 @@
 (defn handle-item-detail [request]
   (let [[id (str-to-num (get (get request "params") "id"))] [item (item-record id)]]
     (if (= item nil) (server-status 404 "품목을 찾을 수 없습니다.")
-      (item-detail-page item "" "" "in" ""))))
+      (item-detail-page item "" "" "in" "" (cookie-value request "erp_session")))))
 
 (defn handle-stock-move [request]
   (let [[id (str-to-num (get (get request "params") "id"))] [item (item-record id)]
@@ -224,17 +292,20 @@
 (if (= (_fl_env_get "FL_HTTP_TEST_SLOW") "1")
   (server-get "/__slow" handle-test-slow))
 
-(server-get "/items" handle-items)
-(server-get "/items/new" handle-new-item)
-(server-post "/items" handle-create-item)
-(server-get "/items/:id" handle-item-detail)
-(server-post "/items/:id/moves" handle-stock-move)
+(server-get "/items/new" (fn [request] (protected-get handle-new-item request)))
+(server-post "/items" (fn [request] (protected-post handle-create-item request)))
+(server-get "/items/:id" (fn [request] (protected-get handle-item-detail request)))
+(server-post "/items/:id/moves" (fn [request] (protected-post handle-stock-move request)))
 
-(server-get "/vendors" handle-list)
-(server-get "/vendors/new" handle-new)
-(server-post "/vendors" handle-create)
-(server-get "/vendors/:id/edit" handle-edit)
-(server-post "/vendors/:id" handle-update)
-(server-post "/vendors/:id/delete" handle-delete)
+(server-get "/login" login-get)
+(server-post "/login" login-post)
+(server-post "/logout" (fn [request] (protected-post logout-post request)))
+(server-get "/items" (fn [request] (protected-get handle-items request)))
+(server-get "/vendors" (fn [request] (protected-get handle-list request)))
+(server-get "/vendors/new" (fn [request] (protected-get handle-new request)))
+(server-post "/vendors" (fn [request] (protected-post handle-create request)))
+(server-get "/vendors/:id/edit" (fn [request] (protected-get handle-edit request)))
+(server-post "/vendors/:id" (fn [request] (protected-post handle-update request)))
+(server-post "/vendors/:id/delete" (fn [request] (protected-post handle-delete request)))
 (server-workers 16)
 (server-start 0)

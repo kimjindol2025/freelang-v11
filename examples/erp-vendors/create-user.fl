@@ -1,0 +1,13 @@
+;; Create an initial ERP account without placing the password in argv or output.
+(load "../../lib/db/db.fl")
+(let [[username (_fl_env_get "ERP_NEW_USERNAME")]
+      [password (_fl_env_get "ERP_NEW_PASSWORD")]
+      [path (or (_fl_env_get "ERP_DB_PATH") "vendors.sqlite3")]]
+  (if (and (not (= username "")) (not (= password "")))
+    (let [[db (db-open path)] [salt (auth-random-token 16)]
+          [hash (auth-pbkdf2 password salt)]]
+      (do
+        (db_execute db "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, pw_hash TEXT NOT NULL, pw_salt TEXT NOT NULL, created_at TEXT NOT NULL)" [])
+        (db_insert db "users" {"username" username "pw_hash" hash "pw_salt" salt "created_at" (now-iso)})
+        (println "ERP user created")))
+    (println "ERP_NEW_USERNAME and ERP_NEW_PASSWORD are required")))
