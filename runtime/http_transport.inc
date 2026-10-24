@@ -88,7 +88,7 @@ static void transport_stream_available(char *buffer, size_t used, FLHTTPStreamSt
         if (!text) { state->stopped = 1; return; }
         memcpy(text, buffer + data, chunk_size); text[chunk_size] = '\0';
         FLValue part = fl_str_val(text); free(text);
-        if (!fl_truthy(fl_fn_call(callback, 1, &part))) state->stopped = 1;
+        if (!fl_truthy(fl_fn_call(callback, 1, &part))) { state->stopped = 1; return; }
         state->cursor = data + chunk_size + 2;
     }
 }
