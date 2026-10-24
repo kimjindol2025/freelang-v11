@@ -89,12 +89,12 @@ FLValue _fl_fs_io(FLValue operation, FLValue path, FLValue content) {
         else if (!S_ISREG(st.st_mode)) n = S_ISDIR(st.st_mode) ? EISDIR : EINVAL;
         if (n) { close(fd); return fs_errno(path,n); }
         size_t cap = 8192, used = 0;
-        char *buf = malloc(cap);
+        char *buf = fl_malloc(cap);
         if (!buf) { close(fd); return fs_errno(path,ENOMEM); }
         for (;;) {
             if (used == cap) {
                 if (cap >= UINT32_MAX / 2) { n = EFBIG; break; }
-                char *grown = realloc(buf,cap * 2);
+                char *grown = fl_realloc(buf,cap * 2);
                 if (!grown) { n = ENOMEM; break; }
                 buf = grown; cap *= 2;
             }
@@ -106,7 +106,7 @@ FLValue _fl_fs_io(FLValue operation, FLValue path, FLValue content) {
         }
         if (close(fd) && !n) n = errno;
         if (n) { free(buf); return fs_errno(path,n); }
-        FLString *s = malloc(sizeof(FLString) + used + 1);
+        FLString *s = fl_malloc(sizeof(FLString) + used + 1);
         if (!s) { free(buf); return fs_errno(path,ENOMEM); }
         s->base.type = FL_STRING; s->base.rc = 1; s->len = (uint32_t)used;
         memcpy(s->data,buf,used); s->data[used] = 0; free(buf);
@@ -120,7 +120,7 @@ FLValue _fl_fs_io(FLValue operation, FLValue path, FLValue content) {
         char *temp = NULL;
         int fd;
         if (atomic) {
-            temp = malloc(strlen(p) + 24);
+            temp = fl_malloc(strlen(p) + 24);
             if (!temp) return fs_errno(path,ENOMEM);
             sprintf(temp,"%s.fs-XXXXXX",p);
             fd = mkstemp(temp);

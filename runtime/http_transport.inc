@@ -84,7 +84,7 @@ static void transport_stream_available(char *buffer, size_t used, FLHTTPStreamSt
         if (buffer[data + chunk_size] != '\r' || buffer[data + chunk_size + 1] != '\n' || memchr(buffer + data, 0, chunk_size)) {
             state->stopped = 1; return;
         }
-        char *text = malloc(chunk_size + 1);
+        char *text = fl_malloc(chunk_size + 1);
         if (!text) { state->stopped = 1; return; }
         memcpy(text, buffer + data, chunk_size); text[chunk_size] = '\0';
         FLValue part = fl_str_val(text); free(text);
@@ -154,7 +154,7 @@ FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLVal
         if (n <= 0) { close(fd); return transport_error("IO", "send failed"); }
         sent += (size_t)n;
     }
-    char *buffer = malloc((size_t)limit.i + 2);
+    char *buffer = fl_malloc((size_t)limit.i + 2);
     if (!buffer) { close(fd); return transport_error("IO", "allocation failed"); }
     size_t used = 0;
     FLHTTPStreamState stream = {0};
