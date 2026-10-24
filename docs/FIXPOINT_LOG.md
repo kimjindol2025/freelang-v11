@@ -624,5 +624,17 @@ ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682  stage4.c
 CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
+
+2026-10-24, TASK 9-25에서 map/filter/reduce와 동일한 `FLClosure`·`fl_fn_call` 경로를 이용해 함수형 컬렉션 내장 함수 16개를 구현하고 ABI 보류 목록에서 제거했다. 이전 고정점 `ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682`, 새 고정점 `334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d  stage2.c
+334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d  stage3.c
+334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
 ```
 ```

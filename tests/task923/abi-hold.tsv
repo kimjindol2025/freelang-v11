@@ -1,30 +1,14 @@
 # builtin<TAB>C symbol<TAB>reason
-any?	fl_any_p	No native higher-order predicate implementation exists; keep pending a runtime implementation.
 auth-hash-password	fl_hash_password	No native password-hash entry exists; do not substitute a weaker hash.
 auth-jwt-decode	fl_jwt_verify	No native JWT implementation exists; keep pending a complete verifier.
 auth-jwt-expired	fl_jwt_expired	No native JWT implementation exists.
 auth-jwt-sign	fl_jwt_sign	No native JWT implementation exists; partial signing would be unsafe.
 auth-jwt-verify	fl_jwt_verify	No native JWT implementation exists; partial verification would be unsafe.
 auth-verify-password	fl_verify_password	No native password verification entry exists.
-comp	fl_comp	No native function-composition implementation exists.
-conj	fl_conj	No native collection-conjoin implementation exists.
-count-if	fl_count_if	No native predicate-count implementation exists.
-find-first	fl_find_first	No native predicate-search implementation exists.
-frequencies	frequencies	No native frequency-map implementation exists.
-get-in	fl_get_in	No native nested-map lookup implementation exists.
-group-by	group_by	No native grouping implementation exists.
 http-get-headers	fl_http_get_headers	Only the basic GET client is implemented natively.
 http-post	fl_http_post	No native POST client implementation exists.
 http-post-headers	fl_http_post_headers	No native POST client implementation exists.
 http-post-stream	fl_http_post_stream	No native HTTP streaming client implementation exists.
 http-stream-collect	fl_http_stream_collect	No native HTTP streaming client implementation exists.
-into	fl_into	No native collection conversion implementation exists.
-keep	fl_keep	No native keep/filter-map implementation exists.
-map-indexed	fl_map_indexed	No native indexed-map implementation exists.
-map-vals	fl_map_vals_fn	No native map-values callback implementation exists.
-none?	fl_none_p	No native higher-order predicate implementation exists.
-obj-omit	fl_obj_omit	No native map-omit implementation exists.
-obj-pick	select_keys	No native map-pick implementation exists.
 run-parallel	fl_run_parallel	No native parallel scheduler implementation exists.
 uuid	uuid	No native UUID implementation exists.
-zip-with	fl_zip_with	No native callback-based zip-with implementation exists.

@@ -169,6 +169,22 @@ FLValue fl_fn_call(FLValue fn, int argc, FLValue* argv);
 FLValue fl_map_fn(FLValue fn, FLValue vec);
 FLValue fl_filter_fn(FLValue fn, FLValue vec);
 FLValue fl_reduce_fn(FLValue fn, FLValue init, FLValue vec);
+FLValue fl_any_p(FLValue fn, FLValue vec);
+FLValue fl_none_p(FLValue fn, FLValue vec);
+FLValue fl_count_if(FLValue fn, FLValue vec);
+FLValue fl_find_first(FLValue fn, FLValue vec);
+FLValue fl_keep(FLValue fn, FLValue vec);
+FLValue fl_map_indexed(FLValue fn, FLValue vec);
+FLValue fl_map_vals_fn(FLValue fn, FLValue map);
+FLValue fl_comp(uint32_t count, FLValue* fns);
+FLValue fl_get_in(FLValue obj, FLValue path, FLValue default_value);
+FLValue fl_group_by(FLValue fn, FLValue vec);
+FLValue fl_frequencies(FLValue vec);
+FLValue fl_into(FLValue target, FLValue coll);
+FLValue fl_conj(uint32_t count, FLValue* args);
+FLValue fl_obj_pick(FLValue map, FLValue keys);
+FLValue fl_obj_omit(FLValue map, FLValue keys);
+FLValue fl_zip_with(FLValue fn, FLValue left, FLValue right);
 
 /* ── S9: 맵 accessor ── */
 FLValue fl_map_keys(FLValue map);

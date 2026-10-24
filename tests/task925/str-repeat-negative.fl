@@ -1,0 +1,3 @@
+(define value (str-repeat "x" -3))
+(println (str "STR_REPEAT_NEG_LEN=" (length value)))
+(if (= (length value) 0) (println "PASS str-repeat-negative") (throw "FAIL str-repeat-negative"))

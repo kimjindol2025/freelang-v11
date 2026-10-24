@@ -192,6 +192,242 @@ FLValue fl_reduce_fn(FLValue fn, FLValue init, FLValue vec) {
     return acc;
 }
 
+FLValue fl_any_p(FLValue fn, FLValue vec) {
+    if (vec.tag == FL_NIL) return fl_nil();
+    if (vec.tag != FL_VECTOR) {
+        fl_throw(fl_str_val("any?: second argument must be an array"));
+        return fl_nil();
+    }
+    FLVector* v = (FLVector*)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue item = v->data[i];
+        if (fl_truthy(fl_fn_call(fn, 1, &item))) return item;
+    }
+    return fl_nil();
+}
+
+FLValue fl_none_p(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_bool(true);
+    FLVector* v = (FLVector*)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue item = v->data[i];
+        if (fl_truthy(fl_fn_call(fn, 1, &item))) return fl_bool(false);
+    }
+    return fl_bool(true);
+}
+
+FLValue fl_count_if(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_int(0);
+    FLVector* v = (FLVector*)vec.obj; uint32_t count = 0;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue item = v->data[i];
+        if (fl_truthy(fl_fn_call(fn, 1, &item))) count++;
+    }
+    return fl_int(count);
+}
+
+FLValue fl_find_first(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_nil();
+    FLVector* v = (FLVector*)vec.obj;
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue item = v->data[i];
+        if (fl_truthy(fl_fn_call(fn, 1, &item))) return item;
+    }
+    return fl_nil();
+}
+
+FLValue fl_keep(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj; FLValue out = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue item = v->data[i], value = fl_fn_call(fn, 1, &item);
+        if (value.tag != FL_NIL) out = fl_vec_push(out, value);
+    }
+    return out;
+}
+
+FLValue fl_map_indexed(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* v = (FLVector*)vec.obj; FLValue out = fl_vec_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue args[2] = { fl_int(i), v->data[i] };
+        out = fl_vec_push(out, fl_fn_call(fn, 2, args));
+    }
+    return out;
+}
+
+FLValue fl_map_vals_fn(FLValue fn, FLValue map) {
+    if (map.tag != FL_MAP) return fl_map_new();
+    FLMap* m = (FLMap*)map.obj; FLValue out = fl_map_new();
+    for (uint32_t i = 0; i < m->len; i++) {
+        FLValue value = fl_fn_call(fn, 1, &m->entries[i].val);
+        out = fl_map_set(out, m->entries[i].key, value);
+    }
+    return out;
+}
+
+static FLValue fl_comp_call(FLClosure* self, int argc, FLValue* argv) {
+    if (self->nenv == 0) return argc > 0 ? argv[0] : fl_nil();
+    FLValue result = fl_fn_call(self->env[self->nenv - 1], argc, argv);
+    for (uint32_t i = self->nenv - 1; i > 0; i--)
+        result = fl_fn_call(self->env[i - 1], 1, &result);
+    return result;
+}
+
+FLValue fl_comp(uint32_t count, FLValue* fns) {
+    return fl_fn_new(fl_comp_call, count, fns);
+}
+
+static FLValue fl_path_key(FLValue key) {
+    if (key.tag != FL_STRING || !key.obj) return key;
+    const char* s = ((FLString*)key.obj)->data;
+    return s[0] == ':' ? fl_str_val(s + 1) : key;
+}
+
+FLValue fl_get_in(FLValue obj, FLValue path, FLValue default_value) {
+    if (path.tag != FL_VECTOR) {
+        fl_throw(fl_str_val("get-in: second argument must be an array"));
+        return default_value;
+    }
+    FLVector* p = (FLVector*)path.obj; FLValue cur = obj;
+    for (uint32_t i = 0; i < p->len; i++) {
+        FLValue key = fl_path_key(p->data[i]);
+        if (cur.tag == FL_MAP) cur = fl_map_get(cur, key);
+        else if (cur.tag == FL_VECTOR) {
+            if (key.tag == FL_STRING && key.obj) {
+                const char* text = ((FLString*)key.obj)->data; char* end = NULL;
+                long index = strtol(text, &end, 10);
+                if (*text && end && *end == '\0') key = fl_int(index);
+            }
+            cur = key.tag == FL_INT ? fl_vec_get(cur, key) : fl_nil();
+        }
+        else return default_value;
+        if (cur.tag == FL_NIL) return default_value;
+    }
+    return cur;
+}
+
+static FLValue fl_key_string(FLValue key) {
+    if (key.tag == FL_NIL) return fl_str_val("null");
+    if (key.tag == FL_STRING && key.obj) return key;
+    char buf[256]; return fl_str_val(fl_to_str(key, buf, sizeof buf));
+}
+
+static FLValue fl_group_key(FLValue fn, FLValue item) {
+    if (fn.tag == FL_STRING) {
+        FLValue key = fl_path_key(fn), value = fl_map_get(item, key);
+        return fl_key_string(value);
+    }
+    return fl_key_string(fl_fn_call(fn, 1, &item));
+}
+
+FLValue fl_group_by(FLValue fn, FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_map_new();
+    FLVector* v = (FLVector*)vec.obj; FLValue out = fl_map_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue key = fl_group_key(fn, v->data[i]);
+        FLValue group = fl_map_get(out, key);
+        if (group.tag != FL_VECTOR) group = fl_vec_new();
+        group = fl_vec_push(group, v->data[i]);
+        out = fl_map_set(out, key, group);
+    }
+    return out;
+}
+
+FLValue fl_frequencies(FLValue vec) {
+    if (vec.tag != FL_VECTOR) return fl_map_new();
+    FLVector* v = (FLVector*)vec.obj; FLValue out = fl_map_new();
+    for (uint32_t i = 0; i < v->len; i++) {
+        FLValue key = fl_key_string(v->data[i]);
+        FLValue prior = fl_map_get(out, key);
+        out = fl_map_set(out, key, fl_int(prior.tag == FL_INT ? prior.i + 1 : 1));
+    }
+    return out;
+}
+
+FLValue fl_into(FLValue target, FLValue coll) {
+    if (target.tag == FL_VECTOR)
+        return coll.tag == FL_VECTOR ? fl_append(target, coll) : target;
+    if (target.tag == FL_MAP) {
+        if (coll.tag != FL_VECTOR) return target;
+        FLVector* items = (FLVector*)coll.obj; FLValue out = target;
+        for (uint32_t i = 0; i < items->len; i++) {
+            FLValue item = items->data[i];
+            if (item.tag == FL_VECTOR && ((FLVector*)item.obj)->len == 2) {
+                FLVector* pair = (FLVector*)item.obj;
+                out = fl_map_set(out, pair->data[0], pair->data[1]);
+            } else if (item.tag == FL_MAP && item.obj) {
+                FLMap* m = (FLMap*)item.obj;
+                for (uint32_t j = 0; j < m->len; j++) out = fl_map_set(out, m->entries[j].key, m->entries[j].val);
+            }
+        }
+        return out;
+    }
+    return coll.tag == FL_NIL ? target : coll;
+}
+
+FLValue fl_conj(uint32_t count, FLValue* args) {
+    if (!count) return fl_vec_new();
+    FLValue target = args[0];
+    if (target.tag == FL_VECTOR) {
+        FLValue out = target;
+        for (uint32_t i = 1; i < count; i++) out = fl_vec_push(out, args[i]);
+        return out;
+    }
+    if (target.tag == FL_MAP) {
+        FLValue out = target;
+        for (uint32_t i = 1; i < count; i++) {
+            FLValue item = args[i];
+            if (item.tag == FL_VECTOR && ((FLVector*)item.obj)->len == 2) {
+                FLVector* pair = (FLVector*)item.obj;
+                out = fl_map_set(out, pair->data[0], pair->data[1]);
+            } else if (item.tag == FL_MAP && item.obj) {
+                FLMap* m = (FLMap*)item.obj;
+                for (uint32_t j = 0; j < m->len; j++) out = fl_map_set(out, m->entries[j].key, m->entries[j].val);
+            }
+        }
+        return out;
+    }
+    FLValue out = fl_vec_new();
+    for (uint32_t i = 1; i < count; i++) out = fl_vec_push(out, args[i]);
+    return out;
+}
+
+static int fl_keys_contains(FLValue keys, FLValue key) {
+    if (keys.tag != FL_VECTOR) return 0;
+    FLVector* v = (FLVector*)keys.obj;
+    for (uint32_t i = 0; i < v->len; i++)
+        if (fl_truthy(fl_eq(fl_path_key(v->data[i]), key))) return 1;
+    return 0;
+}
+
+FLValue fl_obj_pick(FLValue map, FLValue keys) {
+    if (map.tag != FL_MAP || keys.tag != FL_VECTOR) return fl_map_new();
+    FLMap* m = (FLMap*)map.obj; FLValue out = fl_map_new();
+    for (uint32_t i = 0; i < m->len; i++)
+        if (fl_keys_contains(keys, m->entries[i].key)) out = fl_map_set(out, m->entries[i].key, m->entries[i].val);
+    return out;
+}
+
+FLValue fl_obj_omit(FLValue map, FLValue keys) {
+    if (map.tag != FL_MAP) return fl_map_new();
+    FLMap* m = (FLMap*)map.obj; FLValue out = fl_map_new();
+    for (uint32_t i = 0; i < m->len; i++)
+        if (!fl_keys_contains(keys, m->entries[i].key)) out = fl_map_set(out, m->entries[i].key, m->entries[i].val);
+    return out;
+}
+
+FLValue fl_zip_with(FLValue fn, FLValue left, FLValue right) {
+    if (left.tag != FL_VECTOR || right.tag != FL_VECTOR) return fl_vec_new();
+    FLVector* a = (FLVector*)left.obj; FLVector* b = (FLVector*)right.obj;
+    uint32_t n = a->len < b->len ? a->len : b->len; FLValue out = fl_vec_new();
+    for (uint32_t i = 0; i < n; i++) {
+        FLValue args[2] = { a->data[i], b->data[i] };
+        out = fl_vec_push(out, fl_fn_call(fn, 2, args));
+    }
+    return out;
+}
+
 /* ── S9: 맵 accessor ── */
 
 FLValue fl_map_keys(FLValue map) {

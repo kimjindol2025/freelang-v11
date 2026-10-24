@@ -116,6 +116,26 @@ grep -E '^\[FL Error\] 아직 네이티브로 구현되지 않은 내장 함수:
 BUILTIN2_COUNT=$((BUILTIN2_COUNT + 2))
 printf 'BUILTIN2_SUMMARY=%s/16\n' "$BUILTIN2_COUNT"
 
+"$COMPILER" "$ROOT/tests/task925/hof.fl" "$WORK/hof.c" >"$WORK/hof.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/hof" "$WORK/hof.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/hof" >"$WORK/hof.log" 2>&1
+HOF_COUNT="$(grep -c '^PASS ' "$WORK/hof.log")"
+for spec in 'str-repeat-0' 'str-repeat-negative' 'str-repeat-million' 'repeat-million'; do
+  "$COMPILER" "$ROOT/tests/task925/$spec.fl" "$WORK/$spec.c" >"$WORK/$spec.compile" 2>&1
+  gcc -w -I "$RUNTIME" -o "$WORK/$spec" "$WORK/$spec.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  if test "$spec" = repeat-million; then
+    /usr/bin/time -f 'REPEAT_VECTOR_MAX_RSS_KB=%M' -o "$WORK/$spec.time" "$WORK/$spec" >"$WORK/$spec.log" 2>&1
+    cat "$WORK/$spec.time"
+  else
+    "$WORK/$spec" >"$WORK/$spec.log" 2>&1
+  fi
+  printf '%s_RC=0\n' "$spec"
+  HOF_COUNT=$((HOF_COUNT + 1))
+done
+test "$HOF_COUNT" -eq 25
+grep -E '^(STR_REPEAT_ZERO_LEN|STR_REPEAT_NEG_LEN|STR_REPEAT_MILLION_LEN|REPEAT_MILLION_LEN)=' "$WORK"/{str-repeat-0,str-repeat-negative,str-repeat-million,repeat-million}.log
+printf 'HOF_SUMMARY=%s/25\n' "$HOF_COUNT"
+
 grep -E '^FL_TEST_SUMMARY ' "$WORK/existing41.log"
 grep -hE '^TEST_EVIDENCE_SUMMARY=|^TCP_SUMMARY=|^HTTP_SUMMARY=' "$WORK/test-evidence.log" "$WORK/tcp.log" "$WORK/http.log"
 sed -n 's/.*"expectedCount":\([0-9]*\),"resultCount":\([0-9]*\).*/AUDIT_SUMMARY=\1\/\2/p' "$WORK/audit.log"
@@ -123,3 +143,4 @@ grep -E '^NATIVE_FORMS_SUMMARY=|^CGC_SYMBOL_SUMMARY=' "$WORK/symbol.log"
 grep -hE '^(ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|AUTH_SUMMARY)=' "$WORK"/{erp,erp2,erp3,conc,auth}.log
 grep -E '^PAGE_SUMMARY=' "$WORK/pages.log"
 grep '^PASS ' "$WORK/builtins2.log"
+grep '^PASS ' "$WORK/hof.log" "$WORK"/{str-repeat-0,str-repeat-negative,str-repeat-million,repeat-million}.log

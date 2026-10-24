@@ -707,6 +707,22 @@
     [(= $op "auth-random-token") "fl_auth_random_token"]
     [(= $op "auth-pbkdf2") "fl_auth_pbkdf2"]
     [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
+    [(= $op "any?") "fl_any_p"]
+    [(= $op "none?") "fl_none_p"]
+    [(= $op "count-if") "fl_count_if"]
+    [(= $op "find-first") "fl_find_first"]
+    [(= $op "keep") "fl_keep"]
+    [(= $op "map-indexed") "fl_map_indexed"]
+    [(= $op "map-vals") "fl_map_vals_fn"]
+    [(= $op "comp") "fl_comp"]
+    [(= $op "get-in") "fl_get_in"]
+    [(= $op "group-by") "fl_group_by"]
+    [(= $op "frequencies") "fl_frequencies"]
+    [(= $op "into") "fl_into"]
+    [(= $op "conj") "fl_conj"]
+    [(= $op "obj-pick") "fl_obj_pick"]
+    [(= $op "obj-omit") "fl_obj_omit"]
+    [(= $op "zip-with") "fl_zip_with"]
     [(= $op "html-escape") "fl_html_escape"]
     [(= $op "str-pad-left") "fl_str_pad_left"]
     [(= $op "str-pad-right") "fl_str_pad_right"]
@@ -730,7 +746,14 @@
 
 (defn cgc-runtime-call [$op $args]
   (let [[$name (c-runtime-name $op)]]
-    (str $name "(" (cgc-args $args) ")")))
+    (cond
+      [(or (= $op "comp") (= $op "conj"))
+        (if (= (length $args) 0)
+          (str $name "(0, NULL)")
+          (str $name "(" (length $args) ", (FLValue[]){" (cgc-args $args) "})"))]
+      [(= $op "get-in")
+        (str $name "(" (cgc-args $args) (if (= (length $args) 2) ", fl_nil()" "") ")")]
+      [true (str $name "(" (cgc-args $args) ")")])))
 
 (defn cgc-register-function [$raw]
   (let [[$name (c-name $raw)]
@@ -958,7 +981,7 @@
   [(= $op "uuid")        "uuid()"]
   ;; 맵 ops
   [(= $op "obj-merge")   (str "fl_map_merge(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "obj-pick")    (str "select_keys(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "obj-pick")    (str "fl_obj_pick(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "obj-omit")    (str "fl_obj_omit(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "get-in")      (str "fl_get_in(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "map-vals")    (str "fl_map_vals_fn(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -1000,8 +1023,8 @@
   [(= $op "distinct")    (str "fl_distinct(" (cgc (get $args 0)) ")")]
   [(= $op "zip")         (str "fl_zip(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "zip-with")    (str "fl_zip_with(" (cgc-args $args) ")")]
-  [(= $op "group-by")    (str "group_by(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "frequencies") (str "frequencies(" (cgc (get $args 0)) ")")]
+  [(= $op "group-by")    (str "fl_group_by(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "frequencies") (str "fl_frequencies(" (cgc (get $args 0)) ")")]
   ;; P1: 신규 C 구현 함수
   [(= $op "every?")      (str "fl_every_p(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "any?")        (str "fl_any_p(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
@@ -1013,7 +1036,7 @@
   [(= $op "mapcat")      (str "fl_mapcat(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "keep")        (str "fl_keep(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "comp")        (str "fl_comp(" (cgc-args $args) ", " (length $args) ")")]
-  [(= $op "conj")        (str "fl_conj(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "conj")        (cgc-runtime-call $op $args)]
   [(= $op "into")        (str "fl_into(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "keys")        (str "fl_map_keys(" (cgc (get $args 0)) ")")]
   [(= $op "obj-keys")    (str "fl_map_keys(" (cgc (get $args 0)) ")")]
