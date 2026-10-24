@@ -1,0 +1,2 @@
+(let [[local-value 1]]
+  local-value)

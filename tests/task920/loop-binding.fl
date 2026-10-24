@@ -1,0 +1,4 @@
+(loop [index 0]
+  (if (< index 2)
+    (recur (+ index 1))
+    index))
