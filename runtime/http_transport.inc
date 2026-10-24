@@ -92,7 +92,7 @@ static void transport_stream_available(char *buffer, size_t used, FLHTTPStreamSt
         state->cursor = data + chunk_size + 2;
     }
 }
-FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback) {
+FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback) {
     if (host.tag != FL_STRING || wire.tag != FL_STRING || port.tag != FL_INT ||
         timeout.tag != FL_INT || limit.tag != FL_INT || port.i < 1 || port.i > 65535 ||
         timeout.i < 1 || timeout.i > 60000 || limit.i < 1 || limit.i > 16777216 ||
@@ -185,4 +185,7 @@ FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue time
     result = fl_map_set(result, fl_str_val("value"), fl_str_val(buffer));
     free(buffer);
     return result;
+}
+FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit) {
+    return _fl_http_exchange_stream(host, port, wire, timeout, limit, fl_nil());
 }

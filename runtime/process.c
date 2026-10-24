@@ -603,7 +603,7 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
         free(wire); return http_client_error("REQUEST_TOO_LARGE", "request overflow");
     }
     wire[used] = '\0';
-    FLValue exchange = _fl_http_exchange(fl_str_val(host), fl_int(port), fl_str_val(wire), fl_int(5000), fl_int(2097152), callback);
+    FLValue exchange = _fl_http_exchange_stream(fl_str_val(host), fl_int(port), fl_str_val(wire), fl_int(5000), fl_int(2097152), callback);
     free(wire);
     if (!fl_truthy(fl_map_get(exchange, fl_str_val("ok")))) return exchange;
     FLValue raw_value = fl_map_get(exchange, fl_str_val("value"));
