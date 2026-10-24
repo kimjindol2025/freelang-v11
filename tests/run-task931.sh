@@ -62,6 +62,7 @@ test "$db_signal" -eq 11 && segv_count=$((segv_count + 1)) || true
 printf 'CASE=sqlite-file-size-limit RC=%s SIGNAL=%s ERROR=%s\n' "$db_rc" "$db_signal" "$(grep -m1 -o 'db-exec: .*' "$WORK/oom-dbwrite.err" || head -n 1 "$WORK/oom-dbwrite.err" || true)"
 test "$db_rc" -eq 1 && grep -q 'db-exec:' "$WORK/oom-dbwrite.err"
 
+sqlite3 "$WORK/fd-limit.sqlite" 'CREATE TABLE payload(value TEXT);'
 set +e
 (ulimit -n 4; exec "$WORK/oom-disk" db "$WORK/fd-limit.sqlite") >"$WORK/oom-fd.out" 2>"$WORK/oom-fd.err"
 fd_rc=$?
@@ -83,7 +84,7 @@ gcc -w -I "$RUNTIME" -o "$WORK/oom-server" "$WORK/oom-server.c" "${LINK[@]}" -ls
 start_server() {
   local work="$1" limit="$2" max="$3" fd_limit="$4"
   mkdir -p "$work"
-  (ulimit -u "$limit"; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max"; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
+  (if test -n "$limit"; then ulimit -u "$limit"; fi; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max"; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
   SERVER_PID=$!
   for _ in $(seq 1 100); do
     if grep -q '^HTTP_LISTENING=' "$work/server.log"; then break; fi
@@ -130,7 +131,7 @@ nofile_503="$(printf '%s\n' "$nofile_codes" | grep -Ec '^503$' || true)"
 printf 'CASE=http-descriptor-limit-30-requests SERVER_RC=%s SIGNAL=%s ERROR=%s RESPONSES=%s/30 HTTP_200=%s HTTP_503=%s\n' "$server_rc" "$server_signal" "$server_error" "$nofile_responses" "$nofile_total" "$nofile_503"
 test "$nofile_responses" -eq 30 && test "$nofile_503" -gt 0
 
-start_server "$WORK/oom-recovery" 64 1 32
+start_server "$WORK/oom-recovery" "" 1 32
 recovery_code="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$SERVER_PORT/")"
 set +e; wait "$SERVER_PID"; server_rc=$?; set -e
 server_signal=0; test "$server_rc" -gt 128 && server_signal=$((server_rc - 128)) || true
