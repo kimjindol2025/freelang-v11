@@ -707,6 +707,8 @@
     [(= $op "auth-random-token") "fl_auth_random_token"]
     [(= $op "auth-pbkdf2") "fl_auth_pbkdf2"]
     [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
+    [(= $op "auth-hash-password") "fl_auth_hash_password"]
+    [(= $op "auth-verify-password") "fl_auth_verify_password"]
     [(= $op "http-get-headers") "fl_http_get_headers"]
     [(= $op "http-post") "fl_http_post"]
     [(= $op "http-post-headers") "fl_http_post_headers"]
@@ -1218,8 +1220,6 @@
   [(= $op "auth-jwt-verify")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "auth-jwt-expired")    (str "fl_jwt_expired(" (cgc (get $args 0)) ")")]
   [(= $op "auth-jwt-decode")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", fl_str_val(\"\"))")]
-  [(= $op "auth-hash-password")  (str "fl_hash_password(" (cgc (get $args 0)) ")")]
-  [(= $op "auth-verify-password")(str "fl_verify_password(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [true             (cgc-dispatch-fallback $op $args)])))))
 
 (defn cgc-swap! [$args]

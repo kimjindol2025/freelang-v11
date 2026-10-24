@@ -1,10 +1,8 @@
 # builtin<TAB>C symbol<TAB>reason
-auth-hash-password	fl_hash_password	No native password-hash entry exists; do not substitute a weaker hash.
 auth-jwt-decode	fl_jwt_verify	No native JWT implementation exists; keep pending a complete verifier.
 auth-jwt-expired	fl_jwt_expired	No native JWT implementation exists.
 auth-jwt-sign	fl_jwt_sign	No native JWT implementation exists; partial signing would be unsafe.
 auth-jwt-verify	fl_jwt_verify	No native JWT implementation exists; partial verification would be unsafe.
-auth-verify-password	fl_verify_password	No native password verification entry exists.
 http-post-stream	fl_http_post_stream	No native HTTP streaming client implementation exists.
 http-stream-collect	fl_http_stream_collect	No native HTTP streaming client implementation exists.
 run-parallel	fl_run_parallel	Fork cannot safely serialize captured FreeLang closures or return FLValue results without an IPC contract; keep held.

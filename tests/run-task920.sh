@@ -149,3 +149,15 @@ bash "$ROOT/tests/run-task926.sh" "$COMPILER" "$WORK/net2" >"$WORK/net2.log" 2>&
 grep -E '^(PASS |UUID_COUNT=|UUID_UNIQUE=|UUID_REGEX_MATCH=|UUID_VERSION_4=|UUID_VARIANT_VALID=|NET2_SUMMARY=)' "$WORK/net2.log"
 sed -n '/^RAW_POST_BEGIN$/,/^RAW_POST_END$/p' "$WORK/net2.log"
 sed -n '/^RAW_HEADER_BEGIN$/,/^RAW_HEADER_END$/p' "$WORK/net2.log"
+
+"$COMPILER" "$ROOT/tests/task927/password.fl" "$WORK/password.c" >"$WORK/password.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/password" "$WORK/password.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/password" >"$WORK/password.log" 2>&1
+grep -E '^(PW_FORMAT_EXAMPLE|PW_SUMMARY)=' "$WORK/password.log"
+test "$(grep -c '^PASS ' "$WORK/password.log")" -eq 10
+grep '^PASS ' "$WORK/password.log"
+"$COMPILER" "$ROOT/tests/task927/hash-once.fl" "$WORK/hash-once.c" >"$WORK/hash-once.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/hash-once" "$WORK/hash-once.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+/usr/bin/time -f '%e' -o "$WORK/hash-once.seconds" "$WORK/hash-once" >"$WORK/hash-once.log" 2>&1
+awk '{printf "PW_HASH_ONCE_MS=%.0f\n", $1 * 1000}' "$WORK/hash-once.seconds"
+grep '^PASS password hash timing$' "$WORK/hash-once.log"

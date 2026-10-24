@@ -65,6 +65,14 @@
             [lock-still-blocked (not (has locked-attempts "Set-Cookie: erp_session="))]
             [unlocked (out "sh" ["-c" "sleep 2.2; curl --silent --show-error --include --cookie \"$1\" --cookie-jar \"$1\" --data-urlencode \"_csrf=$2\" --data-urlencode username=\"o'neil\" --data-urlencode \"password@$3\" \"$4/login\"" "auth-unlock" jar-c csrf-c pass-a url])]
             [salt-info (out "sqlite3" [database "SELECT count(*)||'|'||min(length(pw_hash))||'|'||min(length(pw_salt))||'|'||count(DISTINCT pw_salt) FROM users;"])]
+            [legacy-salt "0123456789abcdef0123456789abcdef"]
+            [legacy-password (str-trim (out "cat" [pass-a]))]
+            [legacy-digest (auth-pbkdf2 legacy-password legacy-salt)]
+            [legacy-row (out "sqlite3" [database (str "INSERT INTO users(username,pw_hash,pw_salt,created_at) VALUES('legacy-test','" legacy-digest "','" legacy-salt "',strftime('%Y-%m-%dT%H:%M:%fZ','now'));" )])]
+            [legacy-page (login-page url (str work "/legacy.cookies") work "legacy-login.html")]
+            [legacy-csrf (csrf-from work "legacy-login.html")]
+            [legacy-login (login-post url (str work "/legacy.cookies") legacy-csrf "legacy-test" pass-a)]
+            [legacy-vendors (curl-get url (str work "/legacy.cookies") "/vendors")]
             [plaintext-columns (out "sqlite3" [database "SELECT count(*) FROM pragma_table_info('users') WHERE name IN ('password','plain_password');"])]
             [expire-result (out "sh" ["-c" "token=$(awk '$6==\"erp_session\"{print $7}' \"$1\"); sqlite3 \"$2\" \"UPDATE sessions SET expires_at=0 WHERE token='$token';\"; curl --silent --show-error --include --cookie \"$1\" \"$3/vendors\"" "auth-expire" jar-c database url])]
             [checks [
@@ -74,7 +82,8 @@
               (check (has bad-no-csrf "HTTP/1.1 403") "login POST without CSRF returns 403")
               (check (has injection "아이디 또는 비밀번호가 틀립니다") "SQL-like username is safely rejected")
               (check (and (has successful "HTTP/1.1 303") (has successful "Location: /vendors") (has successful "HttpOnly") (has successful "SameSite=Strict") (has successful "Path=/") (>= (length session-a) 64)) "valid login issues a 256-bit session cookie")
-              (check (has vendors "HTTP/1.1 200") "valid session opens vendors")
+              (check (and (has vendors "HTTP/1.1 200") (has legacy-login "HTTP/1.1 303")
+                          (has legacy-vendors "HTTP/1.1 200")) "new and legacy split-column hashes authenticate")
               (check (and (has missing-csrf "HTTP/1.1 403") (= vendor-count "0\n")) "protected POST without CSRF leaves database unchanged")
               (check (and (has logout "HTTP/1.1 303") (has logout "Max-Age=0") (has after-logout "HTTP/1.1 303")) "logout expires cookie and revokes session")
               (check (and (has xss-user "HTTP/1.1 303") (has (curl-get url jar-b "/vendors") "HTTP/1.1 200")) "script-like username authenticates without HTML injection")

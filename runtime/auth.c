@@ -77,6 +77,55 @@ FLValue fl_auth_pbkdf2(FLValue password_value, FLValue salt_value) {
     return fl_str_val(hex);
 }
 
+static int auth_hex(const char *value, size_t length) {
+    if (length & 1) return 0;
+    for (size_t i = 0; i < length; i++) {
+        unsigned char c = (unsigned char)value[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+              (c >= 'A' && c <= 'F'))) return 0;
+    }
+    return 1;
+}
+
+FLValue fl_auth_hash_password(FLValue password_value) {
+    const char *password = auth_string(password_value, "auth-hash-password expects password string");
+    FLValue salt_value = fl_auth_random_token(fl_int(16));
+    FLValue digest_value = fl_auth_pbkdf2(password_value, salt_value);
+    const char *salt = ((FLString *)salt_value.obj)->data;
+    const char *digest = ((FLString *)digest_value.obj)->data;
+    char encoded[13 + 1 + 6 + 1 + 32 + 1 + 64 + 1];
+    if (strlen(password) > 4096 || strlen(digest) != 64)
+        fl_throw(fl_str_val("auth-hash-password failed"));
+    snprintf(encoded, sizeof(encoded), "pbkdf2-sha256$100000$%s$%s", salt, digest);
+    return fl_str_val(encoded);
+}
+
+FLValue fl_auth_verify_password(FLValue password_value, FLValue encoded_value) {
+    (void)auth_string(password_value, "auth-verify-password expects password string");
+    const char *encoded = auth_string(encoded_value, "auth-verify-password expects encoded hash string");
+    static const char prefix[] = "pbkdf2-sha256$";
+    if (strncmp(encoded, prefix, sizeof(prefix) - 1) != 0) return fl_bool(false);
+    const char *rounds = encoded + sizeof(prefix) - 1;
+    const char *rounds_end = strchr(rounds, '$');
+    if (!rounds_end || rounds_end == rounds ||
+        (rounds_end - rounds != 6) || memcmp(rounds, "100000", 6) != 0)
+        return fl_bool(false);
+    const char *salt = rounds_end + 1;
+    const char *salt_end = strchr(salt, '$');
+    if (!salt_end) return fl_bool(false);
+    size_t salt_length = (size_t)(salt_end - salt);
+    const char *digest = salt_end + 1;
+    size_t digest_length = strlen(digest);
+    if (salt_length < 32 || salt_length > 256 || digest_length != 64 ||
+        strchr(digest, '$') || !auth_hex(salt, salt_length) || !auth_hex(digest, digest_length))
+        return fl_bool(false);
+    char salt_copy[257];
+    memcpy(salt_copy, salt, salt_length);
+    salt_copy[salt_length] = '\0';
+    FLValue computed = fl_auth_pbkdf2(password_value, fl_str_val(salt_copy));
+    return fl_auth_constant_time_equal(computed, fl_str_val(digest));
+}
+
 FLValue fl_auth_constant_time_equal(FLValue left_value, FLValue right_value) {
     const char *left = auth_string(left_value, "auth-constant-time-equal expects strings");
     const char *right = auth_string(right_value, "auth-constant-time-equal expects strings");

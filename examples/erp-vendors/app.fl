@@ -56,7 +56,7 @@
         [row (first (db-query DB "SELECT id, pw_hash, pw_salt FROM users WHERE username = ?" [username]))]
         [salt (if (= row nil) "00000000000000000000000000000000" (get row "pw_salt"))]
         [expected (if (= row nil) "0000000000000000000000000000000000000000000000000000000000000000" (get row "pw_hash"))]
-        [matches (auth-constant-time-equal (auth-pbkdf2 password salt) expected)]
+        [matches (auth-verify-password password (str "pbkdf2-sha256$100000$" salt "$" expected))]
         [attempt (first (db-query DB "SELECT locked_until > CAST(strftime('%s','now') AS INTEGER) AS blocked FROM login_attempts WHERE username = ?" [username]))]
         [blocked (if (= attempt nil) false (= (get attempt "blocked") 1))]]
     (if (not (auth-constant-time-equal csrf-cookie csrf-form))

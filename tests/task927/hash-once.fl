@@ -1,0 +1,3 @@
+(let [[digest (auth-hash-password "test-only-timing-password")]]
+  (if (= (length digest) 118) (println "PASS password hash timing")
+    (throw "FAIL password hash timing")))

@@ -636,7 +636,6 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
-```
 
 2026-10-24, TASK 9-26에서 기존 `_fl_http_exchange` bounded loopback HTTP transport를 재사용해 POST/헤더 응답 래퍼를 추가하고, UUID v4는 `getrandom`으로 생성하도록 구현했다. `run-parallel`은 FreeLang 클로저를 fork 자식에 전달해 결과를 안전하게 회수할 직렬화/IPC 계약이 없어 보류를 유지했다. 이전 고정점 `334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d`, 새 고정점 `93b5976d85762b60e9beb1cd84399d25dc853f58c925d43b556d73a5e68dbf97`. 시드는 유지했다.
 
@@ -649,4 +648,15 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-24, TASK 9-27에서 기존 PBKDF2·무작위 토큰·상수 시간 비교 헬퍼만 조합해 버전 문자열 비밀번호 해시와 검증 내장 함수를 추가했다. ERP는 새 해시를 기존 `pw_hash`/`pw_salt` 컬럼으로 분리 저장하고, 로그인 때 같은 포맷으로 검증해 기존 사용자 데이터를 보존한다. 이전 고정점 `93b5976d85762b60e9beb1cd84399d25dc853f58c925d43b556d73a5e68dbf97`, 새 고정점 `2d786ac75f1a2f0d58cbab329b594439a2a35f2966a8b7c81876b39cb1705c35`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+2d786ac75f1a2f0d58cbab329b594439a2a35f2966a8b7c81876b39cb1705c35  stage2.c
+2d786ac75f1a2f0d58cbab329b594439a2a35f2966a8b7c81876b39cb1705c35  stage3.c
+2d786ac75f1a2f0d58cbab329b594439a2a35f2966a8b7c81876b39cb1705c35  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
 ```
