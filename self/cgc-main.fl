@@ -757,6 +757,9 @@
         (if (= (length $args) 0)
           (str $name "(0, NULL)")
           (str $name "(" (length $args) ", (FLValue[]){" (cgc-args $args) "})"))]
+      [(= $op "auth-pbkdf2")
+        (str $name "(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", "
+          (if (= (length $args) 2) "fl_int(100000)" (cgc (get $args 2))) ")")]
       [(= $op "get-in")
         (str $name "(" (cgc-args $args) (if (= (length $args) 2) ", fl_nil()" "") ")")]
       [true (str $name "(" (cgc-args $args) ")")])))

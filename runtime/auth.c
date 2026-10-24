@@ -57,16 +57,18 @@ FLValue fl_auth_random_token(FLValue bytes_value) {
     return fl_str_val(hex);
 }
 
-FLValue fl_auth_pbkdf2(FLValue password_value, FLValue salt_value) {
+FLValue fl_auth_pbkdf2(FLValue password_value, FLValue salt_value, FLValue iterations_value) {
     const char *password = auth_string(password_value, "auth-pbkdf2 expects password string");
     const char *salt = auth_string(salt_value, "auth-pbkdf2 expects salt string");
+    if (iterations_value.tag != FL_INT || iterations_value.i < 10000 || iterations_value.i > 1000000)
+        fl_throw(fl_str_val("auth-pbkdf2 iterations must be between 10000 and 1000000"));
     unsigned char digest[32];
     char hex[65];
     static const char digits[] = "0123456789abcdef";
     if (strlen(password) > 4096 || strlen(salt) < 32 || strlen(salt) > 256 ||
         PKCS5_PBKDF2_HMAC(password, (int)strlen(password),
                           (const unsigned char *)salt, (int)strlen(salt),
-                          100000, EVP_sha256(), sizeof(digest), digest) != 1)
+                          (int)iterations_value.i, EVP_sha256(), sizeof(digest), digest) != 1)
         fl_throw(fl_str_val("PBKDF2-SHA256 failed"));
     for (size_t i = 0; i < sizeof(digest); i++) {
         hex[i * 2] = digits[digest[i] >> 4];
@@ -90,7 +92,7 @@ static int auth_hex(const char *value, size_t length) {
 FLValue fl_auth_hash_password(FLValue password_value) {
     const char *password = auth_string(password_value, "auth-hash-password expects password string");
     FLValue salt_value = fl_auth_random_token(fl_int(16));
-    FLValue digest_value = fl_auth_pbkdf2(password_value, salt_value);
+    FLValue digest_value = fl_auth_pbkdf2(password_value, salt_value, fl_int(100000));
     const char *salt = ((FLString *)salt_value.obj)->data;
     const char *digest = ((FLString *)digest_value.obj)->data;
     char encoded[13 + 1 + 6 + 1 + 32 + 1 + 64 + 1];
@@ -107,8 +109,13 @@ FLValue fl_auth_verify_password(FLValue password_value, FLValue encoded_value) {
     if (strncmp(encoded, prefix, sizeof(prefix) - 1) != 0) return fl_bool(false);
     const char *rounds = encoded + sizeof(prefix) - 1;
     const char *rounds_end = strchr(rounds, '$');
-    if (!rounds_end || rounds_end == rounds ||
-        (rounds_end - rounds != 6) || memcmp(rounds, "100000", 6) != 0)
+    if (!rounds_end || rounds_end == rounds) return fl_bool(false);
+    unsigned long iterations = 0;
+    for (const char *p = rounds; p < rounds_end; p++) {
+        if (*p < '0' || *p > '9' || iterations > 1000000) return fl_bool(false);
+        iterations = iterations * 10 + (unsigned long)(*p - '0');
+    }
+    if (iterations < 10000 || iterations > 1000000)
         return fl_bool(false);
     const char *salt = rounds_end + 1;
     const char *salt_end = strchr(salt, '$');
@@ -122,7 +129,7 @@ FLValue fl_auth_verify_password(FLValue password_value, FLValue encoded_value) {
     char salt_copy[257];
     memcpy(salt_copy, salt, salt_length);
     salt_copy[salt_length] = '\0';
-    FLValue computed = fl_auth_pbkdf2(password_value, fl_str_val(salt_copy));
+    FLValue computed = fl_auth_pbkdf2(password_value, fl_str_val(salt_copy), fl_int((int64_t)iterations));
     return fl_auth_constant_time_equal(computed, fl_str_val(digest));
 }
 

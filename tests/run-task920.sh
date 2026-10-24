@@ -154,7 +154,7 @@ sed -n '/^RAW_HEADER_BEGIN$/,/^RAW_HEADER_END$/p' "$WORK/net2.log"
 gcc -w -I "$RUNTIME" -o "$WORK/password" "$WORK/password.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
 "$WORK/password" >"$WORK/password.log" 2>&1
 grep -E '^(PW_FORMAT_EXAMPLE|PW_SUMMARY)=' "$WORK/password.log"
-test "$(grep -c '^PASS ' "$WORK/password.log")" -eq 10
+test "$(grep -c '^PASS ' "$WORK/password.log")" -eq 11
 grep '^PASS ' "$WORK/password.log"
 "$COMPILER" "$ROOT/tests/task927/hash-once.fl" "$WORK/hash-once.c" >"$WORK/hash-once.compile" 2>&1
 gcc -w -I "$RUNTIME" -o "$WORK/hash-once" "$WORK/hash-once.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
