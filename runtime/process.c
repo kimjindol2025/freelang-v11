@@ -19,6 +19,7 @@
 #include <ctype.h>
 #include <sys/select.h>
 #include <sys/random.h>
+#include <math.h>
 
 FLValue _fl_process_getcwd(void) {
     char buf[4096];
@@ -361,6 +362,242 @@ FLValue _fl_test_isolate(FLValue callback) {
     }
     free(buf);
     return result;
+}
+
+#define FL_PARALLEL_LIMIT 8
+#define FL_PARALLEL_RESULT_MAX (2u * 1024u * 1024u)
+#define FL_PARALLEL_TIMEOUT_MS 5000
+
+static int fl_parallel_json_size(FLValue v, size_t *size, unsigned depth) {
+    if (depth > 256) return 0;
+    size_t n = 0;
+    char number[64];
+    if (v.tag == FL_NIL) n = 4;
+    else if (v.tag == FL_BOOL) n = v.b ? 4 : 5;
+    else if (v.tag == FL_INT) {
+        int k = snprintf(number, sizeof number, "%lld", (long long)v.i);
+        if (k < 0) return 0;
+        n = (size_t)k;
+    } else if (v.tag == FL_FLOAT) {
+        if (!isfinite(v.f)) return 0;
+        int k = snprintf(number, sizeof number, "%.17g", v.f);
+        if (k < 0) return 0;
+        n = (size_t)k;
+    } else if (v.tag == FL_STRING && v.obj) {
+        FLString *s = (FLString*)v.obj;
+        n = 2;
+        for (uint32_t i = 0; i < s->len; i++) {
+            unsigned char c = (unsigned char)s->data[i];
+            size_t add = (c == '"' || c == '\\' || c == '\b' || c == '\f' || c == '\n' || c == '\r' || c == '\t') ? 2 : (c < 0x20 ? 6 : 1);
+            if (add > FL_PARALLEL_RESULT_MAX || n > FL_PARALLEL_RESULT_MAX - add) return -1;
+            n += add;
+        }
+    } else if (v.tag == FL_VECTOR && v.obj) {
+        FLVector *vec = (FLVector*)v.obj;
+        n = 2;
+        for (uint32_t i = 0; i < vec->len; i++) {
+            size_t part = 0;
+            int valid = fl_parallel_json_size(vec->data[i], &part, depth + 1);
+            if (valid <= 0) return valid;
+            if (part > FL_PARALLEL_RESULT_MAX || n > FL_PARALLEL_RESULT_MAX - part) return -1;
+            n += part + (i ? 1 : 0);
+        }
+    } else if (v.tag == FL_MAP && v.obj) {
+        FLMap *map = (FLMap*)v.obj;
+        n = 2;
+        for (uint32_t i = 0; i < map->len; i++) {
+            size_t key = 0, val = 0;
+            if (map->entries[i].key.tag != FL_STRING) return 0;
+            int key_valid = fl_parallel_json_size(map->entries[i].key, &key, depth + 1);
+            int val_valid = fl_parallel_json_size(map->entries[i].val, &val, depth + 1);
+            if (key_valid <= 0) return key_valid;
+            if (val_valid <= 0) return val_valid;
+            if (key > FL_PARALLEL_RESULT_MAX || val > FL_PARALLEL_RESULT_MAX ||
+                n > FL_PARALLEL_RESULT_MAX - key || n + key > FL_PARALLEL_RESULT_MAX - val - 1) return -1;
+            n += key + val + 1 + (i ? 1 : 0);
+        }
+    } else return 0;
+    if (n > FL_PARALLEL_RESULT_MAX || *size > FL_PARALLEL_RESULT_MAX - n) return -1;
+    *size += n;
+    return 1;
+}
+
+static int64_t fl_parallel_now_ms(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static FLValue fl_parallel_error(const char *code) {
+    return fl_err(code);
+}
+
+typedef struct {
+    pid_t pid;
+    int fd, reaped, eof, failed, parsed, status;
+    int64_t start_ms;
+    size_t len;
+    char *data;
+} FLParallelChild;
+
+static void fl_parallel_child(FLValue callback, int fd) {
+    FLValue result = fl_fn_call(callback, 0, NULL);
+    size_t expected = 0;
+    int size_status = fl_parallel_json_size(result, &expected, 0);
+    if (size_status <= 0) _exit(size_status < 0 ? 3 : 2);
+    FLValue encoded = fl_json_stringify(result);
+    if (encoded.tag != FL_STRING || !encoded.obj) _exit(2);
+    FLString *s = (FLString*)encoded.obj;
+    if (s->len != expected || s->len > FL_PARALLEL_RESULT_MAX) _exit(3);
+    size_t off = 0;
+    while (off < s->len) {
+        ssize_t n = write(fd, s->data + off, s->len - off);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) _exit(4);
+        off += (size_t)n;
+    }
+    close(fd);
+    _exit(0);
+}
+
+FLValue fl_run_parallel(FLValue jobs, FLValue workers_value) {
+    if (jobs.tag != FL_VECTOR || !jobs.obj) fl_throw(fl_str_val("run-parallel expects a vector of functions"));
+    int workers_limit = workers_value.tag == FL_INT ? (int)workers_value.i : FL_PARALLEL_LIMIT;
+    if (workers_limit < 1) workers_limit = 1;
+    if (workers_limit > FL_PARALLEL_LIMIT) workers_limit = FL_PARALLEL_LIMIT;
+    FLVector *items = (FLVector*)jobs.obj;
+    if (!items->len) return fl_vec_new();
+    FLValue *results = calloc(items->len, sizeof *results);
+    if (!results) fl_throw(fl_str_val("run-parallel allocation failed"));
+    for (uint32_t base = 0; base < items->len; base += (uint32_t)workers_limit) {
+        FLParallelChild child[FL_PARALLEL_LIMIT];
+        memset(child, 0, sizeof child);
+        int count = (int)(items->len - base);
+        if (count > workers_limit) count = workers_limit;
+        for (int i = 0; i < count; i++) {
+            child[i].fd = -1;
+            if (items->data[base + (uint32_t)i].tag != FL_FN) {
+                results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_NOT_FUNCTION");
+                child[i].reaped = child[i].eof = 1;
+                continue;
+            }
+            int fds[2];
+            if (pipe(fds) != 0) {
+                results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_PIPE");
+                child[i].reaped = child[i].eof = 1;
+                continue;
+            }
+            fflush(NULL);
+            pid_t pid = fork();
+            if (pid < 0) {
+                close(fds[0]); close(fds[1]);
+                results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_FORK");
+                child[i].reaped = child[i].eof = 1;
+                continue;
+            }
+            if (pid == 0) {
+                close(fds[0]);
+                for (int j = 0; j < i; j++) if (child[j].fd >= 0) close(child[j].fd);
+                fl_parallel_child(items->data[base + (uint32_t)i], fds[1]);
+            }
+            close(fds[1]);
+            int flags = fcntl(fds[0], F_GETFL, 0);
+            if (flags >= 0) (void)fcntl(fds[0], F_SETFL, flags | O_NONBLOCK);
+            child[i].pid = pid;
+            child[i].fd = fds[0];
+            child[i].start_ms = fl_parallel_now_ms();
+            child[i].data = malloc(FL_PARALLEL_RESULT_MAX + 1u);
+            if (!child[i].data) {
+                child[i].failed = 1;
+                results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_MEMORY");
+                kill(pid, SIGKILL);
+                close(child[i].fd); child[i].fd = -1; child[i].eof = 1;
+            }
+        }
+        for (;;) {
+            int active = 0;
+            int64_t now = fl_parallel_now_ms();
+            struct pollfd pfds[FL_PARALLEL_LIMIT];
+            int pmap[FL_PARALLEL_LIMIT], pn = 0;
+            for (int i = 0; i < count; i++) {
+                FLParallelChild *c = &child[i];
+                if (!c->reaped || !c->eof) active++;
+                if (c->pid > 0 && !c->reaped && !c->failed && now - c->start_ms >= FL_PARALLEL_TIMEOUT_MS) {
+                    c->failed = 1;
+                    results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_TIMEOUT");
+                    kill(c->pid, SIGKILL);
+                    if (c->fd >= 0) { close(c->fd); c->fd = -1; c->eof = 1; }
+                }
+                if (c->fd >= 0 && !c->eof) {
+                    pfds[pn].fd = c->fd; pfds[pn].events = POLLIN | POLLHUP | POLLERR; pfds[pn].revents = 0;
+                    pmap[pn++] = i;
+                }
+            }
+            if (!active) break;
+            int pr = poll(pfds, (nfds_t)pn, 50);
+            if (pr < 0 && errno != EINTR) {
+                for (int i = 0; i < count; i++) if (child[i].pid > 0 && !child[i].reaped) kill(child[i].pid, SIGKILL);
+            }
+            if (pr > 0) for (int p = 0; p < pn; p++) if (pfds[p].revents) {
+                int i = pmap[p]; FLParallelChild *c = &child[i];
+                for (;;) {
+                    char part[8192];
+                    ssize_t n = read(c->fd, part, sizeof part);
+                    if (n < 0 && errno == EINTR) continue;
+                    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) break;
+                    if (n <= 0) {
+                        close(c->fd); c->fd = -1; c->eof = 1;
+                        break;
+                    }
+                    if ((size_t)n > FL_PARALLEL_RESULT_MAX - c->len) {
+                        c->failed = 1;
+                        results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_RESULT_TOO_LARGE");
+                        kill(c->pid, SIGKILL);
+                        close(c->fd); c->fd = -1; c->eof = 1;
+                        break;
+                    }
+                    memcpy(c->data + c->len, part, (size_t)n); c->len += (size_t)n;
+                }
+            }
+            for (int i = 0; i < count; i++) {
+                FLParallelChild *c = &child[i];
+                if (c->pid <= 0 || c->reaped) continue;
+                pid_t w = waitpid(c->pid, &c->status, WNOHANG);
+                if (w == c->pid) {
+                    c->reaped = 1;
+                    if (!c->failed && (!WIFEXITED(c->status) || WEXITSTATUS(c->status) != 0)) {
+                        c->failed = 1;
+                        const char *reason = WIFEXITED(c->status) && WEXITSTATUS(c->status) == 2
+                            ? "E_RUN_PARALLEL_UNSUPPORTED_RESULT"
+                            : WIFEXITED(c->status) && WEXITSTATUS(c->status) == 3
+                                ? "E_RUN_PARALLEL_RESULT_TOO_LARGE" : "E_RUN_PARALLEL_CHILD";
+                        results[base + (uint32_t)i] = fl_parallel_error(reason);
+                    }
+                } else if (w < 0 && errno != EINTR) {
+                    c->reaped = c->failed = 1;
+                    results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_WAIT");
+                }
+            }
+            for (int i = 0; i < count; i++) {
+                FLParallelChild *c = &child[i];
+                if (c->pid > 0 && c->reaped && c->eof && !c->failed && !c->parsed) {
+                    c->parsed = 1;
+                    if (!c->len) results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_NO_RESULT");
+                    else {
+                        c->data[c->len] = '\0';
+                        results[base + (uint32_t)i] = fl_json_parse(fl_str_val(c->data));
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < count; i++) {
+            if (child[i].fd >= 0) close(child[i].fd);
+            free(child[i].data);
+        }
+    }
+    FLValue out = fl_vec_from(results, items->len);
+    free(results);
+    return out;
 }
 
 FLValue _fl_exit(FLValue code) {

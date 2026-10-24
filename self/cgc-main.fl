@@ -718,6 +718,7 @@
     [(= $op "http-post-headers") "fl_http_post_headers"]
     [(= $op "http-post-stream") "fl_http_post_stream"]
     [(= $op "http-stream-collect") "fl_http_stream_collect"]
+    [(= $op "run-parallel") "fl_run_parallel"]
     [(= $op "uuid") "fl_uuid"]
     [(= $op "any?") "fl_any_p"]
     [(= $op "none?") "fl_none_p"]
@@ -771,6 +772,8 @@
           (if (= (length $args) 2) "fl_int(3600)" (cgc (get $args 2))) ")")]
       [(= $op "get-in")
         (str $name "(" (cgc-args $args) (if (= (length $args) 2) ", fl_nil()" "") ")")]
+      [(= $op "run-parallel")
+        (str $name "(" (cgc (get $args 0)) ", " (if (>= (length $args) 2) (cgc (get $args 1)) "fl_int(8)") ")")]
       [true (str $name "(" (cgc-args $args) ")")])))
 
 (defn cgc-register-function [$raw]
@@ -1165,8 +1168,6 @@
     (if (includes-item @known-defns-atom (c-name $op))
       (cgc-dispatch-fallback $op $args)
       (str "fl_json_stringify(" (cgc (get $args 0)) ")"))]
-  ;; 병렬 실행
-  [(= $op "run-parallel")      (str "fl_run_parallel(" (cgc (get $args 0)) ", " (if (>= (length $args) 2) (cgc (get $args 1)) "fl_int(0)") ")")]
   ;; HTTP 클라이언트 (libcurl) — {:status N :body "..." :headers {}}
   [(= $op "http-get")          (str "fl_http_get(" (cgc (get $args 0)) ")")]
   ;; 유틸 — sleep/now

@@ -334,6 +334,7 @@ FLValue _fl_process_exec_args(FLValue cmd, FLValue args);
 FLValue _fl_process_spawn(FLValue cmd, FLValue args);
 FLValue process_spawn(FLValue cmd, FLValue args);
 FLValue _fl_test_isolate(FLValue callback);
+FLValue fl_run_parallel(FLValue jobs, FLValue workers);
 FLValue _fl_exit(FLValue code);
 FLValue capability_list(void);
 FLValue capability_enable(FLValue name);

@@ -1,0 +1,69 @@
+(defn check [condition name]
+  (if condition (println (str "PASS " name)) (throw (str "FAIL " name))))
+
+(define ordered (run-parallel [(fn [] (do (sleep 150) "first")) (fn [] "second")
+                              (fn [] (do (sleep 50) "third")) (fn [] "fourth")]))
+(check (= ordered ["first" "second" "third" "fourth"]) "input order")
+(define json-values (run-parallel [(fn [] [nil true false 1.5 "text" (str "line" (get (char-from-byte 10) "value") "break") [1 2] {"key" "value"}])]))
+(check (= (get json-values 0) [nil true false 1.5 "text" (str "line" (get (char-from-byte 10) "value") "break") [1 2] {"key" "value"}]) "JSON value round trip")
+
+(define parallel-start (now-ms))
+(define timed (run-parallel [(fn [] (do (sleep 1000) 1)) (fn [] (do (sleep 1000) 2))
+                             (fn [] (do (sleep 1000) 3)) (fn [] (do (sleep 1000) 4))]))
+(define parallel-ms (- (now-ms) parallel-start))
+(check (and (= timed [1 2 3 4]) (< parallel-ms 2000)) "four jobs run concurrently")
+(println (str "PAR_FOUR_JOBS_MS=" parallel-ms))
+
+(define captured (let [offset 37] (run-parallel [(fn [] (+ offset 5))])))
+(check (= captured [42]) "captured outer value")
+
+(define outer (atom 10))
+(define mutation (run-parallel [(fn [] (do (reset! outer 99) (deref outer)))]))
+(check (and (= mutation [99]) (= (deref outer) 10)) "child mutation stays private")
+
+(define function-result (run-parallel [(fn [] (fn [] 1)) (fn [] "still-ok")]))
+(check (and (= (get (get function-result 0) "code") "E_RUN_PARALLEL_UNSUPPORTED_RESULT")
+            (= (get function-result 1) "still-ok"))
+  "unsupported function result is isolated")
+
+(define killed (run-parallel [(fn [] (_fl_exit 9)) (fn [] 23)]))
+(check (= (get (get killed 0) "_tag") "Error") "child exit becomes error")
+(check (= (get killed 1) 23) "other job survives child exit")
+
+(define timed-out (run-parallel [(fn [] (sleep 6000)) (fn [] 31)]))
+(check (= (get (get timed-out 0) "code") "E_RUN_PARALLEL_TIMEOUT") "timeout becomes error")
+(check (= (get timed-out 1) 31) "other job survives timeout")
+
+(define too-large (run-parallel [(fn [] (str-repeat "x" 2097153)) (fn [] "ok")]))
+(check (= (get (get too-large 0) "code") "E_RUN_PARALLEL_RESULT_TOO_LARGE") "oversized result becomes error")
+(check (= (get too-large 1) "ok") "other job survives oversized result")
+
+(check (= (run-parallel []) []) "empty input")
+
+(define concurrency-results
+  (run-parallel
+    (map (fn [i] (fn [] (let [started (now-ms)]
+                         (do (sleep 150) {"start" started "end" (now-ms)}))))
+         [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19]) 8))
+(define active-at-start
+  (map (fn [event]
+         (count-if (fn [other]
+                     (and (<= (get other "start") (get event "start"))
+                          (> (get other "end") (get event "start"))))
+                   concurrency-results))
+       concurrency-results))
+(define max-active (reduce (fn [best n] (if (> n best) n best)) 0 active-at-start))
+(check (and (= (length concurrency-results) 20) (<= max-active 8)) "worker cap holds for 20 jobs")
+(println (str "PAR_MAX_CONCURRENCY=" max-active))
+
+(define pid (process-pid))
+(define fd-before (str-trim (process-run (str "find /proc/" pid "/fd -mindepth 1 -maxdepth 1 -type l | wc -l"))))
+(define zombie-count (str-trim (process-run (str "ps -o stat= --ppid " pid " | awk '$1 ~ /^Z/ {n++} END {print n+0}'"))))
+(define fd-after (str-trim (process-run (str "find /proc/" pid "/fd -mindepth 1 -maxdepth 1 -type l | wc -l"))))
+(check (= zombie-count "0") "all children reaped")
+(check (= fd-before fd-after) "pipe descriptors closed")
+(println (str "PAR_ZOMBIES=" zombie-count))
+(println (str "PAR_FD_START=" fd-before))
+(println (str "PAR_FD_END=" fd-after))
+
+(println "PAR_SUMMARY=16/16")

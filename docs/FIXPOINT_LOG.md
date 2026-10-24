@@ -685,3 +685,15 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-25, TASK 9-30에서 `(run-parallel jobs [workers])`를 기존 `fl_fn_call`과 JSON 직렬화/파싱으로 구현하고, 작업당 5초·2 MiB 및 최대 8개 자식 제한을 적용했다. 부모가 입력 순서대로 결과를 복원하고 각 자식을 `waitpid`로 회수한다. 2 MiB 결과를 지원하려고 기존 JSON 직렬화를 동적 버퍼로 바꾸고 제어 문자 escape를 왕복 처리했다. 이전 고정점 `4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f`, 새 고정점 `9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage2.c
+9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage3.c
+9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

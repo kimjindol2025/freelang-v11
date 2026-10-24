@@ -109,10 +109,10 @@ gcc -w -I "$RUNTIME" -o "$WORK/builtins2" "$WORK/builtins2.c" "${link_sources[@]
 BUILTIN2_COUNT="$(grep -c '^PASS ' "$WORK/builtins2.log")"
 test "$BUILTIN2_COUNT" -eq 14
 grep -Fx '&lt;script&gt;&quot;&#x27;&amp;' "$WORK/builtins2.log"
-if "$COMPILER" "$ROOT/tests/task924/held-auth.fl" "$WORK/held-auth.c" >"$WORK/held-auth.log" 2>&1; then
-  echo 'held builtin unexpectedly compiled' >&2; exit 1
-fi
-  grep -E '^\[FL Error\] 아직 네이티브로 구현되지 않은 내장 함수: run-parallel \(line [0-9]+\)$' "$WORK/held-auth.log"
+"$COMPILER" "$ROOT/tests/task924/held-auth.fl" "$WORK/held-auth.c" >"$WORK/held-auth.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/held-auth" "$WORK/held-auth.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/held-auth" >"$WORK/held-auth.log" 2>&1
+grep -Fx 'PASS run-parallel-empty' "$WORK/held-auth.log"
 BUILTIN2_COUNT=$((BUILTIN2_COUNT + 2))
 printf 'BUILTIN2_SUMMARY=%s/16\n' "$BUILTIN2_COUNT"
 
@@ -143,6 +143,7 @@ grep -E '^NATIVE_FORMS_SUMMARY=|^CGC_SYMBOL_SUMMARY=' "$WORK/symbol.log"
 grep -hE '^(ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|AUTH_SUMMARY)=' "$WORK"/{erp,erp2,erp3,conc,auth}.log
 grep -E '^PAGE_SUMMARY=' "$WORK/pages.log"
 grep '^PASS ' "$WORK/builtins2.log"
+grep '^PASS ' "$WORK/held-auth.log"
 grep '^PASS ' "$WORK/hof.log" "$WORK"/{str-repeat-0,str-repeat-negative,str-repeat-million,repeat-million}.log
 
 bash "$ROOT/tests/run-task926.sh" "$COMPILER" "$WORK/net2" >"$WORK/net2.log" 2>&1
@@ -199,3 +200,9 @@ sed -n '/^RAW_STREAM_REQUEST_BEGIN$/,/^RAW_STREAM_REQUEST_END$/p' "$WORK/stream-
 gcc -w -I "$RUNTIME" -o "$WORK/jsonnum" "$WORK/jsonnum.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
 "$WORK/jsonnum" >"$WORK/jsonnum.log" 2>&1
 grep -E '^(JSONNUM_OUTPUTS=|JSONNUM_SUMMARY=)' "$WORK/jsonnum.log"
+
+"$COMPILER" "$ROOT/tests/task930/parallel.fl" "$WORK/parallel.c" >"$WORK/parallel.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/parallel" "$WORK/parallel.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/parallel" >"$WORK/parallel.log" 2>&1
+test "$(grep -c '^PASS ' "$WORK/parallel.log")" -eq 16
+grep -E '^(PASS |PAR_FOUR_JOBS_MS=|PAR_MAX_CONCURRENCY=|PAR_ZOMBIES=|PAR_FD_START=|PAR_FD_END=|PAR_SUMMARY=)' "$WORK/parallel.log"

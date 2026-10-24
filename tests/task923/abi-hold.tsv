@@ -1,2 +1,1 @@
 # builtin<TAB>C symbol<TAB>reason
-run-parallel	fl_run_parallel	Fork cannot safely serialize captured FreeLang closures or return FLValue results without an IPC contract; keep held.
