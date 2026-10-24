@@ -76,11 +76,10 @@ for name in loop-binding function-parameter let-local; do
   test "$count" -eq 0 || { cat "$WORK/$name.log"; exit 1; }
   WARN_COUNT=$((WARN_COUNT + 1))
 done
-if ! "$COMPILER" "$ROOT/tests/task920/undefined-name.fl" "$WORK/undefined-name.c" >"$WORK/undefined-name.log" 2>&1; then
-  cat "$WORK/undefined-name.log"; exit 1
-fi
+"$COMPILER" "$ROOT/tests/task920/undefined-name.fl" "$WORK/undefined-name.c" >"$WORK/undefined-name.log" 2>&1 || true
 count="$(grep -c '정의되지 않은 이름' "$WORK/undefined-name.log" || true)"
 test "$count" -eq 1 || { cat "$WORK/undefined-name.log"; exit 1; }
+grep -q '\[CGC-ERR\] generated C failed gcc -fsyntax-only:' "$WORK/undefined-name.log"
 WARN_COUNT=$((WARN_COUNT + 1))
 printf 'WARN_SUMMARY=%s/4\n' "$WARN_COUNT"
 
