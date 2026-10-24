@@ -553,7 +553,7 @@ static int http_wire_append(char *wire, size_t capacity, size_t *used,
     return 0;
 }
 
-static FLValue http_client_request(const char *method, FLValue url, FLValue headers, FLValue body) {
+static FLValue http_client_request(const char *method, FLValue url, FLValue headers, FLValue body, FLValue callback) {
     char host[256], authority[320], path[2048];
     int64_t port;
     if (http_client_parse_url(url, host, sizeof host, authority, sizeof authority,
@@ -637,37 +637,129 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
         response_headers = fl_map_set(response_headers, fl_str_val(key), fl_str_val(copy));
         free(copy); cursor = end + 2;
     }
-    if (fl_map_get(response_headers, fl_str_val("transfer-encoding")).tag != FL_NIL)
-        return http_client_error("HTTP_PROTOCOL", "transfer encoding is unsupported");
+    FLValue transfer = fl_map_get(response_headers, fl_str_val("transfer-encoding"));
+    int chunked = 0;
+    if (transfer.tag != FL_NIL) {
+        if (transfer.tag != FL_STRING || !transfer.obj ||
+            strcasecmp(((FLString *)transfer.obj)->data, "chunked"))
+            return http_client_error("HTTP_PROTOCOL", "unsupported transfer encoding");
+        if (fl_map_get(response_headers, fl_str_val("content-length")).tag != FL_NIL)
+            return http_client_error("HTTP_PROTOCOL", "conflicting response framing");
+        chunked = 1;
+    }
     const char *body_start = split + 4;
-    size_t body_len = raw->len - (size_t)(body_start - raw->data);
+    size_t wire_body_len = raw->len - (size_t)(body_start - raw->data);
+    char *decoded = malloc(2097153);
+    if (!decoded) return http_client_error("IO", "response allocation failed");
+    size_t body_len = 0, offset = 0;
+    int callback_open = callback.tag == FL_FN;
+    if (!chunked) {
+        if (wire_body_len > 2097152) { free(decoded); return http_client_error("RESPONSE_TOO_LARGE", "response body exceeds 2097152 bytes"); }
+        memcpy(decoded, body_start, wire_body_len); body_len = wire_body_len;
+        decoded[body_len] = '\0';
+        if (callback_open && body_len) {
+            FLValue part = fl_str_val(decoded);
+            if (!fl_truthy(fl_fn_call(callback, 1, &part))) callback_open = 0;
+        }
+    } else {
+        int final_seen = 0;
+        while (offset < wire_body_len) {
+            const char *line_end = memmem(body_start + offset, wire_body_len - offset, "\r\n", 2);
+            if (!line_end || line_end == body_start + offset || (size_t)(line_end - (body_start + offset)) > 16) {
+                free(decoded); return http_client_error("HTTP_PROTOCOL", "invalid chunk size");
+            }
+            size_t line_len = (size_t)(line_end - (body_start + offset));
+            size_t chunk_size = 0;
+            for (size_t i = 0; i < line_len; i++) {
+                unsigned char c = (unsigned char)body_start[offset + i];
+                unsigned digit;
+                if (c >= '0' && c <= '9') digit = c - '0';
+                else if (c >= 'a' && c <= 'f') digit = c - 'a' + 10;
+                else if (c >= 'A' && c <= 'F') digit = c - 'A' + 10;
+                else { free(decoded); return http_client_error("HTTP_PROTOCOL", "invalid chunk size"); }
+                if (chunk_size > (2097152u - digit) / 16u) {
+                    free(decoded); return http_client_error("RESPONSE_TOO_LARGE", "chunked response exceeds 2097152 bytes");
+                }
+                chunk_size = chunk_size * 16u + digit;
+            }
+            offset += line_len + 2;
+            if (!chunk_size) {
+                for (;;) {
+                    const char *trailer_end = memmem(body_start + offset, wire_body_len - offset, "\r\n", 2);
+                    if (!trailer_end) { free(decoded); return http_client_error("HTTP_PROTOCOL", "truncated chunk trailers"); }
+                    size_t trailer_len = (size_t)(trailer_end - (body_start + offset));
+                    if (!trailer_len) { offset += 2; break; }
+                    if (!memchr(body_start + offset, ':', trailer_len)) {
+                        free(decoded); return http_client_error("HTTP_PROTOCOL", "invalid chunk trailer");
+                    }
+                    offset += trailer_len + 2;
+                }
+                if (offset != wire_body_len) { free(decoded); return http_client_error("HTTP_PROTOCOL", "bytes after final chunk"); }
+                final_seen = 1;
+                break;
+            }
+            if (chunk_size > 2097152u - body_len || chunk_size > wire_body_len - offset ||
+                wire_body_len - offset - chunk_size < 2 ||
+                body_start[offset + chunk_size] != '\r' || body_start[offset + chunk_size + 1] != '\n') {
+                free(decoded); return http_client_error(chunk_size > 2097152u - body_len ? "RESPONSE_TOO_LARGE" : "HTTP_PROTOCOL",
+                                                        "invalid or oversized chunk data");
+            }
+            memcpy(decoded + body_len, body_start + offset, chunk_size);
+            if (callback_open && chunk_size) {
+                char *part_text = malloc(chunk_size + 1);
+                if (!part_text) { free(decoded); return http_client_error("IO", "chunk allocation failed"); }
+                memcpy(part_text, body_start + offset, chunk_size); part_text[chunk_size] = '\0';
+                FLValue part = fl_str_val(part_text); free(part_text);
+                if (!fl_truthy(fl_fn_call(callback, 1, &part))) callback_open = 0;
+            }
+            body_len += chunk_size; offset += chunk_size + 2;
+        }
+        if (!wire_body_len || !final_seen || offset != wire_body_len) { free(decoded); return http_client_error("HTTP_PROTOCOL", "missing final chunk"); }
+    }
+    decoded[body_len] = '\0';
     FLValue content_length = fl_map_get(response_headers, fl_str_val("content-length"));
     if (content_length.tag != FL_NIL) {
-        if (content_length.tag != FL_STRING || !content_length.obj) return http_client_error("HTTP_PROTOCOL", "invalid content length");
+        if (content_length.tag != FL_STRING || !content_length.obj) {
+            free(decoded); return http_client_error("HTTP_PROTOCOL", "invalid content length");
+        }
         const char *text = ((FLString *)content_length.obj)->data; char *end = NULL;
         for (const unsigned char *p = (const unsigned char *)text; *p; p++)
-            if (*p < '0' || *p > '9') return http_client_error("HTTP_PROTOCOL", "invalid content length");
+            if (*p < '0' || *p > '9') {
+                free(decoded); return http_client_error("HTTP_PROTOCOL", "invalid content length");
+            }
         errno = 0;
         unsigned long long expected = strtoull(text, &end, 10);
-        if (!text[0] || errno == ERANGE || !end || *end || expected != body_len)
+        if (!text[0] || errno == ERANGE || !end || *end || expected != body_len) {
+            free(decoded);
             return http_client_error("HTTP_PROTOCOL", "content length mismatch");
+        }
     }
     FLValue result = fl_map_new();
     result = fl_map_set(result, fl_str_val("ok"), fl_bool(status >= 200 && status < 300));
     result = fl_map_set(result, fl_str_val("status"), fl_int(status));
     result = fl_map_set(result, fl_str_val("headers"), response_headers);
-    result = fl_map_set(result, fl_str_val("body"), fl_str_val(body_start));
+    result = fl_map_set(result, fl_str_val("body"), fl_str_val(decoded));
+    free(decoded);
     return result;
 }
 
 FLValue fl_http_get_headers(FLValue url, FLValue headers) {
-    return http_client_request("GET", url, headers, fl_str_val(""));
+    return http_client_request("GET", url, headers, fl_str_val(""), fl_nil());
 }
 FLValue fl_http_post(FLValue url, FLValue body) {
-    return http_client_request("POST", url, fl_map_new(), body);
+    return http_client_request("POST", url, fl_map_new(), body, fl_nil());
 }
 FLValue fl_http_post_headers(FLValue url, FLValue headers, FLValue body) {
-    return http_client_request("POST", url, headers, body);
+    return http_client_request("POST", url, headers, body, fl_nil());
+}
+FLValue fl_http_post_stream(FLValue url, FLValue headers, FLValue body, FLValue callback) {
+    if (callback.tag != FL_FN) return http_client_error("INVALID_REQUEST", "stream callback must be a function");
+    return http_client_request("POST", url, headers, body, callback);
+}
+FLValue fl_http_stream_collect(FLValue url, FLValue headers, FLValue body) {
+    FLValue response = http_client_request("POST", url, headers, body, fl_nil());
+    if (!fl_truthy(fl_map_get(response, fl_str_val("ok")))) return response;
+    return fl_map_get(response, fl_str_val("body"));
 }
 
 FLValue fl_uuid(void) {

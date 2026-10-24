@@ -348,6 +348,8 @@ FLValue fl_http_get(FLValue url);
 FLValue fl_http_get_headers(FLValue url, FLValue headers);
 FLValue fl_http_post(FLValue url, FLValue body);
 FLValue fl_http_post_headers(FLValue url, FLValue headers, FLValue body);
+FLValue fl_http_post_stream(FLValue url, FLValue headers, FLValue body, FLValue callback);
+FLValue fl_http_stream_collect(FLValue url, FLValue headers, FLValue body);
 FLValue fl_uuid(void);
 FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit);
 FLValue _fl_fs_io(FLValue operation, FLValue path, FLValue content);

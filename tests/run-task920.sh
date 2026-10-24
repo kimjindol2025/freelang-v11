@@ -112,7 +112,7 @@ grep -Fx '&lt;script&gt;&quot;&#x27;&amp;' "$WORK/builtins2.log"
 if "$COMPILER" "$ROOT/tests/task924/held-auth.fl" "$WORK/held-auth.c" >"$WORK/held-auth.log" 2>&1; then
   echo 'held builtin unexpectedly compiled' >&2; exit 1
 fi
-  grep -E '^\[FL Error\] 아직 네이티브로 구현되지 않은 내장 함수: http-post-stream \(line [0-9]+\)$' "$WORK/held-auth.log"
+  grep -E '^\[FL Error\] 아직 네이티브로 구현되지 않은 내장 함수: run-parallel \(line [0-9]+\)$' "$WORK/held-auth.log"
 BUILTIN2_COUNT=$((BUILTIN2_COUNT + 2))
 printf 'BUILTIN2_SUMMARY=%s/16\n' "$BUILTIN2_COUNT"
 
@@ -168,3 +168,34 @@ gcc -w -I "$RUNTIME" -o "$WORK/jwt" "$WORK/jwt.c" "${link_sources[@]}" -lsqlite3
 grep -E '^(PASS |JWT_SUMMARY=)' "$WORK/jwt.log"
 gcc -w -I "$RUNTIME" -o "$WORK/rfc7515-vector" "$ROOT/tests/task928/rfc7515-vector.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
 "$WORK/rfc7515-vector"
+
+gcc -Wall -Wextra -Werror -o "$WORK/chunk-server" "$ROOT/tests/task929/chunk-server.c"
+"$WORK/chunk-server" "$WORK/stream.port" >"$WORK/stream-server.log" 2>&1 &
+STREAM_SERVER_PID=$!
+trap 'kill "$STREAM_SERVER_PID" 2>/dev/null || true' EXIT
+for attempt in $(seq 1 100); do test -s "$WORK/stream.port" && break; sleep 0.02; done
+test -s "$WORK/stream.port"
+export FL_STREAM_PORT="$(cat "$WORK/stream.port")"
+"$COMPILER" "$ROOT/tests/task929/stream.fl" "$WORK/stream.c" >"$WORK/stream.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/stream" "$WORK/stream.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/stream" >"$WORK/stream.log" 2>&1
+wait "$STREAM_SERVER_PID"
+trap - EXIT
+grep -Fx 'CALLBACK_CHUNK=one' "$WORK/stream.log"
+grep -Fx 'CALLBACK_CHUNK=two' "$WORK/stream.log"
+grep -Fx 'CALLBACK_CHUNK=three' "$WORK/stream.log"
+grep -Fx 'STOP_CHUNK=one' "$WORK/stream.log"
+if grep -Eq '^STOP_CHUNK=(two|three)$' "$WORK/stream.log"; then echo 'callback continued after false' >&2; exit 1; fi
+grep -Fx 'PLAIN_CHUNK=plain' "$WORK/stream.log"
+grep -Fx 'STREAM_SUMMARY=13/13' "$WORK/stream.log"
+awk '/^CALLBACK_CHUNK=/{n++; if ($0 != "CALLBACK_CHUNK=" (n==1 ? "one" : n==2 ? "two" : "three")) exit 1} END{exit !(n==3)}' "$WORK/stream.log"
+grep -Fq 'POST /echo HTTP/1.0' "$WORK/stream-server.log"
+grep -Fq 'Content-Length: 12' "$WORK/stream-server.log"
+grep -Fq 'X-Test: free-lang' "$WORK/stream-server.log"
+grep -Fq 'request-body' "$WORK/stream-server.log"
+sed -n '/^RAW_STREAM_REQUEST_BEGIN$/,/^RAW_STREAM_REQUEST_END$/p' "$WORK/stream-server.log"
+
+"$COMPILER" "$ROOT/tests/task929/jsonnum.fl" "$WORK/jsonnum.c" >"$WORK/jsonnum.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/jsonnum" "$WORK/jsonnum.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/jsonnum" >"$WORK/jsonnum.log" 2>&1
+grep -E '^(JSONNUM_OUTPUTS=|JSONNUM_SUMMARY=)' "$WORK/jsonnum.log"

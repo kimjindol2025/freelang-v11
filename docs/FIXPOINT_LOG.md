@@ -19,6 +19,7 @@ TS_EXEC_COUNT=0
 FX_OR_AFJ_OPENAT_COUNT=0
 ```
 
+
 2026-10-17, 8-4에서 `self/cgc-main.fl`에 괄호·문자열 균형 검사를 넣었다. 깨진 소스는 `[CGC-ERR]`를 찍고 종료 코드 1로 끝난다. 직전 지문 `150217ae91e718dbeb0a9e140edd4a7f320289392ef6bb046508de403f8fba16`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
 
 ```text
@@ -671,4 +672,16 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+```
+
+2026-10-25, TASK 9-29에서 `http-post-stream`과 `http-stream-collect`를 `c-runtime-name` 단일 매핑에 연결해 ABI hold에서 제거했다. 컴파일러 출력이 달라져 기존 고정점 `1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03`에서 새 고정점 `4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f`로 변경됐다. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f  stage2.c
+4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f  stage3.c
+4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
 ```
