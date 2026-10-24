@@ -375,7 +375,7 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
     char *raw_header = NULL;
 #ifdef FL_HTTP_CAPTURE_RAW_TEST
     {
-        raw_header = (char *)malloc(header_length);
+        raw_header = (char *)fl_malloc(header_length);
         if (!raw_header) { *out_status = 500; return fl_nil(); }
         memcpy(raw_header, buffer, header_length);
     }
@@ -427,7 +427,7 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
 
     size_t body_available = received - header_length;
     size_t body_received = body_available < body_length ? body_available : body_length;
-    char *body = malloc(body_length + 1);
+    char *body = fl_malloc(body_length + 1);
     if (!body) { free(raw_header); *out_status = 500; return fl_nil(); }
     if (body_received) memcpy(body, buffer + header_length, body_received);
     while (body_received < body_length) {
@@ -440,7 +440,7 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
 
     FLValue raw_request = fl_nil();
     if (raw_header) {
-        char *raw = (char *)malloc(header_length + body_length + 1);
+        char *raw = (char *)fl_malloc(header_length + body_length + 1);
         if (!raw) { free(raw_header); free(body); *out_status = 500; return fl_nil(); }
         memcpy(raw, raw_header, header_length);
         memcpy(raw + header_length, body, body_length);

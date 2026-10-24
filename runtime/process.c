@@ -42,12 +42,12 @@ FLValue _fl_process_run(FLValue cmd) {
     FILE* f = popen(_strval(cmd), "r");
     if (!f) return fl_nil();
     size_t sz = 0, cap = 4096;
-    char* buf = malloc(cap);
+    char* buf = fl_malloc(cap);
     buf[0] = '\0';
     char tmp[1024];
     while (fgets(tmp, sizeof(tmp), f)) {
         size_t n = strlen(tmp);
-        if (sz + n + 1 > cap) { cap = (sz + n + 1) * 2; buf = realloc(buf, cap); }
+        if (sz + n + 1 > cap) { cap = (sz + n + 1) * 2; buf = fl_realloc(buf, cap); }
         memcpy(buf + sz, tmp, n); sz += n; buf[sz] = '\0';
     }
     pclose(f);
@@ -216,12 +216,12 @@ static FLValue fl_err(const char* code) {
 
 static char* fl_read_fd(int fd) {
     size_t n = 0, cap = 256;
-    char* buf = malloc(cap);
+    char* buf = fl_malloc(cap);
     buf[0] = 0;
     char tmp[512];
     ssize_t r;
     while ((r = read(fd, tmp, sizeof tmp)) > 0) {
-        if (n + (size_t)r + 1 > cap) { cap = (n + (size_t)r + 1) * 2; buf = realloc(buf, cap); }
+        if (n + (size_t)r + 1 > cap) { cap = (n + (size_t)r + 1) * 2; buf = fl_realloc(buf, cap); }
         memcpy(buf + n, tmp, (size_t)r); n += (size_t)r; buf[n] = 0;
     }
     return buf;
@@ -254,8 +254,8 @@ FLValue process_spawn(FLValue cmd, FLValue args) {
     /* Drain stdout and stderr together so a child that fills stderr
        (e.g. cat gcc.log) cannot deadlock against a parent that reads
        stdout to EOF first. */
-    char *out = (char*)malloc(1); size_t olen = 0; out[0] = '\0';
-    char *err = (char*)malloc(1); size_t elen = 0; err[0] = '\0';
+    char *out = (char*)fl_malloc(1); size_t olen = 0; out[0] = '\0';
+    char *err = (char*)fl_malloc(1); size_t elen = 0; err[0] = '\0';
     int oopen = 1, eopen = 1;
     while (oopen || eopen) {
         fd_set rfds;
@@ -272,7 +272,7 @@ FLValue process_spawn(FLValue cmd, FLValue args) {
             ssize_t n = read(outp[0], buf, sizeof buf);
             if (n <= 0) oopen = 0;
             else {
-                char *p = (char*)realloc(out, olen + (size_t)n + 1);
+                char *p = (char*)fl_realloc(out, olen + (size_t)n + 1);
                 if (!p) break;
                 out = p;
                 memcpy(out + olen, buf, (size_t)n);
@@ -284,7 +284,7 @@ FLValue process_spawn(FLValue cmd, FLValue args) {
             ssize_t n = read(errp[0], buf, sizeof buf);
             if (n <= 0) eopen = 0;
             else {
-                char *p = (char*)realloc(err, elen + (size_t)n + 1);
+                char *p = (char*)fl_realloc(err, elen + (size_t)n + 1);
                 if (!p) break;
                 err = p;
                 memcpy(err + elen, buf, (size_t)n);
@@ -335,7 +335,7 @@ FLValue _fl_test_isolate(FLValue callback) {
         _exit(0);
     }
     close(fds[1]);
-    char *buf = malloc(1048577);
+    char *buf = fl_malloc(1048577);
     size_t used = 0;
     int failed = !buf;
     while (!failed) {
@@ -467,7 +467,7 @@ FLValue fl_run_parallel(FLValue jobs, FLValue workers_value) {
     if (workers_limit > FL_PARALLEL_LIMIT) workers_limit = FL_PARALLEL_LIMIT;
     FLVector *items = (FLVector*)jobs.obj;
     if (!items->len) return fl_vec_new();
-    FLValue *results = calloc(items->len, sizeof *results);
+    FLValue *results = fl_calloc(items->len, sizeof *results);
     if (!results) fl_throw(fl_str_val("run-parallel allocation failed"));
     for (uint32_t base = 0; base < items->len; base += (uint32_t)workers_limit) {
         FLParallelChild child[FL_PARALLEL_LIMIT];
@@ -506,7 +506,7 @@ FLValue fl_run_parallel(FLValue jobs, FLValue workers_value) {
             child[i].pid = pid;
             child[i].fd = fds[0];
             child[i].start_ms = fl_parallel_now_ms();
-            child[i].data = malloc(FL_PARALLEL_RESULT_MAX + 1u);
+            child[i].data = fl_malloc(FL_PARALLEL_RESULT_MAX + 1u);
             if (!child[i].data) {
                 child[i].failed = 1;
                 results[base + (uint32_t)i] = fl_parallel_error("E_RUN_PARALLEL_MEMORY");
@@ -817,7 +817,7 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
         capacity += (size_t)k->len + (size_t)v->len + 4;
     }
     if (capacity > 2097152) return http_client_error("REQUEST_TOO_LARGE", "request exceeds 2097152 bytes");
-    char *wire = (char *)malloc(capacity);
+    char *wire = (char *)fl_malloc(capacity);
     if (!wire) return http_client_error("IO", "request allocation failed");
     size_t used = 0; char line[512];
     int n = snprintf(line, sizeof line, "%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\nContent-Length: %u\r\n",
@@ -868,7 +868,7 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
         const char *value = colon + 1;
         while (value_len && (*value == ' ' || *value == '\t')) { value++; value_len--; }
         while (value_len && (value[value_len - 1] == ' ' || value[value_len - 1] == '\t')) value_len--;
-        char *copy = (char *)malloc(value_len + 1);
+        char *copy = (char *)fl_malloc(value_len + 1);
         if (!copy) return http_client_error("IO", "response allocation failed");
         memcpy(copy, value, value_len); copy[value_len] = '\0';
         response_headers = fl_map_set(response_headers, fl_str_val(key), fl_str_val(copy));
@@ -886,7 +886,7 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
     }
     const char *body_start = split + 4;
     size_t wire_body_len = raw->len - (size_t)(body_start - raw->data);
-    char *decoded = malloc(2097153);
+    char *decoded = fl_malloc(2097153);
     if (!decoded) return http_client_error("IO", "response allocation failed");
     size_t body_len = 0, offset = 0;
     if (!chunked) {
@@ -1022,7 +1022,7 @@ static FLTcpSocket *tcp_lookup(FLValue handle) {
     return NULL;
 }
 static FLValue tcp_register(int fd, int listening) {
-    FLTcpSocket *s = malloc(sizeof(*s));
+    FLTcpSocket *s = fl_malloc(sizeof(*s));
     if (!s || tcp_next_id == INT64_MAX) { free(s); close(fd); return tcp_error("RESOURCE"); }
     s->id = tcp_next_id++; s->fd = fd; s->listening = listening;
     s->next = tcp_sockets; tcp_sockets = s;

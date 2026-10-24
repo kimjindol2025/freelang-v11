@@ -142,7 +142,7 @@ FLValue str_join(FLValue sep, FLValue vec) {
         total += strlen(fl_to_str(v->data[i], tmp, sizeof(tmp)));
         if (i + 1 < v->len) total += slen;
     }
-    char* buf = malloc(total + 1); buf[0] = '\0';
+    char* buf = fl_malloc(total + 1); buf[0] = '\0';
     for (uint32_t i = 0; i < v->len; i++) {
         strcat(buf, fl_to_str(v->data[i], tmp, sizeof(tmp)));
         if (i + 1 < v->len) strcat(buf, s);

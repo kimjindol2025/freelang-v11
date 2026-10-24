@@ -1,0 +1,3 @@
+(defn ready [request] (fl-resp-html "ready"))
+(fl-http-route "GET" "/" ready)
+(fl-http-start 0)

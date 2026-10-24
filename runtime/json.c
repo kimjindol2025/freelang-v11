@@ -14,7 +14,7 @@ static FLValue json_parse_value(const char** pp);
 static FLValue json_parse_string(const char** pp) {
     const char* p = *pp + 1; /* skip opening " */
     size_t cap = 64, len = 0;
-    char* buf = malloc(cap);
+    char* buf = fl_malloc(cap);
     while (*p && *p != '"') {
         if (*p == '\\') {
             p++;
@@ -42,7 +42,7 @@ static FLValue json_parse_string(const char** pp) {
         } else {
             buf[len++] = *p++;
         }
-        if (len + 4 >= cap) { cap *= 2; char *next = realloc(buf, cap); if (!next) { free(buf); fl_throw(fl_str_val("json-parse: out of memory")); return fl_nil(); } buf = next; }
+        if (len + 4 >= cap) { cap *= 2; char *next = fl_realloc(buf, cap); if (!next) { free(buf); fl_throw(fl_str_val("json-parse: out of memory")); return fl_nil(); } buf = next; }
     }
     if (*p == '"') p++;
     buf[len] = 0;
@@ -154,7 +154,7 @@ static void json_append(JsonBuffer *b, const char *s, size_t n) {
             if (cap > SIZE_MAX / 2) { cap = need; break; }
             cap *= 2;
         }
-        char *next = realloc(b->data, cap);
+        char *next = fl_realloc(b->data, cap);
         if (!next) { b->failed = 1; return; }
         b->data = next; b->cap = cap;
     }

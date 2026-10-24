@@ -206,3 +206,6 @@ gcc -w -I "$RUNTIME" -o "$WORK/parallel" "$WORK/parallel.c" "${link_sources[@]}"
 "$WORK/parallel" >"$WORK/parallel.log" 2>&1
 test "$(grep -c '^PASS ' "$WORK/parallel.log")" -eq 16
 grep -E '^(PASS |PAR_FOUR_JOBS_MS=|PAR_MAX_CONCURRENCY=|PAR_ZOMBIES=|PAR_FD_START=|PAR_FD_END=|PAR_SUMMARY=)' "$WORK/parallel.log"
+
+bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom" >"$WORK/oom.log" 2>&1
+cat "$WORK/oom.log"

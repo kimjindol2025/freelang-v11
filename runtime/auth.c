@@ -149,7 +149,7 @@ FLValue fl_auth_constant_time_equal(FLValue left_value, FLValue right_value) {
 static int jwt_b64url_encode(const unsigned char *src, size_t len, char **out, size_t *out_len) {
     if (len > INT_MAX) return 0;
     size_t cap = 4 * ((len + 2) / 3) + 1;
-    char *buf = malloc(cap);
+    char *buf = fl_malloc(cap);
     if (!buf) return 0;
     int n = EVP_EncodeBlock((unsigned char *)buf, src, (int)len);
     if (n < 0) { free(buf); return 0; }
@@ -164,8 +164,8 @@ static int jwt_b64url_encode(const unsigned char *src, size_t len, char **out, s
 static int jwt_b64url_decode(const char *src, size_t len, unsigned char **out, size_t *out_len) {
     if (!src || !len || len % 4 == 1 || len > 131072) return 0;
     size_t padded_len = (len + 3) & ~(size_t)3;
-    char *padded = malloc(padded_len + 1);
-    unsigned char *decoded = malloc(padded_len / 4 * 3 + 1);
+    char *padded = fl_malloc(padded_len + 1);
+    unsigned char *decoded = fl_malloc(padded_len / 4 * 3 + 1);
     if (!padded || !decoded) { free(padded); free(decoded); return 0; }
     for (size_t i = 0; i < len; i++) {
         unsigned char c = (unsigned char)src[i];
@@ -256,7 +256,7 @@ static int jwt_json_value(const char **pp, int depth) {
 
 static FLValue jwt_parse_object(const unsigned char *src, size_t len) {
     if (!src || !len || len > 65500 || memchr(src, 0, len)) return fl_nil();
-    char *json = malloc(len + 1); if (!json) return fl_nil();
+    char *json = fl_malloc(len + 1); if (!json) return fl_nil();
     memcpy(json, src, len); json[len] = '\0';
     const char *p = json; jwt_json_ws(&p);
     int valid = *p == '{' && jwt_json_value(&p, 0);
@@ -292,7 +292,7 @@ static int jwt_hmac(const char *key, size_t key_len, const char *message, size_t
 
 static int jwt_header_hs256(const char *json, size_t len) {
     if (!json || memchr(json, 0, len)) return 0;
-    char *copy = malloc(len + 1); if (!copy) return 0;
+    char *copy = fl_malloc(len + 1); if (!copy) return 0;
     memcpy(copy, json, len); copy[len] = 0;
     FLValue header = jwt_parse_object((const unsigned char *)copy, len);
     int count = 0; const char *p = copy;
@@ -339,13 +339,13 @@ FLValue fl_jwt_sign(FLValue payload_value, FLValue secret_value, FLValue expiry_
     if (!jwt_b64url_encode((unsigned char *)header, strlen(header), &h64, &hl) ||
         !jwt_b64url_encode((unsigned char *)json->data, json->len, &p64, &pl)) { free(h64); free(p64); return fl_nil(); }
     size_t input_len = hl + 1 + pl;
-    char *input = malloc(input_len + 1);
+    char *input = fl_malloc(input_len + 1);
     if (!input) { free(h64); free(p64); return fl_nil(); }
     memcpy(input,h64,hl); input[hl]='.'; memcpy(input+hl+1,p64,pl); input[input_len]=0;
     unsigned char mac[32]; char *sig=NULL; size_t sl=0;
     int ok = jwt_hmac(key->data,key->len,input,input_len,mac) && jwt_b64url_encode(mac,sizeof(mac),&sig,&sl);
     FLValue result = fl_nil();
-    if (ok) { char *token=malloc(hl+pl+sl+3); if(token) { snprintf(token,hl+pl+sl+3,"%s.%s.%s",h64,p64,sig); result=fl_str_val(token); free(token); } }
+    if (ok) { char *token=fl_malloc(hl+pl+sl+3); if(token) { snprintf(token,hl+pl+sl+3,"%s.%s.%s",h64,p64,sig); result=fl_str_val(token); free(token); } }
     OPENSSL_cleanse(mac,sizeof(mac)); free(h64);free(p64);free(sig);free(input); return result;
 }
 

@@ -1,0 +1,10 @@
+(define mode (get (cli-args) 0))
+(defn grow [text n]
+  (if (= n 0) text (grow (str text text) (- n 1))))
+(if (= mode "vector")
+  (do (repeat 10000000 1) (println "VECTOR_DONE"))
+  (if (= mode "string")
+    (do (grow "x" 25) (println "STRING_DONE"))
+    (if (= mode "json")
+      (do (json-stringify (grow "x" 24)) (println "JSON_DONE"))
+      (throw "unknown memory case"))))

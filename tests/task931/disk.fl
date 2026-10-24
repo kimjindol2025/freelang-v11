@@ -1,0 +1,9 @@
+(define mode (get (cli-args) 0))
+(define target (get (cli-args) 1))
+(defn grow [text n]
+  (if (= n 0) text (grow (str text text) (- n 1))))
+(if (= mode "file")
+  (file-write target (grow "x" 22))
+  (let [db (db-open target)]
+    (db-exec db "INSERT INTO payload(value) VALUES (?)" [(grow "x" 22)])))
+(println "WRITE_DONE")

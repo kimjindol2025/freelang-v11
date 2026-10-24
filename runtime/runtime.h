@@ -382,6 +382,10 @@ typedef struct { jmp_buf buf; FLValue err; } FLTryFrame;
 extern FLTryFrame fl_try_stack[FL_TRY_MAX];
 extern int fl_try_top;
 void fl_throw(FLValue err);
+void *fl_malloc(size_t size);
+void *fl_calloc(size_t count, size_t size);
+void *fl_realloc(void *ptr, size_t size);
+
 FLValue fl_cgc_halt(void);
 FLValue fl_make_error(const char* type, const char* msg);
 FLValue fl_is(FLValue val);

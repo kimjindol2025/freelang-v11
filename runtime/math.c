@@ -52,17 +52,17 @@ FLValue str_replace(FLValue s, FLValue from, FLValue to) {
     if (flen==0) return s;
     size_t tlen=strlen(t);
     /* global replace: 모든 occurrence 치환 */
-    size_t cap=strlen(src)*2+64; char *buf=(char*)malloc(cap+1);
+    size_t cap=strlen(src)*2+64; char *buf=(char*)fl_malloc(cap+1);
     size_t wi=0; const char *cur=src; const char *pos;
     while ((pos=strstr(cur,f))) {
         size_t plen=(size_t)(pos-cur);
-        if (wi+plen+tlen>cap) { cap=(wi+plen+tlen)*2; buf=(char*)realloc(buf,cap+1); }
+        if (wi+plen+tlen>cap) { cap=(wi+plen+tlen)*2; buf=(char*)fl_realloc(buf,cap+1); }
         memcpy(buf+wi,cur,plen); wi+=plen;
         memcpy(buf+wi,t,tlen); wi+=tlen;
         cur=pos+flen;
     }
     size_t rest=strlen(cur);
-    if (wi+rest>cap) buf=(char*)realloc(buf,wi+rest+1);
+    if (wi+rest>cap) buf=(char*)fl_realloc(buf,wi+rest+1);
     memcpy(buf+wi,cur,rest); buf[wi+rest]='\0';
     FLValue r=fl_str_val(buf); free(buf); return r;
 }
@@ -73,7 +73,7 @@ FLValue split(FLValue s, FLValue sep) {
     size_t dlen=strlen(d); FLValue vec=fl_vec_new();
     const char *p=src, *q;
     while ((q=strstr(p,d))) {
-        size_t n=(size_t)(q-p); char *buf=(char*)malloc(n+1);
+        size_t n=(size_t)(q-p); char *buf=(char*)fl_malloc(n+1);
         memcpy(buf,p,n); buf[n]='\0';
         vec=fl_vec_push(vec,fl_str_val(buf)); free(buf); p=q+dlen;
     }
@@ -89,7 +89,7 @@ static FLValue _fl_template_fill(FLValue tmpl, FLValue env, int use_env) {
     const char* s = ((FLString*)tmpl.obj)->data;
     size_t n = strlen(s);
     size_t cap = n + 1;
-    char* out = (char*)malloc(cap);
+    char* out = (char*)fl_malloc(cap);
     size_t w = 0;
     for (size_t i = 0; i < n; ) {
         if (s[i] == '$' && i + 1 < n && s[i + 1] == '{') {
@@ -115,7 +115,7 @@ static FLValue _fl_template_fill(FLValue tmpl, FLValue env, int use_env) {
                 size_t il = strlen(ins);
                 if (w + il + 1 >= cap) {
                     cap = (w + il + 1) * 2;
-                    out = (char*)realloc(out, cap);
+                    out = (char*)fl_realloc(out, cap);
                 }
                 memcpy(out + w, ins, il);
                 w += il;
@@ -123,7 +123,7 @@ static FLValue _fl_template_fill(FLValue tmpl, FLValue env, int use_env) {
         } else {
             if (w + 2 >= cap) {
                 cap *= 2;
-                out = (char*)realloc(out, cap);
+                out = (char*)fl_realloc(out, cap);
             }
             out[w++] = s[i++];
         }
@@ -150,7 +150,7 @@ FLValue join(FLValue vec, FLValue sep) {
         if (v->data[i].tag==FL_STRING) total+=strlen(((FLString*)v->data[i].obj)->data);
         if (i+1<v->len) total+=dlen;
     }
-    char *buf=(char*)malloc(total+1); buf[0]='\0';
+    char *buf=(char*)fl_malloc(total+1); buf[0]='\0';
     for (uint32_t i=0;i<v->len;i++) {
         if (v->data[i].tag==FL_STRING) strcat(buf,((FLString*)v->data[i].obj)->data);
         if (i+1<v->len) strcat(buf,d);
@@ -194,7 +194,7 @@ FLValue char_from_byte(FLValue byte) {
         return char_byte_error("BYTE_RANGE", "expected integer byte in range 0..255");
     if (n == 0)
         return char_byte_error("UNSUPPORTED_NUL", "runtime strings truncate at NUL");
-    FLString* obj = malloc(sizeof(FLString) + 2);
+    FLString* obj = fl_malloc(sizeof(FLString) + 2);
     obj->base.type = FL_STRING;
     obj->base.rc = 1;
     obj->len = 1;
@@ -226,7 +226,7 @@ FLValue substring(FLValue s, FLValue start, FLValue end) {
     if (a<0) a=0;
     if (b>len) b=len;
     if (a>b) a=b;
-    size_t n=(size_t)(b-a); char *buf=(char*)malloc(n+1);
+    size_t n=(size_t)(b-a); char *buf=(char*)fl_malloc(n+1);
     memcpy(buf,p+a,n); buf[n]='\0';
     FLValue r=fl_str_val(buf); free(buf); return r;
 }
@@ -236,7 +236,7 @@ FLValue trim(FLValue s) {
     while (*p==' '||*p=='\t'||*p=='\n'||*p=='\r') p++;
     size_t len=strlen(p);
     while (len>0&&(p[len-1]==' '||p[len-1]=='\t'||p[len-1]=='\n'||p[len-1]=='\r')) len--;
-    char *buf=(char*)malloc(len+1); memcpy(buf,p,len); buf[len]='\0';
+    char *buf=(char*)fl_malloc(len+1); memcpy(buf,p,len); buf[len]='\0';
     FLValue r=fl_str_val(buf); free(buf); return r;
 }
 
@@ -477,7 +477,7 @@ FLValue str_lower(FLValue s) {
     const char* p = "";
     if (s.tag == FL_STRING && s.obj) p = ((FLString*)s.obj)->data;
     size_t n = strlen(p);
-    char* buf = malloc(n + 1);
+    char* buf = fl_malloc(n + 1);
     for (size_t i = 0; i < n; i++) buf[i] = (char)tolower((unsigned char)p[i]);
     buf[n] = 0;
     FLValue r = fl_str_val(buf);
@@ -489,7 +489,7 @@ FLValue str_to_upper(FLValue s) {
     const char* p = "";
     if (s.tag == FL_STRING && s.obj) p = ((FLString*)s.obj)->data;
     size_t n = strlen(p);
-    char* buf = malloc(n + 1);
+    char* buf = fl_malloc(n + 1);
     for (size_t i = 0; i < n; i++) buf[i] = (char)toupper((unsigned char)p[i]);
     buf[n] = 0;
     FLValue r = fl_str_val(buf);
@@ -530,7 +530,7 @@ FLValue sort(FLValue vec) {
     if (vec.tag != FL_VECTOR) return fl_vec_new();
     FLVector* src = (FLVector*)vec.obj;
     if (src->len == 0) return fl_vec_new();
-    FLValue* items = malloc(sizeof(FLValue) * src->len);
+    FLValue* items = fl_malloc(sizeof(FLValue) * src->len);
     memcpy(items, src->data, sizeof(FLValue) * src->len);
     qsort(items, src->len, sizeof(FLValue), fl_sort_cmp);
     FLValue out = fl_vec_from(items, src->len);
@@ -551,7 +551,7 @@ FLValue fl_html_escape(FLValue value) {
     const char *src = value.tag == FL_STRING && value.obj ? ((FLString*)value.obj)->data :
         value.tag == FL_NIL ? "" : fl_to_str(value, value_buf, sizeof value_buf);
     size_t cap = strlen(src) * 6 + 1, used = 0;
-    char *out = malloc(cap);
+    char *out = fl_malloc(cap);
     if (!out) return fl_str_val("");
     for (const char *p = src; *p; p++) {
         const char *rep = NULL;
@@ -578,7 +578,7 @@ static FLValue fl_pad(FLValue value, FLValue width, FLValue pad, int left) {
     int64_t target = width.tag == FL_FLOAT ? (int64_t)width.f : width.tag == FL_INT ? width.i : 0;
     if (target <= 0 || (uint64_t)target <= len || fill_len == 0) return fl_str_val(src);
     size_t total = (size_t)target, missing = total - len;
-    char *out = malloc(total + 1);
+    char *out = fl_malloc(total + 1);
     if (!out) return fl_str_val(src);
     size_t off = left ? missing : 0;
     memcpy(out + off, src, len);
@@ -595,7 +595,7 @@ FLValue fl_str_repeat(FLValue value, FLValue count) {
     const char *src = ((FLString*)value.obj)->data; size_t len = strlen(src);
     if (n <= 0 || len == 0) return fl_str_val("");
     if ((uint64_t)n > (SIZE_MAX - 1) / (len ? len : 1)) return fl_str_val("");
-    size_t total = len * (size_t)n; char *out = malloc(total + 1);
+    size_t total = len * (size_t)n; char *out = fl_malloc(total + 1);
     if (!out) return fl_str_val("");
     for (int64_t i = 0; i < n; i++) memcpy(out + (size_t)i * len, src, len);
     out[total] = '\0'; FLValue result = fl_str_val(out); free(out); return result;
@@ -660,7 +660,7 @@ FLValue fl_repeat(FLValue count, FLValue value) {
     if (count.tag == FL_STRING && (value.tag == FL_INT || value.tag == FL_FLOAT)) return fl_str_repeat(count, value);
     int64_t n = count.tag == FL_FLOAT ? (int64_t)count.f : count.tag == FL_INT ? count.i : 0;
     if (n <= 0 || (uint64_t)n > UINT32_MAX || (uint64_t)n > SIZE_MAX / sizeof(FLValue)) return fl_vec_new();
-    FLValue *items = malloc(sizeof(FLValue) * (size_t)n);
+    FLValue *items = fl_malloc(sizeof(FLValue) * (size_t)n);
     if (!items) return fl_vec_new();
     for (int64_t i = 0; i < n; i++) items[i] = value;
     FLValue out = fl_vec_from(items, (uint32_t)n); free(items); return out;

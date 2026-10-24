@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 static const char *db_string(FLValue value, const char *operation) {
     if (value.tag != FL_STRING || !value.obj) {
@@ -164,7 +165,7 @@ static FLValue db_column(sqlite3_stmt *statement, int column) {
 FLValue fl_db_open(FLValue path_value) {
     const char *path = db_string(path_value, "db-open");
     sqlite3 *db = db_open_path(path);
-    FLDbEntry *entry = calloc(1, sizeof(*entry));
+    FLDbEntry *entry = fl_calloc(1, sizeof(*entry));
     if (!entry || !(entry->path = strdup(path))) {
         free(entry);
         sqlite3_close(db);
@@ -221,8 +222,10 @@ FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params) {
     sqlite3 *db = lease.handle;
     sqlite3_stmt *statement = db_prepare(db, sql, params, "db-exec");
     int changed_before = sqlite3_total_changes(db);
+    void (*previous_xfsz)(int) = signal(SIGXFSZ, SIG_IGN);
     int code = sqlite3_step(statement);
     sqlite3_finalize(statement);
+    if (previous_xfsz != SIG_ERR) (void)signal(SIGXFSZ, previous_xfsz);
     int changed = sqlite3_total_changes(db) - changed_before;
     if (code != SQLITE_DONE) db_error(db, "db-exec", code);
     if (lease.owned) sqlite3_close(db);

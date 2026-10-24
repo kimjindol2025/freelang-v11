@@ -4,6 +4,35 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <unistd.h>
+#include <signal.h>
+
+#undef malloc
+#undef calloc
+#undef realloc
+static void fl_allocation_failure(void) {
+    static const char message[] = "FreeLang runtime: out of memory\n";
+    (void)write(STDERR_FILENO, message, sizeof(message) - 1);
+    _exit(71);
+}
+void *fl_malloc(size_t size) {
+    void *p = malloc(size);
+    if (!p && size) fl_allocation_failure();
+    return p;
+}
+void *fl_calloc(size_t count, size_t size) {
+    void *p = calloc(count, size);
+    if (!p && count && size) fl_allocation_failure();
+    return p;
+}
+void *fl_realloc(void *ptr, size_t size) {
+    void *p = realloc(ptr, size);
+    if (!p && size) fl_allocation_failure();
+    return p;
+}
+#define malloc(size) fl_malloc(size)
+#define calloc(count, size) fl_calloc((count), (size))
+#define realloc(ptr, size) fl_realloc((ptr), (size))
 
 /* ── Error Handling Global State ── */
 FLTryFrame fl_try_stack[FL_TRY_MAX];
@@ -411,7 +440,16 @@ FLValue fl_file_write(FLValue path, FLValue content) {
         fl_throw(fl_str_val("file-write-failed"));
         return fl_nil();
     }
-    fwrite(s, 1, strlen(s), f);
-    fclose(f);
+    struct sigaction ignore, previous;
+    memset(&ignore, 0, sizeof(ignore));
+    ignore.sa_handler = SIG_IGN;
+    sigemptyset(&ignore.sa_mask);
+    int restore_signal = sigaction(SIGXFSZ, &ignore, &previous) == 0;
+    size_t length = strlen(s);
+    size_t written = fwrite(s, 1, length, f);
+    int failed = written != length || ferror(f);
+    if (fclose(f) != 0) failed = 1;
+    if (restore_signal) (void)sigaction(SIGXFSZ, &previous, NULL);
+    if (failed) fl_throw(fl_str_val("file-write-failed"));
     return fl_bool(true);
 }
