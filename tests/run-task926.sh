@@ -9,7 +9,11 @@ sources=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c d
 link_sources=(); for name in "${sources[@]}"; do link_sources+=("$RUNTIME/$name"); done
 for name in net-server net-client; do
   "$COMPILER" "$ROOT/tests/task926/$name.fl" "$WORK/$name.c" >"$WORK/$name.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  if test "$name" = net-server; then
+    gcc -w -DFL_HTTP_CAPTURE_RAW_TEST -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  else
+    gcc -w -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  fi
 done
 "$WORK/net-server" >"$WORK/server.log" 2>"$WORK/server.err" &
 server_pid=$!

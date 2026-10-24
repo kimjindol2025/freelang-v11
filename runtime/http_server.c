@@ -372,13 +372,22 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
     }
     char *header_end = strstr(buffer, "\r\n\r\n");
     if (!header_end) { *out_status = 400; return fl_nil(); }
+    char *raw_header = NULL;
+#ifdef FL_HTTP_CAPTURE_RAW_TEST
+    {
+        raw_header = (char *)malloc(header_length);
+        if (!raw_header) { *out_status = 500; return fl_nil(); }
+        memcpy(raw_header, buffer, header_length);
+    }
+#endif
     *header_end = '\0';
     char *line_end = strstr(buffer, "\r\n");
-    if (!line_end) { *out_status = 400; return fl_nil(); }
+    if (!line_end) { free(raw_header); *out_status = 400; return fl_nil(); }
     *line_end = '\0';
     char method[16], target[2048], version[16];
     if (sscanf(buffer, "%15s %2047s %15s", method, target, version) != 3 ||
         strncmp(version, "HTTP/1.", 7) != 0) {
+        free(raw_header);
         *out_status = 400;
         return fl_nil();
     }
@@ -401,6 +410,7 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
                 char *end = NULL;
                 unsigned long long parsed = strtoull(value, &end, 10);
                 if (!end || *end || parsed > (unsigned long long)SIZE_MAX) {
+                    free(raw_header);
                     *out_status = 400;
                     return fl_nil();
                 }
@@ -412,21 +422,32 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
         if (!next) break;
         cursor = next + 2;
     }
-    if (has_transfer_encoding) { *out_status = 400; return fl_nil(); }
-    if (body_length > http_body_limit) { *out_status = 413; return fl_nil(); }
+    if (has_transfer_encoding) { free(raw_header); *out_status = 400; return fl_nil(); }
+    if (body_length > http_body_limit) { free(raw_header); *out_status = 413; return fl_nil(); }
 
     size_t body_available = received - header_length;
     size_t body_received = body_available < body_length ? body_available : body_length;
     char *body = malloc(body_length + 1);
-    if (!body) { *out_status = 500; return fl_nil(); }
+    if (!body) { free(raw_header); *out_status = 500; return fl_nil(); }
     if (body_received) memcpy(body, buffer + header_length, body_received);
     while (body_received < body_length) {
         ssize_t n = recv(fd, body + body_received, body_length - body_received, 0);
         if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) { free(body); *out_status = 400; return fl_nil(); }
+        if (n <= 0) { free(raw_header); free(body); *out_status = 400; return fl_nil(); }
         body_received += (size_t)n;
     }
     body[body_length] = '\0';
+
+    FLValue raw_request = fl_nil();
+    if (raw_header) {
+        char *raw = (char *)malloc(header_length + body_length + 1);
+        if (!raw) { free(raw_header); free(body); *out_status = 500; return fl_nil(); }
+        memcpy(raw, raw_header, header_length);
+        memcpy(raw + header_length, body, body_length);
+        raw[header_length + body_length] = '\0';
+        raw_request = fl_str_val(raw);
+        free(raw); free(raw_header);
+    }
 
     char *query = strchr(target, '?');
     const char *query_text = "";
@@ -440,6 +461,8 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
     request = fl_map_set(request, fl_str_val("query"), fl_str_val(query_text));
     request = fl_map_set(request, fl_str_val("headers"), headers);
     request = fl_map_set(request, fl_str_val("body"), fl_str_val(body));
+    if (raw_request.tag != FL_NIL)
+        request = fl_map_set(request, fl_str_val("raw"), raw_request);
     free(body);
     *out_request = request;
     *out_status = 200;

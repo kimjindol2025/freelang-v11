@@ -146,4 +146,6 @@ grep '^PASS ' "$WORK/builtins2.log"
 grep '^PASS ' "$WORK/hof.log" "$WORK"/{str-repeat-0,str-repeat-negative,str-repeat-million,repeat-million}.log
 
 bash "$ROOT/tests/run-task926.sh" "$COMPILER" "$WORK/net2" >"$WORK/net2.log" 2>&1
-grep -E '^(PASS |RAW_POST_BEGIN|RAW_POST_END|RAW_HEADER_BEGIN|RAW_HEADER_END|UUID_COUNT=|UUID_UNIQUE=|UUID_REGEX_MATCH=|UUID_VERSION_4=|UUID_VARIANT_VALID=|NET2_SUMMARY=)' "$WORK/net2.log"
+grep -E '^(PASS |UUID_COUNT=|UUID_UNIQUE=|UUID_REGEX_MATCH=|UUID_VERSION_4=|UUID_VARIANT_VALID=|NET2_SUMMARY=)' "$WORK/net2.log"
+sed -n '/^RAW_POST_BEGIN$/,/^RAW_POST_END$/p' "$WORK/net2.log"
+sed -n '/^RAW_HEADER_BEGIN$/,/^RAW_HEADER_END$/p' "$WORK/net2.log"

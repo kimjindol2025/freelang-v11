@@ -1,16 +1,5 @@
 (defn raw-request [request]
-  (let [[method (get request "method")]
-        [path (get request "path")]
-        [headers (get request "headers")]
-        [body (get request "body")]
-        [probe (get headers "x-probe")]]
-    (fl-resp-html
-      (str method " " path " HTTP/1.0\r\n"
-           "Host: " (get headers "host") "\r\n"
-           "Connection: close\r\n"
-           "Content-Length: " (get headers "content-length") "\r\n"
-           (if probe (str "X-Probe: " probe "\r\n") "")
-           "\r\n" body))))
+  (fl-resp-html (get request "raw")))
 (defn measure-request [request]
   (fl-resp-html
     (str "CL=" (get (get request "headers") "content-length")
