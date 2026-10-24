@@ -1801,13 +1801,30 @@
            "    FLValue " $tmp " = " $val ";\n"
            "    FLValue " $name " = " $tmp ";\n")))))
 
+(defn cgc-loop-bind-names [$vars $i]
+  (if (>= $i (length $vars)) nil
+    (let [[$name (get $vars $i)]]
+      (do
+        (swap! outer-params-atom push $name)
+        (swap! known-fncall-targets-atom push $name)
+        (cgc-loop-bind-names $vars (+ $i 1))))))
+
+(defn cgc-loop-body [$body $vars]
+  (let [[$saved-params @outer-params-atom]
+        [$saved-targets @known-fncall-targets-atom]
+        [$_bind (cgc-loop-bind-names $vars 0)]
+        [$body-c (cgc-with-recur $body $vars)]
+        [$_restore-targets (reset! known-fncall-targets-atom $saved-targets)]
+        [$_restore-params (reset! outer-params-atom $saved-params)]]
+    $body-c))
+
 ;; (loop [...] body) → while 래퍼 생성
 (defn cgc-loop [$args]
   (let [[$items (get-block-items (get $args 0))]
         [$body (get $args 1)]
         [$vars (loop-extract-vars $items 0 [])]
         [$decls (loop-make-decls $items 0 "")]
-        [$body-c (cgc-with-recur $body $vars)]]
+        [$body-c (cgc-loop-body $body $vars)]]
     (str "(__extension__ ({\n"
          $decls
          "    int _fl_looping = 1; FLValue _fl_result = fl_nil();\n"

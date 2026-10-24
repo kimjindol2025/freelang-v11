@@ -578,3 +578,15 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+2026-10-24, TASK 9-19에서 loop 바인딩을 코드 생성기 이름 분석 범위에 포함했다. 이전 고정점 `862c3fdf44016036d57b4e100b67119523211611e2d5717a6eab868279070443`, 새 고정점 `5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32`. 불변 seed는 기존 미정의 이름 오진 594건을 출력하지만, stage2와 stage3 컴파일에서는 경고가 0건이다. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32  stage2.c
+5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32  stage3.c
+5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

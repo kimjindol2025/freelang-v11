@@ -191,13 +191,11 @@
 (defn item-stock [id]
   (get (item-record id) "stock"))
 
-(defn item-rows-html [rows index html]
-  (if (>= index (length rows)) html
-    (let [[row (get rows index)] [id (str (get row "id"))]]
-      (item-rows-html rows (+ index 1)
-        (str html "<tr><td><a href=\"/items/" id "\">" id "</a></td><td>" (escapehtml (get row "name"))
-          "</td><td>" (escapehtml (get row "unit")) "</td><td>" (escapehtml (get row "vendor_name"))
-          "</td><td>" (str (get row "stock")) "</td></tr>\n")))))
+(defn item-row-html [row]
+  (let [[id (str (get row "id"))]]
+    (str "<tr><td><a href=\"/items/" id "\">" id "</a></td><td>" (escapehtml (get row "name"))
+      "</td><td>" (escapehtml (get row "unit")) "</td><td>" (escapehtml (get row "vendor_name"))
+      "</td><td>" (str (get row "stock")) "</td></tr>\n")))
 
 (defn vendor-options [rows index selected html]
   (if (>= index (length rows)) html
@@ -237,7 +235,7 @@
 (defn handle-items [request]
   (server-html (page "품목 목록"
     (str "<form method=\"post\" action=\"/logout\">" (csrf-input (cookie-value request "erp_session")) "<button>로그아웃</button></form><p><a href=\"/items/new\">품목 추가</a></p><table><thead><tr><th>ID</th><th>품목명</th><th>단위</th><th>거래처</th><th>재고</th></tr></thead><tbody>"
-      (item-rows-html (item-list-rows) 0 "") "</tbody></table>"))))
+      (str-join (map item-row-html (item-list-rows)) "") "</tbody></table>"))))
 
 (defn handle-new-item [request]
   (item-form "" "" "" "" (cookie-value request "erp_session")))
