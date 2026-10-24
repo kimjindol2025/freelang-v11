@@ -42,8 +42,8 @@ gcc -Wno-unused -I "$RUNTIME" -o "$WORK/tcp" "$WORK/tcp.c" \
 "$WORK/tcp" >"$WORK/tcp.log" 2>&1
 "$TOOLS/scripts/fl-test" "$TOOLS" >"$WORK/existing41.log" 2>&1
 
-"$TOOLS/scripts/cgc-native" "$TOOLS/native/tester-registry.fl" "$WORK/tester-registry.c" >"$WORK/tester-registry.compile" 2>&1
-gcc -Wno-unused -I "$RUNTIME" -o "$FREELANG_TESTER_REGISTRY" "$WORK/tester-registry.c" \
+"$TOOLS/scripts/cgc-native" "$TOOLS/native/tester-registry.fl" "$WORK/tr.c" >"$WORK/tester-registry.compile" 2>&1
+gcc -Wno-unused -I "$RUNTIME" -o "$FREELANG_TESTER_REGISTRY" "$WORK/tr.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm
 "$TOOLS/scripts/fl-native-tester-audit" --run --output "$WORK/audit-results.json" >"$WORK/audit.log"
