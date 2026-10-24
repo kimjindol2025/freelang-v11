@@ -28,18 +28,33 @@ for mode in vector string json; do
   test "$rc" -eq 71 && grep -Fxq 'FreeLang runtime: out of memory' "$WORK/oom-$mode.err"
 done
 
-"$COMPILER" "$ROOT/tests/task931/parallel.fl" "$WORK/oom-parallel.c" >"$WORK/oom-parallel.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/oom-parallel" "$WORK/oom-parallel.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
+"$COMPILER" "$ROOT/tests/task932/forkfail.fl" "$WORK/forkfail.c" >"$WORK/forkfail.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
+parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
+parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
+parallel_nproc_limit=$((parallel_user_tasks + 8))
+printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
+printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
+printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
 set +e
-(ulimit -u 1; exec "$WORK/oom-parallel") >"$WORK/oom-parallel.out" 2>"$WORK/oom-parallel.err"
+(ulimit -u "$parallel_nproc_limit"; printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u; exec "$WORK/forkfail") >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
 parallel_rc=$?
 set -e
 parallel_signal=0; test "$parallel_rc" -gt 128 && parallel_signal=$((parallel_rc - 128)) || true
 test "$parallel_signal" -eq 11 && segv_count=$((segv_count + 1)) || true
-printf 'CASE=process-limit-run-parallel RC=%s SIGNAL=%s ERROR=%s\n' "$parallel_rc" "$parallel_signal" "$(head -n 1 "$WORK/oom-parallel.err" || true)"
-test "$parallel_rc" -eq 0
-grep -Fxq 'RESULT_COUNT=20' "$WORK/oom-parallel.out"
-grep -Fxq 'PARALLEL_DONE' "$WORK/oom-parallel.out"
+parallel_failed="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/forkfail.out" || true)"
+parallel_succeeded="$(grep -Ec '^SLOT[0-9]+=[0-9]+$' "$WORK/forkfail.out" || true)"
+grep '^PARALLEL_EFFECTIVE_ULIMIT_U=' "$WORK/forkfail.out"
+printf 'CASE=process-limit-run-parallel RC=%s SIGNAL=%s FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK\n' "$parallel_rc" "$parallel_signal" "$parallel_failed" "$parallel_succeeded"
+grep '^SLOT[0-9]*=' "$WORK/forkfail.out"
+test "$parallel_rc" -eq 0 && test "$parallel_signal" -eq 0
+test "$parallel_failed" -gt 0 && test "$parallel_succeeded" -gt 0
+test $((parallel_failed + parallel_succeeded)) -eq 20
+grep -Fxq 'PARALLEL_DONE' "$WORK/forkfail.out"
+parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
+printf 'FORKFAIL_CASE=run-parallel FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$parallel_failed" "$parallel_succeeded" "$parallel_rc" "$parallel_signal" "$parallel_zombie_delta"
+test "$parallel_zombie_delta" -eq 0
 
 "$COMPILER" "$ROOT/tests/task931/disk.fl" "$WORK/oom-disk.c" >"$WORK/oom-disk.compile" 2>&1
 gcc -w -I "$RUNTIME" -o "$WORK/oom-disk" "$WORK/oom-disk.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
@@ -84,7 +99,7 @@ gcc -w -I "$RUNTIME" -o "$WORK/oom-server" "$WORK/oom-server.c" "${LINK[@]}" -ls
 start_server() {
   local work="$1" limit="$2" max="$3" fd_limit="$4"
   mkdir -p "$work"
-  (if test -n "$limit"; then ulimit -u "$limit"; fi; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max"; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
+  (if test -n "$limit"; then ulimit -u "$limit"; printf 'HTTP_EFFECTIVE_ULIMIT_U='; ulimit -u; fi; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max"; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
   SERVER_PID=$!
   for _ in $(seq 1 100); do
     if grep -q '^HTTP_LISTENING=' "$work/server.log"; then break; fi
@@ -94,7 +109,11 @@ start_server() {
   test -n "$SERVER_PORT"
 }
 
+http_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
+printf 'HTTP_USER_PROCESS_COUNT=%s\n' "$http_user_processes"
+printf 'HTTP_ULIMIT_U=1\n'
 start_server "$WORK/oom-nproc" 1 30 32
+grep '^HTTP_EFFECTIVE_ULIMIT_U=' "$WORK/oom-nproc/server.log"
 mkdir -p "$WORK/oom-nproc/codes"
 CURL_PIDS=()
 for i in $(seq 1 30); do
@@ -111,6 +130,10 @@ server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-nproc/server.log" || true
 test -n "$server_error" || server_error=none
 printf 'CASE=http-process-limit-30-requests SERVER_RC=%s SIGNAL=%s ERROR=%s RESPONSES=%s/30 HTTP_503=%s\n' "$server_rc" "$server_signal" "$server_error" "$nproc_total" "$nproc_503"
 test "$nproc_total" -eq 30 && test "$nproc_503" -gt 0
+parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
+printf 'FORKFAIL_CASE=http-process-limit FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=HTTP_503 RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$nproc_503" "$((nproc_total - nproc_503))" "$server_rc" "$server_signal" "$parallel_zombie_delta"
+test "$parallel_zombie_delta" -eq 0
 
 start_server "$WORK/oom-nofile" 64 30 5
 mkdir -p "$WORK/oom-nofile/codes"
@@ -139,13 +162,34 @@ server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-recovery/server.log" || t
 test -n "$server_error" || server_error=none
 printf 'CASE=http-recovery SERVER_RC=%s SIGNAL=%s ERROR=%s HTTP_STATUS=%s\n' "$server_rc" "$server_signal" "$server_error" "$recovery_code"
 test "$recovery_code" = 200
+parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
+printf 'FORKFAIL_CASE=http-recovery FAILED_SLOTS=0 SUCCESSFUL_SLOTS=1 ERROR=none RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$server_rc" "$server_signal" "$parallel_zombie_delta"
+test "$parallel_zombie_delta" -eq 0
 
 zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+zombie_delta=$((zombies - baseline_zombies))
+test_zombies="$(ps -eo ppid=,stat= | awk -v p="$$" '$1 == p && $2 ~ /^Z/ {n++} END {print n+0}')"
 printf 'SEGV_COUNT=%s\n' "$segv_count"
 printf 'ZOMBIE_COUNT=%s\n' "$zombies"
-printf 'ZOMBIE_BASELINE=%s ZOMBIE_DELTA=%s\n' "$baseline_zombies" "$((zombies - baseline_zombies))"
+printf 'ZOMBIE_BASELINE=%s ZOMBIE_DELTA=%s\n' "$baseline_zombies" "$zombie_delta"
+printf 'TEST_PARENT_ZOMBIE_COUNT=%s\n' "$test_zombies"
 printf 'ZOMBIE_PS_RAW_BEGIN\n'; ps -eo pid,ppid,stat,comm | awk 'NR==1 || $3 ~ /^Z/'; printf 'ZOMBIE_PS_RAW_END\n'
 passed=11
-test "$zombies" -eq 0 && passed=12 || true
-test "$segv_count" -eq 0 && test "$zombies" -eq "$baseline_zombies"
+test "$zombie_delta" -eq 0 && test "$test_zombies" -eq 0 && passed=12 || true
+test "$segv_count" -eq 0 && test "$zombie_delta" -eq 0 && test "$test_zombies" -eq 0
 printf 'OOM_SUMMARY=%s/12\n' "$passed"
+
+# Global zombies may predate this test; compare the baseline and count only zombies parented by this test.
+forkfail_passed=0
+test "$parallel_user_processes" -gt 0 && forkfail_passed=$((forkfail_passed + 1))
+test "$parallel_nproc_limit" -gt "$parallel_user_tasks" && forkfail_passed=$((forkfail_passed + 1))
+test "$parallel_failed" -gt 0 && forkfail_passed=$((forkfail_passed + 1))
+test "$parallel_succeeded" -gt 0 && forkfail_passed=$((forkfail_passed + 1))
+test $((parallel_failed + parallel_succeeded)) -eq 20 && forkfail_passed=$((forkfail_passed + 1))
+test "$parallel_rc" -eq 0 && test "$parallel_signal" -eq 0 && forkfail_passed=$((forkfail_passed + 1))
+test "$nproc_total" -eq 30 && test "$nproc_503" -gt 0 && forkfail_passed=$((forkfail_passed + 1))
+test "$recovery_code" = 200 && forkfail_passed=$((forkfail_passed + 1))
+test "$zombie_delta" -eq 0 && test "$test_zombies" -eq 0 && forkfail_passed=$((forkfail_passed + 1))
+printf 'FORKFAIL_SUMMARY=%s/9\n' "$forkfail_passed"
+test "$forkfail_passed" -eq 9
