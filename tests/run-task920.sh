@@ -62,7 +62,7 @@ gcc -w -Dauth_random_token=fl_auth_random_token -Dauth_pbkdf2=fl_auth_pbkdf2 -Da
 for spec in 'erp test.fl' 'erp2 test2.fl' 'erp3 test3.fl' 'conc test-concurrency.fl' 'auth test-auth.fl'; do
   read -r label source <<<"$spec"
   "$COMPILER" "$ROOT/examples/erp-vendors/$source" "$WORK/$label.c" >"$WORK/$label.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$WORK/$label" "$WORK/$label.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  gcc -w -Dtcp_bind=fl_tcp_bind -Dtcp_listen=fl_tcp_listen -Dtcp_close=fl_tcp_close -Dtcp_local_port=fl_tcp_local_port -I "$RUNTIME" -o "$WORK/$label" "$WORK/$label.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
   mkdir -p "$WORK/$label-run"
   "$WORK/$label" "$WORK/$label-run" "$WORK/app" "$WORK/create-user" >"$WORK/$label.log" 2>&1
 done
