@@ -135,7 +135,7 @@ static void json_stringify_buf(FLValue v, char* buf, size_t sz, size_t* pos) {
     if (v.tag == FL_NIL)    { JCAT("null"); return; }
     if (v.tag == FL_BOOL)   { JCAT("%s", v.b ? "true" : "false"); return; }
     if (v.tag == FL_INT)    { JCAT("%lld", (long long)v.i); return; }
-    if (v.tag == FL_FLOAT)  { JCAT("%g", v.f); return; }
+    if (v.tag == FL_FLOAT)  { JCAT("%.17g", v.f); return; }
     if (v.tag == FL_STRING) {
         FLString* s = (FLString*)v.obj;
         JCAT("\"");

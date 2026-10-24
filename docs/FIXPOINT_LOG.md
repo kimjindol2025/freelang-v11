@@ -659,4 +659,16 @@ NATIVE_FIXED_POINT=PASS
 CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
+
+2026-10-25, TASK 9-28에서 JWT 네이티브 이름을 단일 `c-runtime-name` 매핑에 연결하고 OpenSSL HMAC-SHA256과 strict base64url 검증으로 HS256 sign/verify/decode/expired를 구현했다. `auth-jwt-decode`는 미검증 claims만 반환하며 인증 판단에 쓰지 말라는 경고를 헤더와 문서에 추가했다. JWT 시험에서 숫자 claim 정밀도 손실을 발견해 JSON float 직렬화를 왕복 가능한 17자리 정밀도로 고쳤다. 이전 고정점 `1fbbb7f87643e5e7daef08ade746bcd1a97cb28a9a9f2dbc9ad480f436833257`, 새 고정점 `1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03  stage2.c
+1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03  stage3.c
+1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
 ```

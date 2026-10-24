@@ -709,6 +709,10 @@
     [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
     [(= $op "auth-hash-password") "fl_auth_hash_password"]
     [(= $op "auth-verify-password") "fl_auth_verify_password"]
+    [(= $op "auth-jwt-sign") "fl_jwt_sign"]
+    [(= $op "auth-jwt-verify") "fl_jwt_verify"]
+    [(= $op "auth-jwt-decode") "fl_jwt_decode"]
+    [(= $op "auth-jwt-expired") "fl_jwt_expired"]
     [(= $op "http-get-headers") "fl_http_get_headers"]
     [(= $op "http-post") "fl_http_post"]
     [(= $op "http-post-headers") "fl_http_post_headers"]
@@ -760,6 +764,9 @@
       [(= $op "auth-pbkdf2")
         (str $name "(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", "
           (if (= (length $args) 2) "fl_int(100000)" (cgc (get $args 2))) ")")]
+      [(= $op "auth-jwt-sign")
+        (str $name "(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", "
+          (if (= (length $args) 2) "fl_int(3600)" (cgc (get $args 2))) ")")]
       [(= $op "get-in")
         (str $name "(" (cgc-args $args) (if (= (length $args) 2) ", fl_nil()" "") ")")]
       [true (str $name "(" (cgc-args $args) ")")])))
@@ -1218,11 +1225,7 @@
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
-  ;; N-09: 암호화 / JWT / 비밀번호
-  [(= $op "auth-jwt-sign")       (str "fl_jwt_sign(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "auth-jwt-verify")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "auth-jwt-expired")    (str "fl_jwt_expired(" (cgc (get $args 0)) ")")]
-  [(= $op "auth-jwt-decode")     (str "fl_jwt_verify(" (cgc (get $args 0)) ", fl_str_val(\"\"))")]
+  ;; N-09: 암호화 / 비밀번호
   [true             (cgc-dispatch-fallback $op $args)])))))
 
 (defn cgc-swap! [$args]

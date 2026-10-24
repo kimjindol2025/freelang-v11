@@ -112,7 +112,7 @@ grep -Fx '&lt;script&gt;&quot;&#x27;&amp;' "$WORK/builtins2.log"
 if "$COMPILER" "$ROOT/tests/task924/held-auth.fl" "$WORK/held-auth.c" >"$WORK/held-auth.log" 2>&1; then
   echo 'held builtin unexpectedly compiled' >&2; exit 1
 fi
-grep -E '^\[FL Error\] 아직 네이티브로 구현되지 않은 내장 함수: auth-jwt-sign \(line [0-9]+\)$' "$WORK/held-auth.log"
+  grep -E '^\[FL Error\] 아직 네이티브로 구현되지 않은 내장 함수: http-post-stream \(line [0-9]+\)$' "$WORK/held-auth.log"
 BUILTIN2_COUNT=$((BUILTIN2_COUNT + 2))
 printf 'BUILTIN2_SUMMARY=%s/16\n' "$BUILTIN2_COUNT"
 
@@ -161,3 +161,10 @@ gcc -w -I "$RUNTIME" -o "$WORK/hash-once" "$WORK/hash-once.c" "${link_sources[@]
 /usr/bin/time -f '%e' -o "$WORK/hash-once.seconds" "$WORK/hash-once" >"$WORK/hash-once.log" 2>&1
 awk '{printf "PW_HASH_ONCE_MS=%.0f\n", $1 * 1000}' "$WORK/hash-once.seconds"
 grep '^PASS password hash timing$' "$WORK/hash-once.log"
+
+"$COMPILER" "$ROOT/tests/task928/jwt.fl" "$WORK/jwt.c" >"$WORK/jwt.compile" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/jwt" "$WORK/jwt.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/jwt" >"$WORK/jwt.log" 2>&1
+grep -E '^(PASS |JWT_SUMMARY=)' "$WORK/jwt.log"
+gcc -w -I "$RUNTIME" -o "$WORK/rfc7515-vector" "$ROOT/tests/task928/rfc7515-vector.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+"$WORK/rfc7515-vector"

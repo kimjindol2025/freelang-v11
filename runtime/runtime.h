@@ -147,6 +147,11 @@ FLValue fl_auth_pbkdf2(FLValue password, FLValue salt, FLValue iterations);
 FLValue fl_auth_constant_time_equal(FLValue left, FLValue right);
 FLValue fl_auth_hash_password(FLValue password);
 FLValue fl_auth_verify_password(FLValue password, FLValue encoded_hash);
+FLValue fl_jwt_sign(FLValue payload, FLValue secret, FLValue expiry_seconds);
+FLValue fl_jwt_verify(FLValue token, FLValue secret);
+/* Unverified payload only; never use for authentication decisions. */
+FLValue fl_jwt_decode(FLValue token);
+FLValue fl_jwt_expired(FLValue token);
 FLValue server_put(FLValue path, FLValue handler);
 FLValue server_delete(FLValue path, FLValue handler);
 FLValue server_workers(FLValue count);

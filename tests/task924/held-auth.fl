@@ -1,1 +1,1 @@
-(auth-jwt-sign "example")
+(http-post-stream "http://127.0.0.1:1" {})
