@@ -8,7 +8,7 @@ WORK="${2:?usage: run-task920.sh <stage2-compiler> <work-dir>}"
 RUNTIME="$ROOT/runtime"
 mkdir -p "$WORK"
 export FL_TOOLS_DISPATCH_ROOT="$TOOLS" FREELANG_V11_RUNTIME="$RUNTIME" FL_TEST_CONTINUE=1
-export FREELANG_TESTER_REGISTRY="$TOOLS/scripts/tester-registry-native"
+export FREELANG_TESTER_REGISTRY="$WORK/tester-registry-native"
 
 for name in time str-regex fs test-evidence; do
   "$TOOLS/scripts/cgc-native" "$ROOT/tests/lib-contract/run-$name.fl" "$WORK/$name.c" >"$WORK/$name.compile" 2>&1
@@ -42,6 +42,10 @@ gcc -Wno-unused -I "$RUNTIME" -o "$WORK/tcp" "$WORK/tcp.c" \
 "$WORK/tcp" >"$WORK/tcp.log" 2>&1
 "$TOOLS/scripts/fl-test" "$TOOLS" >"$WORK/existing41.log" 2>&1
 
+"$TOOLS/scripts/cgc-native" "$TOOLS/native/tester-registry.fl" "$WORK/tester-registry.c" >"$WORK/tester-registry.compile" 2>&1
+gcc -Wno-unused -I "$RUNTIME" -o "$FREELANG_TESTER_REGISTRY" "$WORK/tester-registry.c" \
+  "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
+  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm
 "$TOOLS/scripts/fl-native-tester-audit" --run --output "$WORK/audit-results.json" >"$WORK/audit.log"
 bash "$ROOT/tests/run-cgc-symbol-contract.sh" >"$WORK/symbol.log" 2>&1
 
