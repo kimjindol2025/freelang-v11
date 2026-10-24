@@ -145,5 +145,7 @@ printf 'SEGV_COUNT=%s\n' "$segv_count"
 printf 'ZOMBIE_COUNT=%s\n' "$zombies"
 printf 'ZOMBIE_BASELINE=%s ZOMBIE_DELTA=%s\n' "$baseline_zombies" "$((zombies - baseline_zombies))"
 printf 'ZOMBIE_PS_RAW_BEGIN\n'; ps -eo pid,ppid,stat,comm | awk 'NR==1 || $3 ~ /^Z/'; printf 'ZOMBIE_PS_RAW_END\n'
+passed=11
+test "$zombies" -eq 0 && passed=12 || true
 test "$segv_count" -eq 0 && test "$zombies" -eq "$baseline_zombies"
-printf 'OOM_SUMMARY=12/12\n'
+printf 'OOM_SUMMARY=%s/12\n' "$passed"
