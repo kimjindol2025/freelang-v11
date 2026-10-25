@@ -52,13 +52,16 @@ worker() {
 
 server_metrics() {
   local elapsed="$1" rss fd threads zombies errors p50 p99
-  local pid
+  local pid value
   rss=0; fd=0; threads=0
   for pid in "$SERVER_PID" $( (ps -o pid= --ppid "$SERVER_PID" 2>/dev/null || true) | awk '{$1=$1; print}') ; do
-    test -r "/proc/$pid/statm" || continue
-    rss=$((rss + $(awk '{print int($2*4)}' "/proc/$pid/statm")))
-    fd=$((fd + $(find "/proc/$pid/fd" -mindepth 1 -maxdepth 1 -type l 2>/dev/null | wc -l)))
-    threads=$((threads + $(find "/proc/$pid/task" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)))
+    value="$(awk '{print int($2*4)}' "/proc/$pid/statm" 2>/dev/null || true)"
+    [[ "$value" =~ ^[0-9]+$ ]] || continue
+    rss=$((rss + value))
+    value="$(find "/proc/$pid/fd" -mindepth 1 -maxdepth 1 -type l 2>/dev/null | wc -l || true)"
+    fd=$((fd + ${value:-0}))
+    value="$(find "/proc/$pid/task" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l || true)"
+    threads=$((threads + ${value:-0}))
   done
   zombies="$( (ps -o stat= --ppid "$SERVER_PID" 2>/dev/null || true) | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
   errors=0
