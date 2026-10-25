@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <time.h>
@@ -74,6 +75,27 @@ static int send_all(int fd, const char *data, size_t length) {
         sent += (size_t)n;
     }
     return 1;
+}
+
+static int response_body_complete(const char *response, size_t used) {
+    const char *separator = strstr(response, "\r\n\r\n");
+    if (!separator) return 0;
+    const char *line = strstr(response, "\r\n") + 2;
+    while (line < separator) {
+        const char *end = strstr(line, "\r\n");
+        if (!end || end > separator) return 0;
+        if (strncasecmp(line, "Content-Length:", 15) == 0) {
+            const char *value = line + 15;
+            while (value < end && (*value == ' ' || *value == '\t')) value++;
+            char *parsed_end = NULL;
+            unsigned long long body_length = strtoull(value, &parsed_end, 10);
+            if (parsed_end == value || parsed_end > end) return 0;
+            size_t body_offset = (size_t)(separator - response) + 4;
+            return body_offset <= used && body_length <= used - body_offset;
+        }
+        line = end + 2;
+    }
+    return 0;
 }
 
 static int connect_with_timeout(int fd, const struct sockaddr *address, socklen_t length) {
@@ -168,7 +190,7 @@ static void do_request(Worker *worker, unsigned route, uint64_t sequence) {
         if (!status && sscanf(response, "HTTP/1.%*d %d", &status) != 1) status = 0;
     }
     close(fd);
-    if (!eof) io_error = 1;
+    if (!eof) io_error = !response_body_complete(response, used);
     if (status == 503 && !strstr(response, "Retry-After: 1")) worker->retry_after_missing++;
 
 done:
