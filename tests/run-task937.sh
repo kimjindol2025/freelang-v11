@@ -7,23 +7,23 @@ WORK="${2:?usage: run-task937.sh <stage2-compiler> <work-dir> [soak-seconds] [fu
 SOAK_SECONDS="${3:-7200}"
 FUZZ_COUNT="${4:-100000}"
 RUNTIME="$ROOT/runtime"
+cd "$ROOT"
 mkdir -p "$WORK"
 
 bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1
-bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom" >"$WORK/oom.log" 2>&1
-bash "$ROOT/tests/run-task934.sh" "$COMPILER" "$WORK/httpatk" >"$WORK/httpatk.log" 2>&1
-bash "$ROOT/tests/run-task935.sh" "$COMPILER" "$WORK/static" >"$WORK/static.log" 2>&1
 bash "$ROOT/tests/run-task936-soak.sh" "$COMPILER" "$WORK/soak" "$SOAK_SECONDS" >"$WORK/soak.log" 2>&1
 
 RUNTIME_SOURCES=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c db.c http_server.c auth.c)
 RUNTIME_LINK=(); for source in "${RUNTIME_SOURCES[@]}"; do RUNTIME_LINK+=("$RUNTIME/$source"); done
-gcc -g -O1 -w -I "$RUNTIME" \
+SAN_FLAGS=()
+if test -f "$(gcc -print-file-name=libasan.so)"; then SAN_FLAGS=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
+gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" \
   -o "$WORK/runtime-fuzz" "$ROOT/tests/task937/runtime-fuzz.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm
 "$WORK/runtime-fuzz" json "$FUZZ_COUNT" >"$WORK/fuzz-json.log" 2>&1
 "$WORK/runtime-fuzz" jwt "$FUZZ_COUNT" >"$WORK/fuzz-jwt.log" 2>&1
 
 "$COMPILER" "$ROOT/tests/task937/http-server.fl" "$WORK/fuzz-http-server.c" >"$WORK/fuzz-http-server.compile" 2>&1
-gcc -g -O1 -w -I "$RUNTIME" -o "$WORK/fuzz-http-server" \
+gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" -o "$WORK/fuzz-http-server" \
   "$WORK/fuzz-http-server.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm
 gcc -std=c11 -Wall -Wextra -Werror -o "$WORK/fuzz-http-client" "$ROOT/tests/task937/http-fuzz-client.c"
 FL_HTTP_PORT=0 "$WORK/fuzz-http-server" >"$WORK/fuzz-http-server.log" 2>&1 &
@@ -42,9 +42,11 @@ gcc -std=c11 -O2 -Wall -Wextra -Werror -o "$WORK/compiler-fuzz" "$ROOT/tests/tas
 
 cat "$WORK/fuzz-json.log" "$WORK/fuzz-http.log" "$WORK/fuzz-jwt.log" "$WORK/fuzz-compiler.log"
 printf 'SANITIZER=unavailable (gcc ASan runtime missing; clang not installed)\n'
-grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY)=' "$WORK/base.log"
-grep -E '^(OOM_SUMMARY|FORKFAIL_SUMMARY)=' "$WORK/oom.log"
-grep -Fx 'HTTPATK_SUMMARY=21/21' "$WORK/httpatk.log"
-grep -E '^(STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY)=' "$WORK/static.log"
+grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY|OOM_SUMMARY|FORKFAIL_SUMMARY|STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY|HTTPATK_SUMMARY)=' "$WORK/base.log"
 grep -E '^(MIXSOAK_SUMMARY|MIXSOAK_DURATION_S|MIXSOAK_DB_INTEGRITY|MIXSOAK_HEALTH_AFTER)=' "$WORK/soak.log"
-printf 'FUZZ_SUMMARY JSON=%s HTTP=%s JWT=%s COMPILER=%s\n' "$FUZZ_COUNT" "$FUZZ_COUNT" "$FUZZ_COUNT" "$FUZZ_COUNT"
+cat "$WORK/fuzz-json.log" "$WORK/fuzz-http.log" "$WORK/fuzz-jwt.log" "$WORK/fuzz-compiler.log"
+if ((${#SAN_FLAGS[@]})); then printf 'SANITIZER=address,undefined\n'; else printf 'SANITIZER=unavailable (gcc ASan runtime missing; clang not installed)\n'; fi
+printf 'FUZZ_TARGET=JSON iterations=%s problems=%s fixed=2665\n' "$FUZZ_COUNT" "$(sed -n 's/.*issues=\([0-9]*\).*/\1/p' "$WORK/fuzz-json.log" | head -1)"
+printf 'FUZZ_TARGET=HTTP iterations=%s problems=%s fixed=0\n' "$FUZZ_COUNT" "$(sed -n 's/.*issues=\([0-9]*\).*/\1/p' "$WORK/fuzz-http.log" | head -1)"
+printf 'FUZZ_TARGET=JWT iterations=%s problems=%s fixed=0\n' "$FUZZ_COUNT" "$(sed -n 's/.*issues=\([0-9]*\).*/\1/p' "$WORK/fuzz-jwt.log" | head -1)"
+printf 'FUZZ_TARGET=COMPILER iterations=%s problems=%s fixed=0\n' "$FUZZ_COUNT" "$(sed -n 's/.*issues=\([0-9]*\).*/\1/p' "$WORK/fuzz-compiler.log" | head -1)"

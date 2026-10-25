@@ -2,6 +2,7 @@
 #include "runtime.h"
 #include <setjmp.h>
 #include <stdint.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,10 +44,20 @@ static int run_json(unsigned count) {
             buf[n - 1] = ',';
             buf[n] = 0;
         }
+        FLString *raw = malloc(sizeof(*raw) + n + 1);
+        if (!raw) return 2;
+        raw->base.type = FL_STRING; raw->base.rc = 1; raw->len = (uint32_t)n;
+        memcpy(raw->data, buf, n + 1);
         FLValue out;
-        int threw = caught(fl_json_parse, fl_str_val(buf), &out);
+        int threw = caught(fl_json_parse, (FLValue){.tag=FL_STRING,.obj=(FLObject *)raw}, &out);
         int expected_invalid = i < 13 || i >= 15;
-        if (expected_invalid && !threw) issues++;
+        if (expected_invalid && !threw) {
+            if (issues < 16) {
+                char path[96]; snprintf(path, sizeof(path), "tests/fuzz-crashers/json-%04u.bin", i);
+                FILE *f = fopen(path, "wb"); if (f) { fwrite(buf, 1, n, f); fclose(f); }
+            }
+            issues++;
+        }
     }
     pid_t child = fork();
     if (child == 0) {
@@ -57,11 +68,49 @@ static int run_json(unsigned count) {
         memset(deep + depth + 4, ']', depth); deep[cap - 1] = 0;
         FLValue result;
         int rejected = caught(fl_json_parse, fl_str_val(deep), &result);
+        if (!rejected) {
+            FILE *f = fopen("tests/fuzz-crashers/json-depth-10000.json", "wb");
+            if (f) { fwrite(deep, 1, cap - 1, f); fclose(f); }
+        }
         _exit(rejected ? 0 : 3);
     }
     int status = 0;
     if (child < 0 || waitpid(child, &status, 0) != child || !WIFEXITED(status) || WEXITSTATUS(status) != 0) issues++;
     printf("JSON_FUZZ iterations=%u issues=%u seed=0x937a51e1 deep_depth=10000\n", count, issues);
+    DIR *dir = opendir("tests/fuzz-crashers");
+    unsigned regressions = 0, regression_issues = 0;
+    if (!dir) return 2;
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strncmp(entry->d_name, "json-", 5) != 0) continue;
+        char path[256]; snprintf(path, sizeof(path), "tests/fuzz-crashers/%s", entry->d_name);
+        FILE *f = fopen(path, "rb"); if (!f) { closedir(dir); return 2; }
+        if (fseek(f, 0, SEEK_END) != 0) { fclose(f); closedir(dir); return 2; }
+        long size = ftell(f); rewind(f);
+        if (size < 0 || size > 2 * 1024 * 1024) { fclose(f); closedir(dir); return 2; }
+        FLString *raw = malloc(sizeof(*raw) + (size_t)size + 1);
+        if (!raw) { fclose(f); closedir(dir); return 2; }
+        raw->base.type=FL_STRING; raw->base.rc=1; raw->len=(uint32_t)size;
+        if (fread(raw->data,1,(size_t)size,f)!=(size_t)size) { fclose(f); closedir(dir); return 2; }
+        fclose(f); raw->data[size]=0;
+        FLValue parsed; regression_issues += (unsigned)!caught(fl_json_parse,(FLValue){.tag=FL_STRING,.obj=(FLObject *)raw},&parsed);
+        regressions++;
+    }
+    closedir(dir);
+    printf("JSON_CRASHER_REGRESSION cases=%u issues=%u\n", regressions, regression_issues);
+    issues += regression_issues;
+    unsigned edge_passed = 0;
+    FLValue korean = fl_json_parse(fl_str_val("\"한글\""));
+    if (korean.tag == FL_STRING && ((FLString *)korean.obj)->len == strlen("한글") &&
+        memcmp(((FLString *)korean.obj)->data, "한글", strlen("한글")) == 0) edge_passed++;
+    FLValue nul = fl_json_parse(fl_str_val("\"\\u0000x\""));
+    if (nul.tag == FL_STRING && ((FLString *)nul.obj)->len == 2 &&
+        ((FLString *)nul.obj)->data[0] == 0 && ((FLString *)nul.obj)->data[1] == 'x') edge_passed++;
+    FLValue invalid_utf8;
+    char bad_utf8[] = {'"', (char)0xff, '"', 0};
+    if (caught(fl_json_parse, fl_str_val(bad_utf8), &invalid_utf8)) edge_passed++;
+    printf("JSON_EDGE_REGRESSION=%u/3\n", edge_passed);
+    if (edge_passed != 3) issues++;
     return issues ? 1 : 0;
 }
 
