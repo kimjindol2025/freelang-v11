@@ -37,7 +37,7 @@ static int one(unsigned i, unsigned *issues) {
     }}
     int fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0) { (*issues)++; return 0; }
-    struct timeval tv = {.tv_sec=2}; setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    struct timeval tv = {.tv_sec=1}; setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
     struct sockaddr_in a = {.sin_family=AF_INET, .sin_port=htons((unsigned short)port), .sin_addr.s_addr=htonl(INADDR_LOOPBACK)};
     if (connect(fd, (struct sockaddr *)&a, sizeof(a)) != 0) { close(fd); (*issues)++; return 0; }
     size_t sent = 0;
@@ -49,6 +49,9 @@ static int one(unsigned i, unsigned *issues) {
     }
     shutdown(fd, SHUT_WR);
     char response[256] = {0}; ssize_t got = recv(fd, response, sizeof(response)-1, 0); close(fd);
+    if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        if ((*issues)++ == 0) { FILE *f=fopen("tests/fuzz-crashers/http-first.txt","wb"); if(f){fwrite(req,1,n,f);fclose(f);} }
+    }
     if (got > 0) {
         int status = 0; (void)sscanf(response, "HTTP/1.1 %d", &status);
         if (!(status == 200 || status == 400 || status == 404 || status == 408 || status == 413 || status == 431)) {

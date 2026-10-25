@@ -16,17 +16,21 @@ bash "$ROOT/tests/run-task936-soak.sh" "$COMPILER" "$WORK/soak" "$SOAK_SECONDS" 
 RUNTIME_SOURCES=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c db.c http_server.c auth.c)
 RUNTIME_LINK=(); for source in "${RUNTIME_SOURCES[@]}"; do RUNTIME_LINK+=("$RUNTIME/$source"); done
 SAN_FLAGS=()
-if test -f "$(gcc -print-file-name=libasan.so)"; then SAN_FLAGS=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
+SAN_RUN=()
+if test -f "$(gcc -print-file-name=libasan.so)"; then
+  SAN_FLAGS=(-fsanitize=address,undefined -fno-omit-frame-pointer)
+  SAN_RUN=(env ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1)
+fi
 gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" \
   -o "$WORK/runtime-fuzz" "$ROOT/tests/task937/runtime-fuzz.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm
-"$WORK/runtime-fuzz" json "$FUZZ_COUNT" >"$WORK/fuzz-json.log" 2>&1
-"$WORK/runtime-fuzz" jwt "$FUZZ_COUNT" >"$WORK/fuzz-jwt.log" 2>&1
+"${SAN_RUN[@]}" "$WORK/runtime-fuzz" json "$FUZZ_COUNT" >"$WORK/fuzz-json.log" 2>&1
+"${SAN_RUN[@]}" "$WORK/runtime-fuzz" jwt "$FUZZ_COUNT" >"$WORK/fuzz-jwt.log" 2>&1
 
 "$COMPILER" "$ROOT/tests/task937/http-server.fl" "$WORK/fuzz-http-server.c" >"$WORK/fuzz-http-server.compile" 2>&1
 gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" -o "$WORK/fuzz-http-server" \
   "$WORK/fuzz-http-server.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm
 gcc -std=c11 -Wall -Wextra -Werror -o "$WORK/fuzz-http-client" "$ROOT/tests/task937/http-fuzz-client.c"
-FL_HTTP_PORT=0 "$WORK/fuzz-http-server" >"$WORK/fuzz-http-server.log" 2>&1 &
+"${SAN_RUN[@]}" FL_HTTP_PORT=0 "$WORK/fuzz-http-server" >"$WORK/fuzz-http-server.log" 2>&1 &
 SERVER_PID=$!
 cleanup() { kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM

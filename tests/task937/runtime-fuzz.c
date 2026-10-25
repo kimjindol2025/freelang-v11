@@ -7,9 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <signal.h>
+#include <setjmp.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 static uint32_t state = 0x937a51e1u;
+static sigjmp_buf timeout_jump;
+static void timeout_handler(int signal_number) { (void)signal_number; siglongjmp(timeout_jump, 1); }
 static uint32_t next_u32(void) {
     state ^= state << 13; state ^= state >> 17; state ^= state << 5;
     return state;
@@ -25,6 +30,36 @@ static int caught(FLValue (*fn)(FLValue), FLValue arg, FLValue *out) {
     fl_try_top = 0;
     *out = fl_nil();
     return 1;
+}
+
+static int timed_caught(FLValue (*fn)(FLValue), FLValue arg, FLValue *out) {
+    struct itimerval timer = {.it_value={.tv_sec=1}};
+    if (sigsetjmp(timeout_jump, 1) == 0) {
+        setitimer(ITIMER_REAL, &timer, NULL);
+        int result = caught(fn, arg, out);
+        timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
+        setitimer(ITIMER_REAL, &timer, NULL);
+        return result;
+    }
+    timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
+    setitimer(ITIMER_REAL, &timer, NULL);
+    fl_try_top = 0;
+    return -1;
+}
+
+static int timed_jwt(FLValue token, FLValue key) {
+    struct itimerval timer = {.it_value={.tv_sec=1}};
+    if (sigsetjmp(timeout_jump, 1) == 0) {
+        setitimer(ITIMER_REAL, &timer, NULL);
+        (void)fl_jwt_verify(token, key);
+        timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
+        setitimer(ITIMER_REAL, &timer, NULL);
+        return 0;
+    }
+    timer.it_value.tv_sec = timer.it_value.tv_usec = 0;
+    setitimer(ITIMER_REAL, &timer, NULL);
+    fl_try_top = 0;
+    return -1;
 }
 
 static int run_json(unsigned count) {
@@ -49,7 +84,8 @@ static int run_json(unsigned count) {
         raw->base.type = FL_STRING; raw->base.rc = 1; raw->len = (uint32_t)n;
         memcpy(raw->data, buf, n + 1);
         FLValue out;
-        int threw = caught(fl_json_parse, (FLValue){.tag=FL_STRING,.obj=(FLObject *)raw}, &out);
+        int threw = timed_caught(fl_json_parse, (FLValue){.tag=FL_STRING,.obj=(FLObject *)raw}, &out);
+        if (threw < 0) { issues++; printf("JSON_TIMEOUT case=%u timeout_ms=1000\n", i); break; }
         int expected_invalid = i < 13 || i >= 15;
         if (expected_invalid && !threw) {
             if (issues < 16) {
@@ -67,7 +103,7 @@ static int run_json(unsigned count) {
         memset(deep, '[', depth); memcpy(deep + depth, "null", 4);
         memset(deep + depth + 4, ']', depth); deep[cap - 1] = 0;
         FLValue result;
-        int rejected = caught(fl_json_parse, fl_str_val(deep), &result);
+        int rejected = timed_caught(fl_json_parse, fl_str_val(deep), &result);
         if (!rejected) {
             FILE *f = fopen("tests/fuzz-crashers/json-depth-10000.json", "wb");
             if (f) { fwrite(deep, 1, cap - 1, f); fclose(f); }
@@ -93,7 +129,9 @@ static int run_json(unsigned count) {
         raw->base.type=FL_STRING; raw->base.rc=1; raw->len=(uint32_t)size;
         if (fread(raw->data,1,(size_t)size,f)!=(size_t)size) { fclose(f); closedir(dir); return 2; }
         fclose(f); raw->data[size]=0;
-        FLValue parsed; regression_issues += (unsigned)!caught(fl_json_parse,(FLValue){.tag=FL_STRING,.obj=(FLObject *)raw},&parsed);
+        FLValue parsed; int timed = timed_caught(fl_json_parse,(FLValue){.tag=FL_STRING,.obj=(FLObject *)raw},&parsed);
+        if (timed < 0) regression_issues++;
+        else regression_issues += (unsigned)!timed;
         regressions++;
     }
     closedir(dir);
@@ -108,7 +146,7 @@ static int run_json(unsigned count) {
         ((FLString *)nul.obj)->data[0] == 0 && ((FLString *)nul.obj)->data[1] == 'x') edge_passed++;
     FLValue invalid_utf8;
     char bad_utf8[] = {'"', (char)0xff, '"', 0};
-    if (caught(fl_json_parse, fl_str_val(bad_utf8), &invalid_utf8)) edge_passed++;
+    if (timed_caught(fl_json_parse, fl_str_val(bad_utf8), &invalid_utf8) == 1) edge_passed++;
     printf("JSON_EDGE_REGRESSION=%u/3\n", edge_passed);
     if (edge_passed != 3) issues++;
     return issues ? 1 : 0;
@@ -128,7 +166,7 @@ static int run_jwt(unsigned count) {
             char base[256]; memcpy(base, token, n + 1);
             snprintf(token, sizeof(token), "%.80s.%.80s.%.80s", base, base, base);
         }
-        (void)fl_jwt_verify(fl_str_val(token), key);
+        if (timed_jwt(fl_str_val(token), key) != 0) { issues++; printf("JWT_TIMEOUT case=%u timeout_ms=1000\n", i); break; }
     }
     printf("JWT_FUZZ iterations=%u issues=%u seed=0x937a51e1\n", count, issues);
     return 0;
@@ -136,6 +174,7 @@ static int run_jwt(unsigned count) {
 
 int main(int argc, char **argv) {
     if (argc != 3) return 2;
+    signal(SIGALRM, timeout_handler);
     unsigned count = (unsigned)strtoul(argv[2], NULL, 10);
     if (!count) return 2;
     if (!strcmp(argv[1], "json")) return run_json(count);
