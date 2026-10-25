@@ -140,7 +140,7 @@ grep -E '^FL_TEST_SUMMARY ' "$WORK/existing41.log"
 grep -hE '^TEST_EVIDENCE_SUMMARY=|^TCP_SUMMARY=|^HTTP_SUMMARY=' "$WORK/test-evidence.log" "$WORK/tcp.log" "$WORK/http.log"
 sed -n 's/.*"expectedCount":\([0-9]*\),"resultCount":\([0-9]*\).*/AUDIT_SUMMARY=\1\/\2/p' "$WORK/audit.log"
 grep -E '^NATIVE_FORMS_SUMMARY=|^CGC_SYMBOL_SUMMARY=' "$WORK/symbol.log"
-grep -hE '^(ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|AUTH_SUMMARY)=' "$WORK"/{erp,erp2,erp3,conc,auth}.log
+grep -hE '^(ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|AUTH_SUMMARY|SEC_SUMMARY)=' "$WORK"/{erp,erp2,erp3,conc,auth}.log
 grep -E '^PAGE_SUMMARY=' "$WORK/pages.log"
 grep '^PASS ' "$WORK/builtins2.log"
 grep '^PASS ' "$WORK/held-auth.log"

@@ -141,9 +141,16 @@ FLValue fl_auth_verify_password(FLValue password_value, FLValue encoded_value) {
 FLValue fl_auth_constant_time_equal(FLValue left_value, FLValue right_value) {
     const char *left = auth_string(left_value, "auth-constant-time-equal expects strings");
     const char *right = auth_string(right_value, "auth-constant-time-equal expects strings");
-    size_t length = strlen(left);
-    if (length != strlen(right)) return fl_bool(false);
-    return fl_bool(CRYPTO_memcmp(left, right, length) == 0);
+    size_t left_length = strlen(left), right_length = strlen(right);
+    size_t length = left_length > right_length ? left_length : right_length;
+    size_t length_diff = left_length ^ right_length;
+    unsigned char diff = 0;
+    for (size_t i = 0; i < length; i++) {
+        unsigned char a = i < left_length ? (unsigned char)left[i] : 0;
+        unsigned char b = i < right_length ? (unsigned char)right[i] : 0;
+        diff |= (unsigned char)(a ^ b);
+    }
+    return fl_bool(length_diff == 0 && diff == 0);
 }
 
 static int jwt_b64url_encode(const unsigned char *src, size_t len, char **out, size_t *out_len) {
@@ -306,11 +313,15 @@ static int jwt_claim_times(FLValue payload, int64_t now, int skew) {
     const char *names[] = { "exp", "nbf" };
     for (int i=0; i<2; i++) {
         FLValue v = fl_map_get(payload, fl_str_val(names[i]));
-        if (v.tag == FL_NIL) continue;
+        if (v.tag == FL_NIL) {
+            if (i == 0) return 0;
+            continue;
+        }
         double t;
         if (v.tag == FL_INT) t = (double)v.i;
         else if (v.tag == FL_FLOAT && isfinite(v.f)) t = v.f;
         else return 0;
+        if (i == 0 && t < 0) return 0;
         if (i == 0 && (double)now > t + skew) return 0;
         if (i == 1 && (double)now + skew < t) return 0;
     }
