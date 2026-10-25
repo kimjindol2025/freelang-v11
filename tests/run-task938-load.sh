@@ -327,7 +327,7 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 test -n "$CAP_PORT"
-CAP_ZOMBIE_BEFORE="$(ps -o stat= --ppid "$CAP_SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}')"
+CAP_ZOMBIE_BEFORE="$(ps -o stat= --ppid "$CAP_SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}' || true)"
 "$WORK/load-client" "$CAP_PORT" 400 30 941 "$WORK/cap-acknowledged.sql" slow300 \
   >"$WORK/cap-client.log" 2>&1 &
 CAP_CLIENT_PID=$!
@@ -347,7 +347,7 @@ CAP_OTHER_ERRORS=$((CAP_ERRORS - CAP_503))
 CAP_ALIVE=0
 kill -0 "$CAP_SERVER_PID" 2>/dev/null && CAP_ALIVE=1
 CAP_RECOVERY="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$CAP_PORT/ok" 2>/dev/null || echo 000)"
-CAP_ZOMBIE_AFTER="$(ps -o stat= --ppid "$CAP_SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}')"
+CAP_ZOMBIE_AFTER="$(ps -o stat= --ppid "$CAP_SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}' || true)"
 CAP_ZOMBIE_DELTA=$((CAP_ZOMBIE_AFTER - CAP_ZOMBIE_BEFORE))
 kill "$CAP_SERVER_PID"
 wait "$CAP_SERVER_PID" || true
