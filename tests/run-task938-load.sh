@@ -65,6 +65,7 @@ server_snapshot() {
 STAGES=0
 RECOVERIES=0
 METRIC_OK=0
+ALIVE_STAGES=0
 OVERLOAD_CLEAN=1
 FIRST_LIMIT=none
 TOTAL_WRITE_HTTP_200=0
@@ -105,11 +106,15 @@ for concurrency in 10 50 100 200 500 1000; do
   connect_other="$(sed -n 's/.*connect_other=\([0-9]*\).*/\1/p' <<<"$line")"
   other_http="$(sed -n 's/.*other_http=\([0-9]*\).*/\1/p' <<<"$line")"
   if [[ -n "$io_errors" && "$io_errors" != 0 ]] || [[ -n "$connect_other" && "$connect_other" != 0 ]] || [[ -n "$other_http" && "$other_http" != 0 ]]; then OVERLOAD_CLEAN=0; fi
-  recovery="$(curl --silent --show-error --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ok")"
+  recovery="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ok" 2>/dev/null || echo 000)"
   printf 'LOAD_RECOVERY concurrency=%s HTTP_STATUS=%s\n' "$concurrency" "$recovery"
   [[ "$recovery" == 200 ]] && RECOVERIES=$((RECOVERIES + 1))
-  kill -0 "$SERVER_PID"
-  printf 'LOAD_SERVER_ALIVE concurrency=%s value=1\n' "$concurrency"
+  if kill -0 "$SERVER_PID" 2>/dev/null && [[ "$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}')" != Z* ]]; then
+    ALIVE_STAGES=$((ALIVE_STAGES + 1)); alive=1
+  else
+    alive=0
+  fi
+  printf 'LOAD_SERVER_ALIVE concurrency=%s value=%s\n' "$concurrency" "$alive"
 done
 
 DB_ROWS="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'SELECT count(*) FROM soak_writes;')"
@@ -118,7 +123,9 @@ printf 'LOAD_WRITE_HTTP_200=%s\n' "$TOTAL_WRITE_HTTP_200"
 printf 'LOAD_DB_ROWS=%s\n' "$DB_ROWS"
 printf 'LOAD_DB_WRITE_MATCH=%s\n' "$([[ "$DB_ROWS" == "$TOTAL_WRITE_HTTP_200" ]] && echo 1 || echo 0)"
 printf 'LOAD_DB_INTEGRITY=%s\n' "$DB_INTEGRITY"
-printf 'LOAD_SERVER_ALIVE=%s\n' "$([[ -d "/proc/$SERVER_PID" ]] && echo 1 || echo 0)"
+if kill -0 "$SERVER_PID" 2>/dev/null && [[ "$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}')" != Z* ]]; then SERVER_ALIVE=1; else SERVER_ALIVE=0; fi
+printf 'LOAD_SERVER_ALIVE=%s\n' "$SERVER_ALIVE"
+printf 'LOAD_SERVER_ALIVE_STAGES=%s/6\n' "$ALIVE_STAGES"
 printf 'LOAD_LIMIT_CONCURRENCY=%s\n' "$FIRST_LIMIT"
 printf 'LOAD_OVERLOAD_CLEAN=%s\n' "$OVERLOAD_CLEAN"
 printf 'LOAD_CLIENTS_CREATED_ALL=%s\n' "$CREATED_ALL"
@@ -130,7 +137,7 @@ SUMMARY=0
 (( METRIC_OK == 6 )) && SUMMARY=$((SUMMARY + 1))
 [[ "$DB_ROWS" == "$TOTAL_WRITE_HTTP_200" ]] && SUMMARY=$((SUMMARY + 1))
 [[ "$DB_INTEGRITY" == ok ]] && SUMMARY=$((SUMMARY + 1))
-[[ -d "/proc/$SERVER_PID" ]] && SUMMARY=$((SUMMARY + 1))
+[[ "$ALIVE_STAGES" == 6 && "$SERVER_ALIVE" == 1 ]] && SUMMARY=$((SUMMARY + 1))
 [[ "$FIRST_LIMIT" != none || "$OVERLOAD_CLEAN" == 1 ]] && SUMMARY=$((SUMMARY + 1))
 [[ "$OVERLOAD_CLEAN" == 1 ]] && SUMMARY=$((SUMMARY + 1))
 printf 'LOAD_SUMMARY=%s/9\n' "$SUMMARY"

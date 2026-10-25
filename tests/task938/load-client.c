@@ -164,6 +164,10 @@ static void *worker_main(void *opaque) {
         unsigned route = (worker->id + (unsigned)sequence) % ROUTE_COUNT;
         do_request(worker, route);
         sequence++;
+        if (monotonic_ns() < deadline_ns) {
+            struct timespec pause = {.tv_sec = 1, .tv_nsec = 0};
+            while (nanosleep(&pause, &pause) != 0 && errno == EINTR) {}
+        }
     }
     return NULL;
 }
