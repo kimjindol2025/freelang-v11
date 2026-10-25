@@ -57,6 +57,7 @@ server_snapshot() {
     stat="$(ps -o stat= -p "$pid" 2>/dev/null | awk '{$1=$1;print}')"
     [[ "$stat" == Z* ]] && SERVER_ZOMBIE_NOW=$((SERVER_ZOMBIE_NOW + 1))
   done
+  return 0
 }
 
 STAGES=0
