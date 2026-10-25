@@ -908,7 +908,13 @@ FLValue fl_http_start(FLValue port_value) {
         if (http_stopping) break;
         int client = accept(server, NULL, NULL);
         if (client < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR || errno == ECONNABORTED || errno == EPROTO ||
+                errno == EAGAIN || errno == EWOULDBLOCK) continue;
+            if (errno == EMFILE || errno == ENFILE || errno == ENOBUFS || errno == ENOMEM) {
+                struct timespec retry = {.tv_sec = 0, .tv_nsec = 10 * 1000 * 1000};
+                while (nanosleep(&retry, &retry) != 0 && errno == EINTR && !http_stopping) {}
+                continue;
+            }
             break;
         }
         pid_t worker = fork();
