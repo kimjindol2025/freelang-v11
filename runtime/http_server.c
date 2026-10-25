@@ -916,6 +916,7 @@ FLValue fl_http_start(FLValue port_value) {
     memset(&child_action, 0, sizeof(child_action));
     child_action.sa_handler = http_child_signal;
     sigemptyset(&child_action.sa_mask);
+    child_action.sa_flags = SA_NOCLDWAIT;
     http_stopping = 0;
     http_child_changed = 0;
     http_worker_count = 0;
