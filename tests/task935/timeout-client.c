@@ -87,6 +87,20 @@ static int fast_health(int port) {
     return status;
 }
 
+static long long timeout_request(int port, int body) {
+    long long start = now_ms();
+    int fd = open_local(port);
+    if (fd < 0) { last_ms = now_ms() - start; return -1; }
+    if (body)
+        send_all(fd, "POST /ok HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Length: 3\r\n\r\na");
+    else
+        send_all(fd, "GET ");
+    int status = receive_status(fd);
+    close(fd);
+    last_ms = now_ms() - start;
+    return status;
+}
+
 static int slow_body(int port) {
     long long start = now_ms();
     int fd = open_local(port);
@@ -111,7 +125,7 @@ static void record(const char *name, int status, int expected) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3) return 2;
+    if (argc < 3 || argc > 4 || (argc == 4 && strcmp(argv[2], "precision") != 0)) return 2;
     int port = atoi(argv[1]);
     const char *mode = argv[2];
     if (strcmp(mode, "default") == 0) {
@@ -123,12 +137,27 @@ int main(int argc, char **argv) {
     } else if (strcmp(mode, "body-long") == 0) {
         record("header-remains-500ms", slow_header(port), 408);
         record("configured-body-1100ms", slow_body(port), 200);
+    } else if (strcmp(mode, "precision") == 0) {
+        for (int body = 0; body <= 1; body++) {
+            long long actual = timeout_request(port, body);
+            long long configured = argc == 4 ? strtoll(argv[3], NULL, 10) : 0;
+            int ok = actual == 408 && last_ms >= configured - 50 && last_ms <= configured + 200;
+            passed += ok;
+            total++;
+            printf("TIMEPREC_CASE=%s CONFIG_MS=%lld ACTUAL_MS=%lld STATUS=%lld DELTA_MS=%lld RESULT=%s\n",
+                   body ? "body" : "header", configured, last_ms, actual,
+                   last_ms - configured, ok ? "PASS" : "FAIL");
+        }
     } else {
         return 2;
     }
     if (strcmp(mode, "default") == 0) {
         record("fast-health-after-slow-header", fast_health(port), 200);
         record("fast-health-after-slow-body", fast_health(port), 200);
+    }
+    if (strcmp(mode, "precision") == 0) {
+        printf("TIMEPREC_SUMMARY=%d/%d\n", passed, total);
+        return passed == total ? 0 : 1;
     }
     printf("TIMEOUT_SUMMARY=%d/%d\n", passed, total);
     return passed == total ? 0 : 1;

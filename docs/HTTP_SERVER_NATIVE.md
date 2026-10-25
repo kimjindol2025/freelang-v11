@@ -17,3 +17,8 @@ The header and body read deadlines are configured independently:
 
 Each deadline starts when that part is read. Invalid values prevent the server
 from starting.
+
+Both deadlines use a monotonic clock and `poll` with the remaining time, so the
+timeout does not depend on the next application request. The 9-35 slow-client
+cases also report total client time including their deliberate send delays;
+`TIMEPREC_SUMMARY` measures the server's 408 response deadline directly.

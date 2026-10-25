@@ -81,3 +81,16 @@ run_timeout_suite timeout-header-long 1600 500 header-long
 run_timeout_suite timeout-body-long 500 1600 body-long
 test "$timeout_count" -eq 8
 printf 'TIMEOUT_SUMMARY=%s/8\n' "$timeout_count"
+
+precision_count=0
+for setting in 100 500 2000; do
+  start_server "timeout-precision-$setting" "$setting" "$setting" timeout
+  pid="$SERVER_PID"
+  port="$SERVER_PORT"
+  "$WORK/timeout-client" "$port" precision "$setting" >"$WORK/timeout-precision-$setting.client.log" 2>&1
+  grep '^TIMEPREC_CASE=' "$WORK/timeout-precision-$setting.client.log"
+  precision_count=$((precision_count + $(grep -c '^TIMEPREC_CASE=.*RESULT=PASS$' "$WORK/timeout-precision-$setting.client.log")))
+  stop_server "$pid"
+done
+test "$precision_count" -eq 6
+printf 'TIMEPREC_SUMMARY=%s/6\n' "$precision_count"
