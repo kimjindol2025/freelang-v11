@@ -6,6 +6,10 @@ COMPILER="${1:?usage: run-task936-soak.sh <stage2-compiler> <work-dir> [seconds]
 WORK="${2:?usage: run-task936-soak.sh <stage2-compiler> <work-dir> [seconds]}"
 DURATION="${3:-7200}"
 RUNTIME="$ROOT/runtime"
+if [[ -e "$WORK" && -n "$(find "$WORK" -mindepth 1 -print -quit)" ]]; then
+  echo 'soak work directory must be empty' >&2
+  exit 2
+fi
 mkdir -p "$WORK/public" "$WORK/logs"
 touch "$WORK/logs"/{health,static,login,jwt,write,read,parallel,attack}.log
 printf 'MIXSOAK_STATIC_EXAMPLE_OK\n' >"$WORK/public/sample.txt"
