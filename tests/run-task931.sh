@@ -32,8 +32,8 @@ done
 gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
 parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
 parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
-# RLIMIT_NPROC counts processes here; leave room for setup plus fewer than eight workers.
-parallel_nproc_limit=$((parallel_user_processes + 10))
+# RLIMIT_NPROC counts tasks here; leave fewer than eight worker slots after setup.
+parallel_nproc_limit=$((parallel_user_tasks + 5))
 printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
 printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
 printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
