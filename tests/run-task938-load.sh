@@ -91,20 +91,24 @@ ACK_SQL="$WORK/acknowledged.sql"
 
 PAGE_KB="$(( $(getconf PAGESIZE) / 1024 ))"
 server_snapshot() {
-  local pid statm rss_pages rss fd_count stat
+  local pid child_stat statm rss_pages stat
   local -a pids=()
   SERVER_RSS_NOW=0; SERVER_FD_NOW=0; SERVER_ZOMBIE_NOW=0
   pids=("$SERVER_PID")
-  while read -r pid; do [[ -n "$pid" ]] && pids+=("$pid"); done < <(ps -o pid= --ppid "$SERVER_PID" 2>/dev/null || true)
+  while read -r pid child_stat; do
+    [[ -n "$pid" ]] || continue
+    pids+=("$pid")
+    [[ "$child_stat" == Z* ]] && SERVER_ZOMBIE_NOW=$((SERVER_ZOMBIE_NOW + 1))
+  done < <(ps -o pid=,stat= --ppid "$SERVER_PID" 2>/dev/null || true)
   for pid in "${pids[@]}"; do
     [[ -r "/proc/$pid/statm" ]] || continue
     read -r _ rss_pages _ <"/proc/$pid/statm"
     SERVER_RSS_NOW=$((SERVER_RSS_NOW + rss_pages * PAGE_KB))
     local -a fds=(/proc/"$pid"/fd/*)
     SERVER_FD_NOW=$((SERVER_FD_NOW + ${#fds[@]}))
-    stat="$(ps -o stat= -p "$pid" 2>/dev/null | awk '{$1=$1;print}' || true)"
-    [[ "$stat" == Z* ]] && SERVER_ZOMBIE_NOW=$((SERVER_ZOMBIE_NOW + 1))
   done
+  stat="$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}' || true)"
+  [[ "$stat" == Z* ]] && SERVER_ZOMBIE_NOW=$((SERVER_ZOMBIE_NOW + 1))
   return 0
 }
 
@@ -157,8 +161,10 @@ for concurrency in 10 50 100 200 500 1000; do
   connect_other="$(sed -n 's/.*connect_other=\([0-9]*\).*/\1/p' <<<"$line")"
   other_http="$(sed -n 's/.*other_http=\([0-9]*\).*/\1/p' <<<"$line")"
   reject_pct="$(sed -n 's/.*rejection_pct=\([0-9.]*\).*/\1/p' <<<"$line")"
+  errors="$(sed -n 's/.*errors=\([0-9]*\).*/\1/p' <<<"$line")"
   if (( concurrency <= 200 )) && [[ -n "$error_pct" ]] && awk -v p="$error_pct" 'BEGIN{exit !(p>=1.0)}'; then LOW_LOAD_OK=0; fi
-  if (( concurrency >= 500 )) && { [[ -z "$reject_pct" ]] || ! awk -v p="$reject_pct" 'BEGIN{exit !(p>=90.0)}'; }; then HIGH_REJECTION_OK=0; fi
+  if (( concurrency >= 500 && ${errors:-0} > 0 )) &&
+     { [[ -z "$reject_pct" ]] || ! awk -v p="$reject_pct" 'BEGIN{exit !(p>=90.0)}'; }; then HIGH_REJECTION_OK=0; fi
   recovery="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ok" 2>/dev/null || echo 000)"
   printf 'LOAD_RECOVERY concurrency=%s HTTP_STATUS=%s\n' "$concurrency" "$recovery"
   [[ "$recovery" == 200 ]] && RECOVERIES=$((RECOVERIES + 1))

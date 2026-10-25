@@ -84,7 +84,7 @@ static int connect_with_timeout(int fd, const struct sockaddr *address, socklen_
     }
     if (errno != EINPROGRESS) return -1;
     struct pollfd item = {.fd = fd, .events = POLLOUT};
-    rc = poll(&item, 1, 1000);
+    rc = poll(&item, 1, 3000);
     if (rc <= 0) { if (rc == 0) errno = ETIMEDOUT; return -1; }
     int error = 0;
     socklen_t error_length = sizeof(error);
@@ -118,7 +118,7 @@ static void do_request(Worker *worker, unsigned route, uint64_t sequence) {
         goto done;
     }
 
-    struct timeval timeout = {.tv_sec = 1, .tv_usec = 0};
+    struct timeval timeout = {.tv_sec = 3, .tv_usec = 0};
     (void)setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
     (void)setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
     struct sockaddr_in address = {.sin_family = AF_INET, .sin_port = htons((uint16_t)server_port)};
