@@ -58,9 +58,22 @@ typedef struct {
     volatile int lock;
     int64_t window_start;
     int count;
+    volatile int active_connections;
+    volatile int max_active_connections;
 } FLHttpRateState;
 static FLHttpRateState *http_rate_shared;
 static int64_t http_now_ms(void);
+
+static void http_connection_enter(void) {
+    int active = __sync_add_and_fetch(&http_rate_shared->active_connections, 1);
+    int peak = __sync_val_compare_and_swap(&http_rate_shared->max_active_connections, 0, 0);
+    while (active > peak) {
+        int previous = __sync_val_compare_and_swap(
+            &http_rate_shared->max_active_connections, peak, active);
+        if (previous == peak) break;
+        peak = previous;
+    }
+}
 
 static void http_stop_signal(int signal_number) {
     (void)signal_number;
@@ -937,7 +950,9 @@ FLValue fl_http_start(FLValue port_value) {
             (void)signal(SIGINT, SIG_DFL);
             (void)signal(SIGTERM, SIG_DFL);
             (void)signal(SIGCHLD, SIG_DFL);
+            http_connection_enter();
             http_handle_client(client);
+            (void)__sync_sub_and_fetch(&http_rate_shared->active_connections, 1);
             close(client);
             _exit(0);
         }
@@ -953,6 +968,8 @@ FLValue fl_http_start(FLValue port_value) {
     }
     close(server);
     http_stop_workers();
+    fprintf(stderr, "HTTP_ACTIVE_CONNECTIONS_MAX=%d\n",
+            http_rate_shared->max_active_connections);
     (void)sigaction(SIGINT, &old_int, NULL);
     (void)sigaction(SIGTERM, &old_term, NULL);
     (void)sigaction(SIGCHLD, &old_child, NULL);

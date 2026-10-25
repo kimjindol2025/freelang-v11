@@ -17,6 +17,41 @@ export FREELANG_HTTP_CGC="$COMPILER"
 bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1 || BASE_RC=$?
 printf 'LOAD_FAST_SUITE_RC=%s\n' "$BASE_RC"
 
+FDFIX_DIR="$WORK/fdfix"
+mkdir -p "$FDFIX_DIR"
+"$COMPILER" "$ROOT/tests/task931/disk.fl" "$FDFIX_DIR/disk.c" >"$FDFIX_DIR/compile.log" 2>&1
+gcc -w -I "$RUNTIME" -o "$FDFIX_DIR/disk" "$FDFIX_DIR/disk.c" \
+  "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
+  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/db.c" \
+  "$RUNTIME/http_server.c" "$RUNTIME/auth.c" "$RUNTIME/cgc-bridge.c" \
+  -lsqlite3 -lcrypto -lm
+sqlite3 "$FDFIX_DIR/probe.sqlite" 'CREATE TABLE payload(value TEXT);'
+set +e
+(ulimit -n 4; exec "$FDFIX_DIR/disk" db "$FDFIX_DIR/probe.sqlite") \
+  >"$FDFIX_DIR/limited.out" 2>"$FDFIX_DIR/limited.err"
+FDFIX_RC=$?
+set -e
+FDFIX_SIGNAL=0; (( FDFIX_RC > 128 )) && FDFIX_SIGNAL=$((FDFIX_RC - 128)) || true
+FDFIX_ERROR="$(grep -o 'db-exec: .*' "$FDFIX_DIR/limited.err" | tail -n 1 || true)"
+printf 'FDFIX_CASE=fd-limit RC=%s SIGNAL=%s ERROR=%s\n' \
+  "$FDFIX_RC" "$FDFIX_SIGNAL" "$FDFIX_ERROR"
+if (( FDFIX_RC != 1 || FDFIX_SIGNAL != 0 )) || [[ -z "$FDFIX_ERROR" ]]; then
+  echo 'FDFIX_LIMITED_WRITE=FAIL' >&2
+  exit 1
+fi
+set +e
+"$FDFIX_DIR/disk" db "$FDFIX_DIR/probe.sqlite" >"$FDFIX_DIR/recovery.out" 2>"$FDFIX_DIR/recovery.err"
+FDFIX_RECOVERY_RC=$?
+set -e
+FDFIX_ROWS="$(sqlite3 -batch -noheader "$FDFIX_DIR/probe.sqlite" 'SELECT count(*) FROM payload;')"
+printf 'FDFIX_RECOVERY_RC=%s ROWS=%s\n' "$FDFIX_RECOVERY_RC" "$FDFIX_ROWS"
+FDFIX_OOM_SUMMARY="$(grep -m1 '^OOM_SUMMARY=' "$WORK/base.log" || true)"
+printf '%s\n' "$FDFIX_OOM_SUMMARY"
+if (( FDFIX_RECOVERY_RC != 0 )) || [[ "$FDFIX_ROWS" != 1 || "$FDFIX_OOM_SUMMARY" != 'OOM_SUMMARY=12/12' ]]; then
+  echo 'FDFIX_RECOVERY_OR_OOM=FAIL' >&2
+  exit 1
+fi
+
 printf 'LOAD_STATIC_EXAMPLE_OK\n' >"$WORK/public/sample.txt"
 export MIXSOAK_DB="$WORK/load.sqlite"
 export FL_HTTP_MAX_CONN=256
@@ -220,10 +255,25 @@ SUMMARY=0
 [[ "$DUPLICATES" == 0 ]] && SUMMARY=$((SUMMARY + 1))
 [[ "$DB_INTEGRITY" == ok ]] && SUMMARY=$((SUMMARY + 1))
 [[ "$RESOURCE_STABLE" == 1 ]] && SUMMARY=$((SUMMARY + 1))
-printf 'LOAD2_SUMMARY=%s/10\n' "$SUMMARY"
+printf 'LOAD2_SUMMARY=%s/10\n' "$SUMMARY" | tee "$WORK/final-summary.log"
 test "$SUMMARY" -ge 9 && test "$BASE_RC" -eq 0
 
 cleanup
 trap - EXIT INT TERM
+
+ACTIVE_CONNECTIONS_MAX="$(sed -n 's/^HTTP_ACTIVE_CONNECTIONS_MAX=//p' "$WORK/server.log" | tail -n 1)"
+printf 'LOAD_ACTIVE_CONNECTIONS_MAX=%s\n' "$ACTIVE_CONNECTIONS_MAX"
+if [[ ! "$ACTIVE_CONNECTIONS_MAX" =~ ^[0-9]+$ ]] || (( ACTIVE_CONNECTIONS_MAX > 256 )); then
+  echo 'LOAD_ACTIVE_CONNECTIONS_MAX_INVALID=1' >&2
+  exit 1
+fi
+FDFIX_PASSED=0
+[[ -n "$FDFIX_ERROR" ]] && FDFIX_PASSED=$((FDFIX_PASSED + 1))
+(( FDFIX_SIGNAL == 0 )) && FDFIX_PASSED=$((FDFIX_PASSED + 1))
+(( FDFIX_RECOVERY_RC == 0 )) && [[ "$FDFIX_ROWS" == 1 ]] && FDFIX_PASSED=$((FDFIX_PASSED + 1))
+[[ "$FDFIX_OOM_SUMMARY" == 'OOM_SUMMARY=12/12' ]] && FDFIX_PASSED=$((FDFIX_PASSED + 1))
+grep -Fxq 'LOAD2_SUMMARY=10/10' "$WORK/final-summary.log" && FDFIX_PASSED=$((FDFIX_PASSED + 1))
+printf 'FDFIX_SUMMARY=%s/5\n' "$FDFIX_PASSED"
+test "$FDFIX_PASSED" -eq 5
 
 grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY|OOM_SUMMARY|FORKFAIL_SUMMARY|STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY|HTTPATK_SUMMARY)=' "$WORK/base.log"

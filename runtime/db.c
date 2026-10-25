@@ -38,7 +38,7 @@ static sqlite3 *db_open_path(const char *path, bool configure_wal) {
                                NULL);
     if (code != SQLITE_OK) {
         char message[512];
-        snprintf(message, sizeof(message), "db-open: %s (sqlite=%d)",
+        snprintf(message, sizeof(message), "db-exec: db-open: %s (sqlite=%d)",
                  db ? sqlite3_errmsg(db) : sqlite3_errstr(code), code);
         if (db) sqlite3_close(db);
         fl_throw(fl_str_val(message));
@@ -49,14 +49,27 @@ static sqlite3 *db_open_path(const char *path, bool configure_wal) {
         char *error = NULL;
         int wal_code = sqlite3_exec(db, "PRAGMA journal_mode = WAL", NULL, NULL, &error);
         if (wal_code != SQLITE_OK) {
-            char message[512];
-            snprintf(message, sizeof(message), "db-open WAL: %s (sqlite=%d)",
+            char wal_message[512];
+            snprintf(wal_message, sizeof(wal_message), "%s (sqlite=%d)",
                      error ? error : sqlite3_errmsg(db), wal_code);
             sqlite3_free(error);
-            sqlite3_close(db);
-            fl_throw(fl_str_val(message));
+            error = NULL;
+            int fallback_code = sqlite3_exec(db, "PRAGMA journal_mode = DELETE",
+                                             NULL, NULL, &error);
+            if (fallback_code != SQLITE_OK) {
+                char message[512];
+                snprintf(message, sizeof(message),
+                         "db-exec: WAL and DELETE journal setup failed: %s (sqlite=%d)",
+                         error ? error : sqlite3_errmsg(db), fallback_code);
+                sqlite3_free(error);
+                sqlite3_close(db);
+                fl_throw(fl_str_val(message));
+            }
+            sqlite3_free(error);
+            fprintf(stderr,
+                    "db-open warning: WAL unavailable; using DELETE journal mode: %s\n",
+                    wal_message);
         }
-        sqlite3_free(error);
     }
     return db;
 }
