@@ -121,12 +121,12 @@ test -n "$BENCH_PORT"
 BENCH_ACK_SQL="$WORK/bench-acknowledged.sql"
 : >"$BENCH_ACK_SQL"
 printf 'BENCH_MEASUREMENT=client_monotonic_per_request_time duration_s=10 concurrency=1000\n'
-"$WORK/load-client" "$BENCH_PORT" 1000 10 "$((STAGES + 99))" "$BENCH_ACK_SQL" \
+"$WORK/load-client" "$BENCH_PORT" 1000 10 99 "$BENCH_ACK_SQL" \
   >"$WORK/bench-mixed.log" 2>&1
 printf 'BENCH_MODE=mixed_legacy_think_time '
 cat "$WORK/bench-mixed.log"
 for route in ok static jwt read write; do
-  "$WORK/load-client" "$BENCH_PORT" 1000 10 "$((STAGES + 100))" "$BENCH_ACK_SQL" "$route" \
+  "$WORK/load-client" "$BENCH_PORT" 1000 10 100 "$BENCH_ACK_SQL" "$route" \
     >"$WORK/bench-$route.log" 2>&1
   printf 'BENCH_ROUTE=%s ' "$route"
   cat "$WORK/bench-$route.log"
