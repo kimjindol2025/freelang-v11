@@ -1,0 +1,43 @@
+#define _POSIX_C_SOURCE 200809L
+#include <errno.h>
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+#include <signal.h>
+
+static uint32_t state=0x937a51e1u;
+static uint32_t rnd(void){state^=state<<13;state^=state>>17;state^=state<<5;return state;}
+static long long ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (long long)t.tv_sec*1000+t.tv_nsec/1000000;}
+
+int main(int argc,char **argv){
+    if(argc!=4)return 2;
+    const char *compiler=argv[1],*src=argv[2]; unsigned count=(unsigned)strtoul(argv[3],NULL,10),issues=0,timeouts=0,crashes=0;
+    if(!count)return 2;
+    int fd=open(src,O_WRONLY|O_CREAT|O_TRUNC,0600);if(fd<0)return 2;
+    static const char chars[]="abcXYZ0123[]{}&?:\0\xffλ";
+    char input[4096];
+    for(unsigned i=0;i<count;i++){
+        size_t depth=(i%4==0)?1+(rnd()%24):0,n=0;
+        while(depth--)input[n++]='(';
+        input[n++]='('; input[n++]='d'; input[n++]='e'; input[n++]='f'; input[n++]='n'; input[n++]=' ';
+        size_t extra=rnd()%64;
+        for(size_t j=0;j<extra && n+1<sizeof(input);j++)input[n++]=chars[rnd()%(sizeof(chars)-1)];
+        input[n]=0;
+        if(ftruncate(fd,0)||lseek(fd,0,SEEK_SET)<0||write(fd,input,n)!=(ssize_t)n){close(fd);return 2;}
+        pid_t pid=fork();if(pid<0){issues++;continue;}
+        if(pid==0){int null=open("/dev/null",O_WRONLY);if(null>=0){dup2(null,1);dup2(null,2);close(null);}execl(compiler,compiler,src,"/dev/null",(char *)NULL);_exit(127);}
+        long long deadline=ms()+1000;int status=0,done=0;
+        while(ms()<deadline){pid_t w=waitpid(pid,&status,WNOHANG);if(w==pid){done=1;break;}if(w<0&&errno!=EINTR)break;struct timespec pause={0,1000000};nanosleep(&pause,NULL);}
+        if(!done){kill(pid,SIGKILL);waitpid(pid,&status,0);timeouts++;issues++;}
+        else if(WIFSIGNALED(status)){crashes++;issues++;}
+        else if(!WIFEXITED(status)||WEXITSTATUS(status)==0)issues++;
+    }
+    close(fd);
+    printf("COMPILER_FUZZ iterations=%u issues=%u timeouts=%u crashes=%u seed=0x937a51e1 timeout_ms=1000\n",count,issues,timeouts,crashes);
+    return issues!=0;
+}
