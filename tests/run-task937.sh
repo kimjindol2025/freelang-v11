@@ -17,7 +17,7 @@ RUNTIME_SOURCES=(core.c collection.c io.c math.c error.c process.c json.c cgc-br
 RUNTIME_LINK=(); for source in "${RUNTIME_SOURCES[@]}"; do RUNTIME_LINK+=("$RUNTIME/$source"); done
 SAN_FLAGS=()
 SAN_RUN=()
-if test -f "$(gcc -print-file-name=libasan.so)"; then
+if printf 'int main(void){return 0;}\n' | gcc -x c -fsanitize=address,undefined -o "$WORK/sanitizer-probe" - >/dev/null 2>"$WORK/sanitizer-probe.log"; then
   SAN_FLAGS=(-fsanitize=address,undefined -fno-omit-frame-pointer)
   SAN_RUN=(env ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1)
 fi
