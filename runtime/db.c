@@ -31,7 +31,7 @@ typedef struct FLDbEntry {
 
 static FLDbEntry *db_entries;
 
-static sqlite3 *db_open_path(const char *path) {
+static sqlite3 *db_open_path(const char *path, bool configure_wal) {
     sqlite3 *db = NULL;
     int code = sqlite3_open_v2(path, &db,
                                SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX,
@@ -43,8 +43,21 @@ static sqlite3 *db_open_path(const char *path) {
         if (db) sqlite3_close(db);
         fl_throw(fl_str_val(message));
     }
-    (void)sqlite3_busy_timeout(db, 5000);
+    (void)sqlite3_busy_timeout(db, 2000);
     (void)sqlite3_exec(db, "PRAGMA foreign_keys = ON", NULL, NULL, NULL);
+    if (configure_wal) {
+        char *error = NULL;
+        int wal_code = sqlite3_exec(db, "PRAGMA journal_mode = WAL", NULL, NULL, &error);
+        if (wal_code != SQLITE_OK) {
+            char message[512];
+            snprintf(message, sizeof(message), "db-open WAL: %s (sqlite=%d)",
+                     error ? error : sqlite3_errmsg(db), wal_code);
+            sqlite3_free(error);
+            sqlite3_close(db);
+            fl_throw(fl_str_val(message));
+        }
+        sqlite3_free(error);
+    }
     return db;
 }
 
@@ -56,7 +69,7 @@ static FLDbEntry *db_entry(int64_t id) {
 
 static sqlite3 *db_reopen_after_fork(FLDbEntry *entry) {
     if (entry->pid != getpid()) {
-        entry->db = db_open_path(entry->path);
+        entry->db = db_open_path(entry->path, false);
         entry->pid = getpid();
     }
     return entry->db;
@@ -79,7 +92,7 @@ static FLDbLease db_acquire(FLValue value) {
             fl_throw(fl_str_val("database type must be sqlite"));
         path_value = fl_map_get(value, fl_str_val("path"));
     }
-    lease.handle = db_open_path(db_string(path_value, "database"));
+    lease.handle = db_open_path(db_string(path_value, "database"), true);
     lease.owned = true;
     return lease;
 }
@@ -164,7 +177,7 @@ static FLValue db_column(sqlite3_stmt *statement, int column) {
 
 FLValue fl_db_open(FLValue path_value) {
     const char *path = db_string(path_value, "db-open");
-    sqlite3 *db = db_open_path(path);
+    sqlite3 *db = db_open_path(path, true);
     FLDbEntry *entry = fl_calloc(1, sizeof(*entry));
     if (!entry || !(entry->path = strdup(path))) {
         free(entry);

@@ -18,6 +18,7 @@ printf 'LOAD_FAST_SUITE_RC=%s\n' "$BASE_RC"
 
 printf 'LOAD_STATIC_EXAMPLE_OK\n' >"$WORK/public/sample.txt"
 export MIXSOAK_DB="$WORK/load.sqlite"
+export FL_HTTP_MAX_CONN=256
 "$COMPILER" "$ROOT/tests/task936/soak-server.fl" "$WORK/load-server.c" >"$WORK/load-server.compile" 2>&1
 gcc -w -I "$RUNTIME" -o "$WORK/load-server" "$WORK/load-server.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
@@ -26,6 +27,44 @@ gcc -w -I "$RUNTIME" -o "$WORK/load-server" "$WORK/load-server.c" \
   -lsqlite3 -lcrypto -lm
 gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread \
   -o "$WORK/load-client" "$ROOT/tests/task938/load-client.c"
+
+MIXSOAK_DB="$WORK/probe.sqlite" FL_HTTP_MAX_CONN=1 FL_HTTP_PORT=0 \
+  "$WORK/load-server" "$WORK/public" >"$WORK/probe-server.log" 2>&1 &
+PROBE_PID=$!
+SLOW_PID=""
+cleanup_probe() {
+  [[ -z "$SLOW_PID" ]] || kill "$SLOW_PID" 2>/dev/null || true
+  kill "$PROBE_PID" 2>/dev/null || true
+  wait "$PROBE_PID" 2>/dev/null || true
+}
+trap cleanup_probe EXIT INT TERM
+PROBE_PORT=""
+for _ in $(seq 1 100); do
+  PROBE_PORT="$(sed -n 's/^HTTP_LISTENING=127\.0\.0\.1://p' "$WORK/probe-server.log" | head -n 1)"
+  test -n "$PROBE_PORT" && break
+  sleep 0.05
+done
+test -n "$PROBE_PORT"
+curl --silent --show-error --max-time 5 -o "$WORK/slow-response" \
+  -w '%{http_code}\n' "http://127.0.0.1:$PROBE_PORT/__slow" >"$WORK/slow-status" &
+SLOW_PID=$!
+sleep 0.1
+PROBE_STATUS="$(curl --silent --show-error --max-time 3 -D "$WORK/overload.headers" \
+  -o "$WORK/overload.body" -w '%{http_code}' "http://127.0.0.1:$PROBE_PORT/ok")"
+wait "$SLOW_PID"
+SLOW_PID=""
+SLOW_STATUS="$(cat "$WORK/slow-status")"
+if [[ "$PROBE_STATUS" != 503 || "$SLOW_STATUS" != 200 ]] ||
+   ! grep -Eiq '^Retry-After: 1\r?$' "$WORK/overload.headers"; then
+  printf 'LOAD_OVERLOAD_PROBE status=%s retry_after_missing=1 slow_status=%s\n' "$PROBE_STATUS" "$SLOW_STATUS"
+  kill "$PROBE_PID" 2>/dev/null || true
+  wait "$PROBE_PID" 2>/dev/null || true
+  exit 1
+fi
+printf 'LOAD_OVERLOAD_PROBE status=%s retry_after=1 slow_status=%s\n' "$PROBE_STATUS" "$SLOW_STATUS"
+kill "$PROBE_PID"
+wait "$PROBE_PID" || true
+trap - EXIT INT TERM
 
 FL_HTTP_PORT=0 "$WORK/load-server" "$WORK/public" >"$WORK/server.log" 2>&1 &
 SERVER_PID=$!
@@ -42,6 +81,12 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 test -n "$PORT"
+grep -E '^(DB_BUSY_TIMEOUT_MS|DB_JOURNAL_MODE|HTTP_LISTEN_BACKLOG|HTTP_MAX_CONN)=' "$WORK/server.log"
+DB_JOURNAL_MODE="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'PRAGMA journal_mode;')"
+printf 'LOAD_SQLITE3_JOURNAL_MODE=%s\n' "$DB_JOURNAL_MODE"
+test "$DB_JOURNAL_MODE" = wal
+ACK_SQL="$WORK/acknowledged.sql"
+: >"$ACK_SQL"
 
 PAGE_KB="$(( $(getconf PAGESIZE) / 1024 ))"
 server_snapshot() {
@@ -66,16 +111,20 @@ STAGES=0
 RECOVERIES=0
 METRIC_OK=0
 ALIVE_STAGES=0
-OVERLOAD_CLEAN=1
+LOW_LOAD_OK=1
+HIGH_REJECTION_OK=1
 FIRST_LIMIT=none
 TOTAL_WRITE_HTTP_200=0
 CREATED_ALL=1
+server_snapshot
+INITIAL_RSS=$SERVER_RSS_NOW
+INITIAL_FD=$SERVER_FD_NOW
 for concurrency in 10 50 100 200 500 1000; do
   stage_id=$((STAGES + 1))
   server_snapshot
   rss_start=$SERVER_RSS_NOW; fd_start=$SERVER_FD_NOW
   rss_max=$rss_start; fd_max=$fd_start; zombies_max=$SERVER_ZOMBIE_NOW
-  "$WORK/load-client" "$PORT" "$concurrency" 60 "$stage_id" >"$WORK/stage-$concurrency.log" 2>&1 &
+  "$WORK/load-client" "$PORT" "$concurrency" 60 "$stage_id" "$ACK_SQL" >"$WORK/stage-$concurrency.log" 2>&1 &
   LOAD_PID=$!
   while kill -0 "$LOAD_PID" 2>/dev/null; do
     server_snapshot
@@ -106,7 +155,9 @@ for concurrency in 10 50 100 200 500 1000; do
   connect_timeout="$(sed -n 's/.*connect_timeout=\([0-9]*\).*/\1/p' <<<"$line")"
   connect_other="$(sed -n 's/.*connect_other=\([0-9]*\).*/\1/p' <<<"$line")"
   other_http="$(sed -n 's/.*other_http=\([0-9]*\).*/\1/p' <<<"$line")"
-  if [[ -n "$io_errors" && "$io_errors" != 0 ]] || [[ -n "$connect_timeout" && "$connect_timeout" != 0 ]] || [[ -n "$connect_other" && "$connect_other" != 0 ]] || [[ -n "$other_http" && "$other_http" != 0 ]]; then OVERLOAD_CLEAN=0; fi
+  reject_pct="$(sed -n 's/.*rejection_pct=\([0-9.]*\).*/\1/p' <<<"$line")"
+  if (( concurrency <= 200 )) && [[ -n "$error_pct" ]] && awk -v p="$error_pct" 'BEGIN{exit !(p>=1.0)}'; then LOW_LOAD_OK=0; fi
+  if (( concurrency >= 500 )) && { [[ -z "$reject_pct" ]] || ! awk -v p="$reject_pct" 'BEGIN{exit !(p>=90.0)}'; }; then HIGH_REJECTION_OK=0; fi
   recovery="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ok" 2>/dev/null || echo 000)"
   printf 'LOAD_RECOVERY concurrency=%s HTTP_STATUS=%s\n' "$concurrency" "$recovery"
   [[ "$recovery" == 200 ]] && RECOVERIES=$((RECOVERIES + 1))
@@ -118,33 +169,54 @@ for concurrency in 10 50 100 200 500 1000; do
   printf 'LOAD_SERVER_ALIVE concurrency=%s value=%s\n' "$concurrency" "$alive"
 done
 
+{ printf 'BEGIN;\n'; cat "$ACK_SQL"; printf 'COMMIT;\n'; } | sqlite3 -batch "$MIXSOAK_DB"
 DB_ROWS="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'SELECT count(*) FROM soak_writes;')"
+ACK_ROWS="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'SELECT count(*) FROM acknowledged_ids;')"
+ACK_MISSING="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'SELECT count(*) FROM acknowledged_ids a LEFT JOIN soak_writes w USING(request_id) WHERE w.request_id IS NULL;')"
+DB_ONLY="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'SELECT count(*) FROM soak_writes w LEFT JOIN acknowledged_ids a USING(request_id) WHERE a.request_id IS NULL;')"
+DUPLICATES="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'SELECT count(*)-count(DISTINCT request_id) FROM soak_writes;')"
 DB_INTEGRITY="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'PRAGMA integrity_check;')"
 printf 'LOAD_WRITE_HTTP_200=%s\n' "$TOTAL_WRITE_HTTP_200"
+printf 'LOAD_ACK_SQL_ROWS=%s\n' "$ACK_ROWS"
 printf 'LOAD_DB_ROWS=%s\n' "$DB_ROWS"
+printf 'LOAD_200_IDS_MISSING_FROM_DB=%s\n' "$ACK_MISSING"
+printf 'LOAD_DB_ONLY_IDS=%s\n' "$DB_ONLY"
+printf 'LOAD_DUPLICATE_IDS=%s\n' "$DUPLICATES"
 printf 'LOAD_DB_WRITE_MATCH=%s\n' "$([[ "$DB_ROWS" == "$TOTAL_WRITE_HTTP_200" ]] && echo 1 || echo 0)"
 printf 'LOAD_DB_INTEGRITY=%s\n' "$DB_INTEGRITY"
+LOCK_ERRORS="$(grep -ic 'database is locked' "$WORK/server.log" || true)"
+printf 'LOAD_DATABASE_IS_LOCKED=%s\n' "$LOCK_ERRORS"
+server_snapshot
+FINAL_RSS=$SERVER_RSS_NOW
+FINAL_FD=$SERVER_FD_NOW
+printf 'LOAD_RESOURCE_START rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
+printf 'LOAD_RESOURCE_END rss_kb=%s fd=%s\n' "$FINAL_RSS" "$FINAL_FD"
+RESOURCE_STABLE=0
+(( FINAL_RSS <= INITIAL_RSS + 2048 && FINAL_FD <= INITIAL_FD + 1 && INITIAL_FD <= FINAL_FD + 1 )) && RESOURCE_STABLE=1
+printf 'LOAD_RESOURCE_STABLE=%s\n' "$RESOURCE_STABLE"
 if kill -0 "$SERVER_PID" 2>/dev/null && [[ "$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}')" != Z* ]]; then SERVER_ALIVE=1; else SERVER_ALIVE=0; fi
 printf 'LOAD_SERVER_ALIVE=%s\n' "$SERVER_ALIVE"
 printf 'LOAD_SERVER_ALIVE_STAGES=%s/6\n' "$ALIVE_STAGES"
 printf 'LOAD_LIMIT_CONCURRENCY=%s\n' "$FIRST_LIMIT"
-printf 'LOAD_OVERLOAD_CLEAN=%s\n' "$OVERLOAD_CLEAN"
+printf 'LOAD_LOW_CONCURRENCY_ERROR_RATE_OK=%s\n' "$LOW_LOAD_OK"
+printf 'LOAD_HIGH_CONCURRENCY_REJECTIONS_OK=%s\n' "$HIGH_REJECTION_OK"
 printf 'LOAD_CLIENTS_CREATED_ALL=%s\n' "$CREATED_ALL"
 printf 'LOAD_ZOMBIE_STAGES=%s/6\n' "$METRIC_OK"
 SUMMARY=0
-(( STAGES == 6 )) && SUMMARY=$((SUMMARY + 1))
-[[ "$CREATED_ALL" == 1 ]] && SUMMARY=$((SUMMARY + 1))
+(( STAGES == 6 && ALIVE_STAGES == 6 && SERVER_ALIVE == 1 )) && [[ "$CREATED_ALL" == 1 ]] && SUMMARY=$((SUMMARY + 1))
 (( RECOVERIES == 6 )) && SUMMARY=$((SUMMARY + 1))
 (( METRIC_OK == 6 )) && SUMMARY=$((SUMMARY + 1))
-[[ "$DB_ROWS" == "$TOTAL_WRITE_HTTP_200" ]] && SUMMARY=$((SUMMARY + 1))
+[[ "$LOW_LOAD_OK" == 1 ]] && SUMMARY=$((SUMMARY + 1))
+[[ "$HIGH_REJECTION_OK" == 1 ]] && SUMMARY=$((SUMMARY + 1))
+[[ "$LOCK_ERRORS" == 0 ]] && SUMMARY=$((SUMMARY + 1))
+[[ "$ACK_MISSING" == 0 && "$ACK_ROWS" == "$TOTAL_WRITE_HTTP_200" ]] && SUMMARY=$((SUMMARY + 1))
+[[ "$DUPLICATES" == 0 ]] && SUMMARY=$((SUMMARY + 1))
 [[ "$DB_INTEGRITY" == ok ]] && SUMMARY=$((SUMMARY + 1))
-[[ "$ALIVE_STAGES" == 6 && "$SERVER_ALIVE" == 1 ]] && SUMMARY=$((SUMMARY + 1))
-[[ "$FIRST_LIMIT" != none || "$OVERLOAD_CLEAN" == 1 ]] && SUMMARY=$((SUMMARY + 1))
-[[ "$OVERLOAD_CLEAN" == 1 ]] && SUMMARY=$((SUMMARY + 1))
-printf 'LOAD_SUMMARY=%s/9\n' "$SUMMARY"
-test "$SUMMARY" -eq 9 && test "$BASE_RC" -eq 0
+[[ "$RESOURCE_STABLE" == 1 ]] && SUMMARY=$((SUMMARY + 1))
+printf 'LOAD2_SUMMARY=%s/10\n' "$SUMMARY"
+test "$SUMMARY" -ge 9 && test "$BASE_RC" -eq 0
 
 cleanup
 trap - EXIT INT TERM
 
-grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY|OOM_SUMMARY|FORKFAIL_SUMMARY|STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY)=' "$WORK/base.log"
+grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY|OOM_SUMMARY|FORKFAIL_SUMMARY|STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY|HTTPATK_SUMMARY)=' "$WORK/base.log"

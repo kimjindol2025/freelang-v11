@@ -37,6 +37,9 @@ typedef struct {
     uint64_t connect_other;
     uint64_t io_errors;
     uint64_t write_200;
+    char **ack_ids;
+    size_t ack_count;
+    size_t ack_capacity;
     uint32_t *latency_us;
     size_t latency_count;
     size_t latency_capacity;
@@ -91,7 +94,21 @@ static int connect_with_timeout(int fd, const struct sockaddr *address, socklen_
     return 0;
 }
 
-static void do_request(Worker *worker, unsigned route) {
+static int remember_ack(Worker *worker, const char *request_id) {
+    if (worker->ack_count == worker->ack_capacity) {
+        size_t capacity = worker->ack_capacity ? worker->ack_capacity * 2 : 16;
+        char **items = realloc(worker->ack_ids, capacity * sizeof(*items));
+        if (!items) return 0;
+        worker->ack_ids = items;
+        worker->ack_capacity = capacity;
+    }
+    worker->ack_ids[worker->ack_count] = strdup(request_id);
+    if (!worker->ack_ids[worker->ack_count]) return 0;
+    worker->ack_count++;
+    return 1;
+}
+
+static void do_request(Worker *worker, unsigned route, uint64_t sequence) {
     uint64_t began = monotonic_ns();
     int status = 0;
     int io_error = 0;
@@ -116,9 +133,13 @@ static void do_request(Worker *worker, unsigned route) {
 
     char request[512];
     int length;
+    char request_id[96] = "";
     if (route == 4) {
+        snprintf(request_id, sizeof(request_id), "s%u-w%u-q%llu", stage_id, worker->id,
+                 (unsigned long long)sequence);
         length = snprintf(request, sizeof(request),
-            "POST /write HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+            "POST /write HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Request-ID: %s\r\n"
+            "Connection: close\r\nContent-Length: 0\r\n\r\n", request_id);
     } else {
         const char *path = route == 0 ? "/ok" : route == 1 ? "/static/sample.txt" :
                            route == 2 ? "/jwt" : "/read";
@@ -150,9 +171,12 @@ done:
     if (status >= 0 && status < STATUS_MAX) worker->statuses[status]++;
     worker->requests++;
     worker->route_requests[route]++;
+    if (route == 4 && status == 200 && !io_error) {
+        if (strstr(response, request_id) && remember_ack(worker, request_id)) worker->write_200++;
+        else io_error = 1;
+    }
     if (status != 200 || io_error) worker->errors++;
     if (io_error) worker->io_errors++;
-    if (route == 4 && status == 200 && !io_error) worker->write_200++;
     add_latency(worker, monotonic_ns() - began);
 }
 
@@ -164,7 +188,7 @@ static void *worker_main(void *opaque) {
     uint64_t sequence = 0;
     while (monotonic_ns() < deadline_ns) {
         unsigned route = (worker->id + (unsigned)sequence) % ROUTE_COUNT;
-        do_request(worker, route);
+        do_request(worker, route, sequence);
         sequence++;
         if (monotonic_ns() < deadline_ns) {
             struct timespec pause = {.tv_sec = 1, .tv_nsec = 0};
@@ -180,14 +204,15 @@ static int compare_u32(const void *left, const void *right) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 5) {
-        fprintf(stderr, "usage: load-client <port> <concurrency> <seconds> <stage-id>\n");
+    if (argc != 6) {
+        fprintf(stderr, "usage: load-client <port> <concurrency> <seconds> <stage-id> <ack-sql>\n");
         return 2;
     }
     server_port = atoi(argv[1]);
     unsigned concurrency = (unsigned)strtoul(argv[2], NULL, 10);
     duration_seconds = (unsigned)strtoul(argv[3], NULL, 10);
     stage_id = (unsigned)strtoul(argv[4], NULL, 10);
+    const char *ack_path = argv[5];
     if (server_port < 1 || server_port > 65535 || !concurrency || concurrency > 1000 ||
         !duration_seconds || duration_seconds > 60) return 2;
     signal(SIGPIPE, SIG_IGN);
@@ -218,6 +243,7 @@ int main(int argc, char **argv) {
     double elapsed = (double)(ended - start_ns) / 1000000000.0;
 
     uint64_t requests = 0, errors = 0, refused = 0, connect_timeout = 0, connect_other = 0, io_errors = 0, write_200 = 0;
+    size_t ack_count = 0;
     uint64_t statuses[STATUS_MAX] = {0}, other_http = 0, route_requests[ROUTE_COUNT] = {0};
     size_t sample_count = 0;
     for (unsigned i = 0; i < created; i++) {
@@ -228,6 +254,7 @@ int main(int argc, char **argv) {
         connect_other += workers[i].connect_other;
         io_errors += workers[i].io_errors;
         write_200 += workers[i].write_200;
+        ack_count += workers[i].ack_count;
         sample_count += workers[i].latency_count;
         for (unsigned route = 0; route < ROUTE_COUNT; route++) route_requests[route] += workers[i].route_requests[route];
         for (int code = 0; code < STATUS_MAX; code++) {
@@ -247,7 +274,9 @@ int main(int argc, char **argv) {
     uint32_t p99 = sample_count ? samples[(sample_count - 1) * 99 / 100] : 0;
     uint32_t maximum = sample_count ? samples[sample_count - 1] : 0;
     double error_pct = requests ? 100.0 * (double)errors / (double)requests : 0.0;
-    printf("LOAD_STAGE stage=%u concurrency=%u created=%u create_failures=%u duration_s=%u elapsed_s=%.3f requests=%llu rps=%.2f p50_ms=%.3f p99_ms=%.3f max_ms=%.3f errors=%llu error_pct=%.3f connect_refused=%llu connect_timeout=%llu connect_other=%llu io_errors=%llu other_http=%llu write_http_200=%llu route_counts=",
+    uint64_t overload_rejected = statuses[503] + refused;
+    double rejection_pct = errors ? 100.0 * (double)overload_rejected / (double)errors : 0.0;
+    printf("LOAD_STAGE stage=%u concurrency=%u created=%u create_failures=%u duration_s=%u elapsed_s=%.3f requests=%llu rps=%.2f p50_ms=%.3f p99_ms=%.3f max_ms=%.3f errors=%llu error_pct=%.3f connect_refused=%llu connect_timeout=%llu connect_other=%llu io_errors=%llu other_http=%llu status_503=%llu overload_rejected=%llu rejection_pct=%.3f write_http_200=%llu route_counts=",
         stage_id, concurrency, created, concurrency - created, duration_seconds, elapsed,
         (unsigned long long)requests, elapsed > 0 ? requests / elapsed : 0.0,
         p50 / 1000.0, p99 / 1000.0, maximum / 1000.0,
@@ -255,6 +284,8 @@ int main(int argc, char **argv) {
         (unsigned long long)connect_timeout,
         (unsigned long long)connect_other, (unsigned long long)io_errors,
         (unsigned long long)other_http,
+        (unsigned long long)statuses[503], (unsigned long long)overload_rejected,
+        rejection_pct,
         (unsigned long long)write_200);
     for (unsigned route = 0; route < ROUTE_COUNT; route++) {
         printf("%s%s:%llu", route ? "," : "", route_names[route],
@@ -269,7 +300,19 @@ int main(int argc, char **argv) {
         comma = 1;
     }
     printf("\n");
-    for (unsigned i = 0; i < created; i++) free(workers[i].latency_us);
+    FILE *ack_file = fopen(ack_path, "a");
+    if (!ack_file) return 2;
+    for (unsigned i = 0; i < created; i++) {
+        for (size_t j = 0; j < workers[i].ack_count; j++) {
+            if (fprintf(ack_file, "INSERT INTO acknowledged_ids(request_id) VALUES('%s');\n",
+                        workers[i].ack_ids[j]) < 0) return 2;
+            free(workers[i].ack_ids[j]);
+        }
+        free(workers[i].ack_ids);
+        free(workers[i].latency_us);
+    }
+    if (fclose(ack_file) != 0) return 2;
+    printf("LOAD_ACK_IDS_SAVED=%zu\n", ack_count);
     free(samples);
     free(workers);
     free(threads);

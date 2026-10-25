@@ -28,7 +28,8 @@
 #define HTTP_DEFAULT_BODY_LIMIT (1024 * 1024)
 #define HTTP_STATIC_FILE_MAX (8 * 1024 * 1024)
 #define HTTP_STATIC_PATH_MAX 4096
-#define HTTP_MAX_WORKERS 128
+#define HTTP_MAX_WORKERS 256
+#define HTTP_LISTEN_BACKLOG 1024
 
 typedef struct {
     char method[16];
@@ -50,6 +51,7 @@ static int http_rate_count = 0;
 static volatile sig_atomic_t http_stopping = 0;
 static volatile sig_atomic_t http_child_changed = 0;
 static int http_worker_limit = 8;
+static int http_max_conn = 256;
 static pid_t http_workers[HTTP_MAX_WORKERS];
 static size_t http_worker_count = 0;
 typedef struct {
@@ -78,26 +80,6 @@ static void http_reap_workers(void) {
             http_workers[i] = http_workers[--http_worker_count];
         } else {
             i++;
-        }
-    }
-}
-
-static void http_wait_for_worker_slot(void) {
-    while (http_worker_count >= (size_t)http_worker_limit && !http_stopping) {
-        http_child_changed = 0;
-        int status;
-        pid_t result = waitpid(-1, &status, 0);
-        if (result > 0) {
-            for (size_t i = 0; i < http_worker_count; i++) {
-                if (http_workers[i] == result) {
-                    http_workers[i] = http_workers[--http_worker_count];
-                    break;
-                }
-            }
-        } else if (errno != EINTR && errno != ECHILD) {
-            break;
-        } else {
-            http_reap_workers();
         }
     }
 }
@@ -288,7 +270,7 @@ FLValue server_delete(FLValue path, FLValue handler) {
 
 FLValue server_workers(FLValue count) {
     if (count.tag != FL_INT || count.i < 1 || count.i > HTTP_MAX_WORKERS)
-        fl_throw(fl_str_val("HTTP worker count must be between 1 and 128"));
+        fl_throw(fl_str_val("HTTP worker count must be between 1 and 256"));
     http_worker_limit = (int)count.i;
     return fl_int(http_worker_limit);
 }
@@ -387,6 +369,18 @@ static void http_send_status(int fd, int status, const char *message) {
     int length = snprintf(body, sizeof(body), "{\"error\":\"%s\"}", message);
     if (length < 0) return;
     http_send_raw(fd, status, "application/json", NULL, NULL, body, (size_t)length);
+}
+
+static void http_send_busy(int fd) {
+    static const char body[] = "{\"error\":\"server busy\"}";
+    char response[256];
+    int length = snprintf(response, sizeof(response),
+        "HTTP/1.1 503 Service Unavailable\r\n"
+        "Content-Type: application/json\r\nContent-Length: %zu\r\n"
+        "Retry-After: 1\r\nConnection: close\r\nX-Freelang: native\r\n\r\n%s",
+        sizeof(body) - 1, body);
+    if (length > 0 && (size_t)length < sizeof(response))
+        http_send_all(fd, response, (size_t)length);
 }
 
 static char *http_trim(char *value) {
@@ -858,6 +852,16 @@ FLValue fl_http_start(FLValue port_value) {
         }
         max_requests = (int)parsed;
     }
+    const char *conn_env = getenv("FL_HTTP_MAX_CONN");
+    http_max_conn = 256;
+    if (conn_env && *conn_env) {
+        char *end = NULL;
+        long parsed = strtol(conn_env, &end, 10);
+        if (!end || *end || parsed < 1 || parsed > HTTP_MAX_WORKERS) {
+            fl_throw(fl_str_val("FL_HTTP_MAX_CONN must be between 1 and 256"));
+        }
+        http_max_conn = (int)parsed;
+    }
 
     int server = socket(AF_INET, SOCK_STREAM, 0);
     if (server < 0) return fl_nil();
@@ -868,7 +872,8 @@ FLValue fl_http_start(FLValue port_value) {
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     address.sin_port = htons((uint16_t)port);
-    if (bind(server, (struct sockaddr *)&address, sizeof(address)) != 0 || listen(server, 32) != 0) {
+    if (bind(server, (struct sockaddr *)&address, sizeof(address)) != 0 ||
+        listen(server, HTTP_LISTEN_BACKLOG) != 0) {
         close(server);
         return fl_nil();
     }
@@ -887,6 +892,8 @@ FLValue fl_http_start(FLValue port_value) {
     memset(http_rate_shared, 0, sizeof(*http_rate_shared));
     http_rate_shared->window_start = http_rate_window_start;
     printf("HTTP_LISTENING=127.0.0.1:%u\n", (unsigned)ntohs(address.sin_port));
+    printf("HTTP_LISTEN_BACKLOG=%d\n", HTTP_LISTEN_BACKLOG);
+    printf("HTTP_MAX_CONN=%d\n", http_max_conn);
     fflush(stdout);
     struct sigaction stop_action, child_action, old_int, old_term, old_child;
     memset(&stop_action, 0, sizeof(stop_action));
@@ -904,8 +911,6 @@ FLValue fl_http_start(FLValue port_value) {
     int served = 0;
     while (!http_stopping && (max_requests == 0 || served < max_requests)) {
         if (http_child_changed) http_reap_workers();
-        http_wait_for_worker_slot();
-        if (http_stopping) break;
         int client = accept(server, NULL, NULL);
         if (client < 0) {
             if (errno == EINTR || errno == ECONNABORTED || errno == EPROTO ||
@@ -916,6 +921,13 @@ FLValue fl_http_start(FLValue port_value) {
                 continue;
             }
             break;
+        }
+        if (http_worker_count >= (size_t)http_worker_limit ||
+            http_worker_count >= (size_t)http_max_conn) {
+            http_send_busy(client);
+            close(client);
+            served++;
+            continue;
         }
         pid_t worker = fork();
         if (worker == 0) {
@@ -929,7 +941,7 @@ FLValue fl_http_start(FLValue port_value) {
             _exit(0);
         }
         if (worker < 0) {
-            http_send_status(client, 503, "server busy");
+            http_send_busy(client);
             close(client);
         } else {
             (void)setpgid(worker, worker);
