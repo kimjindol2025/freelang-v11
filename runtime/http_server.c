@@ -4,7 +4,9 @@
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +19,8 @@
 
 #define HTTP_ROUTE_MAX 128
 #define HTTP_HEADER_MAX 65536
+#define HTTP_HEADER_COUNT_MAX 128
+#define HTTP_REQUEST_TIMEOUT_MS 500
 #define HTTP_DEFAULT_BODY_LIMIT (1024 * 1024)
 #define HTTP_MAX_WORKERS 128
 
@@ -305,7 +309,9 @@ static const char *http_reason(int status) {
         case 401: return "Unauthorized";
         case 403: return "Forbidden";
         case 404: return "Not Found";
+        case 408: return "Request Timeout";
         case 413: return "Payload Too Large";
+        case 431: return "Request Header Fields Too Large";
         case 429: return "Too Many Requests";
         case 500: return "Internal Server Error";
         case 503: return "Service Unavailable";
@@ -344,11 +350,26 @@ static char *http_trim(char *value) {
     return value;
 }
 
+static int http_wait_readable(int fd, int64_t deadline_ms) {
+    for (;;) {
+        int64_t remaining = deadline_ms - http_now_ms();
+        if (remaining <= 0) return 0;
+        struct pollfd item = { .fd = fd, .events = POLLIN };
+        int ready = poll(&item, 1, remaining > INT_MAX ? INT_MAX : (int)remaining);
+        if (ready < 0 && errno == EINTR) continue;
+        return ready;
+    }
+}
+
 static int http_read_headers(int fd, char *buffer, size_t capacity,
-                             size_t *received, size_t *header_length) {
+                             size_t *received, size_t *header_length,
+                             int64_t deadline_ms) {
     *received = 0;
     buffer[0] = '\0';
     while (*received < capacity - 1) {
+        int ready = http_wait_readable(fd, deadline_ms);
+        if (ready == 0) return -3;
+        if (ready < 0) return -1;
         ssize_t n = recv(fd, buffer + *received, capacity - 1 - *received, 0);
         if (n < 0 && errno == EINTR) continue;
         if (n <= 0) return -1;
@@ -360,18 +381,25 @@ static int http_read_headers(int fd, char *buffer, size_t capacity,
             return 0;
         }
     }
-    return -1;
+    return -2;
+}
+
+static int http_header_token_char(unsigned char c) {
+    return isalnum(c) || strchr("!#$%&'*+-.^_`|~", c) != NULL;
 }
 
 static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status) {
     char buffer[HTTP_HEADER_MAX + 1];
     size_t received = 0, header_length = 0;
-    if (http_read_headers(fd, buffer, sizeof(buffer), &received, &header_length) != 0) {
-        *out_status = 400;
+    int64_t deadline_ms = http_now_ms() + HTTP_REQUEST_TIMEOUT_MS;
+    int header_result = http_read_headers(fd, buffer, sizeof(buffer), &received, &header_length, deadline_ms);
+    if (header_result != 0) {
+        *out_status = header_result == -2 ? 431 : (header_result == -3 ? 408 : 400);
         return fl_nil();
     }
     char *header_end = strstr(buffer, "\r\n\r\n");
     if (!header_end) { *out_status = 400; return fl_nil(); }
+    if (memchr(buffer, '\0', (size_t)(header_end - buffer))) { *out_status = 400; return fl_nil(); }
     char *raw_header = NULL;
 #ifdef FL_HTTP_CAPTURE_RAW_TEST
     {
@@ -385,39 +413,76 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
     if (!line_end) { free(raw_header); *out_status = 400; return fl_nil(); }
     *line_end = '\0';
     char method[16], target[2048], version[16];
-    if (sscanf(buffer, "%15s %2047s %15s", method, target, version) != 3 ||
-        strncmp(version, "HTTP/1.", 7) != 0) {
+    size_t request_line_length = (size_t)(line_end - buffer);
+    if (memchr(buffer, '\0', request_line_length)) {
+        free(raw_header); *out_status = 400; return fl_nil();
+    }
+    char *first_space = memchr(buffer, ' ', request_line_length);
+    char *second_space = first_space ? memchr(first_space + 1, ' ',
+        request_line_length - (size_t)(first_space + 1 - buffer)) : NULL;
+    if (!first_space || !second_space || first_space == buffer || second_space == first_space + 1 ||
+        second_space + 1 >= line_end || memchr(second_space + 1, ' ',
+            (size_t)(line_end - second_space - 1))) {
         free(raw_header);
         *out_status = 400;
         return fl_nil();
     }
+    *first_space = '\0'; *second_space = '\0';
+    size_t method_length = strlen(buffer), target_length = strlen(first_space + 1);
+    if (method_length >= sizeof(method) || target_length >= sizeof(target) ||
+        (strcmp(second_space + 1, "HTTP/1.0") != 0 && strcmp(second_space + 1, "HTTP/1.1") != 0) ||
+        first_space[1] != '/' || first_space[1] == '\0') {
+        free(raw_header); *out_status = 400; return fl_nil();
+    }
+    for (size_t i = 0; i < method_length; i++)
+        if (!http_header_token_char((unsigned char)buffer[i])) {
+            free(raw_header); *out_status = 400; return fl_nil();
+        }
+    for (size_t i = 0; i < target_length; i++) {
+        unsigned char c = (unsigned char)first_space[1 + i];
+        if (c <= 0x20 || c == 0x7f) { free(raw_header); *out_status = 400; return fl_nil(); }
+    }
+    memcpy(method, buffer, method_length + 1);
+    memcpy(target, first_space + 1, target_length + 1);
+    memcpy(version, second_space + 1, strlen(second_space + 1) + 1);
 
     FLValue headers = fl_map_new();
     size_t body_length = 0;
     int has_transfer_encoding = 0;
+    int has_content_length = 0;
+    size_t header_count = 0;
     char *cursor = line_end + 2;
     while (cursor && *cursor) {
         char *next = strstr(cursor, "\r\n");
         if (next) *next = '\0';
         char *colon = strchr(cursor, ':');
-        if (colon) {
-            *colon = '\0';
-            char *name = http_trim(cursor);
-            char *value = http_trim(colon + 1);
-            for (char *p = name; *p; p++) *p = (char)tolower((unsigned char)*p);
-            headers = fl_map_set(headers, fl_str_val(name), fl_str_val(value));
-            if (strcmp(name, "content-length") == 0) {
-                char *end = NULL;
-                unsigned long long parsed = strtoull(value, &end, 10);
-                if (!end || *end || parsed > (unsigned long long)SIZE_MAX) {
-                    free(raw_header);
-                    *out_status = 400;
-                    return fl_nil();
-                }
-                body_length = (size_t)parsed;
-            } else if (strcmp(name, "transfer-encoding") == 0) {
-                has_transfer_encoding = 1;
+        if (++header_count > HTTP_HEADER_COUNT_MAX) { free(raw_header); *out_status = 431; return fl_nil(); }
+        if (!colon || colon == cursor || cursor[0] == ' ' || cursor[0] == '\t') {
+            free(raw_header); *out_status = 400; return fl_nil();
+        }
+        *colon = '\0';
+        for (char *p = cursor; *p; p++) {
+            if (!http_header_token_char((unsigned char)*p)) { free(raw_header); *out_status = 400; return fl_nil(); }
+            *p = (char)tolower((unsigned char)*p);
+        }
+        char *value = http_trim(colon + 1);
+        for (const unsigned char *p = (const unsigned char *)value; *p; p++)
+            if ((*p < 0x20 && *p != '\t') || *p == 0x7f) { free(raw_header); *out_status = 400; return fl_nil(); }
+        headers = fl_map_set(headers, fl_str_val(cursor), fl_str_val(value));
+        if (strcmp(cursor, "content-length") == 0) {
+            if (has_content_length || !*value) { free(raw_header); *out_status = 400; return fl_nil(); }
+            has_content_length = 1;
+            size_t parsed = 0;
+            for (const unsigned char *p = (const unsigned char *)value; *p; p++) {
+                if (*p < '0' || *p > '9') { free(raw_header); *out_status = 400; return fl_nil(); }
+                unsigned digit = (unsigned)(*p - '0');
+                if (parsed > (SIZE_MAX - digit) / 10) { free(raw_header); *out_status = 413; return fl_nil(); }
+                parsed = parsed * 10 + digit;
+                if (parsed > http_body_limit) { free(raw_header); *out_status = 413; return fl_nil(); }
             }
+            body_length = parsed;
+        } else if (strcmp(cursor, "transfer-encoding") == 0) {
+            has_transfer_encoding = 1;
         }
         if (!next) break;
         cursor = next + 2;
@@ -426,11 +491,15 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
     if (body_length > http_body_limit) { free(raw_header); *out_status = 413; return fl_nil(); }
 
     size_t body_available = received - header_length;
+    if (body_available > body_length) { free(raw_header); *out_status = 400; return fl_nil(); }
     size_t body_received = body_available < body_length ? body_available : body_length;
     char *body = fl_malloc(body_length + 1);
     if (!body) { free(raw_header); *out_status = 500; return fl_nil(); }
     if (body_received) memcpy(body, buffer + header_length, body_received);
     while (body_received < body_length) {
+        int ready = http_wait_readable(fd, deadline_ms);
+        if (ready == 0) { free(raw_header); free(body); *out_status = 408; return fl_nil(); }
+        if (ready < 0) { free(raw_header); free(body); *out_status = 400; return fl_nil(); }
         ssize_t n = recv(fd, body + body_received, body_length - body_received, 0);
         if (n < 0 && errno == EINTR) continue;
         if (n <= 0) { free(raw_header); free(body); *out_status = 400; return fl_nil(); }
@@ -523,7 +592,10 @@ static void http_handle_client(int fd) {
     int status = 400;
     (void)http_parse_request(fd, &request, &status);
     if (request.tag == FL_NIL) {
-        http_send_status(fd, status, status == 413 ? "payload too large" : "bad request");
+        const char *message = status == 408 ? "request timeout" :
+            (status == 413 ? "payload too large" :
+            (status == 431 ? "headers too large" : "bad request"));
+        http_send_status(fd, status, message);
         return;
     }
     if (http_rate_limited()) {

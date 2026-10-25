@@ -209,3 +209,6 @@ grep -E '^(PASS |PAR_FOUR_JOBS_MS=|PAR_MAX_CONCURRENCY=|PAR_ZOMBIES=|PAR_FD_STAR
 
 bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom" >"$WORK/oom.log" 2>&1
 cat "$WORK/oom.log"
+
+bash "$ROOT/tests/run-task934.sh" "$COMPILER" "$WORK/httpatk" >"$WORK/httpatk.log" 2>&1
+cat "$WORK/httpatk.log"
