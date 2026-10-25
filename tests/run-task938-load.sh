@@ -102,6 +102,39 @@ kill "$PROBE_PID"
 wait "$PROBE_PID" || true
 trap - EXIT INT TERM
 
+MIXSOAK_DB="$WORK/bench.sqlite" FL_HTTP_PORT=0 \
+  "$WORK/load-server" "$WORK/public" >"$WORK/bench-server.log" 2>&1 &
+BENCH_SERVER_PID=$!
+cleanup_bench() {
+  kill "$BENCH_SERVER_PID" 2>/dev/null || true
+  wait "$BENCH_SERVER_PID" 2>/dev/null || true
+}
+trap cleanup_bench EXIT INT TERM
+BENCH_PORT=""
+for _ in $(seq 1 100); do
+  BENCH_PORT="$(sed -n 's/^HTTP_LISTENING=127\.0\.0\.1://p' "$WORK/bench-server.log" | head -n 1)"
+  test -n "$BENCH_PORT" && break
+  kill -0 "$BENCH_SERVER_PID"
+  sleep 0.05
+done
+test -n "$BENCH_PORT"
+BENCH_ACK_SQL="$WORK/bench-acknowledged.sql"
+: >"$BENCH_ACK_SQL"
+printf 'BENCH_MEASUREMENT=client_monotonic_per_request_time duration_s=10 concurrency=1000\n'
+"$WORK/load-client" "$BENCH_PORT" 1000 10 "$((STAGES + 99))" "$BENCH_ACK_SQL" \
+  >"$WORK/bench-mixed.log" 2>&1
+printf 'BENCH_MODE=mixed_legacy_think_time '
+cat "$WORK/bench-mixed.log"
+for route in ok static jwt read write; do
+  "$WORK/load-client" "$BENCH_PORT" 1000 10 "$((STAGES + 100))" "$BENCH_ACK_SQL" "$route" \
+    >"$WORK/bench-$route.log" 2>&1
+  printf 'BENCH_ROUTE=%s ' "$route"
+  cat "$WORK/bench-$route.log"
+done
+kill "$BENCH_SERVER_PID"
+wait "$BENCH_SERVER_PID" || true
+trap - EXIT INT TERM
+
 FL_HTTP_PORT=0 "$WORK/load-server" "$WORK/public" >"$WORK/server.log" 2>&1 &
 SERVER_PID=$!
 cleanup() {
@@ -277,3 +310,58 @@ printf 'FDFIX_SUMMARY=%s/5\n' "$FDFIX_PASSED"
 test "$FDFIX_PASSED" -eq 5
 
 grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY|OOM_SUMMARY|FORKFAIL_SUMMARY|STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY|HTTPATK_SUMMARY)=' "$WORK/base.log"
+
+MIXSOAK_DB="$WORK/cap.sqlite" FL_HTTP_PORT=0 \
+  "$WORK/load-server" "$WORK/public" >"$WORK/cap-server.log" 2>&1 &
+CAP_SERVER_PID=$!
+cleanup_cap() {
+  kill "$CAP_SERVER_PID" 2>/dev/null || true
+  wait "$CAP_SERVER_PID" 2>/dev/null || true
+}
+trap cleanup_cap EXIT INT TERM
+CAP_PORT=""
+for _ in $(seq 1 100); do
+  CAP_PORT="$(sed -n 's/^HTTP_LISTENING=127\.0\.0\.1://p' "$WORK/cap-server.log" | head -n 1)"
+  test -n "$CAP_PORT" && break
+  kill -0 "$CAP_SERVER_PID"
+  sleep 0.05
+done
+test -n "$CAP_PORT"
+CAP_ZOMBIE_BEFORE="$(ps -o stat= --ppid "$CAP_SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}')"
+"$WORK/load-client" "$CAP_PORT" 400 30 941 "$WORK/cap-acknowledged.sql" slow300 \
+  >"$WORK/cap-client.log" 2>&1 &
+CAP_CLIENT_PID=$!
+while kill -0 "$CAP_CLIENT_PID" 2>/dev/null; do sleep 1; done
+wait "$CAP_CLIENT_PID"
+cat "$WORK/cap-client.log"
+CAP_LINE="$(grep '^LOAD_STAGE ' "$WORK/cap-client.log")"
+CAP_503="$(sed -n 's/.*status_503=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_RETRY_AFTER_MISSING="$(sed -n 's/.*retry_after_missing=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_ERRORS="$(sed -n 's/.*errors=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_OTHER_HTTP="$(sed -n 's/.*other_http=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_REFUSED="$(sed -n 's/.*connect_refused=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_TIMEOUT="$(sed -n 's/.*connect_timeout=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_CONNECT_OTHER="$(sed -n 's/.*connect_other=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_IO_ERRORS="$(sed -n 's/.*io_errors=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
+CAP_OTHER_ERRORS=$((CAP_ERRORS - CAP_503))
+CAP_ALIVE=0
+kill -0 "$CAP_SERVER_PID" 2>/dev/null && CAP_ALIVE=1
+CAP_RECOVERY="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$CAP_PORT/ok" 2>/dev/null || echo 000)"
+CAP_ZOMBIE_AFTER="$(ps -o stat= --ppid "$CAP_SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}')"
+CAP_ZOMBIE_DELTA=$((CAP_ZOMBIE_AFTER - CAP_ZOMBIE_BEFORE))
+kill "$CAP_SERVER_PID"
+wait "$CAP_SERVER_PID" || true
+trap - EXIT INT TERM
+CAP_ACTIVE_MAX="$(sed -n 's/^HTTP_ACTIVE_CONNECTIONS_MAX=//p' "$WORK/cap-server.log" | tail -n 1)"
+CAP_PASSED=0
+[[ "$CAP_ACTIVE_MAX" =~ ^[0-9]+$ ]] && (( CAP_ACTIVE_MAX <= 256 )) && CAP_PASSED=$((CAP_PASSED + 1))
+(( CAP_503 > 0 && CAP_RETRY_AFTER_MISSING == 0 )) && CAP_PASSED=$((CAP_PASSED + 1))
+(( CAP_OTHER_ERRORS == 0 && CAP_OTHER_HTTP == 0 && CAP_REFUSED == 0 && CAP_TIMEOUT == 0 && CAP_CONNECT_OTHER == 0 && CAP_IO_ERRORS == 0 )) && CAP_PASSED=$((CAP_PASSED + 1))
+(( CAP_ALIVE == 1 )) && CAP_PASSED=$((CAP_PASSED + 1))
+[[ "$CAP_RECOVERY" == 200 ]] && CAP_PASSED=$((CAP_PASSED + 1))
+(( CAP_ZOMBIE_DELTA == 0 && CAP_ZOMBIE_AFTER == 0 )) && CAP_PASSED=$((CAP_PASSED + 1))
+printf 'CAP_ACTIVE_CONNECTIONS_MAX=%s\nCAP_503=%s\nCAP_RETRY_AFTER_MISSING=%s\nCAP_OTHER_ERRORS=%s\nCAP_SERVER_ALIVE=%s\nCAP_RECOVERY_HTTP=%s\nCAP_ZOMBIE_BEFORE=%s\nCAP_ZOMBIE_AFTER=%s\nCAP_ZOMBIE_DELTA=%s\n' \
+  "$CAP_ACTIVE_MAX" "$CAP_503" "$CAP_RETRY_AFTER_MISSING" "$CAP_OTHER_ERRORS" "$CAP_ALIVE" "$CAP_RECOVERY" \
+  "$CAP_ZOMBIE_BEFORE" "$CAP_ZOMBIE_AFTER" "$CAP_ZOMBIE_DELTA"
+printf 'CAP_SUMMARY=%s/6\n' "$CAP_PASSED"
+test "$CAP_PASSED" -eq 6
