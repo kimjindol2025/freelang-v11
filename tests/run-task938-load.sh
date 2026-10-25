@@ -12,7 +12,9 @@ fi
 mkdir -p "$WORK/public"
 
 # Fast regression suite only; task 9-37 soak and fuzz phases are intentionally excluded.
-bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1
+BASE_RC=0
+bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1 || BASE_RC=$?
+printf 'LOAD_FAST_SUITE_RC=%s\n' "$BASE_RC"
 
 printf 'LOAD_STATIC_EXAMPLE_OK\n' >"$WORK/public/sample.txt"
 export MIXSOAK_DB="$WORK/load.sqlite"
@@ -132,7 +134,7 @@ SUMMARY=0
 [[ "$FIRST_LIMIT" != none || "$OVERLOAD_CLEAN" == 1 ]] && SUMMARY=$((SUMMARY + 1))
 [[ "$OVERLOAD_CLEAN" == 1 ]] && SUMMARY=$((SUMMARY + 1))
 printf 'LOAD_SUMMARY=%s/9\n' "$SUMMARY"
-test "$SUMMARY" -eq 9
+test "$SUMMARY" -eq 9 && test "$BASE_RC" -eq 0
 
 cleanup
 trap - EXIT INT TERM

@@ -207,7 +207,8 @@ gcc -w -I "$RUNTIME" -o "$WORK/parallel" "$WORK/parallel.c" "${link_sources[@]}"
 test "$(grep -c '^PASS ' "$WORK/parallel.log")" -eq 16
 grep -E '^(PASS |PAR_FOUR_JOBS_MS=|PAR_MAX_CONCURRENCY=|PAR_ZOMBIES=|PAR_FD_START=|PAR_FD_END=|PAR_SUMMARY=)' "$WORK/parallel.log"
 
-bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom" >"$WORK/oom.log" 2>&1
+OOM_RC=0
+bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom" >"$WORK/oom.log" 2>&1 || OOM_RC=$?
 cat "$WORK/oom.log"
 
 bash "$ROOT/tests/run-task934.sh" "$COMPILER" "$WORK/httpatk" >"$WORK/httpatk.log" 2>&1
@@ -215,3 +216,4 @@ cat "$WORK/httpatk.log"
 
 bash "$ROOT/tests/run-task935.sh" "$COMPILER" "$WORK/httpstatic" >"$WORK/httpstatic.log" 2>&1
 cat "$WORK/httpstatic.log"
+test "$OOM_RC" -eq 0
