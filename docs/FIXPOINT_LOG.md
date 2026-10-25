@@ -508,6 +508,8 @@ CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
 
+
+
 2026-10-19, TASK 9-2 ② JSON 이후 고정점. 시드는 유지했다. `[FUNC]` 선언을 forward declaration 목록에 포함해 표준 라이브러리의 `json-parse`/`json-stringify`가 FreeLang 구현으로 연결되게 했다.
 
 ```text
@@ -693,6 +695,18 @@ NATIVE_FIXED_POINT=PASS
 9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage2.c
 9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage3.c
 9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-25, TASK 9-35에서 server-static을 native 런타임에 추가했다. URL 경로를 한 번 엄격히 디코드하고 각 구성요소를 루트 디렉터리 파일 디스크립터 기준 openat(O_NOFOLLOW)로 열어 경로 이탈과 심볼릭 링크 탈출을 막는다. 헤더/본문 deadline을 각각 설정할 수 있게 해 기존 기본값 500ms를 유지했다. 이전 고정점 9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c, 새 고정점 ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba  stage2.c
+ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba  stage3.c
+ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba  stage4.c
 CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS

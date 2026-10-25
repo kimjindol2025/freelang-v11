@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -11,7 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -20,19 +23,26 @@
 #define HTTP_ROUTE_MAX 128
 #define HTTP_HEADER_MAX 65536
 #define HTTP_HEADER_COUNT_MAX 128
-#define HTTP_REQUEST_TIMEOUT_MS 500
+#define HTTP_DEFAULT_HEADER_TIMEOUT_MS 500
+#define HTTP_DEFAULT_BODY_TIMEOUT_MS 500
 #define HTTP_DEFAULT_BODY_LIMIT (1024 * 1024)
+#define HTTP_STATIC_FILE_MAX (8 * 1024 * 1024)
+#define HTTP_STATIC_PATH_MAX 4096
 #define HTTP_MAX_WORKERS 128
 
 typedef struct {
     char method[16];
     char *pattern;
     FLValue handler;
+    int static_root_fd;
+    int is_static;
 } FLHttpRoute;
 
 static FLHttpRoute http_routes[HTTP_ROUTE_MAX];
 static size_t http_route_count = 0;
 static size_t http_body_limit = HTTP_DEFAULT_BODY_LIMIT;
+static int http_header_timeout_ms = HTTP_DEFAULT_HEADER_TIMEOUT_MS;
+static int http_body_timeout_ms = HTTP_DEFAULT_BODY_TIMEOUT_MS;
 static int http_rate_max = 0;
 static int64_t http_rate_window_ms = 0;
 static int64_t http_rate_window_start = 0;
@@ -229,6 +239,42 @@ FLValue fl_http_route(FLValue method_value, FLValue path_value, FLValue handler)
     route->pattern = strdup(path);
     if (!route->pattern) fl_throw(fl_str_val("HTTP route allocation failed"));
     route->handler = handler;
+    route->static_root_fd = -1;
+    route->is_static = 0;
+    return fl_bool(true);
+}
+
+FLValue fl_http_static(FLValue root_value, FLValue prefix_value) {
+    const char *root = http_value_string(root_value, "server-static root");
+    const char *prefix = http_value_string(prefix_value, "server-static prefix");
+    size_t prefix_length = strlen(prefix);
+    if (http_route_count >= HTTP_ROUTE_MAX || prefix_length == 0 || prefix[0] != '/' ||
+        prefix_length >= 1024 || strchr(prefix, '?') || strchr(prefix, '#'))
+        fl_throw(fl_str_val("server-static expects a URL prefix and an available route slot"));
+    char *normalized_prefix = malloc(prefix_length + 2);
+    if (!normalized_prefix) fl_throw(fl_str_val("server-static allocation failed"));
+    memcpy(normalized_prefix, prefix, prefix_length + 1);
+    if (normalized_prefix[prefix_length - 1] != '/') {
+        normalized_prefix[prefix_length] = '/';
+        normalized_prefix[prefix_length + 1] = '\0';
+    }
+    char *absolute_root = realpath(root, NULL);
+    if (!absolute_root) {
+        free(normalized_prefix);
+        fl_throw(fl_str_val("server-static root does not exist"));
+    }
+    int root_fd = open(absolute_root, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    free(absolute_root);
+    if (root_fd < 0) {
+        free(normalized_prefix);
+        fl_throw(fl_str_val("server-static root is not a readable directory"));
+    }
+    FLHttpRoute *route = &http_routes[http_route_count++];
+    snprintf(route->method, sizeof(route->method), "GET");
+    route->pattern = normalized_prefix;
+    route->handler = fl_nil();
+    route->static_root_fd = root_fd;
+    route->is_static = 1;
     return fl_bool(true);
 }
 
@@ -391,8 +437,9 @@ static int http_header_token_char(unsigned char c) {
 static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status) {
     char buffer[HTTP_HEADER_MAX + 1];
     size_t received = 0, header_length = 0;
-    int64_t deadline_ms = http_now_ms() + HTTP_REQUEST_TIMEOUT_MS;
-    int header_result = http_read_headers(fd, buffer, sizeof(buffer), &received, &header_length, deadline_ms);
+    int64_t header_deadline_ms = http_now_ms() + http_header_timeout_ms;
+    int header_result = http_read_headers(fd, buffer, sizeof(buffer), &received, &header_length,
+                                          header_deadline_ms);
     if (header_result != 0) {
         *out_status = header_result == -2 ? 431 : (header_result == -3 ? 408 : 400);
         return fl_nil();
@@ -493,11 +540,12 @@ static FLValue http_parse_request(int fd, FLValue *out_request, int *out_status)
     size_t body_available = received - header_length;
     if (body_available > body_length) { free(raw_header); *out_status = 400; return fl_nil(); }
     size_t body_received = body_available < body_length ? body_available : body_length;
+    int64_t body_deadline_ms = http_now_ms() + http_body_timeout_ms;
     char *body = fl_malloc(body_length + 1);
     if (!body) { free(raw_header); *out_status = 500; return fl_nil(); }
     if (body_received) memcpy(body, buffer + header_length, body_received);
     while (body_received < body_length) {
-        int ready = http_wait_readable(fd, deadline_ms);
+        int ready = http_wait_readable(fd, body_deadline_ms);
         if (ready == 0) { free(raw_header); free(body); *out_status = 408; return fl_nil(); }
         if (ready < 0) { free(raw_header); free(body); *out_status = 400; return fl_nil(); }
         ssize_t n = recv(fd, body + body_received, body_length - body_received, 0);
@@ -565,12 +613,167 @@ static int http_match_path(const char *pattern, const char *path, FLValue *param
     return 1;
 }
 
+static int http_hex_value(unsigned char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static int http_static_decode_path(const char *encoded, char *decoded, size_t capacity) {
+    size_t out = 0;
+    for (size_t i = 0; encoded[i]; i++) {
+        unsigned char c = (unsigned char)encoded[i];
+        if (c == '%') {
+            int hi = http_hex_value((unsigned char)encoded[i + 1]);
+            int lo = encoded[i + 1] ? http_hex_value((unsigned char)encoded[i + 2]) : -1;
+            if (hi < 0 || lo < 0) return 0;
+            c = (unsigned char)((hi << 4) | lo);
+            i += 2;
+        }
+        if (out + 1 >= capacity || c == '\0' || c == '\\' || c < 0x20 || c == 0x7f)
+            return 0;
+        decoded[out++] = (char)c;
+    }
+    decoded[out] = '\0';
+    if (!out || decoded[0] == '/') return 0;
+    for (size_t i = 0; i < out; i++) {
+        if (decoded[i] == '%' && decoded[i + 1] && decoded[i + 2] &&
+            http_hex_value((unsigned char)decoded[i + 1]) >= 0 &&
+            http_hex_value((unsigned char)decoded[i + 2]) >= 0)
+            return 0;
+    }
+    for (char *segment = decoded; segment;) {
+        char *slash = strchr(segment, '/');
+        size_t length = slash ? (size_t)(slash - segment) : strlen(segment);
+        if (length == 0 || (length == 1 && segment[0] == '.') ||
+            (length == 2 && segment[0] == '.' && segment[1] == '.'))
+            return 0;
+        if (!slash) break;
+        segment = slash + 1;
+        if (!*segment) return 0;
+    }
+    return 1;
+}
+
+static FLValue http_static_error(int status, const char *message) {
+    char body[96];
+    snprintf(body, sizeof(body), "{\"error\":\"%s\"}", message);
+    return http_response(status, "application/json", fl_str_val(body));
+}
+
+static FLValue http_static_bytes(const unsigned char *bytes, size_t length) {
+    FLString *object = malloc(sizeof(*object) + length + 1);
+    if (!object) return fl_nil();
+    object->base.type = FL_STRING;
+    object->base.rc = 1;
+    object->len = (uint32_t)length;
+    memcpy(object->data, bytes, length);
+    object->data[length] = '\0';
+    FLValue value = { .tag = FL_STRING, .obj = (FLObject *)object };
+    return value;
+}
+
+static const char *http_static_content_type(const char *path) {
+    const char *extension = strrchr(path, '.');
+    if (!extension) return "application/octet-stream";
+    if (strcasecmp(extension, ".html") == 0 || strcasecmp(extension, ".htm") == 0)
+        return "text/html; charset=utf-8";
+    if (strcasecmp(extension, ".css") == 0) return "text/css; charset=utf-8";
+    if (strcasecmp(extension, ".js") == 0) return "application/javascript; charset=utf-8";
+    if (strcasecmp(extension, ".json") == 0) return "application/json; charset=utf-8";
+    if (strcasecmp(extension, ".svg") == 0) return "image/svg+xml";
+    if (strcasecmp(extension, ".txt") == 0) return "text/plain; charset=utf-8";
+    if (strcasecmp(extension, ".png") == 0) return "image/png";
+    if (strcasecmp(extension, ".jpg") == 0 || strcasecmp(extension, ".jpeg") == 0)
+        return "image/jpeg";
+    if (strcasecmp(extension, ".gif") == 0) return "image/gif";
+    return "application/octet-stream";
+}
+
+static FLValue http_static_serve(const FLHttpRoute *route, const char *path, int *status) {
+    size_t prefix_length = strlen(route->pattern);
+    char relative[HTTP_STATIC_PATH_MAX];
+    if (strncmp(path, route->pattern, prefix_length) != 0 ||
+        !http_static_decode_path(path + prefix_length, relative, sizeof(relative))) {
+        *status = 403;
+        return http_static_error(403, "forbidden");
+    }
+    int directory_fd = dup(route->static_root_fd);
+    if (directory_fd < 0) {
+        *status = 500;
+        return http_static_error(500, "file open failed");
+    }
+    char content_path[HTTP_STATIC_PATH_MAX];
+    memcpy(content_path, relative, strlen(relative) + 1);
+    char *cursor = relative;
+    int file_fd = -1;
+    while (cursor) {
+        char *slash = strchr(cursor, '/');
+        if (slash) *slash = '\0';
+        int flags = O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK;
+        if (slash) flags |= O_DIRECTORY;
+        file_fd = openat(directory_fd, cursor, flags);
+        close(directory_fd);
+        if (file_fd < 0) {
+            *status = errno == ELOOP ? 403 : 404;
+            return http_static_error(*status, *status == 403 ? "forbidden" : "not found");
+        }
+        if (!slash) break;
+        directory_fd = file_fd;
+        cursor = slash + 1;
+    }
+    struct stat info;
+    if (fstat(file_fd, &info) != 0 || !S_ISREG(info.st_mode)) {
+        close(file_fd);
+        *status = 404;
+        return http_static_error(404, "not found");
+    }
+    if (info.st_size < 0 || (uint64_t)info.st_size > HTTP_STATIC_FILE_MAX) {
+        close(file_fd);
+        *status = 413;
+        return http_static_error(413, "file too large");
+    }
+    size_t length = (size_t)info.st_size;
+    unsigned char *content = malloc(length ? length : 1);
+    if (!content) {
+        close(file_fd);
+        *status = 500;
+        return http_static_error(500, "file read failed");
+    }
+    size_t received = 0;
+    while (received < length) {
+        ssize_t n = read(file_fd, content + received, length - received);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) break;
+        received += (size_t)n;
+    }
+    close(file_fd);
+    if (received != length) {
+        free(content);
+        *status = 500;
+        return http_static_error(500, "file read failed");
+    }
+    FLValue body = http_static_bytes(content, length);
+    free(content);
+    if (body.tag != FL_STRING) {
+        *status = 500;
+        return http_static_error(500, "response allocation failed");
+    }
+    *status = 200;
+    return http_response(200, http_static_content_type(content_path), body);
+}
+
 static FLValue http_dispatch(FLValue request, int *status) {
     const char *method = ((FLString *)fl_map_get(request, fl_str_val("method")).obj)->data;
     const char *path = ((FLString *)fl_map_get(request, fl_str_val("path")).obj)->data;
     for (size_t i = 0; i < http_route_count; i++) {
         FLHttpRoute *route = &http_routes[i];
         if (strcmp(method, route->method) != 0) continue;
+        if (route->is_static) {
+            if (strncmp(path, route->pattern, strlen(route->pattern)) != 0) continue;
+            return http_static_serve(route, path, status);
+        }
         FLValue params;
         if (!http_match_path(route->pattern, path, &params)) continue;
         request = fl_map_set(request, fl_str_val("params"), params);
@@ -615,10 +818,26 @@ static void http_handle_client(int fd) {
         ? ((FLString *)cookie_value.obj)->data : NULL;
     int response_status = fl_map_get(response, fl_str_val("status")).tag == FL_INT
         ? (int)fl_map_get(response, fl_str_val("status")).i : status;
-    http_send_raw(fd, response_status, content_type, location, cookie, body_text, strlen(body_text));
+    size_t body_length = body.tag == FL_STRING && body.obj ? ((FLString *)body.obj)->len : strlen(body_text);
+    http_send_raw(fd, response_status, content_type, location, cookie, body_text, body_length);
+}
+
+static int http_timeout_setting(const char *name, int default_value) {
+    const char *text = getenv(name);
+    if (!text || !*text) return default_value;
+    char *end = NULL;
+    long value = strtol(text, &end, 10);
+    if (!end || *end || value < 1 || value > 60000) {
+        char message[128];
+        snprintf(message, sizeof(message), "%s must be between 1 and 60000", name);
+        fl_throw(fl_str_val(message));
+    }
+    return (int)value;
 }
 
 FLValue fl_http_start(FLValue port_value) {
+    http_header_timeout_ms = http_timeout_setting("FL_HTTP_HEADER_TIMEOUT_MS", HTTP_DEFAULT_HEADER_TIMEOUT_MS);
+    http_body_timeout_ms = http_timeout_setting("FL_HTTP_BODY_TIMEOUT_MS", HTTP_DEFAULT_BODY_TIMEOUT_MS);
     int port = port_value.tag == FL_INT ? (int)port_value.i : -1;
     const char *override = getenv("FL_HTTP_PORT");
     if (override && *override) {

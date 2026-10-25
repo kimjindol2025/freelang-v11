@@ -212,3 +212,6 @@ cat "$WORK/oom.log"
 
 bash "$ROOT/tests/run-task934.sh" "$COMPILER" "$WORK/httpatk" >"$WORK/httpatk.log" 2>&1
 cat "$WORK/httpatk.log"
+
+bash "$ROOT/tests/run-task935.sh" "$COMPILER" "$WORK/httpstatic" >"$WORK/httpstatic.log" 2>&1
+cat "$WORK/httpstatic.log"

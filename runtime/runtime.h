@@ -136,6 +136,7 @@ FLValue fl_db_exec(FLValue db, FLValue sql, FLValue params);
 FLValue fl_http_start(FLValue port);
 FLValue fl_http_stop(void);
 FLValue fl_http_route(FLValue method, FLValue path, FLValue handler);
+FLValue fl_http_static(FLValue root, FLValue url_prefix);
 FLValue fl_resp_json(FLValue value);
 FLValue fl_resp_status(FLValue status, FLValue body);
 FLValue fl_resp_redirect(FLValue location);

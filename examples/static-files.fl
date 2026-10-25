@@ -1,0 +1,7 @@
+(let [[args (cli-args)]]
+  (server-static (get args 0) "/static/"))
+
+(defn ok [request] (server-html "STATIC_ROUTE_OK"))
+(server-get "/ok" ok)
+(server-workers 64)
+(server-start 0)

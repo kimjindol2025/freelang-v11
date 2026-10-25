@@ -718,6 +718,7 @@
     [(= $op "http-post-headers") "fl_http_post_headers"]
     [(= $op "http-post-stream") "fl_http_post_stream"]
     [(= $op "http-stream-collect") "fl_http_stream_collect"]
+    [(= $op "server-static") "fl_http_static"]
     [(= $op "run-parallel") "fl_run_parallel"]
     [(= $op "uuid") "fl_uuid"]
     [(= $op "any?") "fl_any_p"]
