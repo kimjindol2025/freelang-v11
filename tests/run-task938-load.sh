@@ -56,7 +56,7 @@ server_snapshot() {
     SERVER_RSS_NOW=$((SERVER_RSS_NOW + rss_pages * PAGE_KB))
     local -a fds=(/proc/"$pid"/fd/*)
     SERVER_FD_NOW=$((SERVER_FD_NOW + ${#fds[@]}))
-    stat="$(ps -o stat= -p "$pid" 2>/dev/null | awk '{$1=$1;print}')"
+    stat="$(ps -o stat= -p "$pid" 2>/dev/null | awk '{$1=$1;print}' || true)"
     [[ "$stat" == Z* ]] && SERVER_ZOMBIE_NOW=$((SERVER_ZOMBIE_NOW + 1))
   done
   return 0
@@ -103,9 +103,10 @@ for concurrency in 10 50 100 200 500 1000; do
     [[ "$FIRST_LIMIT" != none ]] || FIRST_LIMIT="$concurrency"
   fi
   io_errors="$(sed -n 's/.*io_errors=\([0-9]*\).*/\1/p' <<<"$line")"
+  connect_timeout="$(sed -n 's/.*connect_timeout=\([0-9]*\).*/\1/p' <<<"$line")"
   connect_other="$(sed -n 's/.*connect_other=\([0-9]*\).*/\1/p' <<<"$line")"
   other_http="$(sed -n 's/.*other_http=\([0-9]*\).*/\1/p' <<<"$line")"
-  if [[ -n "$io_errors" && "$io_errors" != 0 ]] || [[ -n "$connect_other" && "$connect_other" != 0 ]] || [[ -n "$other_http" && "$other_http" != 0 ]]; then OVERLOAD_CLEAN=0; fi
+  if [[ -n "$io_errors" && "$io_errors" != 0 ]] || [[ -n "$connect_timeout" && "$connect_timeout" != 0 ]] || [[ -n "$connect_other" && "$connect_other" != 0 ]] || [[ -n "$other_http" && "$other_http" != 0 ]]; then OVERLOAD_CLEAN=0; fi
   recovery="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ok" 2>/dev/null || echo 000)"
   printf 'LOAD_RECOVERY concurrency=%s HTTP_STATUS=%s\n' "$concurrency" "$recovery"
   [[ "$recovery" == 200 ]] && RECOVERIES=$((RECOVERIES + 1))

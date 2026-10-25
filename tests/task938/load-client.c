@@ -33,6 +33,7 @@ typedef struct {
     uint64_t statuses[STATUS_MAX];
     uint64_t errors;
     uint64_t refused;
+    uint64_t connect_timeout;
     uint64_t connect_other;
     uint64_t io_errors;
     uint64_t write_200;
@@ -80,7 +81,7 @@ static int connect_with_timeout(int fd, const struct sockaddr *address, socklen_
     }
     if (errno != EINPROGRESS) return -1;
     struct pollfd item = {.fd = fd, .events = POLLOUT};
-    rc = poll(&item, 1, 250);
+    rc = poll(&item, 1, 1000);
     if (rc <= 0) { if (rc == 0) errno = ETIMEDOUT; return -1; }
     int error = 0;
     socklen_t error_length = sizeof(error);
@@ -107,6 +108,7 @@ static void do_request(Worker *worker, unsigned route) {
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (connect_with_timeout(fd, (struct sockaddr *)&address, sizeof(address)) != 0) {
         if (errno == ECONNREFUSED) worker->refused++;
+        else if (errno == ETIMEDOUT) worker->connect_timeout++;
         else worker->connect_other++;
         close(fd);
         goto done;
@@ -215,13 +217,14 @@ int main(int argc, char **argv) {
     uint64_t ended = monotonic_ns();
     double elapsed = (double)(ended - start_ns) / 1000000000.0;
 
-    uint64_t requests = 0, errors = 0, refused = 0, connect_other = 0, io_errors = 0, write_200 = 0;
+    uint64_t requests = 0, errors = 0, refused = 0, connect_timeout = 0, connect_other = 0, io_errors = 0, write_200 = 0;
     uint64_t statuses[STATUS_MAX] = {0}, other_http = 0, route_requests[ROUTE_COUNT] = {0};
     size_t sample_count = 0;
     for (unsigned i = 0; i < created; i++) {
         requests += workers[i].requests;
         errors += workers[i].errors;
         refused += workers[i].refused;
+        connect_timeout += workers[i].connect_timeout;
         connect_other += workers[i].connect_other;
         io_errors += workers[i].io_errors;
         write_200 += workers[i].write_200;
@@ -244,11 +247,12 @@ int main(int argc, char **argv) {
     uint32_t p99 = sample_count ? samples[(sample_count - 1) * 99 / 100] : 0;
     uint32_t maximum = sample_count ? samples[sample_count - 1] : 0;
     double error_pct = requests ? 100.0 * (double)errors / (double)requests : 0.0;
-    printf("LOAD_STAGE stage=%u concurrency=%u created=%u create_failures=%u duration_s=%u elapsed_s=%.3f requests=%llu rps=%.2f p50_ms=%.3f p99_ms=%.3f max_ms=%.3f errors=%llu error_pct=%.3f connect_refused=%llu connect_other=%llu io_errors=%llu other_http=%llu write_http_200=%llu route_counts=",
+    printf("LOAD_STAGE stage=%u concurrency=%u created=%u create_failures=%u duration_s=%u elapsed_s=%.3f requests=%llu rps=%.2f p50_ms=%.3f p99_ms=%.3f max_ms=%.3f errors=%llu error_pct=%.3f connect_refused=%llu connect_timeout=%llu connect_other=%llu io_errors=%llu other_http=%llu write_http_200=%llu route_counts=",
         stage_id, concurrency, created, concurrency - created, duration_seconds, elapsed,
         (unsigned long long)requests, elapsed > 0 ? requests / elapsed : 0.0,
         p50 / 1000.0, p99 / 1000.0, maximum / 1000.0,
         (unsigned long long)errors, error_pct, (unsigned long long)refused,
+        (unsigned long long)connect_timeout,
         (unsigned long long)connect_other, (unsigned long long)io_errors,
         (unsigned long long)other_http,
         (unsigned long long)write_200);
