@@ -30,7 +30,12 @@ gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" \
 gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" -o "$WORK/fuzz-http-server" \
   "$WORK/fuzz-http-server.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm
 gcc -std=c11 -Wall -Wextra -Werror -o "$WORK/fuzz-http-client" "$ROOT/tests/task937/http-fuzz-client.c"
-"${SAN_RUN[@]}" FL_HTTP_PORT=0 "$WORK/fuzz-http-server" >"$WORK/fuzz-http-server.log" 2>&1 &
+if ((${#SAN_FLAGS[@]})); then
+  env FL_HTTP_PORT=0 ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \
+    "$WORK/fuzz-http-server" >"$WORK/fuzz-http-server.log" 2>&1 &
+else
+  FL_HTTP_PORT=0 "$WORK/fuzz-http-server" >"$WORK/fuzz-http-server.log" 2>&1 &
+fi
 SERVER_PID=$!
 cleanup() { kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
