@@ -51,9 +51,11 @@ worker() {
 }
 
 server_metrics() {
-  local elapsed="$1" rss fd threads zombies errors p50 p99
+  local elapsed="$1" rss fd threads zombies errors p50 p99 server_rss server_fd children
   local pid value
   rss=0; fd=0; threads=0
+  server_rss="$(awk '{print int($2*4)}' "/proc/$SERVER_PID/statm")"
+  server_fd="$(find "/proc/$SERVER_PID/fd" -mindepth 1 -maxdepth 1 -type l | wc -l)"
   for pid in "$SERVER_PID" $( (ps -o pid= --ppid "$SERVER_PID" 2>/dev/null || true) | awk '{$1=$1; print}') ; do
     value="$(awk '{print int($2*4)}' "/proc/$pid/statm" 2>/dev/null || true)"
     [[ "$value" =~ ^[0-9]+$ ]] || continue
@@ -63,6 +65,7 @@ server_metrics() {
     value="$(find "/proc/$pid/task" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l || true)"
     threads=$((threads + ${value:-0}))
   done
+  children="$( (ps -o pid= --ppid "$SERVER_PID" 2>/dev/null || true) | awk 'NF {n++} END {print n+0}')"
   zombies="$( (ps -o stat= --ppid "$SERVER_PID" 2>/dev/null || true) | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
   errors=0
   for name in health static login jwt write read parallel; do
@@ -73,9 +76,9 @@ server_metrics() {
   errors=$((errors + count))
   p50="$(awk '$1==200 {print $2}' "$WORK/logs/health.log" 2>/dev/null | sort -n | awk '{a[NR]=$1} END {if (NR) printf "%.6f",a[int((NR+1)*0.50)]; else print "0"}')"
   p99="$(awk '$1==200 {print $2}' "$WORK/logs/health.log" 2>/dev/null | sort -n | awk '{a[NR]=$1} END {if (NR) printf "%.6f",a[int((NR+1)*0.99)]; else print "0"}')"
-  printf 'MIXSOAK_METRIC elapsed_s=%s rss_kb=%s fd=%s threads=%s zombie=%s errors=%s health_p50_s=%s health_p99_s=%s\n' \
-    "$elapsed" "$rss" "$fd" "$threads" "$zombies" "$errors" "$p50" "$p99"
-  printf '%s %s %s %s\n' "$elapsed" "$rss" "$fd" "$zombies" >>"$WORK/metrics.tsv"
+  printf 'MIXSOAK_METRIC elapsed_s=%s rss_kb=%s fd=%s threads=%s zombie=%s errors=%s health_p50_s=%s health_p99_s=%s supervisor_rss_kb=%s supervisor_fd=%s active_children=%s\n' \
+    "$elapsed" "$rss" "$fd" "$threads" "$zombies" "$errors" "$p50" "$p99" "$server_rss" "$server_fd" "$children"
+  printf '%s %s %s %s %s %s %s\n' "$elapsed" "$rss" "$fd" "$zombies" "$server_rss" "$server_fd" "$children" >>"$WORK/metrics.tsv"
 }
 
 for _ in 1 2 3 4; do worker & CLIENT_PIDS+=("$!"); done
@@ -109,12 +112,11 @@ FINAL_ZOMBIES="$( (ps -o stat= --ppid "$SERVER_PID" 2>/dev/null || true) | awk '
 ZOMBIE_MAX="$(awk '$4>m {m=$4} END {print m+0}' "$WORK/metrics.tsv")"
 FINAL_RSS="$(awk '{print int($2*4)}' "/proc/$SERVER_PID/statm")"
 FINAL_FD="$(find "/proc/$SERVER_PID/fd" -mindepth 1 -maxdepth 1 -type l | wc -l)"
-FIRST30_RSS="$(awk '$1<=1800 && $2>m {m=$2} END {print m+0}' "$WORK/metrics.tsv")"
-LAST_RSS="$(tail -n 1 "$WORK/metrics.tsv" | awk '{print $2}')"
-FIRST30_FD="$(awk '$1<=1800 && $3>m {m=$3} END {print m+0}' "$WORK/metrics.tsv")"
-LAST_FD="$(tail -n 1 "$WORK/metrics.tsv" | awk '{print $3}')"
-RSS_STABLE="$(awk -v base="$FIRST30_RSS" '$1>1800 && $2>base+1024 {bad=1} END {print bad ? 0 : 1}' "$WORK/metrics.tsv")"
-FD_STABLE="$(awk -v base="$FIRST30_FD" '$1>1800 && $3>base {bad=1} END {print bad ? 0 : 1}' "$WORK/metrics.tsv")"
+FIRST30_RSS="$(awk '$1<=1800 && $5>m {m=$5} END {print m+0}' "$WORK/metrics.tsv")"
+FIRST30_FD="$(awk '$1<=1800 && $6>m {m=$6} END {print m+0}' "$WORK/metrics.tsv")"
+WORKER_MAX="$(awk '$7>m {m=$7} END {print m+0}' "$WORK/metrics.tsv")"
+RSS_STABLE="$(awk -v base="$FIRST30_RSS" '$1>1800 && $5>base+1024 {bad=1} END {print bad ? 0 : 1}' "$WORK/metrics.tsv")"
+FD_STABLE="$(awk -v base="$FIRST30_FD" '$1>1800 && $6>base {bad=1} END {print bad ? 0 : 1}' "$WORK/metrics.tsv")"
 (( FINAL_RSS <= FIRST30_RSS + 1024 )) || RSS_STABLE=0
 (( FINAL_FD <= FIRST30_FD )) || FD_STABLE=0
 SERVER_ALIVE=0; kill -0 "$SERVER_PID" && SERVER_ALIVE=1
@@ -122,13 +124,13 @@ HEALTH_AFTER="$(curl --silent --show-error --max-time 3 -o /dev/null -w '%{http_
 printf 'MIXSOAK_DURATION_S=%s\nMIXSOAK_FAILURES=%s\nMIXSOAK_5XX=%s\nMIXSOAK_HEALTH_FAILURES=%s\nMIXSOAK_ATTACK_FAILURES=%s\n' \
   "$((END-START))" "$TOTAL_FAILURES" "$TOTAL_5XX" "$HEALTH_FAILURES" "$ATTACK_FAILURES"
 printf 'MIXSOAK_WRITES_SENT=%s\nMIXSOAK_DB_ROWS=%s\nMIXSOAK_DB_INTEGRITY=%s\n' "$WRITES_SENT" "$DB_ROWS" "$DB_CHECK"
-printf 'MIXSOAK_FINAL_RSS_KB=%s\nMIXSOAK_FINAL_FD=%s\nMIXSOAK_ZOMBIES=%s\nMIXSOAK_ZOMBIE_MAX=%s\nMIXSOAK_SERVER_ALIVE=%s\nMIXSOAK_HEALTH_AFTER=%s\n' \
-  "$FINAL_RSS" "$FINAL_FD" "$FINAL_ZOMBIES" "$ZOMBIE_MAX" "$SERVER_ALIVE" "$HEALTH_AFTER"
+printf 'MIXSOAK_FINAL_RSS_KB=%s\nMIXSOAK_FINAL_FD=%s\nMIXSOAK_ZOMBIES=%s\nMIXSOAK_ZOMBIE_MAX=%s\nMIXSOAK_ACTIVE_CHILD_MAX=%s\nMIXSOAK_SERVER_ALIVE=%s\nMIXSOAK_HEALTH_AFTER=%s\n' \
+  "$FINAL_RSS" "$FINAL_FD" "$FINAL_ZOMBIES" "$ZOMBIE_MAX" "$WORKER_MAX" "$SERVER_ALIVE" "$HEALTH_AFTER"
 printf 'MIXSOAK_RSS_STABLE=%s\nMIXSOAK_FD_STABLE=%s\n' "$RSS_STABLE" "$FD_STABLE"
 if (( TOTAL_FAILURES == 0 && TOTAL_5XX == 0 && WRITES_SENT == DB_ROWS && ATTACK_FAILURES == 0 &&
-      RSS_STABLE == 1 && FD_STABLE == 1 && FINAL_ZOMBIES == 0 && ZOMBIE_MAX == 0 && SERVER_ALIVE == 1 )) &&
+      RSS_STABLE == 1 && FD_STABLE == 1 && FINAL_ZOMBIES == 0 && ZOMBIE_MAX == 0 && WORKER_MAX <= 16 && SERVER_ALIVE == 1 )) &&
       [[ "$DB_CHECK" == ok && "$HEALTH_AFTER" == 200 ]]; then
-  echo 'MIXSOAK_SUMMARY=9/9'
+  echo 'MIXSOAK_SUMMARY=11/11'
 else
   echo 'MIXSOAK_SUMMARY=FAIL'
   exit 1
