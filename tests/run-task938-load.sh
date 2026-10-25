@@ -13,6 +13,7 @@ mkdir -p "$WORK/public"
 
 # Fast regression suite only; task 9-37 soak and fuzz phases are intentionally excluded.
 BASE_RC=0
+export FREELANG_HTTP_CGC="$COMPILER"
 bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1 || BASE_RC=$?
 printf 'LOAD_FAST_SUITE_RC=%s\n' "$BASE_RC"
 
@@ -55,7 +56,7 @@ wait "$SLOW_PID"
 SLOW_PID=""
 SLOW_STATUS="$(cat "$WORK/slow-status")"
 if [[ "$PROBE_STATUS" != 503 || "$SLOW_STATUS" != 200 ]] ||
-   ! grep -Eiq '^Retry-After: 1\r?$' "$WORK/overload.headers"; then
+   ! grep -Eiq '^Retry-After: 1' "$WORK/overload.headers"; then
   printf 'LOAD_OVERLOAD_PROBE status=%s retry_after_missing=1 slow_status=%s\n' "$PROBE_STATUS" "$SLOW_STATUS"
   kill "$PROBE_PID" 2>/dev/null || true
   wait "$PROBE_PID" 2>/dev/null || true
