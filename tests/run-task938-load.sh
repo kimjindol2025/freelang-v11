@@ -90,7 +90,7 @@ for concurrency in 10 50 100 200 500 1000; do
   printf 'LOAD_SERVER_METRIC concurrency=%s rss_start_kb=%s rss_max_kb=%s fd_start=%s fd_max=%s zombie_max=%s\n' \
     "$concurrency" "$rss_start" "$rss_max" "$fd_start" "$fd_max" "$zombies_max"
   if (( zombies_max == 0 )); then METRIC_OK=$((METRIC_OK + 1)); fi
-  (( STAGES++ ))
+  STAGES=$((STAGES + 1))
   line="$(cat "$WORK/stage-$concurrency.log")"
   writes="$(sed -n 's/.*write_http_200=\([0-9]*\).*/\1/p' <<<"$line")"
   TOTAL_WRITE_HTTP_200=$((TOTAL_WRITE_HTTP_200 + ${writes:-0}))
