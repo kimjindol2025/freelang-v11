@@ -75,7 +75,10 @@ static int run_jwt(unsigned count) {
             token[j] = alphabet[next_u32() % (sizeof(alphabet) - 1)];
         }
         token[n] = 0;
-        if ((i % 5) == 0) snprintf(token, sizeof(token), "%.80s.%.80s.%.80s", token, token, token);
+        if ((i % 5) == 0) {
+            char base[256]; memcpy(base, token, n + 1);
+            snprintf(token, sizeof(token), "%.80s.%.80s.%.80s", base, base, base);
+        }
         (void)fl_jwt_verify(fl_str_val(token), key);
     }
     printf("JWT_FUZZ iterations=%u issues=%u seed=0x937a51e1\n", count, issues);
