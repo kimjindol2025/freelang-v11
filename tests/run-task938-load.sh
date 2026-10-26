@@ -20,6 +20,8 @@ if [[ "${FL_HTTP_SKIP_FAST:-0}" != 1 ]]; then
   cat "$WORK/oom-suite.log" >>"$WORK/base.log"
 else
   : >"$WORK/base.log"
+  bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom-suite" >"$WORK/oom-suite.log" 2>&1
+  cat "$WORK/oom-suite.log" >>"$WORK/base.log"
 fi
 printf 'LOAD_FAST_SUITE_RC=%s\n' "$BASE_RC"
 
