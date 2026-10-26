@@ -229,7 +229,7 @@ HIGH_REJECTION_OK=1
 FIRST_LIMIT=none
 CREATED_ALL=1
 STEADY_RSS_BASELINE=0
-STEADY_FD_BASELINE=0
+STEADY_FD_BASELINE=$INITIAL_FD
 for concurrency in 10 50 100 200 500 1000; do
   stage_id=$((STAGES + 1))
   server_snapshot
@@ -254,7 +254,6 @@ for concurrency in 10 50 100 200 500 1000; do
   (( SERVER_ZOMBIE_NOW > zombies_max )) && zombies_max=$SERVER_ZOMBIE_NOW
   if (( STAGES == 0 )); then
     STEADY_RSS_BASELINE=$rss_max
-    STEADY_FD_BASELINE=$SERVER_FD_NOW
   fi
   printf 'LOAD_SERVER_METRIC concurrency=%s rss_start_kb=%s rss_max_kb=%s fd_start=%s fd_max=%s zombie_max=%s zombie_end=%s\n' \
     "$concurrency" "$rss_start" "$rss_max" "$fd_start" "$fd_max" "$zombies_max" "$SERVER_ZOMBIE_NOW"
