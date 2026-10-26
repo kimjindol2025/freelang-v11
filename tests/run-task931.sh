@@ -38,17 +38,21 @@ set +e
 (
   fillers=()
   for _ in 1 2 3 4; do sleep 10 & fillers+=("$!"); done
-  tasks_now="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
-  parallel_nproc_limit=$((tasks_now + 5))
-  printf '%s\n' "$parallel_nproc_limit" >"$WORK/parallel-nproc-limit"
-  ulimit -u "$parallel_nproc_limit"
-  printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u
-  "$WORK/forkfail"
+  (
+    tasks_now="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
+    parallel_nproc_limit=$((tasks_now + 3))
+    printf '%s\n' "$parallel_nproc_limit" >"$WORK/parallel-nproc-limit"
+    ulimit -u "$parallel_nproc_limit"
+    printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u
+    exec "$WORK/forkfail"
+  ) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err" &
+  run_pid=$!
+  wait "$run_pid"
   run_rc=$?
   for pid in "${fillers[@]}"; do kill "$pid" 2>/dev/null || true; done
   for pid in "${fillers[@]}"; do wait "$pid" 2>/dev/null || true; done
   exit "$run_rc"
-) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
+)
 parallel_rc=$?
 set -e
 parallel_nproc_limit="$(cat "$WORK/parallel-nproc-limit")"
