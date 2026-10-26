@@ -61,14 +61,19 @@ POOL_SUMMARY=8/8
 
 풀 스트레스에서 시험 설정은 `FL_HTTP_CAP_WORKERS=64`, `FL_HTTP_CAP_MAX_CONN=63`을 사용했다. 따라서 풀에서 관측한 상한 63은 런타임 기본 상한 256을 넘지 않는다. 256 worker 포화는 별도의 기존 방식 CAP 회귀에서 `CAP_ACTIVE_CONNECTIONS_MAX=256`으로 확인했다.
 
-작업자 강제 종료 및 요청 수 상한 교대 로그:
+## 4. 작업자 강제 종료와 교대 로그
 
 ```text
 POOL_KILLED_WORKER_RESTART=HTTP_WORKER_RESTART slot=0 old_pid=2515708 reason=signal detail=9 count=20 new_pid=2515843
+POOL_KILL_ERROR_PCT=0.002
+POOL_KILL_RECOVERY_HTTP=200
 POOL_ROTATION_LOG=HTTP_WORKER_RESTART slot=0 old_pid=2515946 reason=request-limit detail=75 count=1 new_pid=2515959
+POOL_ROTATION_SERVER_STOP_RC=0
+POOL_CHILDREN_AFTER_STOP=0
+POOL_WORKERS_ALIVE_AFTER_STOP=0
 ```
 
-## 4. 고정점과 시드
+## 5. 고정점과 시드
 
 컴파일러 단계는 이번에 수정하지 않았고 고정점은 바뀌지 않았다. 마지막으로 기록된 부트스트랩 결과:
 
@@ -82,7 +87,7 @@ CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
 
-## 5. 빠른 시험과 단일 strace
+## 6. 빠른 시험과 단일 strace
 
 최종 실행은 기능·시험 커밋 `1b1fc75d`에서 한 번의 `strace -f -e trace=execve`로 수행했다. 요약 출력:
 
@@ -131,10 +136,17 @@ JS=0
 PYTHON=0
 ```
 
-## 6. 커밋과 원격 반영
+## 7. 최종 커밋, 원격 HEAD와 위험
 
 - 기능 및 시험 실행 커밋: `1b1fc75d` (`test: tolerate ps with no remaining worker children`). 전체 시험은 이 커밋에서 통과했다.
-- 이 보고서는 그 실행의 결과를 보존한다. 보고서 커밋은 별도로 만들고, Forgejo 다음 GitHub 순으로 같은 브랜치에 푸시한다. 최종 `git ls-remote` HEAD 원문은 푸시 확인 결과와 함께 제출한다.
+- 이 보고서는 그 실행의 결과를 보존한다. 첫 보고서 커밋 `bd2a5b65`를 Forgejo 다음 GitHub에 푸시했고 두 원격의 HEAD가 같음을 확인했다.
+
+첫 보고서 푸시 확인 원문:
+
+```text
+bd2a5b6572149898b19ac5b153375302927e5f50	refs/heads/v11-x86-seed-public
+bd2a5b6572149898b19ac5b153375302927e5f50	refs/heads/v11-x86-seed-public
+```
 
 커밋 전 보고서 검사 원문:
 
@@ -149,4 +161,4 @@ REPORT_KEY_MATCHES=0
 
 - 처리량 목표는 미달이며 16 workers `/ok`에서 높은 오류율이 관측됐다. 상용 부하를 권장할 성능 결과는 아니다.
 - 풀 CAP 스트레스는 runner 부담 때문에 63 연결로 설정했다. 256 상한 자체는 기존 방식 CAP 시험에서 확인했으며, 풀 방식에서 256 연결을 지속 포화시키는 시험은 하지 않았다.
-- 보고서 커밋 이후 원격 HEAD는 최종 푸시 확인에서 다시 대조한다.
+- 이 문서의 최종 보정 커밋은 첫 보고서 푸시 다음에 생성되므로, 최종 원격 HEAD는 최종 커밋 후 별도로 대조한다.
