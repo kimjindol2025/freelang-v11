@@ -35,26 +35,29 @@ parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
 printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
 printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
 set +e
-(
-  fillers=()
-  for _ in 1 2 3 4; do sleep 10 & fillers+=("$!"); done
+parallel_rc=1
+parallel_selected=0
+for headroom in $(seq 1 32); do
   (
     tasks_now="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
-    parallel_nproc_limit=$((tasks_now + 3))
+    parallel_nproc_limit=$((tasks_now + headroom))
     printf '%s\n' "$parallel_nproc_limit" >"$WORK/parallel-nproc-limit"
     ulimit -u "$parallel_nproc_limit"
     printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u
     exec "$WORK/forkfail"
-  ) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err" &
-  run_pid=$!
-  wait "$run_pid"
-  run_rc=$?
-  for pid in "${fillers[@]}"; do kill "$pid" 2>/dev/null || true; done
-  for pid in "${fillers[@]}"; do wait "$pid" 2>/dev/null || true; done
-  exit "$run_rc"
-)
-parallel_rc=$?
+  ) >"$WORK/forkfail-attempt.out" 2>"$WORK/forkfail-attempt.err"
+  parallel_rc=$?
+  parallel_failed_try="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/forkfail-attempt.out" || true)"
+  parallel_succeeded_try="$(grep -Ec '^SLOT[0-9]+=[0-9]+$' "$WORK/forkfail-attempt.out" || true)"
+  if (( parallel_failed_try > 0 && parallel_succeeded_try > 0 )); then
+    mv "$WORK/forkfail-attempt.out" "$WORK/forkfail.out"
+    mv "$WORK/forkfail-attempt.err" "$WORK/forkfail.err"
+    parallel_selected=1
+    break
+  fi
+done
 set -e
+test "$parallel_selected" -eq 1
 parallel_nproc_limit="$(cat "$WORK/parallel-nproc-limit")"
 printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
 parallel_signal=0; test "$parallel_rc" -gt 128 && parallel_signal=$((parallel_rc - 128)) || true
