@@ -190,11 +190,13 @@ parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
 printf 'FORKFAIL_CASE=http-recovery FAILED_SLOTS=0 SUCCESSFUL_SLOTS=1 ERROR=none RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$server_rc" "$server_signal" "$parallel_zombie_delta"
 
 zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
-zombie_delta=$((zombies - baseline_zombies))
+zombie_raw_delta=$((zombies - baseline_zombies))
+zombie_delta=$zombie_raw_delta
+(( zombie_delta < 0 )) && zombie_delta=0
 test_zombies="$(ps -eo ppid=,stat= | awk -v p="$$" '$1 == p && $2 ~ /^Z/ {n++} END {print n+0}')"
 printf 'SEGV_COUNT=%s\n' "$segv_count"
 printf 'ZOMBIE_COUNT=%s\n' "$zombies"
-printf 'ZOMBIE_BASELINE=%s ZOMBIE_DELTA=%s\n' "$baseline_zombies" "$zombie_delta"
+printf 'ZOMBIE_BASELINE=%s ZOMBIE_DELTA=%s ZOMBIE_RAW_DELTA=%s\n' "$baseline_zombies" "$zombie_delta" "$zombie_raw_delta"
 printf 'TEST_PARENT_ZOMBIE_COUNT=%s\n' "$test_zombies"
 printf 'ZOMBIE_PS_RAW_BEGIN\n'; ps -eo pid,ppid,stat,comm | awk 'NR==1 || $3 ~ /^Z/'; printf 'ZOMBIE_PS_RAW_END\n'
 passed=11
