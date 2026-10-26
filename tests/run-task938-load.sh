@@ -13,10 +13,14 @@ mkdir -p "$WORK/public"
 
 # Fast regression suite only; task 9-37 soak and fuzz phases are intentionally excluded.
 BASE_RC=0
-export FREELANG_HTTP_CGC="$COMPILER"
-bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1 || BASE_RC=$?
-bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom-suite" >"$WORK/oom-suite.log" 2>&1 || BASE_RC=$?
-cat "$WORK/oom-suite.log" >>"$WORK/base.log"
+if [[ "${FL_HTTP_SKIP_FAST:-0}" != 1 ]]; then
+  export FREELANG_HTTP_CGC="$COMPILER"
+  bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1 || BASE_RC=$?
+  bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom-suite" >"$WORK/oom-suite.log" 2>&1 || BASE_RC=$?
+  cat "$WORK/oom-suite.log" >>"$WORK/base.log"
+else
+  : >"$WORK/base.log"
+fi
 printf 'LOAD_FAST_SUITE_RC=%s\n' "$BASE_RC"
 
 FDFIX_DIR="$WORK/fdfix"
@@ -66,7 +70,7 @@ gcc -w -I "$RUNTIME" -o "$WORK/load-server" "$WORK/load-server.c" \
 gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread \
   -o "$WORK/load-client" "$ROOT/tests/task938/load-client.c"
 
-MIXSOAK_DB="$WORK/probe.sqlite" FL_HTTP_MAX_CONN=1 FL_HTTP_PORT=0 \
+MIXSOAK_DB="$WORK/probe.sqlite" FL_HTTP_MAX_CONN=1 FL_HTTP_WORKERS=1 FL_HTTP_PORT=0 \
   "$WORK/load-server" "$WORK/public" >"$WORK/probe-server.log" 2>&1 &
 PROBE_PID=$!
 SLOW_PID=""
@@ -311,7 +315,9 @@ grep -Fxq 'LOAD2_SUMMARY=10/10' "$WORK/final-summary.log" && FDFIX_PASSED=$((FDF
 printf 'FDFIX_SUMMARY=%s/5\n' "$FDFIX_PASSED"
 test "$FDFIX_PASSED" -eq 5
 
-grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY|OOM_SUMMARY|FORKFAIL_SUMMARY|STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY|HTTPATK_SUMMARY)=' "$WORK/base.log"
+if [[ -s "$WORK/base.log" ]]; then
+  grep -E '^(FL_TEST_SUMMARY|TEST_EVIDENCE_SUMMARY|TCP_SUMMARY|HTTP_SUMMARY|AUDIT_SUMMARY|NATIVE_FORMS_SUMMARY|CGC_SYMBOL_SUMMARY|ERP_SUMMARY|ERP2_SUMMARY|ERP3_SUMMARY|CONC_SUMMARY|SEC_SUMMARY|AUTH_SUMMARY|PAGE_SUMMARY|NET2_SUMMARY|PW_SUMMARY|JWT_SUMMARY|STREAM_SUMMARY|JSONNUM_SUMMARY|PAR_SUMMARY|NAME_SUMMARY|WARN_SUMMARY|ABI_SUMMARY|BUILTIN2_SUMMARY|HOF_SUMMARY|OOM_SUMMARY|FORKFAIL_SUMMARY|STATIC_SUMMARY|TIMEOUT_SUMMARY|TIMEPREC_SUMMARY|HTTPATK_SUMMARY)=' "$WORK/base.log"
+fi
 
 MIXSOAK_DB="$WORK/cap.sqlite" FL_HTTP_PORT=0 \
   "$WORK/load-server" "$WORK/public" >"$WORK/cap-server.log" 2>&1 &

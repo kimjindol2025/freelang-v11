@@ -217,7 +217,7 @@ static void *worker_main(void *opaque) {
                          (worker->id + (unsigned)sequence) % MIXED_ROUTE_COUNT;
         do_request(worker, route, sequence);
         sequence++;
-        if (fixed_route < 0 && monotonic_ns() < deadline_ns) {
+        if (fixed_route == -1 && monotonic_ns() < deadline_ns) {
             struct timespec pause = {.tv_sec = 1, .tv_nsec = 0};
             while (nanosleep(&pause, &pause) != 0 && errno == EINTR) {}
         }
@@ -232,7 +232,7 @@ static int compare_u32(const void *left, const void *right) {
 
 int main(int argc, char **argv) {
     if (argc != 6 && argc != 7) {
-        fprintf(stderr, "usage: load-client <port> <concurrency> <seconds> <stage-id> <ack-sql> [ok|static|jwt|read|write|slow300]\n");
+        fprintf(stderr, "usage: load-client <port> <concurrency> <seconds> <stage-id> <ack-sql> [mixed|ok|static|jwt|read|write|slow300]\n");
         return 2;
     }
     server_port = atoi(argv[1]);
@@ -240,7 +240,9 @@ int main(int argc, char **argv) {
     duration_seconds = (unsigned)strtoul(argv[3], NULL, 10);
     stage_id = (unsigned)strtoul(argv[4], NULL, 10);
     const char *ack_path = argv[5];
-    if (argc == 7) {
+    if (argc == 7 && strcmp(argv[6], "mixed") == 0) {
+        fixed_route = -2;
+    } else if (argc == 7) {
         for (unsigned i = 0; i < ROUTE_COUNT; i++) {
             if (strcmp(argv[6], route_names[i]) == 0) fixed_route = (int)i;
         }

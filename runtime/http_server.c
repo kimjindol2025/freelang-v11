@@ -52,6 +52,9 @@ static volatile sig_atomic_t http_stopping = 0;
 static volatile sig_atomic_t http_child_changed = 0;
 static int http_worker_limit = HTTP_MAX_WORKERS;
 static int http_max_conn = 256;
+static int http_pool_workers = 0;
+static int http_pool_max_requests = 10000;
+static unsigned http_pool_restarts = 0;
 static pid_t http_workers[HTTP_MAX_WORKERS];
 static size_t http_worker_count = 0;
 typedef struct {
@@ -60,12 +63,32 @@ typedef struct {
     int count;
     volatile int active_connections;
     volatile int max_active_connections;
+    volatile int total_requests;
+    int worker_active[HTTP_MAX_WORKERS];
 } FLHttpRateState;
 static FLHttpRateState *http_rate_shared;
 static int64_t http_now_ms(void);
+static void http_handle_client(int fd);
+static void http_send_busy(int fd);
 
-static void http_connection_enter(void) {
-    int active = __sync_add_and_fetch(&http_rate_shared->active_connections, 1);
+static void http_shared_lock(void) {
+    while (__sync_lock_test_and_set(&http_rate_shared->lock, 1)) { }
+}
+
+static void http_shared_unlock(void) {
+    __sync_lock_release(&http_rate_shared->lock);
+}
+
+static int http_connection_enter(void) {
+    int active = __sync_val_compare_and_swap(&http_rate_shared->active_connections, 0, 0);
+    for (;;) {
+        if (active >= http_max_conn) return 0;
+        int previous = __sync_val_compare_and_swap(
+            &http_rate_shared->active_connections, active, active + 1);
+        if (previous == active) break;
+        active = previous;
+    }
+    active++;
     int peak = __sync_val_compare_and_swap(&http_rate_shared->max_active_connections, 0, 0);
     while (active > peak) {
         int previous = __sync_val_compare_and_swap(
@@ -73,6 +96,39 @@ static void http_connection_enter(void) {
         if (previous == peak) break;
         peak = previous;
     }
+    return 1;
+}
+
+static int http_pool_connection_enter(size_t slot) {
+    http_shared_lock();
+    if (http_rate_shared->active_connections >= http_max_conn) {
+        http_shared_unlock();
+        return 0;
+    }
+    http_rate_shared->worker_active[slot] = 1;
+    int active = ++http_rate_shared->active_connections;
+    if (active > http_rate_shared->max_active_connections)
+        http_rate_shared->max_active_connections = active;
+    http_shared_unlock();
+    return 1;
+}
+
+static void http_pool_connection_leave(size_t slot) {
+    http_shared_lock();
+    if (http_rate_shared->worker_active[slot]) {
+        http_rate_shared->worker_active[slot] = 0;
+        if (http_rate_shared->active_connections > 0)
+            http_rate_shared->active_connections--;
+    }
+    http_shared_unlock();
+}
+
+static int http_pool_request_count(void) {
+    return __sync_val_compare_and_swap(&http_rate_shared->total_requests, 0, 0);
+}
+
+static void http_pool_request_enter(void) {
+    (void)__sync_add_and_fetch(&http_rate_shared->total_requests, 1);
 }
 
 static void http_stop_signal(int signal_number) {
@@ -118,6 +174,149 @@ static void http_stop_workers(void) {
             http_worker_count = 0;
         }
     }
+}
+
+static int http_env_integer(const char *name, int fallback, int minimum, int maximum) {
+    const char *text = getenv(name);
+    if (!text || !*text) return fallback;
+    char *end = NULL;
+    long value = strtol(text, &end, 10);
+    if (!end || *end || value < minimum || value > maximum) {
+        char message[160];
+        snprintf(message, sizeof(message), "%s must be between %d and %d",
+                 name, minimum, maximum);
+        fl_throw(fl_str_val(message));
+    }
+    return (int)value;
+}
+
+static void http_pool_worker_loop(int server, size_t slot) {
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = http_stop_signal;
+    sigemptyset(&action.sa_mask);
+    (void)sigaction(SIGINT, &action, NULL);
+    (void)sigaction(SIGTERM, &action, NULL);
+    (void)signal(SIGCHLD, SIG_DFL);
+    http_stopping = 0;
+    int served = 0;
+    while (!http_stopping && served < http_pool_max_requests) {
+        int client = accept(server, NULL, NULL);
+        if (client < 0) {
+            if (errno == EINTR || errno == ECONNABORTED || errno == EPROTO ||
+                errno == EAGAIN || errno == EWOULDBLOCK) continue;
+            if (errno == EMFILE || errno == ENFILE || errno == ENOBUFS || errno == ENOMEM) {
+                struct timespec retry = {.tv_sec = 0, .tv_nsec = 10 * 1000 * 1000};
+                while (nanosleep(&retry, &retry) != 0 && errno == EINTR && !http_stopping) {}
+                continue;
+            }
+            break;
+        }
+        served++;
+        http_pool_request_enter();
+        if (http_pool_connection_enter(slot)) {
+            http_handle_client(client);
+            http_pool_connection_leave(slot);
+        } else {
+            http_send_busy(client);
+        }
+        close(client);
+    }
+    _exit(!http_stopping && served >= http_pool_max_requests ? 75 : 0);
+}
+
+static pid_t http_spawn_pool_worker(int server, size_t slot) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        (void)setpgid(0, 0);
+        http_pool_worker_loop(server, slot);
+    }
+    if (pid > 0) {
+        (void)setpgid(pid, pid);
+        http_workers[slot] = pid;
+        fprintf(stderr, "HTTP_WORKER_STARTED slot=%zu pid=%ld\n", slot, (long)pid);
+        fflush(stderr);
+    }
+    return pid;
+}
+
+static void http_run_pool(int server, int max_requests) {
+    size_t size = (size_t)http_pool_workers;
+    http_worker_count = 0;
+    for (size_t i = 0; i < size; i++) {
+        if (http_spawn_pool_worker(server, i) > 0) http_worker_count++;
+    }
+    while (!http_stopping && (max_requests == 0 || http_pool_request_count() < max_requests)) {
+        int status;
+        pid_t ended;
+        while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
+            for (size_t slot = 0; slot < size; slot++) {
+                if (http_workers[slot] != ended) continue;
+                http_pool_connection_leave(slot);
+                const char *reason = WIFSIGNALED(status) ? "signal" :
+                    (WIFEXITED(status) && WEXITSTATUS(status) == 75 ? "request-limit" : "exit");
+                int detail = WIFSIGNALED(status) ? WTERMSIG(status) :
+                    (WIFEXITED(status) ? WEXITSTATUS(status) : status);
+                http_workers[slot] = 0;
+                if (http_worker_count) http_worker_count--;
+                if (!http_stopping) {
+                    pid_t replacement = http_spawn_pool_worker(server, slot);
+                    http_pool_restarts++;
+                    fprintf(stderr,
+                        "HTTP_WORKER_RESTART slot=%zu old_pid=%ld reason=%s detail=%d count=%u new_pid=%ld\n",
+                        slot, (long)ended, reason, detail, http_pool_restarts,
+                        (long)(replacement > 0 ? replacement : 0));
+                    fflush(stderr);
+                    if (replacement > 0) http_worker_count++;
+                }
+                break;
+            }
+        }
+        if (http_child_changed) http_child_changed = 0;
+        for (size_t slot = 0; slot < size && !http_stopping; slot++) {
+            if (http_workers[slot] != 0) continue;
+            pid_t replacement = http_spawn_pool_worker(server, slot);
+            if (replacement > 0) {
+                http_worker_count++;
+                http_pool_restarts++;
+                fprintf(stderr,
+                    "HTTP_WORKER_RESTART slot=%zu old_pid=0 reason=spawn-retry detail=0 count=%u new_pid=%ld\n",
+                    slot, http_pool_restarts, (long)replacement);
+                fflush(stderr);
+            }
+        }
+        if (http_rate_shared->active_connections >= http_max_conn) {
+            struct pollfd listener = {.fd = server, .events = POLLIN};
+            int ready = poll(&listener, 1, 50);
+            if (ready > 0 && (listener.revents & POLLIN)) {
+                int client = accept(server, NULL, NULL);
+                if (client >= 0) {
+                    http_send_busy(client);
+                    close(client);
+                    http_pool_request_enter();
+                }
+            }
+        } else {
+            struct timespec pause = {.tv_sec = 0, .tv_nsec = 10 * 1000 * 1000};
+            while (nanosleep(&pause, &pause) != 0 && errno == EINTR && !http_stopping) {}
+        }
+    }
+}
+
+static void http_stop_pool(void) {
+    for (size_t i = 0; i < (size_t)http_pool_workers; i++) {
+        if (http_workers[i] > 0) {
+            (void)kill(-http_workers[i], SIGTERM);
+            (void)kill(http_workers[i], SIGTERM);
+        }
+    }
+    for (size_t i = 0; i < (size_t)http_pool_workers; i++) {
+        if (http_workers[i] > 0) {
+            while (waitpid(http_workers[i], NULL, 0) < 0 && errno == EINTR) {}
+            http_workers[i] = 0;
+        }
+    }
+    http_worker_count = 0;
 }
 
 static int http_rate_limited(void) {
@@ -845,6 +1044,8 @@ static int http_timeout_setting(const char *name, int default_value) {
 FLValue fl_http_start(FLValue port_value) {
     http_header_timeout_ms = http_timeout_setting("FL_HTTP_HEADER_TIMEOUT_MS", HTTP_DEFAULT_HEADER_TIMEOUT_MS);
     http_body_timeout_ms = http_timeout_setting("FL_HTTP_BODY_TIMEOUT_MS", HTTP_DEFAULT_BODY_TIMEOUT_MS);
+    http_pool_workers = http_env_integer("FL_HTTP_WORKERS", 0, 0, HTTP_MAX_WORKERS);
+    http_pool_max_requests = http_env_integer("FL_HTTP_WORKER_MAX_REQ", 10000, 1, INT_MAX);
     int port = port_value.tag == FL_INT ? (int)port_value.i : -1;
     const char *override = getenv("FL_HTTP_PORT");
     if (override && *override) {
@@ -908,6 +1109,8 @@ FLValue fl_http_start(FLValue port_value) {
     fprintf(stderr, "HTTP_LISTEN_BACKLOG=%d\n", HTTP_LISTEN_BACKLOG);
     fprintf(stderr, "HTTP_MAX_CONN=%d\n", http_max_conn);
     fprintf(stderr, "HTTP_WORKER_LIMIT=%d\n", http_worker_limit);
+    fprintf(stderr, "FL_HTTP_WORKERS=%d\n", http_pool_workers);
+    fprintf(stderr, "FL_HTTP_WORKER_MAX_REQ=%d\n", http_pool_max_requests);
     fflush(stdout);
     struct sigaction stop_action, child_action, old_int, old_term, old_child;
     memset(&stop_action, 0, sizeof(stop_action));
@@ -916,13 +1119,30 @@ FLValue fl_http_start(FLValue port_value) {
     memset(&child_action, 0, sizeof(child_action));
     child_action.sa_handler = http_child_signal;
     sigemptyset(&child_action.sa_mask);
-    child_action.sa_flags = SA_NOCLDWAIT;
+    child_action.sa_flags = 0;
     http_stopping = 0;
     http_child_changed = 0;
     http_worker_count = 0;
     (void)sigaction(SIGINT, &stop_action, &old_int);
     (void)sigaction(SIGTERM, &stop_action, &old_term);
     (void)sigaction(SIGCHLD, &child_action, &old_child);
+    if (http_pool_workers > 0) {
+        http_run_pool(server, max_requests);
+        close(server);
+        http_stop_pool();
+        fprintf(stderr, "HTTP_WORKER_RESTARTS_TOTAL=%u\n", http_pool_restarts);
+        fprintf(stderr, "HTTP_ACTIVE_CONNECTIONS_MAX=%d\n",
+                http_rate_shared->max_active_connections);
+        (void)sigaction(SIGINT, &old_int, NULL);
+        (void)sigaction(SIGTERM, &old_term, NULL);
+        (void)sigaction(SIGCHLD, &old_child, NULL);
+        (void)munmap(http_rate_shared, sizeof(*http_rate_shared));
+        http_rate_shared = NULL;
+        printf("HTTP_SERVER_STOPPED worker_pool=%d restarts=%u\n",
+               http_pool_workers, http_pool_restarts);
+        fflush(stdout);
+        return fl_int(0);
+    }
     int served = 0;
     while (!http_stopping && (max_requests == 0 || served < max_requests)) {
         if (http_child_changed) http_reap_workers();
@@ -951,9 +1171,12 @@ FLValue fl_http_start(FLValue port_value) {
             (void)signal(SIGINT, SIG_DFL);
             (void)signal(SIGTERM, SIG_DFL);
             (void)signal(SIGCHLD, SIG_DFL);
-            http_connection_enter();
-            http_handle_client(client);
-            (void)__sync_sub_and_fetch(&http_rate_shared->active_connections, 1);
+            if (http_connection_enter()) {
+                http_handle_client(client);
+                (void)__sync_sub_and_fetch(&http_rate_shared->active_connections, 1);
+            } else {
+                http_send_busy(client);
+            }
             close(client);
             _exit(0);
         }
