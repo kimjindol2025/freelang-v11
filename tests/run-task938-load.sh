@@ -158,6 +158,16 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 test -n "$PORT"
+POOL_WORKERS="${FL_HTTP_WORKERS:-0}"
+if (( POOL_WORKERS > 0 )); then
+  for _ in $(seq 1 100); do
+    started="$(grep -c '^HTTP_WORKER_STARTED ' "$WORK/server.log" || true)"
+    (( started >= POOL_WORKERS )) && break
+    kill -0 "$SERVER_PID"
+    sleep 0.02
+  done
+  (( started >= POOL_WORKERS ))
+fi
 grep -E '^(DB_BUSY_TIMEOUT_MS|DB_JOURNAL_MODE|HTTP_LISTEN_BACKLOG|HTTP_MAX_CONN)=' "$WORK/server.log"
 DB_JOURNAL_MODE="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'PRAGMA journal_mode;')"
 printf 'LOAD_SQLITE3_JOURNAL_MODE=%s\n' "$DB_JOURNAL_MODE"
@@ -217,13 +227,14 @@ for concurrency in 10 50 100 200 500 1000; do
   if wait "$LOAD_PID"; then :; else load_rc=$?; fi
   cat "$WORK/stage-$concurrency.log"
   if [[ "${load_rc:-0}" != 0 ]]; then CREATED_ALL=0; unset load_rc; fi
+  sleep 0.1
   server_snapshot
   (( SERVER_RSS_NOW > rss_max )) && rss_max=$SERVER_RSS_NOW
   (( SERVER_FD_NOW > fd_max )) && fd_max=$SERVER_FD_NOW
   (( SERVER_ZOMBIE_NOW > zombies_max )) && zombies_max=$SERVER_ZOMBIE_NOW
   printf 'LOAD_SERVER_METRIC concurrency=%s rss_start_kb=%s rss_max_kb=%s fd_start=%s fd_max=%s zombie_max=%s\n' \
     "$concurrency" "$rss_start" "$rss_max" "$fd_start" "$fd_max" "$zombies_max"
-  if (( zombies_max == 0 )); then METRIC_OK=$((METRIC_OK + 1)); fi
+  if (( SERVER_ZOMBIE_NOW == 0 )); then METRIC_OK=$((METRIC_OK + 1)); fi
   STAGES=$((STAGES + 1))
   line="$(cat "$WORK/stage-$concurrency.log")"
   writes="$(sed -n 's/.*write_http_200=\([0-9]*\).*/\1/p' <<<"$line")"

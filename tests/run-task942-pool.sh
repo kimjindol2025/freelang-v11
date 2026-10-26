@@ -51,7 +51,7 @@ for workers in 0 4 8 16; do
 done
 
 printf 'POOL_MODE_LOAD2_AND_CAP_BEGIN\n'
-FL_HTTP_WORKERS=4 FL_HTTP_CAP_WORKERS=256 FL_HTTP_SKIP_FAST=1 \
+FL_HTTP_WORKERS=4 FL_HTTP_WORKER_MAX_REQ=100 FL_HTTP_CAP_WORKERS=256 FL_HTTP_SKIP_FAST=1 \
   bash "$ROOT/tests/run-task938-load.sh" "$COMPILER" "$WORK/load2" \
   >"$WORK/load2.log" 2>&1
 grep -E '^(LOAD2_SUMMARY|FDFIX_SUMMARY|CAP_SUMMARY|LOAD_200_IDS_MISSING_FROM_DB=|LOAD_DB_ONLY_IDS=|LOAD_DUPLICATE_IDS=|LOAD_DB_INTEGRITY=|LOAD_DATABASE_IS_LOCKED=|CAP_ACTIVE_CONNECTIONS_MAX=|CAP_503=|CAP_OTHER_ERRORS=|CAP_RECOVERY_HTTP=|CAP_ZOMBIE_DELTA=)' "$WORK/load2.log"
@@ -91,6 +91,13 @@ for _ in $(seq 1 100); do
   sleep 0.05
 done
 test -n "$PORT"
+for _ in $(seq 1 100); do
+  started="$(grep -c '^HTTP_WORKER_STARTED ' "$WORK/resources.server.log" || true)"
+  (( started >= 4 )) && break
+  kill -0 "$SERVER_PID"
+  sleep 0.02
+done
+(( started >= 4 ))
 snapshot "$SERVER_PID"
 RSS_START=$SNAP_RSS; FD_START=$SNAP_FD
 : >"$WORK/resources.acks.sql"
@@ -102,6 +109,7 @@ OLD_WORKER="$(sed -n 's/^HTTP_WORKER_STARTED slot=0 pid=//p' "$WORK/resources.se
 kill -KILL "$OLD_WORKER"
 wait "$LOAD_PID"
 cat "$WORK/resources.client.log"
+sleep 0.1
 RESTART_LINE="$(grep 'HTTP_WORKER_RESTART slot=0 .*reason=signal detail=9' "$WORK/resources.server.log" | head -n 1)"
 printf 'POOL_KILLED_WORKER_RESTART=%s\n' "${RESTART_LINE:-missing}"
 ERROR_PCT="$(sed -n 's/.*error_pct=\([0-9.]*\).*/\1/p' "$WORK/resources.client.log")"
