@@ -358,6 +358,7 @@ if [[ -s "$WORK/base.log" ]]; then
 fi
 
 MIXSOAK_DB="$WORK/cap.sqlite" FL_HTTP_PORT=0 FL_HTTP_MAX_CONN="${FL_HTTP_CAP_MAX_CONN:-256}" \
+  FL_HTTP_WORKER_MAX_REQ="${FL_HTTP_CAP_WORKER_MAX_REQ:-10000}" \
   FL_HTTP_WORKERS="${FL_HTTP_CAP_WORKERS:-${FL_HTTP_WORKERS:-0}}" \
   "$WORK/load-server" "$WORK/public" >"$WORK/cap-server.log" 2>&1 &
 CAP_SERVER_PID=$!
