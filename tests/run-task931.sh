@@ -32,8 +32,9 @@ done
 gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
 parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
 parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
-# Leave room for tracing and runner overhead while forcing partial fork failure.
-parallel_nproc_limit=$((parallel_user_tasks + 10))
+# Leave room for tracing and runner overhead, then keep each child alive long
+# enough that the limit is reached before a completed job can free a slot.
+parallel_nproc_limit=$((parallel_user_tasks + 16))
 printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
 printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
 printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
