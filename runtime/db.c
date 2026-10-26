@@ -13,7 +13,10 @@ static const char *db_string(FLValue value, const char *operation) {
         snprintf(message, sizeof(message), "%s expects a string", operation);
         fl_throw(fl_str_val(message));
     }
-    return ((FLString *)value.obj)->data;
+    FLString *string = (FLString *)value.obj;
+    if (strlen(string->data) != string->len)
+        fl_throw(fl_str_val("database strings cannot contain zero bytes"));
+    return string->data;
 }
 
 typedef struct {
@@ -118,10 +121,10 @@ static void db_error(sqlite3 *db, const char *operation, int code) {
 }
 
 static sqlite3_stmt *db_prepare(sqlite3 *db, FLValue sql_value,
-                                FLValue params, const char *operation) {
+                                FLValue params, const char *operation, const char **tail) {
     const char *sql = db_string(sql_value, operation);
     sqlite3_stmt *statement = NULL;
-    int code = sqlite3_prepare_v2(db, sql, -1, &statement, NULL);
+    int code = sqlite3_prepare_v2(db, sql, -1, &statement, tail);
     if (code != SQLITE_OK) db_error(db, operation, code);
 
     if (params.tag != FL_VECTOR || !params.obj) {
@@ -153,9 +156,14 @@ static sqlite3_stmt *db_prepare(sqlite3 *db, FLValue sql_value,
                 if (!value.obj) {
                     code = sqlite3_bind_null(statement, (int)i + 1);
                 } else {
-                    const char *text = ((FLString *)value.obj)->data;
+                    FLString *string = (FLString *)value.obj;
+                    const char *text = string->data;
+                    if (strlen(text) != string->len) {
+                        sqlite3_finalize(statement);
+                        fl_throw(fl_str_val("db-exec: database strings cannot contain zero bytes"));
+                    }
                     code = sqlite3_bind_text(statement, (int)i + 1, text,
-                                             (int)strlen(text), SQLITE_TRANSIENT);
+                                             (int)string->len, SQLITE_TRANSIENT);
                 }
                 break;
             default:
@@ -177,6 +185,9 @@ static FLValue db_column(sqlite3_stmt *statement, int column) {
         case SQLITE_FLOAT:
             return fl_float(sqlite3_column_double(statement, column));
         case SQLITE_TEXT:
+            if (memchr(sqlite3_column_text(statement, column), 0,
+                       sqlite3_column_bytes(statement, column)))
+                fl_throw(fl_str_val("db-query: database text contains zero bytes"));
             return fl_str_val((const char *)sqlite3_column_text(statement, column));
         case SQLITE_NULL:
             return fl_nil();
@@ -225,7 +236,7 @@ FLValue fl_db_close(FLValue handle) {
 FLValue fl_db_query(FLValue handle, FLValue sql, FLValue params) {
     FLDbLease lease = db_acquire(handle);
     sqlite3 *db = lease.handle;
-    sqlite3_stmt *statement = db_prepare(db, sql, params, "db-query");
+    sqlite3_stmt *statement = db_prepare(db, sql, params, "db-query", NULL);
     FLValue rows = fl_vec_new();
     int columns = sqlite3_column_count(statement);
     int code;
@@ -246,7 +257,39 @@ FLValue fl_db_query(FLValue handle, FLValue sql, FLValue params) {
 FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params) {
     FLDbLease lease = db_acquire(handle);
     sqlite3 *db = lease.handle;
-    sqlite3_stmt *statement = db_prepare(db, sql, params, "db-exec");
+    const char *tail = NULL;
+    sqlite3_stmt *statement = db_prepare(db, sql, params, "db-exec", &tail);
+    sqlite3_stmt *next = NULL;
+    int next_code = sqlite3_prepare_v2(db, tail, -1, &next, NULL);
+    bool batch = next_code != SQLITE_OK || next != NULL;
+    sqlite3_finalize(next);
+    if (batch) {
+        sqlite3_finalize(statement);
+        if (((FLVector *)params.obj)->len != 0)
+            fl_throw(fl_str_val("db-exec: multiple statements cannot use parameters"));
+        int code = sqlite3_exec(db, "SAVEPOINT fl_db_batch", NULL, NULL, NULL);
+        if (code != SQLITE_OK) db_error(db, "db-exec", code);
+        int changed_before = sqlite3_total_changes(db);
+        char *error = NULL;
+        void (*previous_xfsz)(int) = signal(SIGXFSZ, SIG_IGN);
+        code = sqlite3_exec(db, db_string(sql, "db-exec"), NULL, NULL, &error);
+        if (previous_xfsz != SIG_ERR) (void)signal(SIGXFSZ, previous_xfsz);
+        if (code != SQLITE_OK) {
+            char message[512];
+            snprintf(message, sizeof(message), "db-exec: %s (sqlite=%d)",
+                     error ? error : sqlite3_errmsg(db), code);
+            sqlite3_free(error);
+            (void)sqlite3_exec(db, "ROLLBACK TO fl_db_batch; RELEASE fl_db_batch", NULL, NULL, NULL);
+            if (lease.owned) sqlite3_close(db);
+            fl_throw(fl_str_val(message));
+        }
+        sqlite3_free(error);
+        code = sqlite3_exec(db, "RELEASE fl_db_batch", NULL, NULL, NULL);
+        if (code != SQLITE_OK) db_error(db, "db-exec", code);
+        int changed = sqlite3_total_changes(db) - changed_before;
+        if (lease.owned) sqlite3_close(db);
+        return fl_int(changed);
+    }
     int changed_before = sqlite3_total_changes(db);
     void (*previous_xfsz)(int) = signal(SIGXFSZ, SIG_IGN);
     int code = sqlite3_step(statement);
