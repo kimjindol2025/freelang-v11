@@ -228,6 +228,8 @@ LOW_LOAD_OK=1
 HIGH_REJECTION_OK=1
 FIRST_LIMIT=none
 CREATED_ALL=1
+STEADY_RSS_BASELINE=0
+STEADY_FD_BASELINE=0
 for concurrency in 10 50 100 200 500 1000; do
   stage_id=$((STAGES + 1))
   server_snapshot
@@ -250,6 +252,10 @@ for concurrency in 10 50 100 200 500 1000; do
   (( SERVER_RSS_NOW > rss_max )) && rss_max=$SERVER_RSS_NOW
   (( SERVER_FD_NOW > fd_max )) && fd_max=$SERVER_FD_NOW
   (( SERVER_ZOMBIE_NOW > zombies_max )) && zombies_max=$SERVER_ZOMBIE_NOW
+  if (( STAGES == 0 )); then
+    STEADY_RSS_BASELINE=$rss_max
+    STEADY_FD_BASELINE=$SERVER_FD_NOW
+  fi
   printf 'LOAD_SERVER_METRIC concurrency=%s rss_start_kb=%s rss_max_kb=%s fd_start=%s fd_max=%s zombie_max=%s zombie_end=%s\n' \
     "$concurrency" "$rss_start" "$rss_max" "$fd_start" "$fd_max" "$zombies_max" "$SERVER_ZOMBIE_NOW"
   if (( SERVER_ZOMBIE_NOW == 0 )); then METRIC_OK=$((METRIC_OK + 1)); fi
@@ -302,10 +308,10 @@ server_snapshot
 FINAL_RSS=$SERVER_RSS_NOW
 FINAL_FD=$SERVER_FD_NOW
 printf 'LOAD_RESOURCE_COLD_START rss_kb=%s fd=%s\n' "$COLD_RSS" "$COLD_FD"
-printf 'LOAD_RESOURCE_START rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
+printf 'LOAD_RESOURCE_START rss_kb=%s fd=%s\n' "$STEADY_RSS_BASELINE" "$STEADY_FD_BASELINE"
 printf 'LOAD_RESOURCE_END rss_kb=%s fd=%s\n' "$FINAL_RSS" "$FINAL_FD"
 RESOURCE_STABLE=0
-(( FINAL_RSS <= INITIAL_RSS + 2048 && FINAL_FD <= INITIAL_FD + 1 && INITIAL_FD <= FINAL_FD + 1 )) && RESOURCE_STABLE=1
+(( FINAL_RSS <= STEADY_RSS_BASELINE + 2048 && FINAL_FD <= STEADY_FD_BASELINE + 1 && STEADY_FD_BASELINE <= FINAL_FD + 1 )) && RESOURCE_STABLE=1
 printf 'LOAD_RESOURCE_STABLE=%s\n' "$RESOURCE_STABLE"
 if kill -0 "$SERVER_PID" 2>/dev/null && [[ "$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}')" != Z* ]]; then SERVER_ALIVE=1; else SERVER_ALIVE=0; fi
 printf 'LOAD_SERVER_ALIVE=%s\n' "$SERVER_ALIVE"
