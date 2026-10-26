@@ -201,14 +201,25 @@ server_snapshot() {
 server_snapshot
 COLD_RSS=$SERVER_RSS_NOW
 COLD_FD=$SERVER_FD_NOW
-# Match the largest stage so the baseline includes per-worker high-water buffers.
-"$WORK/load-client" "$PORT" 1000 10 98 "$ACK_SQL" mixed >"$WORK/warmup.log" 2>&1
+# Match the largest stage and sample its high-water mark before measuring growth.
+WARM_RSS_MAX=$COLD_RSS; WARM_FD_MAX=$COLD_FD
+"$WORK/load-client" "$PORT" 1000 10 98 "$ACK_SQL" mixed >"$WORK/warmup.log" 2>&1 &
+WARMUP_PID=$!
+while kill -0 "$WARMUP_PID" 2>/dev/null; do
+  server_snapshot
+  (( SERVER_RSS_NOW > WARM_RSS_MAX )) && WARM_RSS_MAX=$SERVER_RSS_NOW
+  (( SERVER_FD_NOW > WARM_FD_MAX )) && WARM_FD_MAX=$SERVER_FD_NOW
+  sleep 0.1
+done
+wait "$WARMUP_PID"
 cat "$WORK/warmup.log"
 TOTAL_WRITE_HTTP_200="$(sed -n 's/.*write_http_200=\([0-9]*\).*/\1/p' "$WORK/warmup.log")"
 sleep 0.1
 server_snapshot
-INITIAL_RSS=$SERVER_RSS_NOW
-INITIAL_FD=$SERVER_FD_NOW
+(( SERVER_RSS_NOW > WARM_RSS_MAX )) && WARM_RSS_MAX=$SERVER_RSS_NOW
+(( SERVER_FD_NOW > WARM_FD_MAX )) && WARM_FD_MAX=$SERVER_FD_NOW
+INITIAL_RSS=$WARM_RSS_MAX
+INITIAL_FD=$WARM_FD_MAX
 printf 'LOAD_RESOURCE_WARM_BASELINE rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
 
 STAGES=0
