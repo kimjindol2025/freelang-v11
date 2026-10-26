@@ -46,7 +46,7 @@ static sqlite3 *db_open_path(const char *path, bool configure_wal) {
         if (db) sqlite3_close(db);
         fl_throw(fl_str_val(message));
     }
-    (void)sqlite3_busy_timeout(db, 2000);
+    (void)sqlite3_busy_timeout(db, 30000);
     (void)sqlite3_exec(db, "PRAGMA foreign_keys = ON", NULL, NULL, NULL);
     if (configure_wal) {
         char *error = NULL;

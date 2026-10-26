@@ -106,7 +106,9 @@ int main(int argc, char **argv) {
     } else if (!strcmp(mode, "worker")) {
         if (argc != 4) return 2;
         int start = atoi(argv[3]);
+        run(db, "BEGIN IMMEDIATE");
         for (int i = 0; i < 5000; i++) put(db, start + i, "worker");
+        run(db, "COMMIT");
     } else if (!strcmp(mode, "crash")) {
         run(db, "BEGIN IMMEDIATE");
         for (int i = 0; i < 20; i++) put(db, 1000000 + i, "unfinished");
