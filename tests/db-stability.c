@@ -30,7 +30,7 @@ static int fd_count(void) {
 
 static int benchmark(const char *path) {
     sqlite3 *db = NULL;
-    sqlite3_stmt *insert = NULL, *read = NULL;
+    sqlite3_stmt *insert = NULL;
     int fds_before = fd_count();
     if (sqlite3_open(path, &db) != SQLITE_OK) return 2;
     if (sqlite3_exec(db, "CREATE TABLE big(id INTEGER PRIMARY KEY,value TEXT);BEGIN", NULL, NULL, NULL)) return 2;
@@ -42,29 +42,29 @@ static int benchmark(const char *path) {
         sqlite3_reset(insert);
     }
     if (sqlite3_exec(db, "COMMIT", NULL, NULL, NULL)) return 2;
-    if (sqlite3_prepare_v2(db, "SELECT value FROM big WHERE id=?", -1, &read, NULL)) return 2;
+    sqlite3_finalize(insert);
+    sqlite3_close(db);
+    FLValue handle = fl_db_open(fl_str_val(path));
     long long reads[1000], writes[1000];
     for (int i = 0; i < 1000; i++) {
+        FLValue args = fl_vec_new();
+        args = fl_vec_push(args, fl_int(1 + i * 997));
         long long start = micros();
-        sqlite3_bind_int(read, 1, 1 + i * 997);
-        if (sqlite3_step(read) != SQLITE_ROW) return 2;
-        sqlite3_reset(read);
+        fl_db_query(handle, fl_str_val("SELECT value FROM big WHERE id=?"), args);
         reads[i] = micros() - start;
+        args = fl_vec_new();
+        args = fl_vec_push(args, fl_int(1000001 + i));
+        args = fl_vec_push(args, fl_str_val("data"));
         start = micros();
-        sqlite3_bind_int(insert, 1, 1000001 + i);
-        sqlite3_bind_text(insert, 2, "data", -1, SQLITE_STATIC);
-        if (sqlite3_step(insert) != SQLITE_DONE) return 2;
-        sqlite3_reset(insert);
+        fl_db_exec(handle, fl_str_val("INSERT INTO big VALUES (?,?)"), args);
         writes[i] = micros() - start;
     }
     qsort(reads, 1000, sizeof(*reads), compare_long);
     qsort(writes, 1000, sizeof(*writes), compare_long);
-    sqlite3_finalize(read);
-    sqlite3_finalize(insert);
-    sqlite3_close(db);
+    fl_db_close(handle);
     struct rusage usage;
     if (getrusage(RUSAGE_SELF, &usage)) return 2;
-    printf("BIG_ROWS=1001000 READ_P99_US=%lld WRITE_P99_US=%lld MAX_RSS_KB=%ld FD_BEFORE=%d FD_AFTER=%d\n",
+    printf("BIG_ROWS=1001000 API=FreeLang READ_P99_US=%lld WRITE_P99_US=%lld MAX_RSS_KB=%ld FD_BEFORE=%d FD_AFTER=%d\n",
            reads[989], writes[989], usage.ru_maxrss, fds_before, fd_count());
     return 0;
 }
