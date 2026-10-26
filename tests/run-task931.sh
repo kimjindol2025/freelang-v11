@@ -100,7 +100,7 @@ gcc -w -I "$RUNTIME" -o "$WORK/oom-server" "$WORK/oom-server.c" "${LINK[@]}" -ls
 start_server() {
   local work="$1" limit="$2" max="$3" fd_limit="$4"
   mkdir -p "$work"
-  (if test -n "$limit"; then ulimit -u "$limit"; printf 'HTTP_EFFECTIVE_ULIMIT_U='; ulimit -u; fi; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max"; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
+  (if test -n "$limit"; then ulimit -u "$limit"; printf 'HTTP_EFFECTIVE_ULIMIT_U='; ulimit -u; fi; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max" FL_HTTP_WORKERS=0; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
   SERVER_PID=$!
   for _ in $(seq 1 100); do
     if grep -q '^HTTP_LISTENING=' "$work/server.log"; then break; fi
