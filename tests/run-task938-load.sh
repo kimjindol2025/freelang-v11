@@ -188,7 +188,7 @@ server_snapshot() {
   done < <(ps -o pid=,stat= --ppid "$SERVER_PID" 2>/dev/null || true)
   for pid in "${pids[@]}"; do
     [[ -r "/proc/$pid/statm" ]] || continue
-    read -r _ rss_pages _ <"/proc/$pid/statm"
+    if ! read -r _ rss_pages _ <"/proc/$pid/statm" 2>/dev/null; then continue; fi
     SERVER_RSS_NOW=$((SERVER_RSS_NOW + rss_pages * PAGE_KB))
     local -a fds=(/proc/"$pid"/fd/*)
     SERVER_FD_NOW=$((SERVER_FD_NOW + ${#fds[@]}))
