@@ -198,6 +198,18 @@ server_snapshot() {
   return 0
 }
 
+server_snapshot
+COLD_RSS=$SERVER_RSS_NOW
+COLD_FD=$SERVER_FD_NOW
+"$WORK/load-client" "$PORT" 50 10 98 "$ACK_SQL" mixed >"$WORK/warmup.log" 2>&1
+cat "$WORK/warmup.log"
+TOTAL_WRITE_HTTP_200="$(sed -n 's/.*write_http_200=\([0-9]*\).*/\1/p' "$WORK/warmup.log")"
+sleep 0.1
+server_snapshot
+INITIAL_RSS=$SERVER_RSS_NOW
+INITIAL_FD=$SERVER_FD_NOW
+printf 'LOAD_RESOURCE_WARM_BASELINE rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
+
 STAGES=0
 RECOVERIES=0
 METRIC_OK=0
@@ -205,13 +217,7 @@ ALIVE_STAGES=0
 LOW_LOAD_OK=1
 HIGH_REJECTION_OK=1
 FIRST_LIMIT=none
-TOTAL_WRITE_HTTP_200=0
 CREATED_ALL=1
-server_snapshot
-INITIAL_RSS=$SERVER_RSS_NOW
-INITIAL_FD=$SERVER_FD_NOW
-COLD_RSS=$INITIAL_RSS
-COLD_FD=$INITIAL_FD
 for concurrency in 10 50 100 200 500 1000; do
   stage_id=$((STAGES + 1))
   server_snapshot
@@ -231,11 +237,6 @@ for concurrency in 10 50 100 200 500 1000; do
   if [[ "${load_rc:-0}" != 0 ]]; then CREATED_ALL=0; unset load_rc; fi
   sleep 0.1
   server_snapshot
-  if (( STAGES == 0 )); then
-    INITIAL_RSS=$SERVER_RSS_NOW
-    INITIAL_FD=$SERVER_FD_NOW
-    printf 'LOAD_RESOURCE_WARM_BASELINE rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
-  fi
   (( SERVER_RSS_NOW > rss_max )) && rss_max=$SERVER_RSS_NOW
   (( SERVER_FD_NOW > fd_max )) && fd_max=$SERVER_FD_NOW
   (( SERVER_ZOMBIE_NOW > zombies_max )) && zombies_max=$SERVER_ZOMBIE_NOW
