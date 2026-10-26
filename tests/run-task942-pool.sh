@@ -78,7 +78,7 @@ snapshot() {
   done
 }
 
-MIXSOAK_DB="$WORK/pool-resources.sqlite" FL_HTTP_PORT=0 FL_HTTP_WORKERS=4 \
+MIXSOAK_DB="$WORK/pool-resources.sqlite" FL_HTTP_PORT=0 FL_HTTP_WORKERS=4 FL_HTTP_WORKER_MAX_REQ=1000 \
   "$WORK/server" "$WORK/public" >"$WORK/resources.server.log" 2>&1 &
 SERVER_PID=$!
 cleanup_server() { kill -TERM "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; }
@@ -98,6 +98,9 @@ for _ in $(seq 1 100); do
   sleep 0.02
 done
 (( started >= 4 ))
+: >"$WORK/resources-warmup.acks.sql"
+"$WORK/load-client" "$PORT" 4 1 949 "$WORK/resources-warmup.acks.sql" mixed \
+  >"$WORK/resources-warmup.log" 2>&1
 snapshot "$SERVER_PID"
 RSS_START=$SNAP_RSS; FD_START=$SNAP_FD
 : >"$WORK/resources.acks.sql"
@@ -105,7 +108,7 @@ RSS_START=$SNAP_RSS; FD_START=$SNAP_FD
   >"$WORK/resources.client.log" 2>&1 &
 LOAD_PID=$!
 sleep 0.1
-OLD_WORKER="$(sed -n 's/^HTTP_WORKER_STARTED slot=0 pid=//p' "$WORK/resources.server.log" | head -n 1)"
+OLD_WORKER="$(sed -n 's/^HTTP_WORKER_STARTED slot=0 pid=//p' "$WORK/resources.server.log" | tail -n 1)"
 kill -KILL "$OLD_WORKER"
 wait "$LOAD_PID"
 cat "$WORK/resources.client.log"

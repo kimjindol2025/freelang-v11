@@ -210,6 +210,8 @@ CREATED_ALL=1
 server_snapshot
 INITIAL_RSS=$SERVER_RSS_NOW
 INITIAL_FD=$SERVER_FD_NOW
+COLD_RSS=$INITIAL_RSS
+COLD_FD=$INITIAL_FD
 for concurrency in 10 50 100 200 500 1000; do
   stage_id=$((STAGES + 1))
   server_snapshot
@@ -229,11 +231,16 @@ for concurrency in 10 50 100 200 500 1000; do
   if [[ "${load_rc:-0}" != 0 ]]; then CREATED_ALL=0; unset load_rc; fi
   sleep 0.1
   server_snapshot
+  if (( STAGES == 0 )); then
+    INITIAL_RSS=$SERVER_RSS_NOW
+    INITIAL_FD=$SERVER_FD_NOW
+    printf 'LOAD_RESOURCE_WARM_BASELINE rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
+  fi
   (( SERVER_RSS_NOW > rss_max )) && rss_max=$SERVER_RSS_NOW
   (( SERVER_FD_NOW > fd_max )) && fd_max=$SERVER_FD_NOW
   (( SERVER_ZOMBIE_NOW > zombies_max )) && zombies_max=$SERVER_ZOMBIE_NOW
-  printf 'LOAD_SERVER_METRIC concurrency=%s rss_start_kb=%s rss_max_kb=%s fd_start=%s fd_max=%s zombie_max=%s\n' \
-    "$concurrency" "$rss_start" "$rss_max" "$fd_start" "$fd_max" "$zombies_max"
+  printf 'LOAD_SERVER_METRIC concurrency=%s rss_start_kb=%s rss_max_kb=%s fd_start=%s fd_max=%s zombie_max=%s zombie_end=%s\n' \
+    "$concurrency" "$rss_start" "$rss_max" "$fd_start" "$fd_max" "$zombies_max" "$SERVER_ZOMBIE_NOW"
   if (( SERVER_ZOMBIE_NOW == 0 )); then METRIC_OK=$((METRIC_OK + 1)); fi
   STAGES=$((STAGES + 1))
   line="$(cat "$WORK/stage-$concurrency.log")"
@@ -283,6 +290,7 @@ printf 'LOAD_DATABASE_IS_LOCKED=%s\n' "$LOCK_ERRORS"
 server_snapshot
 FINAL_RSS=$SERVER_RSS_NOW
 FINAL_FD=$SERVER_FD_NOW
+printf 'LOAD_RESOURCE_COLD_START rss_kb=%s fd=%s\n' "$COLD_RSS" "$COLD_FD"
 printf 'LOAD_RESOURCE_START rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
 printf 'LOAD_RESOURCE_END rss_kb=%s fd=%s\n' "$FINAL_RSS" "$FINAL_FD"
 RESOURCE_STABLE=0
