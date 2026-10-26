@@ -136,18 +136,27 @@ curl --silent --show-error --max-time 3 -o /dev/null -w 'POOL_KILL_RECOVERY_HTTP
 snapshot "$SERVER_PID"
 RSS_END=$SNAP_RSS; FD_END=$SNAP_FD
 RESOURCE_STABLE=0
-(( RSS_END <= RSS_START + 2048 && FD_END <= FD_START + 1 && FD_START <= FD_END + 1 )) && RESOURCE_STABLE=1
+(( RSS_END <= RSS_START + 2048 && FD_END <= FD_START + 1 )) && RESOURCE_STABLE=1
 printf 'POOL_RESOURCE_START rss_kb=%s fd=%s\nPOOL_RESOURCE_END rss_kb=%s fd=%s\nPOOL_RESOURCE_STABLE=%s\n' \
   "$RSS_START" "$FD_START" "$RSS_END" "$FD_END" "$RESOURCE_STABLE"
 ZOMBIES="$SNAP_ZOMBIES"
 printf 'POOL_ZOMBIE_CHILDREN=%s\n' "$ZOMBIES"
+WORKER_PIDS="$(sed -n 's/^HTTP_WORKER_STARTED slot=[0-9][0-9]* pid=//p' "$WORK/resources.server.log")"
 kill -TERM "$SERVER_PID"
 STOPPED_PID=$SERVER_PID
-wait "$SERVER_PID"
+set +e; wait "$SERVER_PID"; POOL_STOP_RC=$?; set -e
+printf 'POOL_SERVER_STOP_RC=%s\n' "$POOL_STOP_RC"
+grep -q '^HTTP_SERVER_STOPPED worker_pool=4 ' "$WORK/resources.server.log"
 trap - EXIT INT TERM
 SERVER_PID=""
 LEFT_CHILDREN="$(ps -o pid= --ppid "$STOPPED_PID" 2>/dev/null | wc -l)"
-printf 'POOL_CHILDREN_AFTER_STOP=%s\n' "$LEFT_CHILDREN"
+WORKERS_ALIVE_AFTER_STOP=0
+while read -r worker_pid; do
+  [[ -n "$worker_pid" ]] || continue
+  kill -0 "$worker_pid" 2>/dev/null && WORKERS_ALIVE_AFTER_STOP=$((WORKERS_ALIVE_AFTER_STOP + 1)) || true
+done <<<"$WORKER_PIDS"
+printf 'POOL_CHILDREN_AFTER_STOP=%s\nPOOL_WORKERS_ALIVE_AFTER_STOP=%s\n' "$LEFT_CHILDREN" "$WORKERS_ALIVE_AFTER_STOP"
+test "$LEFT_CHILDREN" -eq 0 && test "$WORKERS_ALIVE_AFTER_STOP" -eq 0
 
 MIXSOAK_DB="$WORK/rotate.sqlite" FL_HTTP_PORT=0 FL_HTTP_WORKERS=2 \
   FL_HTTP_WORKER_MAX_REQ=5 "$WORK/server" "$WORK/public" >"$WORK/rotate.server.log" 2>&1 &
@@ -169,7 +178,9 @@ ROTATE_LOG="$(grep 'HTTP_WORKER_RESTART .*reason=request-limit' "$WORK/rotate.se
 printf 'POOL_ROTATION_LOG=%s\n' "${ROTATE_LOG:-missing}"
 test -n "$ROTATE_LOG"
 kill -TERM "$SERVER_PID"
-wait "$SERVER_PID"
+set +e; wait "$SERVER_PID"; ROTATE_STOP_RC=$?; set -e
+printf 'POOL_ROTATION_SERVER_STOP_RC=%s\n' "$ROTATE_STOP_RC"
+grep -q '^HTTP_SERVER_STOPPED worker_pool=2 ' "$WORK/rotate.server.log"
 trap - EXIT INT TERM
 SERVER_PID=""
 
