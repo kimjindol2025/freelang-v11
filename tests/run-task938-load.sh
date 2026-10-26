@@ -201,7 +201,8 @@ server_snapshot() {
 server_snapshot
 COLD_RSS=$SERVER_RSS_NOW
 COLD_FD=$SERVER_FD_NOW
-"$WORK/load-client" "$PORT" 50 10 98 "$ACK_SQL" mixed >"$WORK/warmup.log" 2>&1
+# Match the largest stage so the baseline includes per-worker high-water buffers.
+"$WORK/load-client" "$PORT" 1000 10 98 "$ACK_SQL" mixed >"$WORK/warmup.log" 2>&1
 cat "$WORK/warmup.log"
 TOTAL_WRITE_HTTP_200="$(sed -n 's/.*write_http_200=\([0-9]*\).*/\1/p' "$WORK/warmup.log")"
 sleep 0.1
