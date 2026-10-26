@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-WORK="${1:?usage: run-db-stability.sh <empty-temp-dir> <quick-log>}"
-QUICK_LOG="${2:?usage: run-db-stability.sh <empty-temp-dir> <quick-log>}"
+WORK="${1:?usage: run-db-stability.sh <empty-temp-dir> <quick-log> <quick-rc-file>}"
+QUICK_LOG="${2:?usage: run-db-stability.sh <empty-temp-dir> <quick-log> <quick-rc-file>}"
+QUICK_RC_FILE="${3:?usage: run-db-stability.sh <empty-temp-dir> <quick-log> <quick-rc-file>}"
 hold_pid=""
 trap 'if test -n "$hold_pid"; then kill "$hold_pid" 2>/dev/null || true; wait "$hold_pid" 2>/dev/null || true; fi' EXIT
 test ! -e "$WORK" || test -z "$(find "$WORK" -mindepth 1 -print -quit)"
@@ -105,9 +106,13 @@ test "$(sqlite3 "$DB" 'SELECT count(*) FROM payload WHERE id=900013')" = 0
 echo 'DB_CASE_8=PASS SPECIAL=stored LONG_LENGTH=100000 NULL=stored ZERO_BYTE_WRITE=rejected ZERO_BYTE_READ=rejected'
 passed=$((passed+1))
 
-grep -q '^LOAD2_SUMMARY=10/10$' "$QUICK_LOG"
-grep -q '^FDFIX_SUMMARY=5/5$' "$QUICK_LOG"
-echo 'DB_CASE_9=PASS QUICK_RC=0 FDFIX=5/5 LOAD2=10/10'
-passed=$((passed+1))
+if test "$(cat "$QUICK_RC_FILE")" = 0 &&
+   grep -q '^LOAD2_SUMMARY=10/10$' "$QUICK_LOG" &&
+   grep -q '^FDFIX_SUMMARY=5/5$' "$QUICK_LOG"; then
+  echo 'DB_CASE_9=PASS QUICK_RC=0 FDFIX=5/5 LOAD2=10/10'
+  passed=$((passed+1))
+else
+  echo 'DB_CASE_9=FAIL QUICK_RC_OR_SUMMARY_MISMATCH'
+fi
 echo "DB_SUMMARY=$passed/9"
 test "$passed" -eq 9
