@@ -38,6 +38,12 @@ typedef struct {
     uint64_t connect_timeout;
     uint64_t connect_other;
     uint64_t io_errors;
+    uint64_t send_timeout;
+    uint64_t send_other;
+    uint64_t recv_timeout;
+    uint64_t recv_other;
+    uint64_t incomplete_response;
+    uint64_t invalid_status;
     uint64_t write_200;
     uint64_t retry_after_missing;
     char **ack_ids;
@@ -136,6 +142,7 @@ static void do_request(Worker *worker, unsigned route, uint64_t sequence) {
     uint64_t began = monotonic_ns();
     int status = 0;
     int io_error = 0;
+    int recv_error = 0;
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         worker->connect_other++;
@@ -172,25 +179,40 @@ static void do_request(Worker *worker, unsigned route, uint64_t sequence) {
             "GET %s HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n", path);
     }
     if (length < 0 || (size_t)length >= sizeof(request) || !send_all(fd, request, (size_t)length)) {
+        if (errno == ETIMEDOUT || errno == EAGAIN || errno == EWOULDBLOCK)
+            worker->send_timeout++;
+        else
+            worker->send_other++;
         close(fd);
         io_error = 1;
         goto done;
     }
 
-    char response[16384];
+    char response[16384] = {0};
     size_t used = 0;
-    int eof = 0;
     while (used + 1 < sizeof(response)) {
         ssize_t n = recv(fd, response + used, sizeof(response) - used - 1, 0);
         if (n < 0 && errno == EINTR) continue;
-        if (n < 0) { io_error = 1; break; }
-        if (n == 0) { eof = 1; break; }
+        if (n < 0) {
+            io_error = 1;
+            recv_error = 1;
+            if (errno == ETIMEDOUT || errno == EAGAIN || errno == EWOULDBLOCK)
+                worker->recv_timeout++;
+            else
+                worker->recv_other++;
+            break;
+        }
+        if (n == 0) break;
         used += (size_t)n;
         response[used] = '\0';
         if (!status && sscanf(response, "HTTP/1.%*d %d", &status) != 1) status = 0;
     }
     close(fd);
-    if (!eof) io_error = !response_body_complete(response, used);
+    if (!recv_error) {
+        io_error = !response_body_complete(response, used);
+        if (io_error) worker->incomplete_response++;
+    }
+    if (!status) worker->invalid_status++;
     if (status == 503 && !strstr(response, "Retry-After: 1")) worker->retry_after_missing++;
 
 done:
@@ -278,6 +300,7 @@ int main(int argc, char **argv) {
     double elapsed = (double)(ended - start_ns) / 1000000000.0;
 
     uint64_t requests = 0, errors = 0, refused = 0, connect_timeout = 0, connect_other = 0, io_errors = 0, write_200 = 0, retry_after_missing = 0;
+    uint64_t send_timeout = 0, send_other = 0, recv_timeout = 0, recv_other = 0, incomplete_response = 0, invalid_status = 0;
     size_t ack_count = 0;
     uint64_t statuses[STATUS_MAX] = {0}, other_http = 0, route_requests[ROUTE_COUNT] = {0};
     size_t sample_count = 0;
@@ -288,6 +311,12 @@ int main(int argc, char **argv) {
         connect_timeout += workers[i].connect_timeout;
         connect_other += workers[i].connect_other;
         io_errors += workers[i].io_errors;
+        send_timeout += workers[i].send_timeout;
+        send_other += workers[i].send_other;
+        recv_timeout += workers[i].recv_timeout;
+        recv_other += workers[i].recv_other;
+        incomplete_response += workers[i].incomplete_response;
+        invalid_status += workers[i].invalid_status;
         write_200 += workers[i].write_200;
         retry_after_missing += workers[i].retry_after_missing;
         ack_count += workers[i].ack_count;
@@ -312,7 +341,7 @@ int main(int argc, char **argv) {
     double error_pct = requests ? 100.0 * (double)errors / (double)requests : 0.0;
     uint64_t overload_rejected = statuses[503] + refused;
     double rejection_pct = errors ? 100.0 * (double)overload_rejected / (double)errors : 0.0;
-    printf("LOAD_STAGE stage=%u concurrency=%u created=%u create_failures=%u duration_s=%u elapsed_s=%.3f requests=%llu rps=%.2f p50_ms=%.3f p99_ms=%.3f max_ms=%.3f errors=%llu error_pct=%.3f connect_refused=%llu connect_timeout=%llu connect_other=%llu io_errors=%llu other_http=%llu status_503=%llu retry_after_missing=%llu overload_rejected=%llu rejection_pct=%.3f write_http_200=%llu route_counts=",
+    printf("LOAD_STAGE stage=%u concurrency=%u created=%u create_failures=%u duration_s=%u elapsed_s=%.3f requests=%llu rps=%.2f p50_ms=%.3f p99_ms=%.3f max_ms=%.3f errors=%llu error_pct=%.3f connect_refused=%llu connect_timeout=%llu connect_other=%llu io_errors=%llu other_http=%llu status_503=%llu retry_after_missing=%llu overload_rejected=%llu rejection_pct=%.3f write_http_200=%llu send_timeout=%llu send_other=%llu recv_timeout=%llu recv_other=%llu incomplete_response=%llu invalid_status=%llu route_counts=",
         stage_id, concurrency, created, concurrency - created, duration_seconds, elapsed,
         (unsigned long long)requests, elapsed > 0 ? requests / elapsed : 0.0,
         p50 / 1000.0, p99 / 1000.0, maximum / 1000.0,
@@ -323,7 +352,10 @@ int main(int argc, char **argv) {
         (unsigned long long)statuses[503], (unsigned long long)retry_after_missing,
         (unsigned long long)overload_rejected,
         rejection_pct,
-        (unsigned long long)write_200);
+        (unsigned long long)write_200,
+        (unsigned long long)send_timeout, (unsigned long long)send_other,
+        (unsigned long long)recv_timeout, (unsigned long long)recv_other,
+        (unsigned long long)incomplete_response, (unsigned long long)invalid_status);
     for (unsigned route = 0; route < ROUTE_COUNT; route++) {
         printf("%s%s:%llu", route ? "," : "", route_names[route],
                (unsigned long long)route_requests[route]);

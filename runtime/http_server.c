@@ -17,6 +17,9 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+#include <sys/resource.h>
+#endif
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -222,8 +225,27 @@ static void http_pool_worker_loop(int server, size_t slot) {
     (void)signal(SIGCHLD, SIG_DFL);
     http_stopping = 0;
     int served = 0;
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+    uint64_t accept_wait_ns = 0;
+    uint64_t accept_wait_max_ns = 0;
+    struct rusage usage_start, usage_end;
+    (void)getrusage(RUSAGE_SELF, &usage_start);
+#endif
     while (!http_stopping && served < http_pool_max_requests) {
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+        struct timespec accept_started, accept_finished;
+        (void)clock_gettime(CLOCK_MONOTONIC, &accept_started);
+#endif
         int client = accept(server, NULL, NULL);
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+        (void)clock_gettime(CLOCK_MONOTONIC, &accept_finished);
+        int64_t accept_elapsed =
+            (int64_t)(accept_finished.tv_sec - accept_started.tv_sec) * 1000000000ll +
+            (int64_t)accept_finished.tv_nsec - (int64_t)accept_started.tv_nsec;
+        uint64_t accept_elapsed_ns = accept_elapsed > 0 ? (uint64_t)accept_elapsed : 0;
+        accept_wait_ns += accept_elapsed_ns;
+        if (accept_elapsed_ns > accept_wait_max_ns) accept_wait_max_ns = accept_elapsed_ns;
+#endif
         if (client < 0) {
             if (errno == EINTR || errno == ECONNABORTED || errno == EPROTO ||
                 errno == EAGAIN || errno == EWOULDBLOCK) continue;
@@ -244,6 +266,17 @@ static void http_pool_worker_loop(int server, size_t slot) {
         }
         close(client);
     }
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+    (void)getrusage(RUSAGE_SELF, &usage_end);
+    fprintf(stderr,
+        "HTTP_PERF_WORKER slot=%zu pid=%ld served=%d accept_wait_ns=%llu accept_wait_max_ns=%llu nvcsw=%ld nivcsw=%ld\n",
+        slot, (long)getpid(), served,
+        (unsigned long long)accept_wait_ns,
+        (unsigned long long)accept_wait_max_ns,
+        usage_end.ru_nvcsw - usage_start.ru_nvcsw,
+        usage_end.ru_nivcsw - usage_start.ru_nivcsw);
+    fflush(stderr);
+#endif
     _exit(!http_stopping && served >= http_pool_max_requests ? 75 : 0);
 }
 
