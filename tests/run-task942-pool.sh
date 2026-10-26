@@ -149,7 +149,7 @@ printf 'POOL_SERVER_STOP_RC=%s\n' "$POOL_STOP_RC"
 grep -q '^HTTP_SERVER_STOPPED worker_pool=4 ' "$WORK/resources.server.log"
 trap - EXIT INT TERM
 SERVER_PID=""
-LEFT_CHILDREN="$(ps -o pid= --ppid "$STOPPED_PID" 2>/dev/null | wc -l)"
+LEFT_CHILDREN="$(ps -o pid= --ppid "$STOPPED_PID" 2>/dev/null | wc -l || true)"
 WORKERS_ALIVE_AFTER_STOP=0
 while read -r worker_pid; do
   [[ -n "$worker_pid" ]] || continue
