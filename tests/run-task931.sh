@@ -30,18 +30,18 @@ done
 
 "$COMPILER" "$ROOT/tests/task932/forkfail.fl" "$WORK/forkfail.c" >"$WORK/forkfail.compile" 2>&1
 gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
-parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
-parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
-printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
-printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
 set +e
 parallel_rc=1
 parallel_selected=0
 for headroom in $(seq 1 32); do
   (
-    tasks_now="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
+    current_uid="$(id -u)"
+    tasks_now="$(ps -u "$current_uid" -L -o lwp= | wc -l | tr -d ' ')"
+    processes_now="$(ps -u "$current_uid" -o pid= | wc -l | tr -d ' ')"
     parallel_nproc_limit=$((tasks_now + headroom))
     printf '%s\n' "$parallel_nproc_limit" >"$WORK/parallel-nproc-limit"
+    printf '%s\n' "$tasks_now" >"$WORK/parallel-user-tasks"
+    printf '%s\n' "$processes_now" >"$WORK/parallel-user-processes"
     ulimit -u "$parallel_nproc_limit"
     printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u
     exec "$WORK/forkfail"
@@ -59,6 +59,10 @@ done
 set -e
 test "$parallel_selected" -eq 1
 parallel_nproc_limit="$(cat "$WORK/parallel-nproc-limit")"
+parallel_user_tasks="$(cat "$WORK/parallel-user-tasks")"
+parallel_user_processes="$(cat "$WORK/parallel-user-processes")"
+printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
+printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
 printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
 parallel_signal=0; test "$parallel_rc" -gt 128 && parallel_signal=$((parallel_rc - 128)) || true
 test "$parallel_signal" -eq 11 && segv_count=$((segv_count + 1)) || true
