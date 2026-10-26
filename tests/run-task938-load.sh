@@ -15,6 +15,8 @@ mkdir -p "$WORK/public"
 BASE_RC=0
 export FREELANG_HTTP_CGC="$COMPILER"
 bash "$ROOT/tests/run-task920.sh" "$COMPILER" "$WORK/base" >"$WORK/base.log" 2>&1 || BASE_RC=$?
+bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/oom-suite" >"$WORK/oom-suite.log" 2>&1 || BASE_RC=$?
+cat "$WORK/oom-suite.log" >>"$WORK/base.log"
 printf 'LOAD_FAST_SUITE_RC=%s\n' "$BASE_RC"
 
 FDFIX_DIR="$WORK/fdfix"
