@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,11 +73,22 @@ static void http_handle_client(int fd);
 static void http_send_busy(int fd);
 
 static void http_shared_lock(void) {
-    while (__sync_lock_test_and_set(&http_rate_shared->lock, 1)) { }
+    // shortcut: reclaim dead PID owners; use a robust process-shared mutex if PID reuse must be excluded.
+    int pid = (int)getpid();
+    for (;;) {
+        int owner = __sync_val_compare_and_swap(&http_rate_shared->lock, 0, 0);
+        if (owner == 0) {
+            if (__sync_bool_compare_and_swap(&http_rate_shared->lock, 0, pid)) return;
+        } else if (kill(owner, 0) != 0 && errno == ESRCH) {
+            (void)__sync_bool_compare_and_swap(&http_rate_shared->lock, owner, 0);
+        } else {
+            sched_yield();
+        }
+    }
 }
 
 static void http_shared_unlock(void) {
-    __sync_lock_release(&http_rate_shared->lock);
+    (void)__sync_bool_compare_and_swap(&http_rate_shared->lock, (int)getpid(), 0);
 }
 
 static int http_connection_enter(void) {
@@ -329,14 +341,14 @@ static int http_rate_limited(void) {
         }
         return ++http_rate_count > http_rate_max;
     }
-    while (__sync_lock_test_and_set(&http_rate_shared->lock, 1)) { }
+    http_shared_lock();
     int64_t now = http_now_ms();
     if (now - http_rate_shared->window_start >= http_rate_window_ms) {
         http_rate_shared->window_start = now;
         http_rate_shared->count = 0;
     }
     int limited = ++http_rate_shared->count > http_rate_max;
-    __sync_lock_release(&http_rate_shared->lock);
+    http_shared_unlock();
     return limited;
 }
 
