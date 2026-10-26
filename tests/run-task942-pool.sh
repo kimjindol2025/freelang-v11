@@ -99,22 +99,20 @@ for _ in $(seq 1 100); do
 done
 (( started >= 4 ))
 : >"$WORK/resources-warmup.acks.sql"
-WARM_RSS_MAX=0; WARM_FD_MAX=0
+WARM_RSS_MAX=0
 "$WORK/load-client" "$PORT" 50 10 949 "$WORK/resources-warmup.acks.sql" mixed \
   >"$WORK/resources-warmup.log" 2>&1 &
 WARMUP_PID=$!
 while kill -0 "$WARMUP_PID" 2>/dev/null; do
   snapshot "$SERVER_PID"
   (( SNAP_RSS > WARM_RSS_MAX )) && WARM_RSS_MAX=$SNAP_RSS
-  (( SNAP_FD > WARM_FD_MAX )) && WARM_FD_MAX=$SNAP_FD
   sleep 0.1
 done
 wait "$WARMUP_PID"
 cat "$WORK/resources-warmup.log"
 snapshot "$SERVER_PID"
 (( SNAP_RSS > WARM_RSS_MAX )) && WARM_RSS_MAX=$SNAP_RSS
-(( SNAP_FD > WARM_FD_MAX )) && WARM_FD_MAX=$SNAP_FD
-RSS_START=$WARM_RSS_MAX; FD_START=$WARM_FD_MAX
+RSS_START=$WARM_RSS_MAX; FD_START=$SNAP_FD
 : >"$WORK/resources.acks.sql"
 "$WORK/load-client" "$PORT" 50 10 950 "$WORK/resources.acks.sql" ok \
   >"$WORK/resources.client.log" 2>&1 &

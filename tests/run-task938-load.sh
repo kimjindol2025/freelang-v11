@@ -188,7 +188,7 @@ server_snapshot() {
   done < <(ps -o pid=,stat= --ppid "$SERVER_PID" 2>/dev/null || true)
   for pid in "${pids[@]}"; do
     [[ -r "/proc/$pid/statm" ]] || continue
-    if ! read -r _ rss_pages _ <"/proc/$pid/statm" 2>/dev/null; then continue; fi
+    if ! read -r _ rss_pages _ 2>/dev/null <"/proc/$pid/statm"; then continue; fi
     SERVER_RSS_NOW=$((SERVER_RSS_NOW + rss_pages * PAGE_KB))
     local -a fds=(/proc/"$pid"/fd/*)
     SERVER_FD_NOW=$((SERVER_FD_NOW + ${#fds[@]}))
@@ -202,13 +202,12 @@ server_snapshot
 COLD_RSS=$SERVER_RSS_NOW
 COLD_FD=$SERVER_FD_NOW
 # Match the largest stage and sample its high-water mark before measuring growth.
-WARM_RSS_MAX=$COLD_RSS; WARM_FD_MAX=$COLD_FD
+WARM_RSS_MAX=$COLD_RSS
 "$WORK/load-client" "$PORT" 1000 10 98 "$ACK_SQL" mixed >"$WORK/warmup.log" 2>&1 &
 WARMUP_PID=$!
 while kill -0 "$WARMUP_PID" 2>/dev/null; do
   server_snapshot
   (( SERVER_RSS_NOW > WARM_RSS_MAX )) && WARM_RSS_MAX=$SERVER_RSS_NOW
-  (( SERVER_FD_NOW > WARM_FD_MAX )) && WARM_FD_MAX=$SERVER_FD_NOW
   sleep 0.1
 done
 wait "$WARMUP_PID"
@@ -217,9 +216,8 @@ TOTAL_WRITE_HTTP_200="$(sed -n 's/.*write_http_200=\([0-9]*\).*/\1/p' "$WORK/war
 sleep 0.1
 server_snapshot
 (( SERVER_RSS_NOW > WARM_RSS_MAX )) && WARM_RSS_MAX=$SERVER_RSS_NOW
-(( SERVER_FD_NOW > WARM_FD_MAX )) && WARM_FD_MAX=$SERVER_FD_NOW
 INITIAL_RSS=$WARM_RSS_MAX
-INITIAL_FD=$WARM_FD_MAX
+INITIAL_FD=$SERVER_FD_NOW
 printf 'LOAD_RESOURCE_WARM_BASELINE rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
 
 STAGES=0
