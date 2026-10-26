@@ -188,6 +188,16 @@ static void http_stop_workers(void) {
     }
 }
 
+static void http_drain_workers(void) {
+    int64_t deadline_ms = http_now_ms() + 5000;
+    while (http_worker_count > 0 && http_now_ms() < deadline_ms) {
+        http_reap_workers();
+        if (http_worker_count == 0) break;
+        struct timespec pause = {.tv_sec = 0, .tv_nsec = 10 * 1000 * 1000};
+        while (nanosleep(&pause, &pause) != 0 && errno == EINTR) {}
+    }
+}
+
 static int http_env_integer(const char *name, int fallback, int minimum, int maximum) {
     const char *text = getenv(name);
     if (!text || !*text) return fallback;
@@ -1203,6 +1213,8 @@ FLValue fl_http_start(FLValue port_value) {
         served++;
     }
     close(server);
+    if (!http_stopping && max_requests > 0 && served >= max_requests)
+        http_drain_workers();
     http_stop_workers();
     fprintf(stderr, "HTTP_ACTIVE_CONNECTIONS_MAX=%d\n",
             http_rate_shared->max_active_connections);
