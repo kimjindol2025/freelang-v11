@@ -73,7 +73,7 @@ for j in $(seq 1 3000); do
   sleep 0.01
 done
 grep -q '^WAL_WRITES=20000$' "$WORK/hold.out"
-backup_hash="$(sqlite3 "$WORK/backup.sqlite" 'SELECT id||":"||quote(value) FROM payload ORDER BY id' | sha256sum | cut -d ' ' -f 1)"
+backup_hash="$(sqlite3 "$WORK/backup.sqlite" "SELECT id||':'||quote(value) FROM payload ORDER BY id" | sha256sum | cut -d ' ' -f 1)"
 source_hash="$(sqlite3 "$DB" "SELECT id||':'||quote(value) FROM payload WHERE id <= $backup_max ORDER BY id" | sha256sum | cut -d ' ' -f 1)"
 test "$backup_hash" = "$source_hash"
 echo "DB_CASE_5=PASS BACKUP_INTEGRITY=ok ROWS=$backup_rows CONTENT_SHA256=$backup_hash SOURCE_CMP=0"
