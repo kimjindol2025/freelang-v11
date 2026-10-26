@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include <sqlite3.h>
 #include <stdint.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -158,9 +159,9 @@ static sqlite3_stmt *db_prepare(sqlite3 *db, FLValue sql_value,
                 } else {
                     FLString *string = (FLString *)value.obj;
                     const char *text = string->data;
-                    if (strlen(text) != string->len) {
+                    if (string->len > INT_MAX || strlen(text) != string->len) {
                         sqlite3_finalize(statement);
-                        fl_throw(fl_str_val("db-exec: database strings cannot contain zero bytes"));
+                        fl_throw(fl_str_val("db-exec: database string is too long or contains zero bytes"));
                     }
                     code = sqlite3_bind_text(statement, (int)i + 1, text,
                                              (int)string->len, SQLITE_TRANSIENT);
@@ -185,9 +186,6 @@ static FLValue db_column(sqlite3_stmt *statement, int column) {
         case SQLITE_FLOAT:
             return fl_float(sqlite3_column_double(statement, column));
         case SQLITE_TEXT:
-            if (memchr(sqlite3_column_text(statement, column), 0,
-                       sqlite3_column_bytes(statement, column)))
-                fl_throw(fl_str_val("db-query: database text contains zero bytes"));
             return fl_str_val((const char *)sqlite3_column_text(statement, column));
         case SQLITE_NULL:
             return fl_nil();
@@ -243,6 +241,13 @@ FLValue fl_db_query(FLValue handle, FLValue sql, FLValue params) {
     while ((code = sqlite3_step(statement)) == SQLITE_ROW) {
         FLValue row = fl_map_new();
         for (int i = 0; i < columns; i++) {
+            if (sqlite3_column_type(statement, i) == SQLITE_TEXT &&
+                memchr(sqlite3_column_text(statement, i), 0,
+                       sqlite3_column_bytes(statement, i))) {
+                sqlite3_finalize(statement);
+                if (lease.owned) sqlite3_close(db);
+                fl_throw(fl_str_val("db-query: database text contains zero bytes"));
+            }
             FLValue key = fl_str_val(sqlite3_column_name(statement, i));
             row = fl_map_set(row, key, db_column(statement, i));
         }
