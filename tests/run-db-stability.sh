@@ -43,8 +43,10 @@ passed=$((passed+1))
 
 "$WORK/db-test" batch "$DB" >"$WORK/batch.out" 2>"$WORK/batch.err"
 grep -q '^BATCH_FAILED=1$' "$WORK/batch.out"
+grep -q '^BATCH_TRANSACTION_REJECTED=1$' "$WORK/batch.out"
 test "$(sqlite3 "$DB" 'SELECT count(*) FROM payload WHERE id BETWEEN 900001 AND 900002')" = 0
-echo 'DB_CASE_3=PASS BATCH_FAILED=1 PARTIAL_ROWS=0'
+test "$(sqlite3 "$DB" 'SELECT count(*) FROM payload WHERE id=900005')" = 0
+echo 'DB_CASE_3=PASS BATCH_FAILED=1 TRANSACTION_CONTROL_REJECTED=1 PARTIAL_ROWS=0'
 passed=$((passed+1))
 
 pids=()

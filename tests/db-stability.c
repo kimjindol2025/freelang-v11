@@ -122,6 +122,9 @@ int main(int argc, char **argv) {
             "INSERT INTO payload VALUES (900001,'duplicate');", empty());
         printf("BATCH_FAILED=%d\n", failed);
         if (!failed) return 1;
+        failed = caught_exec(db, "COMMIT; INSERT INTO payload VALUES (900005,'escaped')", empty());
+        printf("BATCH_TRANSACTION_REJECTED=%d\n", failed);
+        if (!failed) return 1;
     } else if (!strcmp(mode, "disk")) {
         struct rlimit old, limit;
         if (getrlimit(RLIMIT_FSIZE, &old)) return 2;

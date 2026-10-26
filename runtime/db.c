@@ -121,6 +121,13 @@ static void db_error(sqlite3 *db, const char *operation, int code) {
     fl_throw(fl_str_val(message));
 }
 
+static int db_batch_authorizer(void *context, int action, const char *a,
+                               const char *b, const char *c, const char *d) {
+    (void)context; (void)a; (void)b; (void)c; (void)d;
+    return action == SQLITE_TRANSACTION || action == SQLITE_SAVEPOINT
+           ? SQLITE_DENY : SQLITE_OK;
+}
+
 static sqlite3_stmt *db_prepare(sqlite3 *db, FLValue sql_value,
                                 FLValue params, const char *operation, const char **tail) {
     const char *sql = db_string(sql_value, operation);
@@ -277,7 +284,9 @@ FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params) {
         int changed_before = sqlite3_total_changes(db);
         char *error = NULL;
         void (*previous_xfsz)(int) = signal(SIGXFSZ, SIG_IGN);
+        sqlite3_set_authorizer(db, db_batch_authorizer, NULL);
         code = sqlite3_exec(db, db_string(sql, "db-exec"), NULL, NULL, &error);
+        sqlite3_set_authorizer(db, NULL, NULL);
         if (previous_xfsz != SIG_ERR) (void)signal(SIGXFSZ, previous_xfsz);
         if (code != SQLITE_OK) {
             char message[512];
