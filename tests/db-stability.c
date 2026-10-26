@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include <sqlite3.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,9 +19,19 @@ static int compare_long(const void *a, const void *b) {
     return (x > y) - (x < y);
 }
 
+static int fd_count(void) {
+    DIR *dir = opendir("/proc/self/fd");
+    if (!dir) return -1;
+    int count = 0;
+    while (readdir(dir)) count++;
+    closedir(dir);
+    return count - 2;
+}
+
 static int benchmark(const char *path) {
     sqlite3 *db = NULL;
     sqlite3_stmt *insert = NULL, *read = NULL;
+    int fds_before = fd_count();
     if (sqlite3_open(path, &db) != SQLITE_OK) return 2;
     if (sqlite3_exec(db, "CREATE TABLE big(id INTEGER PRIMARY KEY,value TEXT);BEGIN", NULL, NULL, NULL)) return 2;
     if (sqlite3_prepare_v2(db, "INSERT INTO big VALUES (?,?)", -1, &insert, NULL)) return 2;
@@ -51,7 +62,10 @@ static int benchmark(const char *path) {
     sqlite3_finalize(read);
     sqlite3_finalize(insert);
     sqlite3_close(db);
-    printf("BIG_ROWS=1001000 READ_P99_US=%lld WRITE_P99_US=%lld\n", reads[989], writes[989]);
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage)) return 2;
+    printf("BIG_ROWS=1001000 READ_P99_US=%lld WRITE_P99_US=%lld MAX_RSS_KB=%ld FD_BEFORE=%d FD_AFTER=%d\n",
+           reads[989], writes[989], usage.ru_maxrss, fds_before, fd_count());
     return 0;
 }
 

@@ -3,6 +3,8 @@ set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 WORK="${1:?usage: run-db-stability.sh <empty-temp-dir> <quick-log>}"
 QUICK_LOG="${2:?usage: run-db-stability.sh <empty-temp-dir> <quick-log>}"
+hold_pid=""
+trap 'if test -n "$hold_pid"; then kill "$hold_pid" 2>/dev/null || true; wait "$hold_pid" 2>/dev/null || true; fi' EXIT
 test ! -e "$WORK" || test -z "$(find "$WORK" -mindepth 1 -print -quit)"
 mkdir -p "$WORK"
 R="$ROOT/runtime"
@@ -80,16 +82,19 @@ passed=$((passed+1))
 "$WORK/db-test" benchmark "$WORK/big.sqlite" >"$WORK/big.out"
 test "$(sqlite3 "$WORK/big.sqlite" 'SELECT count(*) FROM big')" = 1001000
 test "$(sqlite3 "$WORK/big.sqlite" 'PRAGMA integrity_check')" = ok
-echo "DB_CASE_6=PASS $(cat "$WORK/big.out") INTEGRITY=ok"
+grep -q 'FD_BEFORE=4 FD_AFTER=4' "$WORK/big.out"
+echo "DB_CASE_6=PASS $(cat "$WORK/big.out") FILE_BYTES=$(stat -c %s "$WORK/big.sqlite") INTEGRITY=ok"
 passed=$((passed+1))
 
 wal_before="$(stat -c %s "$DB-wal")"
 sqlite3 "$DB" 'PRAGMA wal_checkpoint(TRUNCATE)' >"$WORK/checkpoint.out"
 wal_after="$(stat -c %s "$DB-wal")"
 test "$wal_after" -le "$wal_before"
+test "$wal_before" -lt 16777216
 echo "DB_CASE_7=PASS WAL_BEFORE=$wal_before WAL_AFTER=$wal_after CHECKPOINT=$(cat "$WORK/checkpoint.out")"
 passed=$((passed+1))
 kill "$hold_pid"; wait "$hold_pid" 2>/dev/null || true
+hold_pid=""
 
 "$WORK/db-test" input "$DB" >"$WORK/input.out" 2>"$WORK/input.err"
 grep -q '^ZERO_BYTE_REJECTED=1$' "$WORK/input.out"
