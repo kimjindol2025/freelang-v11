@@ -32,15 +32,27 @@ done
 gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
 parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
 parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
-# Leave room for the runner and a few children, but fewer than 8 workers.
-parallel_nproc_limit=$((parallel_user_tasks + 5))
 printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
 printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
-printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
 set +e
-(ulimit -u "$parallel_nproc_limit"; printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u; exec "$WORK/forkfail") >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
+(
+  fillers=()
+  for _ in 1 2 3 4; do sleep 10 & fillers+=("$!"); done
+  tasks_now="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
+  parallel_nproc_limit=$((tasks_now + 5))
+  printf '%s\n' "$parallel_nproc_limit" >"$WORK/parallel-nproc-limit"
+  ulimit -u "$parallel_nproc_limit"
+  printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u
+  "$WORK/forkfail"
+  run_rc=$?
+  for pid in "${fillers[@]}"; do kill "$pid" 2>/dev/null || true; done
+  for pid in "${fillers[@]}"; do wait "$pid" 2>/dev/null || true; done
+  exit "$run_rc"
+) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
 parallel_rc=$?
 set -e
+parallel_nproc_limit="$(cat "$WORK/parallel-nproc-limit")"
+printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
 parallel_signal=0; test "$parallel_rc" -gt 128 && parallel_signal=$((parallel_rc - 128)) || true
 test "$parallel_signal" -eq 11 && segv_count=$((segv_count + 1)) || true
 parallel_failed="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/forkfail.out" || true)"
