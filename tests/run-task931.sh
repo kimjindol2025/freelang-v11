@@ -186,6 +186,7 @@ server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-recovery/server.log" || t
 test -n "$server_error" || server_error=none
 printf 'CASE=http-recovery SERVER_RC=%s SIGNAL=%s ERROR=%s HTTP_STATUS=%s\n' "$server_rc" "$server_signal" "$server_error" "$recovery_code"
 test "$recovery_code" = 200
+sleep 0.2
 parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
 parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
 printf 'FORKFAIL_CASE=http-recovery FAILED_SLOTS=0 SUCCESSFUL_SLOTS=1 ERROR=none RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$server_rc" "$server_signal" "$parallel_zombie_delta"
