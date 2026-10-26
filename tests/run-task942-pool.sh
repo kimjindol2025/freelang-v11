@@ -112,6 +112,8 @@ wait "$WARMUP_PID"
 cat "$WORK/resources-warmup.log"
 snapshot "$SERVER_PID"
 (( SNAP_RSS > WARM_RSS_MAX )) && WARM_RSS_MAX=$SNAP_RSS
+sleep 1
+snapshot "$SERVER_PID"
 RSS_START=$WARM_RSS_MAX; FD_START=$SNAP_FD
 : >"$WORK/resources.acks.sql"
 "$WORK/load-client" "$PORT" 50 10 950 "$WORK/resources.acks.sql" ok \
