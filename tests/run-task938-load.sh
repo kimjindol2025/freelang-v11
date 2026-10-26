@@ -337,13 +337,12 @@ cat "$WORK/cap-client.log"
 CAP_LINE="$(grep '^LOAD_STAGE ' "$WORK/cap-client.log")"
 CAP_503="$(sed -n 's/.*status_503=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
 CAP_RETRY_AFTER_MISSING="$(sed -n 's/.*retry_after_missing=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
-CAP_ERRORS="$(sed -n 's/.*errors=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
 CAP_OTHER_HTTP="$(sed -n 's/.*other_http=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
 CAP_REFUSED="$(sed -n 's/.*connect_refused=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
 CAP_TIMEOUT="$(sed -n 's/.*connect_timeout=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
 CAP_CONNECT_OTHER="$(sed -n 's/.*connect_other=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
 CAP_IO_ERRORS="$(sed -n 's/.*io_errors=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
-CAP_OTHER_ERRORS=$((CAP_ERRORS - CAP_503))
+CAP_OTHER_ERRORS=$((CAP_OTHER_HTTP + CAP_REFUSED + CAP_TIMEOUT + CAP_CONNECT_OTHER + CAP_IO_ERRORS))
 CAP_ALIVE=0
 kill -0 "$CAP_SERVER_PID" 2>/dev/null && CAP_ALIVE=1
 CAP_RECOVERY="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$CAP_PORT/ok" 2>/dev/null || echo 000)"
