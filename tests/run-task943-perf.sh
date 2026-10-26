@@ -25,13 +25,29 @@ parse_cpus() {
   done
 }
 mapfile -t ALLOWED_CPUS < <(parse_cpus "$(awk '/Cpus_allowed_list:/ {print $2}' /proc/self/status)")
-(( ${#ALLOWED_CPUS[@]} >= 2 )) || { echo 'PERF_CPU_SEPARATION=FAIL fewer than 2 allowed CPUs'; exit 2; }
-SERVER_CPU="${ALLOWED_CPUS[0]}"
-CLIENT_CPUS="${ALLOWED_CPUS[1]}"
-for ((i=2; i<${#ALLOWED_CPUS[@]} && i<8; i++)); do CLIENT_CPUS+=",${ALLOWED_CPUS[i]}"; done
+mapfile -t ONLINE_CPUS < <(parse_cpus "$(cat /sys/devices/system/cpu/online)")
+declare -A ONLINE_SET=() ALLOWED_SET=() USED_CORES=()
+for cpu in "${ONLINE_CPUS[@]}"; do ONLINE_SET["$cpu"]=1; done
+for cpu in "${ALLOWED_CPUS[@]}"; do [[ -n "${ONLINE_SET[$cpu]:-}" ]] && ALLOWED_SET["$cpu"]=1; done
+mapfile -t USABLE_CPUS < <(printf '%s\n' "${!ALLOWED_SET[@]}" | sort -n)
+(( ${#USABLE_CPUS[@]} >= 2 )) || { echo 'PERF_CPU_SEPARATION=FAIL fewer than 2 online allowed CPUs'; exit 2; }
+SERVER_CPU="${USABLE_CPUS[0]}"
+SERVER_SIBLINGS="$(tr -d '[:space:]' <"/sys/devices/system/cpu/cpu${SERVER_CPU}/topology/thread_siblings_list")"
+USED_CORES["$SERVER_SIBLINGS"]=1
+CLIENT_CPUS=""
+for cpu in "${USABLE_CPUS[@]}"; do
+  siblings="$(tr -d '[:space:]' <"/sys/devices/system/cpu/cpu${cpu}/topology/thread_siblings_list")"
+  [[ "$siblings" == "$SERVER_SIBLINGS" || -n "${USED_CORES[$siblings]:-}" ]] && continue
+  CLIENT_CPUS+="${CLIENT_CPUS:+,}${cpu}"
+  USED_CORES["$siblings"]=1
+  [[ "${#USED_CORES[@]}" -ge 8 ]] && break
+done
+[[ -n "$CLIENT_CPUS" ]] || { echo 'PERF_CPU_SEPARATION=FAIL no distinct physical client core'; exit 2; }
+IFS=',' read -r -a CLIENT_CPU_LIST <<<"$CLIENT_CPUS"
+printf 'PERF_SERVER_CPU=%s\nPERF_SERVER_CORE_SIBLINGS=%s\nPERF_CLIENT_CPUS=%s\nPERF_CLIENT_PHYSICAL_CORES=%s\nPERF_CPU_CORE_SEPARATED=1\n' \
+  "$SERVER_CPU" "$SERVER_SIBLINGS" "$CLIENT_CPUS" "${#CLIENT_CPU_LIST[@]}"
 printf 'PERF_CPU_ONLINE=%s\n' "$(getconf _NPROCESSORS_ONLN)"
-printf 'PERF_CPU_ALLOWED_COUNT=%s\n' "${#ALLOWED_CPUS[@]}"
-printf 'PERF_SERVER_CPU=%s\nPERF_CLIENT_CPUS=%s\nPERF_CPU_SEPARATED=1\n' "$SERVER_CPU" "$CLIENT_CPUS"
+printf 'PERF_CPU_ALLOWED_COUNT=%s\n' "${#USABLE_CPUS[@]}"
 if [[ -r /sys/fs/cgroup/cpu.max ]]; then printf 'PERF_CPU_QUOTA='; cat /sys/fs/cgroup/cpu.max; fi
 
 SEED="$ROOT/bin/cgc-bin-x86_64-seed-v11"
