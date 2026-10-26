@@ -98,10 +98,11 @@ hold_pid=""
 
 "$WORK/db-test" input "$DB" >"$WORK/input.out" 2>"$WORK/input.err"
 grep -q '^ZERO_BYTE_REJECTED=1$' "$WORK/input.out"
+grep -q '^ZERO_BYTE_READ_REJECTED=1$' "$WORK/input.out"
 test "$(sqlite3 "$DB" 'SELECT count(*) FROM payload WHERE id BETWEEN 900010 AND 900012')" = 3
 test "$(sqlite3 "$DB" 'SELECT length(value) FROM payload WHERE id=900012')" = 100000
 test "$(sqlite3 "$DB" 'SELECT count(*) FROM payload WHERE id=900013')" = 0
-echo 'DB_CASE_8=PASS SPECIAL=stored LONG_LENGTH=100000 NULL=stored ZERO_BYTE=rejected'
+echo 'DB_CASE_8=PASS SPECIAL=stored LONG_LENGTH=100000 NULL=stored ZERO_BYTE_WRITE=rejected ZERO_BYTE_READ=rejected'
 passed=$((passed+1))
 
 grep -q '^LOAD2_SUMMARY=10/10$' "$QUICK_LOG"

@@ -164,6 +164,18 @@ int main(int argc, char **argv) {
         int failed = caught_exec(db, "INSERT INTO payload(id,value) VALUES (?,?)", args);
         printf("ZERO_BYTE_REJECTED=%d\n", failed);
         if (!failed) return 1;
+        sqlite3 *raw = NULL;
+        if (sqlite3_open(argv[2], &raw) != SQLITE_OK) return 2;
+        if (sqlite3_exec(raw, "INSERT INTO payload VALUES (900014,char(97,0,98))", NULL, NULL, NULL)) return 2;
+        sqlite3_close(raw);
+        failed = setjmp(fl_try_stack[0].buf);
+        if (!failed) {
+            fl_try_top = 1;
+            fl_db_query(db, fl_str_val("SELECT value FROM payload WHERE id=900014"), empty());
+        }
+        fl_try_top = 0;
+        printf("ZERO_BYTE_READ_REJECTED=%d\n", failed);
+        if (!failed) return 1;
         puts("INPUT_WRITE=ok");
     } else if (!strcmp(mode, "hold")) {
         for (int i = 0; i < 20000; i++) {
