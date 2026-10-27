@@ -438,7 +438,7 @@ FLValue fl_resp_redirect(FLValue location) {
         fl_throw(fl_str_val("server-redirect expects a safe relative path"));
     for (const unsigned char *p = (const unsigned char *)target; *p; p++)
         if (iscntrl(*p)) fl_throw(fl_str_val("server-redirect expects a safe relative path"));
-    FLValue response = http_response(302, "text/plain; charset=utf-8", fl_str_val(""));
+    FLValue response = http_response(303, "text/plain; charset=utf-8", fl_str_val(""));
     return fl_map_set(response, fl_str_val("location"), location);
 }
 
@@ -483,7 +483,9 @@ FLValue fl_resp_redirect_cookie(FLValue location, FLValue cookie) {
     const char *text = http_value_string(cookie, "server-redirect-cookie");
     if (strlen(text) > 400 || !http_safe_header_value(text))
         fl_throw(fl_str_val("server-redirect-cookie expects a safe cookie"));
-    return fl_map_set(fl_resp_redirect(location), fl_str_val("set_cookie"), cookie);
+    FLValue response = fl_resp_redirect(location);
+    response = fl_map_set(response, fl_str_val("status"), fl_int(302));
+    return fl_map_set(response, fl_str_val("set_cookie"), cookie);
 }
 
 FLValue fl_resp_html_cookie(FLValue cookie, FLValue body) {
