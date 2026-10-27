@@ -6,6 +6,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <errno.h>
+#include <regex.h>
 
 FLValue fl_floor(FLValue x) { return x.tag==FL_FLOAT ? fl_float(floor(x.f)) : x; }
 FLValue fl_ceil(FLValue x)  { return x.tag==FL_FLOAT ? fl_float(ceil(x.f))  : x; }
@@ -52,6 +53,39 @@ FLValue str_count(FLValue s, FLValue sub) {
     const char* at = text;
     while ((at = strstr(at, needle)) != NULL) { count++; at += n; }
     return fl_int(count);
+}
+
+/* shortcut: replacement is literal and does not expand backreferences; add expansion if a caller needs it. */
+FLValue str_replace_in(FLValue s, FLValue pattern, FLValue replacement) {
+    if (s.tag != FL_STRING || pattern.tag != FL_STRING || replacement.tag != FL_STRING) return s;
+    regex_t regex;
+    if (regcomp(&regex, ((FLString*)pattern.obj)->data, REG_EXTENDED) != 0)
+        return str_replace(s, pattern, replacement);
+    const char* src = ((FLString*)s.obj)->data;
+    const char* repl = ((FLString*)replacement.obj)->data;
+    size_t cap = strlen(src) + strlen(repl) + 32, used = 0;
+    char* out = fl_malloc(cap);
+    const char* cur = src;
+    regmatch_t match;
+    while (regexec(&regex, cur, 1, &match, 0) == 0) {
+        size_t before = (size_t)match.rm_so, rlen = strlen(repl);
+        while (used + before + rlen + 1 > cap) { cap *= 2; out = fl_realloc(out, cap); }
+        memcpy(out + used, cur, before); used += before;
+        memcpy(out + used, repl, rlen); used += rlen;
+        cur += match.rm_eo;
+        if (match.rm_so == match.rm_eo) {
+            if (*cur == '\0') break;
+            if (used + 2 > cap) { cap *= 2; out = fl_realloc(out, cap); }
+            out[used++] = *cur++;
+        }
+    }
+    size_t rest = strlen(cur);
+    while (used + rest + 1 > cap) { cap *= 2; out = fl_realloc(out, cap); }
+    memcpy(out + used, cur, rest); out[used + rest] = '\0';
+    regfree(&regex);
+    FLValue result = fl_str_val(out);
+    free(out);
+    return result;
 }
 
 FLValue fl_style_join(int count, FLValue* parts) {

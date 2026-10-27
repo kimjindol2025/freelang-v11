@@ -247,6 +247,7 @@ FLValue trim(FLValue s);
 FLValue index_of(FLValue vec, FLValue val);
 FLValue str_index_of(FLValue s, FLValue sub);
 FLValue str_count(FLValue s, FLValue sub);
+FLValue str_replace_in(FLValue s, FLValue pattern, FLValue replacement);
 FLValue fl_style_join(int count, FLValue* parts);
 FLValue parse_date(FLValue value);
 
