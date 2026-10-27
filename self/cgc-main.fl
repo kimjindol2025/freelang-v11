@@ -640,6 +640,7 @@
 (define function-c-symbols-atom (atom []))
 ;; S24: define 전역 선언 목록 ("static FLValue name;")
 (define global-decls-atom  (atom []))
+(define global-names-atom  (atom []))
 
 ;; bug4: nested defn hoisting
 (define cgc-defn-depth-atom   (atom 0))
@@ -1386,7 +1387,7 @@
 
 (defn cgc-template [$raw]
   (let [[$s (if (string? $raw) $raw "")]
-        [$names @outer-params-atom]
+        [$names (concat @outer-params-atom @global-names-atom)]
         [$env (cgc-tpl-env-loop $names 0 "FLValue __fl_te = fl_map_new();")]]
     (str "(__extension__ ({ " $env
          " fl_template_bound(fl_str_val(\"" (c-esc $s) "\"), __fl_te); }))")))
@@ -1656,6 +1657,7 @@
   (let [[$name (c-name (cgc-extract-raw-name (get $args 0)))]
         [$val (cgc (get $args 1))]]
     (swap! known-fncall-targets-atom push $name)
+    (swap! global-names-atom push $name)
     (swap! global-decls-atom push (str "static FLValue " $name ";"))
     (str $name " = " $val ";")))
 
