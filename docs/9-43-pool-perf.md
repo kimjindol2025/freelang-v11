@@ -76,20 +76,20 @@ WORKER_AGG label=w16-mixed process_exits=16 slots=16 served_total=26804 per_slot
 
 ## PERF_SUMMARY
 
-판정은 4/6이다. a(코어 분리), b(16-worker 오류 유형 기록), d(처리량 표), f(민감정보 검사)는 통과했다. c는 `WORKERS=0` mixed의 503을 오류에 포함하면 67.683%라 실패한다. e는 전체 회귀 실행에서 풀 모드의 `LOAD2_SUMMARY=9/10`, `FDFIX_SUMMARY=4/5`가 나와 실패했다.
+판정은 3/6이다. a(코어 분리), d(처리량 표), f(민감정보 검사)는 통과했다. b는 16-worker `/ok` 오류가 코어 분리 측정에서 재현되지 않았고, 비분리 회귀의 재현에서는 부하 도구 CPU를 측정하지 않아 서버와 클라이언트 중 원인을 분리하지 못해 미통과다. c는 `WORKERS=0` mixed의 503을 오류에 포함하면 67.683%라 실패한다. e는 풀 모드 전체 회귀에서 `LOAD2_SUMMARY=9/10`, `FDFIX_SUMMARY=4/5`가 나와 실패했다.
 
 ```text
-PERF_SUMMARY=4/6
+PERF_SUMMARY=3/6
 ```
 
 혼합 성능 목표 `RPS 800 이상 또는 p99 1000ms 미만`은 모든 worker 구성에서 충족했다. 16-worker mixed는 p99가 1038.413ms로 1000ms를 넘었지만 2408.98 RPS였다. SQLite 동시 쓰기 잠금은 남은 위험이다. 원인 분석상 socket reuse 설정을 바꿀 근거는 없었다.
 
 ## 전체 회귀 확인
 
-최종 문서 전 커밋 `b034552bfe65a86c06afe28e3f007bfd3f0498b7`에서 고정점 확인과 `strace -f -e trace=execve` 전체 회귀를 실행했다. 빠른 시험 요약은 전부 통과했다. LOAD2의 데이터 일치, 무결성, 잠김 검사와 CAP은 통과했지만 풀 모드에서 RSS 안정 판정이 실패했다. 저 fd 사례 자체는 예상된 `db-exec:` 오류를 내고 신호 없이 끝났으며, FDFIX의 다섯 번째 조건은 LOAD2가 10/10이 아니어서 실패했다.
+최종 문서 커밋 `8b0b6ede388558419c212a07dd23e6a53032c225`에서 고정점 확인과 `strace -f -e trace=execve` 전체 회귀를 실행했다. 빠른 시험 요약은 전부 통과했다. 기본 모드 LOAD2/FDFIX/CAP은 통과했다. 풀 모드 LOAD2는 데이터 일치·무결성·잠김 검사는 통과했지만 RSS 안정 판정이 실패했다. 저 fd 사례 자체는 예상된 `db-exec:` 오류를 내고 신호 없이 끝났다. FDFIX의 다섯 번째 조건은 풀 모드 LOAD2가 10/10이 아니어서 실패했다.
 
 ```text
-FINALCHECK_HEAD=b034552bfe65a86c06afe28e3f007bfd3f0498b7
+FINALCHECK_HEAD=8b0b6ede388558419c212a07dd23e6a53032c225
 FINALCHECK_SUITE_RC=1
 LOAD2_SUMMARY=9/10
 LOAD_200_IDS_MISSING_FROM_DB=0
@@ -97,19 +97,19 @@ LOAD_DB_ONLY_IDS=0
 LOAD_DUPLICATE_IDS=0
 LOAD_DB_INTEGRITY=ok
 LOAD_DATABASE_IS_LOCKED=0
-LOAD_RESOURCE_START rss_kb=28204 fd=48
-LOAD_RESOURCE_END rss_kb=31088 fd=48
+LOAD_RESOURCE_START rss_kb=31116 fd=48
+LOAD_RESOURCE_END rss_kb=33384 fd=48
 LOAD_RESOURCE_STABLE=0
 FDFIX_SUMMARY=4/5
 CAP_ACTIVE_CONNECTIONS_MAX=256
-CAP_503=8360
+CAP_503=2761
 CAP_OTHER_ERRORS=0
 CAP_RECOVERY_HTTP=200
 CAP_ZOMBIE_DELTA=0
 CAP_SUMMARY=6/6
 ```
 
-기존 풀 부하 반복에서 workers=16 `/ok`는 86.755% 오류였고, 197 연결 시간 초과와 16,466 수신 시간 초과로 집계됐다. 서버의 active connection 최대치는 16이었고, 해당 로그에 503은 없었다. 이 로그에는 클라이언트 CPU 계측이 없어, 코어 분리 본 측정에서 재현되지 않은 차이의 원인을 서버 또는 부하 도구 중 하나로 확정할 수 없다.
+기본 모드에서는 LOAD2 10/10, FDFIX 5/5였다. 풀 모드 실행은 별도 결과로 9/10, 4/5를 냈다. 전체 스크립트는 풀 모드에서 중단되어 `POOL_SUMMARY`까지 도달하지 못했다. 풀 벤치 workers=16 `/ok`는 53.218% 오류였고, 연결 시간 초과 3건과 수신 시간 초과 10,920건이었다. active connection 최대치는 16이고 503은 없었다. 이 회귀 구간은 클라이언트 CPU를 계측하지 않아 오류의 발생 주체를 확정할 수 없다.
 
 전수 요약과 실행 감시:
 
@@ -155,7 +155,7 @@ JS=0
 PYTHON=0
 ```
 
-`LOAD2_SUMMARY=10/10`와 `FDFIX_SUMMARY=5/5`는 일반 모드 실행에서 통과했다. 위 풀 모드 재실행은 별도 결과로 `9/10`, `4/5`를 냈다. 전체 스크립트는 풀 모드 실패로 `FINALCHECK_SUITE_RC=1`에 끝났고 `POOL_SUMMARY`까지 도달하지 못했다.
+`LOAD2_SUMMARY=10/10`와 `FDFIX_SUMMARY=5/5`는 기본 모드에서 통과했다. 풀 모드 재실행은 `9/10`, `4/5`를 냈다. 전체 스크립트는 풀 모드 실패로 `FINALCHECK_SUITE_RC=1`에 끝났고 `POOL_SUMMARY`까지 도달하지 못했다.
 
 ## 해시, 회귀, 커밋과 원격
 
