@@ -853,11 +853,11 @@
           (do (swap! function-c-symbols-atom push [$name $raw]) $name)
           (let [[$entry (get $entries $i)]]
             (if (= (get $entry 0) $name)
-              (let [[$unique (cgc-unique-symbol $name $entries (length $entries))]]
-                (do
-                  (swap! function-c-symbol-overrides-atom push [$raw $unique])
-                  (swap! function-c-symbols-atom push [$unique $raw])
-                  $unique))
+              (do
+                (println (str "[CGC-ERR] C symbol collision: " $raw " -> " $name
+                              " conflicts with " (get $entry 1)))
+                (fl-cgc-halt)
+                $name)
               (recur (+ $i 1)))))))))
 
 ;; ── 메인 dispatch ──
@@ -1798,8 +1798,7 @@
         [$existing (c-global-name $raw)]
         [$base (c-name-base $raw)]
         [$conflict (cgc-symbol-used? @function-c-symbols-atom $base)]
-        [$name (if (not (null? $existing)) $existing
-                 (if $conflict (str "fl_global_" $base) $base))]
+        [$name (if (not (null? $existing)) $existing $base)]
         [$val (cgc (get $args 1))]]
     (if (and (null? $existing) $conflict)
       (swap! global-c-symbols-atom push [$raw $name]) nil)
