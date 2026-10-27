@@ -45,6 +45,22 @@ static int auth_random(void *buffer, size_t length) {
     return 0;
 }
 
+FLValue fl_auth_random_int(FLValue min_value, FLValue max_value) {
+    if (min_value.tag != FL_INT || max_value.tag != FL_INT || min_value.i > max_value.i)
+        fl_throw(fl_str_val("random_int expects ordered integer bounds"));
+    uint64_t span = (uint64_t)max_value.i - (uint64_t)min_value.i + 1;
+    uint64_t value;
+    if (span == 0) {
+        if (auth_random(&value, sizeof(value)) != 0) fl_throw(fl_str_val("secure random source failed"));
+        return fl_int((int64_t)value);
+    }
+    uint64_t threshold = (uint64_t)(-span) % span;
+    do {
+        if (auth_random(&value, sizeof(value)) != 0) fl_throw(fl_str_val("secure random source failed"));
+    } while (value < threshold);
+    return fl_int((int64_t)((uint64_t)min_value.i + value % span));
+}
+
 FLValue fl_auth_random_token(FLValue bytes_value) {
     if (bytes_value.tag != FL_INT || bytes_value.i < 16 || bytes_value.i > 128)
         fl_throw(fl_str_val("auth-random-token expects 16 to 128 bytes"));

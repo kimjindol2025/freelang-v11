@@ -741,6 +741,7 @@
     [(= $op "tcp-close") "fl_tcp_close"]
     [(= $op "tcp-local-port") "fl_tcp_local_port"]
     [(= $op "auth-random-token") "fl_auth_random_token"]
+    [(= $op "random_int") "fl_auth_random_int"]
     [(= $op "auth-pbkdf2") "fl_auth_pbkdf2"]
     [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
     [(= $op "auth-hash-password") "fl_auth_hash_password"]

@@ -146,6 +146,7 @@ FLValue fl_resp_set_cookie(FLValue response, FLValue name, FLValue value);
 FLValue fl_resp_header(FLValue response, FLValue name, FLValue value);
 FLValue fl_resp_redirect_cookie(FLValue location, FLValue cookie);
 FLValue fl_auth_random_token(FLValue bytes);
+FLValue fl_auth_random_int(FLValue min, FLValue max);
 FLValue fl_auth_pbkdf2(FLValue password, FLValue salt, FLValue iterations);
 FLValue fl_auth_constant_time_equal(FLValue left, FLValue right);
 FLValue fl_auth_hash_password(FLValue password);
