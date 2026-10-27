@@ -1,2 +1,5 @@
 (define response (server_html "SYMBOL_OK"))
+(define response (server_header response "X-Example" "ok"))
+(define response (server_status 201 response))
+(define redirect (server_redirect_cookie "/ok" "session=ok; Path=/; HttpOnly"))
 (println "SYMBOL_OK")
