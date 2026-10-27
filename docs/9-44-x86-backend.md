@@ -35,7 +35,7 @@ APP_ERRORS=191
 <가림>/app.c:10463:5: error: implicit declaration of function ‘style’ [-Wimplicit-function-declaration]
 ```
 
-첫 남은 오류는 익명 함수 본문에서 `k`, `v`가 미선언된 것이고, 그 뒤에 누락 런타임 함수와 C 타입 오류가 이어진다. 전체 GCC 오류 191줄은 아래 3항에 원문(경로 가림)으로 붙였다. `_app.fl` 실행 파일 링크와 `/` HTTP 200 확인은 도달하지 못했다.
+최신 진단에서 첫 오류는 아래 전체 원문 첫 줄의 `aes_decrypt` 미선언이다. 이전 시도의 `k`, `v` 미선언은 destructured lambda 인자 수정으로 해결되어 최신 진단에는 없다. 마지막 진단은 `style` 미선언이다. 전체 GCC 오류 191줄은 아래 3항에 원문(경로 가림)으로 붙였다. `_app.fl` 실행 파일 링크와 `/` HTTP 200 확인은 도달하지 못했다.
 
 ### 2 — 선커밋 최소 예제와 수정 순서
 
@@ -416,7 +416,7 @@ b 실제 _app 막힘 전체 원문: PARTIAL (GCC 오류 191줄·누락 이름 �
 c 최소 예제 전부 통과: FAIL (22/23; float만 실패)
 d seed 36a806b0 유지, stage2=3=4: PASS
 e 전체 빠른 시험 strace 및 node/npm/npx/JS/Python 각 0: FAIL (중단, 완료 SUMMARY·집계 없음)
-f 민감 정보 검사: 커밋 전 결과 아래 기록
+f 민감 정보 검사: PASS (보고서 내 로컬 경로 0, IPv4 0, 자격 증명 패턴 0; 금지 경로 변경 0)
 X86_SUMMARY=3/6
 ```
 
@@ -436,10 +436,11 @@ branch: v11-x86-seed-public
 start: 56f28ecb
 supplement_start: c65d409a
 code_head_before_report_commit: 4959818c
-report_commit: 2628a62ccebdb7d75881447c26ba206adfc9c3dc
+initial_report_commit: 2628a62ccebdb7d75881447c26ba206adfc9c3dc
+last_verified_remote_head_before_this_report_update: 1832bf90bd75d17a626438669e4a432a08254e9a
 seed sha256: 36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2
-Forgejo_HEAD: 2628a62ccebdb7d75881447c26ba206adfc9c3dc (verified)
-GitHub_HEAD: 2628a62ccebdb7d75881447c26ba206adfc9c3dc (verified)
+Forgejo_HEAD_before_report_update: 1832bf90bd75d17a626438669e4a432a08254e9a (verified)
+GitHub_HEAD_before_report_update: 1832bf90bd75d17a626438669e4a432a08254e9a (verified)
 ```
 
 미확인: `_app.fl`의 전체 빌드·실행과 HTTP 200, 191개 GCC 오류의 잔여 런타임 기능, float 정책, 중단된 전체 빠른 시험의 SUMMARY·execve 집계, 앱 실행 중 실제 UI/요청 경로.
