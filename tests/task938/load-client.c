@@ -206,6 +206,7 @@ static void do_request(Worker *worker, unsigned route, uint64_t sequence) {
         used += (size_t)n;
         response[used] = '\0';
         if (!status && sscanf(response, "HTTP/1.%*d %d", &status) != 1) status = 0;
+        if (status && response_body_complete(response, used)) break;
     }
     close(fd);
     if (!recv_error) {
