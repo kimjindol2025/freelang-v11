@@ -438,7 +438,7 @@ FLValue fl_resp_redirect(FLValue location) {
         fl_throw(fl_str_val("server-redirect expects a safe relative path"));
     for (const unsigned char *p = (const unsigned char *)target; *p; p++)
         if (iscntrl(*p)) fl_throw(fl_str_val("server-redirect expects a safe relative path"));
-    FLValue response = http_response(303, "text/plain; charset=utf-8", fl_str_val(""));
+    FLValue response = http_response(302, "text/plain; charset=utf-8", fl_str_val(""));
     return fl_map_set(response, fl_str_val("location"), location);
 }
 
@@ -614,6 +614,58 @@ FLValue server_req_json(FLValue request) {
         return parsed;
     }
     fl_try_top--;
+    return fl_nil();
+}
+
+FLValue server_req_path(FLValue request) {
+    return fl_map_get(request, fl_str_val("path"));
+}
+
+FLValue server_req_query(FLValue request, FLValue name) {
+    FLValue value = fl_map_get(fl_map_get(request, fl_str_val("query")), name);
+    return value.tag == FL_VECTOR ? fl_vec_first(value) : value;
+}
+
+FLValue server_req_param(FLValue request, FLValue name) {
+    return fl_map_get(fl_map_get(request, fl_str_val("params")), name);
+}
+
+FLValue server_req_files(FLValue request) {
+    FLValue files = fl_map_get(fl_map_get(request, fl_str_val("body")), fl_str_val("files"));
+    return files.tag == FL_VECTOR ? files : fl_vec_new();
+}
+
+FLValue server_req_cookie(FLValue request, FLValue name_value) {
+    FLValue header = server_req_header(request, fl_str_val("cookie"));
+    if (header.tag != FL_STRING || !header.obj) return fl_nil();
+    const char *name = http_value_string(name_value, "server-req-cookie");
+    FLString *text = (FLString *)header.obj;
+    const char *cursor = text->data;
+    size_t name_len = strlen(name);
+    while (*cursor) {
+        while (*cursor == ' ' || *cursor == '\t' || *cursor == ';') cursor++;
+        const char *end = strchr(cursor, ';');
+        if (!end) end = cursor + strlen(cursor);
+        const char *equals = memchr(cursor, '=', (size_t)(end - cursor));
+        if (equals) {
+            const char *key_end = equals;
+            while (key_end > cursor && (key_end[-1] == ' ' || key_end[-1] == '\t')) key_end--;
+            if ((size_t)(key_end - cursor) == name_len && memcmp(cursor, name, name_len) == 0) {
+                const char *value = equals + 1;
+                while (value < end && (*value == ' ' || *value == '\t')) value++;
+                while (end > value && (end[-1] == ' ' || end[-1] == '\t')) end--;
+                size_t value_len = (size_t)(end - value);
+                char *copy = malloc(value_len + 1);
+                if (!copy) return fl_nil();
+                memcpy(copy, value, value_len);
+                copy[value_len] = '\0';
+                FLValue result = fl_str_val(copy);
+                free(copy);
+                return result;
+            }
+        }
+        cursor = *end ? end + 1 : end;
+    }
     return fl_nil();
 }
 

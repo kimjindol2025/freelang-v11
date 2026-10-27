@@ -165,6 +165,11 @@ FLValue server_body_limit(FLValue bytes);
 FLValue server_rate_limit(FLValue count, FLValue window_ms);
 FLValue server_req_header(FLValue request, FLValue name);
 FLValue server_req_json(FLValue request);
+FLValue server_req_path(FLValue request);
+FLValue server_req_query(FLValue request, FLValue name);
+FLValue server_req_param(FLValue request, FLValue name);
+FLValue server_req_cookie(FLValue request, FLValue name);
+FLValue server_req_files(FLValue request);
 
 /* ── S7: Closure ── */
 typedef struct FLClosure {
