@@ -1347,9 +1347,18 @@
 ;; argv[i] 선언 구문
 (defn cgc-fn-argv-decls [$items $i $acc]
   (if (>= $i (length $items)) $acc
-  (let [[$name (c-name (cgc-extract-raw-name (get $items $i)))]]
+  (let [[$param (get $items $i)]
+        [$nested (and (= (get $param :kind) "block") (= (get $param :type) "Array"))]
+        [$name (c-name (cgc-extract-raw-name $param))]]
     (cgc-fn-argv-decls $items (+ $i 1)
-      (str $acc "    FLValue " $name " __attribute__((unused)) = argv[" $i "];\n")))))
+      (str $acc (if $nested (cgc-fn-destructure-argv (get-block-items $param) $i 0 "")
+        (str "    FLValue " $name " __attribute__((unused)) = argv[" $i "];\n")))))))
+
+(defn cgc-fn-destructure-argv [$parts $arg $i $acc]
+  (if (>= $i (length $parts)) $acc
+    (let [[$name (c-name (cgc-extract-raw-name (get $parts $i)))]]
+      (cgc-fn-destructure-argv $parts $arg (+ $i 1)
+        (str $acc "    FLValue " $name " __attribute__((unused)) = get(argv[" $arg "], fl_int(" $i "));\n")))))
 
 ;; 파라미터 이름 목록 수집
 (defn cgc-fn-param-names [$items $i $acc]
