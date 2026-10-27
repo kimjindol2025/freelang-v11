@@ -1,0 +1,3 @@
+(define value (atom {"a" 1}))
+(swap! value assoc "b" 2)
+(println (get (deref value) "b"))

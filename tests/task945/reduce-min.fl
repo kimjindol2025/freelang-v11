@@ -1,0 +1,1 @@
+(println (reduce min 99 [3 2 4]))

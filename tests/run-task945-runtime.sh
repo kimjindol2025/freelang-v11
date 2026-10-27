@@ -11,7 +11,7 @@ WORK="${2:?usage: run-task945-runtime.sh <compiler> <empty-work-dir>}"
 mkdir -p "$WORK"
 RUNTIME=(core.c collection.c io.c math.c error.c process.c json.c db.c http_server.c auth.c cgc-bridge.c)
 passed=0
-for name in assoc conj dissoc json_str js_keys min mod quot; do
+for name in assoc conj dissoc json_str js_keys min mod quot swap-assoc swap-conj reduce-min doseq; do
   "$COMPILER" "$ROOT/tests/task945/$name.fl" "$WORK/$name.c" >"$WORK/$name.compile" 2>&1
   runtime_args=()
   for file in "${RUNTIME[@]}"; do runtime_args+=("$ROOT/runtime/$file"); done
@@ -22,5 +22,5 @@ for name in assoc conj dissoc json_str js_keys min mod quot; do
   printf 'TASK945_CASE=%s PASS\n' "$name"
   passed=$((passed + 1))
 done
-printf 'TASK945_RUNTIME_SUMMARY=%s/8\n' "$passed"
-(( passed == 8 ))
+printf 'TASK945_RUNTIME_SUMMARY=%s/12\n' "$passed"
+(( passed == 12 ))
