@@ -74,6 +74,7 @@ static FLHttpRateState *http_rate_shared;
 static int64_t http_now_ms(void);
 static void http_handle_client(int fd);
 static void http_send_busy(int fd);
+static void http_send_status(int fd, int status, const char *message);
 
 static void http_shared_lock(void) {
     // shortcut: reclaim dead PID owners; use a robust process-shared mutex if PID reuse must be excluded.
@@ -452,6 +453,39 @@ static int http_safe_header_value(const char *text) {
     return 1;
 }
 
+static int http_safe_header_name(const char *text) {
+    if (!*text) return 0;
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+        if (!(isalnum(*p) || strchr("!#$%&'*+-.^_`|~", *p))) return 0;
+    return 1;
+}
+
+static int http_reserved_header(const char *text) {
+    return strcasecmp(text, "Content-Length") == 0 || strcasecmp(text, "Content-Type") == 0 ||
+        strcasecmp(text, "Connection") == 0 || strcasecmp(text, "Location") == 0 ||
+        strcasecmp(text, "Set-Cookie") == 0 || strcasecmp(text, "X-Freelang") == 0;
+}
+
+FLValue fl_resp_header(FLValue response, FLValue name, FLValue value) {
+    const char *key = http_value_string(name, "server-header");
+    const char *text = http_value_string(value, "server-header");
+    if (response.tag != FL_MAP || !fl_truthy(fl_map_get(response, fl_str_val("_fl_http_response"))) ||
+        strlen(key) > 64 || strlen(text) > 400 || !http_safe_header_name(key) ||
+        http_reserved_header(key) || !http_safe_header_value(text))
+        fl_throw(fl_str_val("server-header expects a response and a safe short header"));
+    FLValue headers = fl_map_get(response, fl_str_val("headers"));
+    if (headers.tag != FL_MAP) headers = fl_map_new();
+    headers = fl_map_set(headers, name, value);
+    return fl_map_set(response, fl_str_val("headers"), headers);
+}
+
+FLValue fl_resp_redirect_cookie(FLValue location, FLValue cookie) {
+    const char *text = http_value_string(cookie, "server-redirect-cookie");
+    if (strlen(text) > 400 || !http_safe_header_value(text))
+        fl_throw(fl_str_val("server-redirect-cookie expects a safe cookie"));
+    return fl_map_set(fl_resp_redirect(location), fl_str_val("set_cookie"), cookie);
+}
+
 FLValue fl_resp_html_cookie(FLValue cookie, FLValue body) {
     const char *value = http_value_string(cookie, "server-html-cookie");
     if (!http_safe_header_value(value) || strlen(value) > 400)
@@ -615,18 +649,48 @@ static const char *http_reason(int status) {
 }
 
 static void http_send_raw(int fd, int status, const char *content_type,
-                          const char *location, const char *set_cookie,
+                          const char *location, const char *set_cookie, FLValue extra_headers,
                           const char *body, size_t body_length) {
-    char header[1024];
+    char header[8192];
     char location_header[256] = "";
     char cookie_header[512] = "";
     if (location) snprintf(location_header, sizeof(location_header), "Location: %s\r\n", location);
     if (set_cookie) snprintf(cookie_header, sizeof(cookie_header), "Set-Cookie: %s\r\n", set_cookie);
     int length = snprintf(header, sizeof(header),
-        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n%s%s"
-        "Connection: close\r\nX-Freelang: native\r\n\r\n",
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n%s%s",
         status, http_reason(status), content_type, body_length, location_header, cookie_header);
     if (length < 0 || (size_t)length >= sizeof(header)) return;
+    if (extra_headers.tag == FL_MAP && extra_headers.obj) {
+        FLMap *headers = (FLMap *)extra_headers.obj;
+        for (uint32_t i = 0; i < headers->len; i++) {
+            FLValue key = headers->entries[i].key, value = headers->entries[i].val;
+            if (key.tag != FL_STRING || value.tag != FL_STRING || !key.obj || !value.obj) {
+                http_send_status(fd, 500, "invalid response header");
+                return;
+            }
+            const char *name = ((FLString *)key.obj)->data;
+            const char *text = ((FLString *)value.obj)->data;
+            if (strlen(name) > 64 || strlen(text) > 400 ||
+                !http_safe_header_name(name) || http_reserved_header(name) ||
+                !http_safe_header_value(text)) {
+                http_send_status(fd, 500, "invalid response header");
+                return;
+            }
+            int n = snprintf(header + length, sizeof(header) - (size_t)length, "%s: %s\r\n", name, text);
+            if (n < 0 || (size_t)n >= sizeof(header) - (size_t)length) {
+                http_send_status(fd, 500, "response headers too large");
+                return;
+            }
+            length += n;
+        }
+    }
+    int ending = snprintf(header + length, sizeof(header) - (size_t)length,
+                          "Connection: close\r\nX-Freelang: native\r\n\r\n");
+    if (ending < 0 || (size_t)ending >= sizeof(header) - (size_t)length) {
+        http_send_status(fd, 500, "response headers too large");
+        return;
+    }
+    length += ending;
     if (length > 0) http_send_all(fd, header, (size_t)length);
     if (body_length) http_send_all(fd, body, body_length);
 }
@@ -635,7 +699,7 @@ static void http_send_status(int fd, int status, const char *message) {
     char body[256];
     int length = snprintf(body, sizeof(body), "{\"error\":\"%s\"}", message);
     if (length < 0) return;
-    http_send_raw(fd, status, "application/json", NULL, NULL, body, (size_t)length);
+    http_send_raw(fd, status, "application/json", NULL, NULL, fl_nil(), body, (size_t)length);
 }
 
 static void http_send_busy(int fd) {
@@ -1071,6 +1135,7 @@ static void http_handle_client(int fd) {
     FLValue type = fl_map_get(response, fl_str_val("content_type"));
     FLValue location_value = fl_map_get(response, fl_str_val("location"));
     FLValue cookie_value = fl_map_get(response, fl_str_val("set_cookie"));
+    FLValue extra_headers = fl_map_get(response, fl_str_val("headers"));
     const char *body_text = body.tag == FL_STRING && body.obj ? ((FLString *)body.obj)->data : "";
     const char *content_type = type.tag == FL_STRING && type.obj ? ((FLString *)type.obj)->data : "application/octet-stream";
     const char *location = location_value.tag == FL_STRING && location_value.obj
@@ -1080,7 +1145,7 @@ static void http_handle_client(int fd) {
     int response_status = fl_map_get(response, fl_str_val("status")).tag == FL_INT
         ? (int)fl_map_get(response, fl_str_val("status")).i : status;
     size_t body_length = body.tag == FL_STRING && body.obj ? ((FLString *)body.obj)->len : strlen(body_text);
-    http_send_raw(fd, response_status, content_type, location, cookie, body_text, body_length);
+    http_send_raw(fd, response_status, content_type, location, cookie, extra_headers, body_text, body_length);
 }
 
 static int http_timeout_setting(const char *name, int default_value) {

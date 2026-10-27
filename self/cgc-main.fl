@@ -722,6 +722,8 @@
     [(= $op "server-static") "fl_http_static"]
     [(= $op "server_html") "fl_resp_html"]
     [(= $op "server_status") "fl_resp_status"]
+    [(= $op "server_header") "fl_resp_header"]
+    [(= $op "server_redirect_cookie") "fl_resp_redirect_cookie"]
     [(= $op "run-parallel") "fl_run_parallel"]
     [(= $op "uuid") "fl_uuid"]
     [(= $op "any?") "fl_any_p"]
