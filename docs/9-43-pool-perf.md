@@ -76,22 +76,100 @@ WORKER_AGG label=w16-mixed process_exits=16 slots=16 served_total=26804 per_slot
 
 ## PERF_SUMMARY
 
-현재 판정은 4/6이며 회귀 항목 e는 최종 전체 시험 대기 중이다. 코어 분리, 16-worker 오류 분석, 처리량표, 민감정보 검사는 확인했다. 기준 c는 `WORKERS=0` mixed에서 상한 초과 503을 오류에 포함하므로 통과하지 못한다.
+판정은 4/6이다. a(코어 분리), b(16-worker 오류 유형 기록), d(처리량 표), f(민감정보 검사)는 통과했다. c는 `WORKERS=0` mixed의 503을 오류에 포함하면 67.683%라 실패한다. e는 전체 회귀 실행에서 풀 모드의 `LOAD2_SUMMARY=9/10`, `FDFIX_SUMMARY=4/5`가 나와 실패했다.
 
 ```text
-PERF_SUMMARY=4/6 (e pending)
+PERF_SUMMARY=4/6
 ```
 
 혼합 성능 목표 `RPS 800 이상 또는 p99 1000ms 미만`은 모든 worker 구성에서 충족했다. 16-worker mixed는 p99가 1038.413ms로 1000ms를 넘었지만 2408.98 RPS였다. SQLite 동시 쓰기 잠금은 남은 위험이다. 원인 분석상 socket reuse 설정을 바꿀 근거는 없었다.
 
-## 해시, 회귀, 커밋과 원격
+## 전체 회귀 확인
 
-컴파일러는 수정하지 않았다. 시드는 고정값을 유지해야 한다. 최종 보고서 커밋에서 stage2/3/4, CMP, 시드 해시와 전체 9-42 회귀·strace 결과를 추가한다.
+최종 문서 전 커밋 `b034552bfe65a86c06afe28e3f007bfd3f0498b7`에서 고정점 확인과 `strace -f -e trace=execve` 전체 회귀를 실행했다. 빠른 시험 요약은 전부 통과했다. LOAD2의 데이터 일치, 무결성, 잠김 검사와 CAP은 통과했지만 풀 모드에서 RSS 안정 판정이 실패했다. 저 fd 사례 자체는 예상된 `db-exec:` 오류를 내고 신호 없이 끝났으며, FDFIX의 다섯 번째 조건은 LOAD2가 10/10이 아니어서 실패했다.
 
 ```text
-PENDING: stage2/3/4 SHA256, CMP_2_3, CMP_3_4, seed SHA256
-PENDING: 빠른 시험 전체 RC, LOAD2_SUMMARY, FDFIX_SUMMARY, CAP_SUMMARY, POOL_SUMMARY
-PENDING: NODE/NPM/NPX/JS/PYTHON, 최종 커밋, Forgejo/GitHub HEAD
+FINALCHECK_HEAD=b034552bfe65a86c06afe28e3f007bfd3f0498b7
+FINALCHECK_SUITE_RC=1
+LOAD2_SUMMARY=9/10
+LOAD_200_IDS_MISSING_FROM_DB=0
+LOAD_DB_ONLY_IDS=0
+LOAD_DUPLICATE_IDS=0
+LOAD_DB_INTEGRITY=ok
+LOAD_DATABASE_IS_LOCKED=0
+LOAD_RESOURCE_START rss_kb=28204 fd=48
+LOAD_RESOURCE_END rss_kb=31088 fd=48
+LOAD_RESOURCE_STABLE=0
+FDFIX_SUMMARY=4/5
+CAP_ACTIVE_CONNECTIONS_MAX=256
+CAP_503=8360
+CAP_OTHER_ERRORS=0
+CAP_RECOVERY_HTTP=200
+CAP_ZOMBIE_DELTA=0
+CAP_SUMMARY=6/6
 ```
 
-미확인: 73에서는 측정하지 않았다. 9-42의 과거 `/ok` 오류 원인은 원자료가 없어 확정할 수 없다. workers=2/4/8/16의 DB 잠금 원인을 이번에 수정하지 않았고, 16-worker mixed 오류 1건은 DB 잠금 수와 일치하지 않는다.
+기존 풀 부하 반복에서 workers=16 `/ok`는 86.755% 오류였고, 197 연결 시간 초과와 16,466 수신 시간 초과로 집계됐다. 서버의 active connection 최대치는 16이었고, 해당 로그에 503은 없었다. 이 로그에는 클라이언트 CPU 계측이 없어, 코어 분리 본 측정에서 재현되지 않은 차이의 원인을 서버 또는 부하 도구 중 하나로 확정할 수 없다.
+
+전수 요약과 실행 감시:
+
+```text
+OOM_SUMMARY=12/12
+LOAD2_SUMMARY=10/10
+FDFIX_SUMMARY=5/5
+NAME_SUMMARY=9/9
+WARN_SUMMARY=4/4
+ABI_SUMMARY=8/8
+BUILTIN2_SUMMARY=16/16
+HOF_SUMMARY=25/25
+TEST_EVIDENCE_SUMMARY=53/53
+TCP_SUMMARY=24/24
+HTTP_SUMMARY=26/26
+AUDIT_SUMMARY=44/44
+NATIVE_FORMS_SUMMARY=18/18
+CGC_SYMBOL_SUMMARY=5/5
+ERP_SUMMARY=22/22
+ERP2_SUMMARY=12/12
+ERP3_SUMMARY=19/19
+CONC_SUMMARY=8/8
+SEC_SUMMARY=14/14
+AUTH_SUMMARY=16/16
+PAGE_SUMMARY=11/11
+NET2_SUMMARY=18/18
+PW_SUMMARY=11/11
+JWT_SUMMARY=19/19
+STREAM_SUMMARY=13/13
+JSONNUM_SUMMARY=9/9
+PAR_SUMMARY=16/16
+OOM_SUMMARY=12/12
+FORKFAIL_SUMMARY=9/9
+HTTPATK_SUMMARY=21/21
+STATIC_SUMMARY=18/18
+TIMEOUT_SUMMARY=8/8
+TIMEPREC_SUMMARY=6/6
+CAP_SUMMARY=6/6
+NODE=0
+NPM=0
+NPX=0
+JS=0
+PYTHON=0
+```
+
+`LOAD2_SUMMARY=10/10`와 `FDFIX_SUMMARY=5/5`는 일반 모드 실행에서 통과했다. 위 풀 모드 재실행은 별도 결과로 `9/10`, `4/5`를 냈다. 전체 스크립트는 풀 모드 실패로 `FINALCHECK_SUITE_RC=1`에 끝났고 `POOL_SUMMARY`까지 도달하지 못했다.
+
+## 해시, 회귀, 커밋과 원격
+
+컴파일러는 수정하지 않았다. 시드는 바뀌지 않았다. 고정점 검증 결과:
+
+```text
+seed: 36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2
+stage2: ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba
+stage3: ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba
+stage4: ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+FIXPOINT_RC=0
+```
+
+미확인: 73에서는 측정하지 않았다. 코어 분리 측정의 16-worker mixed 오류 1건은 DB 잠금 수와 일치하지 않는다. 풀 모드 RSS 안정 실패 원인은 이 측정만으로 확정할 수 없어 수정하지 않았다. 일반 모드에서는 LOAD2 10/10, FDFIX 5/5였으나 풀 모드 전체 회귀는 통과하지 않았다.
