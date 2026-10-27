@@ -964,9 +964,14 @@
 
 (defn cgc-extract-raw-name [$node]
   (cond
-    [(= (get $node :kind) "variable") (if (get $node :dollar) (str "$" (get $node :name)) (get $node :name))]
+    [(= (get $node :kind) "variable") (get $node :name)]
     [(= (get $node :kind) "literal") (str (get $node :value))]
     [true "_anon"]))
+
+(defn cgc-extract-function-name [$node]
+  (if (and (= (get $node :kind) "variable") (get $node :dollar))
+    (str "$" (get $node :name))
+    (cgc-extract-raw-name $node)))
 
 ;; ── sexpr ──
 
@@ -1682,7 +1687,7 @@
       (cgc-bind-names-loop $names (+ $i 1)))))
 
 (defn cgc-defn-impl [$args]
-  (let [[$name (c-name (cgc-extract-raw-name (get $args 0)))]
+  (let [[$name (c-name (cgc-extract-function-name (get $args 0)))]
         [$param-items (get-block-items (get $args 1))]
         [$ps (cgc-params $param-items)]
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
@@ -1710,7 +1715,7 @@
       (reset! cgc-defn-depth-atom (- @cgc-defn-depth-atom 1))
       (reset! outer-params-atom $saved-params)
       (if (> $depth 0)
-        (let [[$name (cgc-register-function (cgc-extract-raw-name (get $args 0)))]
+        (let [[$name (cgc-register-function (cgc-extract-function-name (get $args 0)))]
               [$param-items (get-block-items (get $args 1))]
               [$ps (cgc-params $param-items)]]
           (swap! cgc-hoisted-fns-atom push $result)
@@ -1823,7 +1828,7 @@
     (recur (+ $i 1)
       (if (or $is-defn $is-block-func)
         (let [[$raw-name (if $is-defn
-                           (cgc-extract-raw-name (get (get $n :args) 0))
+                           (cgc-extract-function-name (get (get $n :args) 0))
                            (get $n :name))]
               [$name (cgc-register-function $raw-name)]
               [$params (if $is-defn
@@ -1851,7 +1856,7 @@
           [$kind (get $n :kind)]
           [$defn (and (= $kind "sexpr") (= (get $n :op) "defn"))]
           [$block-func (and (= $kind "block") (= (get $n :type) "FUNC"))]
-          [$candidate (if $defn (cgc-extract-raw-name (get (get $n :args) 0)) (get $n :name))]]
+          [$candidate (if $defn (cgc-extract-function-name (get (get $n :args) 0)) (get $n :name))]]
       (if (and (or $defn $block-func) (= $candidate $raw)) true
         (cgc-function-later? $nodes (+ $i 1) $raw)))))
 
@@ -1862,7 +1867,7 @@
           [$k (get $n :kind)]
           [$is-defn (and (= $k "sexpr") (= (get $n :op) "defn"))]
           [$is-block-func (and (= $k "block") (= (get $n :type) "FUNC"))]
-          [$raw (if $is-defn (cgc-extract-raw-name (get (get $n :args) 0)) (get $n :name))]
+          [$raw (if $is-defn (cgc-extract-function-name (get (get $n :args) 0)) (get $n :name))]
           [$later (and (or $is-defn $is-block-func) (cgc-function-later? $_nodes (+ $i 1) $raw))]]
       (if (or $is-defn $is-block-func)
         (if $later
