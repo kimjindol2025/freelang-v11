@@ -1,0 +1,1 @@
+(println (json-stringify {"kelvin" 273.15}))

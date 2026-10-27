@@ -1,0 +1,4 @@
+(defn server-html [html]
+  (server_html html))
+(server-html "SYMBOL_OK")
+(println "SYMBOL_OK")
