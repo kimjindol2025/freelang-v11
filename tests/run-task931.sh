@@ -190,7 +190,10 @@ server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-nofile/server.log" || tru
 test -n "$server_error" || server_error=none
 nofile_503="$(printf '%s\n' "$nofile_codes" | grep -Ec '^503$' || true)"
 printf 'CASE=http-descriptor-limit-30-requests SERVER_RC=%s SIGNAL=%s ERROR=%s RESPONSES=%s/30 HTTP_200=%s HTTP_503=%s\n' "$server_rc" "$server_signal" "$server_error" "$nofile_responses" "$nofile_total" "$nofile_503"
-test "$nofile_responses" -eq 30 && test "$nofile_503" -gt 0
+if (( nofile_responses != 30 || nofile_503 == 0 )); then
+  printf 'OOM_FAILURE=http-descriptor-limit expected_responses=30 expected_http_503_at_least=1\n' >&2
+  exit 1
+fi
 
 start_server "$WORK/oom-recovery" "" 1 32
 recovery_code="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$SERVER_PORT/")"
