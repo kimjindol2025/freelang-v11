@@ -87,12 +87,16 @@ d `_app.fl` GCC 오류: 이전 191 → 현재 156; 링크/HTTP 200 미실행
 e 시드·stage2=3=4: PASS
 f 전체 빠른 시험 SUMMARY 및 node/npm/npx/JS/Python 실행 횟수: FAIL (`FAST_TEST_RC=1`, `TASK942_ALL=PASS` 없음; node/npm/npx/JS/Python 모두 0회)
 
+```text
+X86_SUMMARY=2/6
+```
+
 ## 6. 아직 남은 v11 필요 기능 목록
 
 `server_req_path`, `server_req_query`, `server_req_param`, `server_req_cookie`, `server_req_files`, `server_redirect_cookie`, `http_*` 미매핑 호출, `hmac_sha256`, `base64_encode`, `base64_decode`, `aes_encrypt`, `aes_decrypt`, `scrypt_kdf`, `random_bytes`, `random`, `db_one`, `format_date`, `measure_time`, `shell`, `shell_exec_stdout`, `style`, `_dollar_callback`, 미완료 앱에서 드러나는 나머지 GCC 심볼·문법 오류, float 출력 정책 결정.
 
 ## 7. 커밋·두 원격 HEAD 및 미확인 항목
 
-시작 커밋 `d43731da`와 seed `36a806b0`을 유지했다. 현재 작업 커밋은 `4fdc307d`이며, Forgejo/GitHub 푸시는 전체 시험·민감정보 검사와 보고서 확정 뒤 수행한다.
+시작 커밋 `d43731da`와 seed `36a806b0`을 유지했다. 코드·시험 결과 커밋 `ab779d9d362d922428d79f2b1bc859cece4c6dcd`를 Forgejo에 먼저, GitHub에 다음으로 푸시하고 양쪽 ref를 확인했다. 이 문서의 요약 갱신은 별도 후속 커밋으로 두 원격에 같은 순서로 푸시한다.
 
-미확인: task942 pool 단계, 암호 함수 구현/벡터, 미실행 최소 예제, 앱 링크 및 HTTP 200, 소수 출력 정책. 두 원격 HEAD는 아직 확인되지 않았다.
+미확인: task942 pool 단계, 암호 함수 구현/벡터, 미실행 최소 예제, 앱 링크 및 HTTP 200, 소수 출력 정책.
