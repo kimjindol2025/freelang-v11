@@ -1,0 +1,2 @@
+(define value (assoc {"a" 1} "b" 2))
+(println (get value "b"))

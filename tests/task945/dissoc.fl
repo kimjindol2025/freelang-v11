@@ -1,0 +1,2 @@
+(define value (dissoc {"a" 1 "b" 2} "a"))
+(println (and (= (length value) 1) (nil? (get value "a"))))
