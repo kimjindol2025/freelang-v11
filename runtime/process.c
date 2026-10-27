@@ -987,6 +987,20 @@ FLValue fl_http_stream_collect(FLValue url, FLValue headers, FLValue body) {
     return fl_map_get(response, fl_str_val("body"));
 }
 
+FLValue fl_http_body(FLValue response) {
+    return response.tag == FL_MAP ? fl_map_get(response, fl_str_val("body")) : fl_nil();
+}
+
+FLValue fl_http_status(FLValue response) {
+    FLValue status = response.tag == FL_MAP ? fl_map_get(response, fl_str_val("status")) : fl_nil();
+    return status.tag == FL_INT ? status : fl_int(0);
+}
+
+FLValue fl_http_ok_p(FLValue response) {
+    FLValue ok = response.tag == FL_MAP ? fl_map_get(response, fl_str_val("ok")) : fl_nil();
+    return fl_bool(ok.tag == FL_BOOL && ok.b);
+}
+
 FLValue fl_uuid(void) {
     unsigned char bytes[16]; size_t left = sizeof bytes; unsigned char *p = bytes;
     while (left) {
