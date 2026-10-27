@@ -643,6 +643,19 @@ FLValue fl_min(FLValue a, FLValue b) {
     return fl_float(m);
 }
 
+static FLValue fl_builtin_min_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    if (argc != 2) {
+        fl_throw(fl_str_val("min expects two arguments"));
+        return fl_nil();
+    }
+    return fl_min(argv[0], argv[1]);
+}
+
+FLValue fl_builtin_min(void) {
+    return fl_fn_new(fl_builtin_min_call, 0, NULL);
+}
+
 FLValue fl_html_escape(FLValue value) {
     char value_buf[128];
     const char *src = value.tag == FL_STRING && value.obj ? ((FLString*)value.obj)->data :

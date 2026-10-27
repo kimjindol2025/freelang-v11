@@ -921,6 +921,7 @@
                         [(= $v "false") "fl_bool(false)"]
                         [(or (= $v "nil") (= $v "null")) "fl_nil()"]
                         [(= $v "json-parse") "fl_fn_new(json_parse_wrap, 0, NULL)"]
+                        [(= $v "min") "fl_builtin_min()"]
                         [true (let [[$cn (c-name $v)] [$global (c-global-name $v)]]
                                 (if (not (null? $global)) $global
                                   (if (or (includes-item @known-fncall-targets-atom $cn)
@@ -1007,7 +1008,17 @@
           (if (= (get $cols 0) $op) true
             (recur (+ $i 1))))))))
 
+(defn cgc-call-target-name [$op]
+  (if (str-starts-with $op "$")
+    (c-name (substring $op 1 (length $op)))
+    (c-name $op)))
+
 (defn cgc-dispatch [$op $args $line]
+  (if (or (includes-item @outer-params-atom (cgc-call-target-name $op))
+          (includes-item @known-fncall-targets-atom (cgc-call-target-name $op)))
+    (cgc-fncall (cgc-call-target-name $op) $args)
+  (if (= $op "doseq")
+    (cgc-doseq $args)
   (if (not (null? (c-runtime-name $op)))
     (cgc-runtime-call $op $args)
   (if (cgc-held-builtin? $op)
@@ -1318,7 +1329,29 @@
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
   ;; N-09: 암호화 / 비밀번호
-  [true             (cgc-dispatch-fallback $op $args)])))))
+      [true             (cgc-dispatch-fallback $op $args)])))))))
+
+(defn cgc-doseq [$args]
+  (let [[$bindings (get-block-items (get $args 0))]
+        [$id @lambda-id-atom]]
+    (if (not (= (length $bindings) 2))
+      (do
+        (println "[CGC-ERR] doseq expects [item collection]")
+        (fl-cgc-halt)
+        "fl_nil()")
+      (let [[$item (c-name (cgc-extract-raw-name (get $bindings 0)))]
+            [$saved @outer-params-atom]]
+        (swap! outer-params-atom push $item)
+        (let [[$body (cgc (get $args 1))]]
+          (reset! outer-params-atom $saved)
+          (swap! lambda-id-atom + 1)
+          (str "(__extension__ ({ FLValue __fl_doseq_seq_" $id " = "
+               (cgc (get $bindings 1)) "; FLValue __fl_doseq_len_" $id
+               " = length(__fl_doseq_seq_" $id "); "
+               "for (int64_t __fl_doseq_i_" $id " = 0; __fl_doseq_i_" $id
+               " < __fl_doseq_len_" $id ".i; __fl_doseq_i_" $id "++) { "
+               "FLValue " $item " = get(__fl_doseq_seq_" $id ", fl_int(__fl_doseq_i_" $id ")); "
+               "(void)" $item "; (void)(" $body "); } fl_nil(); }))"))))))
 
 (defn cgc-swap! [$args]
   (let [[$atom-c  (cgc (get $args 0))]
@@ -1332,6 +1365,10 @@
                     [(= $op "-")    (str "fl_sub(" $deref ", " $ec ")")]
                     [(= $op "*")    (str "fl_mul(" $deref ", " $ec ")")]
                     [(= $op "push") (str "fl_vec_push(" $deref ", " $ec ")")]
+                    [(= $op "assoc") (str "fl_map_set(" $deref ", " $ec ")")]
+                    [(= $op "dissoc") (str "fl_map_del(" $deref ", " (cgc (get $extra 0)) ")")]
+                    [(= $op "conj") (str "fl_conj(" (+ (length $extra) 1) ", (FLValue[]){" $deref
+                                          (if (= (length $extra) 0) "" (str ", " $ec)) "})")]
                     [(= $op "fn")    (str "fl_fn_call(" (cgc $fn-node) ", 1, (FLValue[]){" $deref "})")]
                     [true           (str (c-name $op) "(" $deref
                                       (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
