@@ -12,7 +12,9 @@ fi
 command -v pidstat >/dev/null
 mkdir -p "$WORK/public"
 printf 'TASK944_EXECUTION_LOCATION=freelang-v11\n'
-"$SEED" "$ROOT/tests/task936/soak-server.fl" "$WORK/server.c" >"$WORK/server.compile" 2>&1
+"$SEED" "$ROOT/self/cgc-main.fl" "$WORK/stage2.c"
+bash "$ROOT/scripts/build-cgc-native.sh" "$WORK/stage2.c" "$WORK/stage2-bin" >"$WORK/stage2.build"
+"$WORK/stage2-bin" "$ROOT/tests/task936/soak-server.fl" "$WORK/server.c" >"$WORK/server.compile" 2>&1
 gcc -w -I "$ROOT/runtime" -o "$WORK/server" "$WORK/server.c" \
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
   "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
