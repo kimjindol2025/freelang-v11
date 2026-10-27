@@ -2,6 +2,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -31,6 +32,17 @@ static int user_tasks(void) {
     }
     closedir(processes);
     return count;
+}
+
+__attribute__((constructor)) static void set_probe_limit(void) {
+    if (!getenv("DB_FORK_ISOLATED")) return;
+    int tasks = user_tasks();
+    struct rlimit limit;
+    if (tasks < 0 || getrlimit(RLIMIT_NPROC, &limit) != 0) _exit(126);
+    limit.rlim_cur = (rlim_t)(tasks + 5);
+    if (setrlimit(RLIMIT_NPROC, &limit) != 0) _exit(126);
+    fprintf(stderr, "DB_FORK_MEASURED_TASKS=%d DB_FORK_SET_LIMIT=%llu\n",
+            tasks, (unsigned long long)limit.rlim_cur);
 }
 
 pid_t __wrap_fork(void) {

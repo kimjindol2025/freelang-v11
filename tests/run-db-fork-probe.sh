@@ -19,19 +19,13 @@ gcc -w -I "$R" -o "$BIN_DIR/forkfail" "$BIN_DIR/forkfail.c" \
 passed=0
 for i in $(seq 1 20); do
   rc=0
-  unshare --map-auto --setuid 1 --setgid 1 -- bash -c '
-    tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d " ")"
-    limit=$((tasks + 5))
-    printf "DB_FORK_MEASURED_TASKS=%s DB_FORK_SET_LIMIT=%s\n" "$tasks" "$limit"
-    ulimit -u "$limit"
-    exec "$1"
-  ' _ "$BIN_DIR/forkfail" >"$WORK/run-$i.out" 2>"$WORK/run-$i.err" || rc=$?
+  DB_FORK_ISOLATED=1 unshare --map-auto --setuid 1 --setgid 1 -- "$BIN_DIR/forkfail" >"$WORK/run-$i.out" 2>"$WORK/run-$i.err" || rc=$?
   failed="$(rg -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/run-$i.out" || true)"
   succeeded="$(rg -c '^SLOT[0-9]+=[0-9]+$' "$WORK/run-$i.out" || true)"
   failed="${failed:-0}"
   succeeded="${succeeded:-0}"
   first_failure="$(rg -m1 'DB_FORK_RESULT=fail' "$WORK/run-$i.err" || true)"
-  measured="$(rg -m1 '^DB_FORK_MEASURED_TASKS=' "$WORK/run-$i.out" || true)"
+  measured="$(rg -m1 '^DB_FORK_MEASURED_TASKS=' "$WORK/run-$i.err" || true)"
   verdict=FAIL
   if test "$rc" -eq 0 && test "$failed" -gt 0 && test "$succeeded" -gt 0 &&
      test $((failed + succeeded)) -eq 20 &&
