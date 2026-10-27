@@ -1,0 +1,2 @@
+(defn h [tag attrs content] (str tag attrs (if (= content nil) "" content)))
+(println (h "<div>" "class=x"))
