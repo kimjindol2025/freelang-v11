@@ -1355,7 +1355,9 @@
      (let [[$n (c-name (get $node :value))]]
        (if (or (= $n "") (includes-item $acc $n)) $acc (push $acc $n)))]
     [(= (get $node :kind) "sexpr")
-     (cgc-collect-vars-loop (get $node :args) 0 $acc)]
+     (let [[$op (get $node :op)]
+           [$with-op (if (includes-item $acc $op) $acc (push $acc $op))]]
+       (cgc-collect-vars-loop (get $node :args) 0 $with-op))]
     [(= (get $node :kind) "block")
      (if (= (get $node :type) "Map")
        (let [[$items (get (get $node :fields) :items)]]
