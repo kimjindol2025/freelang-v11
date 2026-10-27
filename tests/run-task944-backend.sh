@@ -14,7 +14,7 @@ SEED="$ROOT/bin/cgc-bin-x86_64-seed-v11"
 bash "$ROOT/scripts/build-cgc-native.sh" "$WORK/compiler.c" "$WORK/compiler" >"$WORK/compiler-build.log"
 RUNTIME=(core.c collection.c io.c math.c error.c process.c json.c db.c http_server.c auth.c cgc-bridge.c)
 passed=0
-for name in try template symbol float triple-string symbol-collision duplicate-defn global-function dollar-function env-alias swap-fn closure-call dollar-param dollar-lambda-param; do
+for name in try template symbol float triple-string symbol-collision duplicate-defn global-function dollar-function env-alias swap-fn closure-call dollar-param dollar-lambda-param type-alias; do
   [[ "$FILTER" == all || "$FILTER" == "$name" ]] || continue
   source="$ROOT/tests/task944/$name.fl"
   cfile="$WORK/$name.c"
