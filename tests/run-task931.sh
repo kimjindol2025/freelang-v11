@@ -11,6 +11,22 @@ SOURCES=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c d
 LINK=(); for source in "${SOURCES[@]}"; do LINK+=("$RUNTIME/$source"); done
 segv_count=0
 
+wait_server_bounded() {
+  local pid="$1" seconds="$2" state
+  for _ in $(seq 1 "$((seconds * 10))"); do
+    state="$(ps -o stat= -p "$pid" 2>/dev/null || true)"
+    if [[ -z "$state" || "$state" == Z* ]]; then
+      wait "$pid"
+      return $?
+    fi
+    sleep 0.1
+  done
+  printf 'SERVER_WAIT_TIMEOUT pid=%s seconds=%s\n' "$pid" "$seconds"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  return 124
+}
+
 for mode in vector string json; do
   "$COMPILER" "$ROOT/tests/task931/memory.fl" "$WORK/oom-memory.c" >"$WORK/oom-memory.compile" 2>&1
   gcc -w -I "$RUNTIME" -o "$WORK/oom-memory" "$WORK/oom-memory.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
@@ -144,7 +160,7 @@ for i in $(seq 1 30); do
   CURL_PIDS+=("$!")
 done
 for pid in "${CURL_PIDS[@]}"; do wait "$pid" || true; done
-set +e; wait "$SERVER_PID"; server_rc=$?; set -e
+set +e; wait_server_bounded "$SERVER_PID" 10; server_rc=$?; set -e
 server_signal=0; test "$server_rc" -gt 128 && server_signal=$((server_rc - 128)) || true
 nproc_codes="$(cat "$WORK"/oom-nproc/codes/*)"
 nproc_total="$(printf '%s\n' "$nproc_codes" | grep -Ec '^(200|503)$' || true)"
@@ -165,7 +181,7 @@ for i in $(seq 1 30); do
   CURL_PIDS+=("$!")
 done
 for pid in "${CURL_PIDS[@]}"; do wait "$pid" || true; done
-set +e; wait "$SERVER_PID"; server_rc=$?; set -e
+set +e; wait_server_bounded "$SERVER_PID" 10; server_rc=$?; set -e
 server_signal=0; test "$server_rc" -gt 128 && server_signal=$((server_rc - 128)) || true
 nofile_codes="$(cat "$WORK"/oom-nofile/codes/*)"
 nofile_total="$(printf '%s\n' "$nofile_codes" | grep -Ec '^200$' || true)"
@@ -178,7 +194,7 @@ test "$nofile_responses" -eq 30 && test "$nofile_503" -gt 0
 
 start_server "$WORK/oom-recovery" "" 1 32
 recovery_code="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$SERVER_PORT/")"
-set +e; wait "$SERVER_PID"; server_rc=$?; set -e
+set +e; wait_server_bounded "$SERVER_PID" 10; server_rc=$?; set -e
 server_signal=0; test "$server_rc" -gt 128 && server_signal=$((server_rc - 128)) || true
 server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-recovery/server.log" || true)"
 test -n "$server_error" || server_error=none

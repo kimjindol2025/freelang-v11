@@ -11,7 +11,9 @@ fi
 mkdir -p "$WORK"
 
 printf 'TASK942_LEGACY_BEGIN\n'
-FL_HTTP_WORKERS=0 bash "$ROOT/tests/run-task938-load.sh" "$COMPILER" "$WORK/legacy"
+timeout --signal=TERM --kill-after=10s 1800s env FL_HTTP_WORKERS=0 \
+  bash "$ROOT/tests/run-task938-load.sh" "$COMPILER" "$WORK/legacy"
 printf 'TASK942_POOL_BEGIN\n'
-bash "$ROOT/tests/run-task942-pool.sh" "$COMPILER" "$WORK/pool"
+timeout --signal=TERM --kill-after=10s 1800s \
+  bash "$ROOT/tests/run-task942-pool.sh" "$COMPILER" "$WORK/pool"
 printf 'TASK942_ALL=PASS\n'
