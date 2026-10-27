@@ -1,0 +1,2 @@
+(defn dollar-value [$value] $value)
+(println (dollar-value 7))
