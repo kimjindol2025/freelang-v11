@@ -1012,6 +1012,9 @@
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
     (cond
+  [(and (= $op "h") (> (length $args) 3))
+   (str "h(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", "
+        (cgc-str (slice $args 2 (length $args))) ")")]
   [(= $op "if")     (cgc-if $args)]
   [(= $op "when")   (cgc-if $args)]
   [(= $op "??")      (cgc-null-coalesce $args)]
