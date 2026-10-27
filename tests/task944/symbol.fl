@@ -1,5 +1,12 @@
 (define response (server_html "SYMBOL_OK"))
-(define response (server_header response "X-Example" "ok"))
-(define response (server_status 201 response))
+(define headed (server_header response "X-Example" "ok"))
+(define status (server_status 201 "SYMBOL_OK"))
 (define redirect (server_redirect_cookie "/ok" "session=ok; Path=/; HttpOnly"))
-(println "SYMBOL_OK")
+(println
+  (if (and
+        (= (get (get headed "headers") "X-Example") "ok")
+        (= (get status "status") 201)
+        (= (get redirect "location") "/ok")
+        (= (get redirect "set_cookie") "session=ok; Path=/; HttpOnly"))
+    "SYMBOL_OK"
+    "SYMBOL_FAIL"))
