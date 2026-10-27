@@ -1,6 +1,6 @@
 # D-3 연결 누수와 프로세스 제한 시험 보고서
 
-기준 가지: `db-stability`, 시작 HEAD `9ffa9cd00bf3d98586fc92cfd61670ac9645beaf`. 모든 측정은 임시 디렉터리와 공용 잠금 `flock -n -o /tmp/fl-heavy.lock`을 사용했다. 실행 위치: 메인. 23·25 서버에는 접속하지 않았다.
+기준 가지: `db-stability`, 시작 HEAD `9ffa9cd00bf3d98586fc92cfd61670ac9645beaf`. 무거운 시험은 임시 디렉터리와 공용 잠금 `flock -n -o /tmp/fl-heavy.lock`을 사용했다. 실행 위치: 메인. 23·25 서버에는 접속하지 않았다.
 
 ## 1. 연결 누수 원문
 
@@ -141,7 +141,7 @@ SELF_AND_SEED_CHANGED_FILES=0
 
 ## 6. http_server.c 손으로 맞출 목록
 
-코1 가지 `v11-x86-seed-public`의 확인 시점 HEAD는 `d0153309e23a0738c20e6d9546b1263960f68bf2`였다. 이 가지는 `runtime/http_server.c`를 수정하지 않아 현재 두 가지 사이에 이 파일의 텍스트 충돌은 없다. 코1 작업이 먼저 끝난 뒤 다음 연결 지점을 수동 확인한다. 합치기는 하지 않았다.
+코1 가지 `v11-x86-seed-public`의 확인 시점 HEAD는 `d0153309e23a0738c20e6d9546b1263960f68bf2`였다. db-stability 가지는 `runtime/http_server.c`를 수정하지 않아 현재 두 가지 사이에 이 파일의 텍스트 충돌은 없다. 코1 작업이 먼저 끝난 뒤 다음 연결 지점을 수동 확인한다. 합치기는 하지 않았다.
 
 - `runtime/http_server.c:215`, `:250`, `:265`: 지속 워커의 fork·재시작과 `runtime/db.c:87`의 PID별 DB 핸들 재열기가 함께 동작하는지 확인.
 - `runtime/http_server.c:75`, `:114`, `:285`, `:328`: 공유 연결 수 복구·워커 재시작과 DB 30초 잠금 대기의 종료 순서 확인.
