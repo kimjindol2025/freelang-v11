@@ -122,4 +122,4 @@ X86_SUMMARY=3/5 (PASS 항목 b,c,e; a,d 미완료)
 - 원인 미확인: 16-worker 오류율이 전체 strace 실행에서만 재현된 원인, LOAD2 FD 스냅샷 단발 변동의 원인.
 - 남은 막힘: `_app.fl`의 `not-found-handler`/`not_found_handler` 사용자 이름 충돌. task920 계약상 앱은 수정하지 않았다.
 - 실행 위치: `<가림>`.
-- 이 보고서는 최종 보고서 커밋 및 두 원격 HEAD 동기화 후 해시를 덧붙인다.
+- 두 원격 HEAD의 최종 해시는 채팅 보고에 원문으로 기재한다.
