@@ -76,10 +76,10 @@ WORKER_AGG label=w16-mixed process_exits=16 slots=16 served_total=26804 per_slot
 
 ## PERF_SUMMARY
 
-현재 판정은 5/6이다. 코어 분리, 16-worker 오류 분석, 처리량표, 민감정보 검사, 최종 회귀 실행은 확인했다. 단, 기준 c는 `WORKERS=0` mixed에서 상한 초과 503을 오류에 포함하므로 통과하지 못한다.
+현재 판정은 4/6이며 회귀 항목 e는 최종 전체 시험 대기 중이다. 코어 분리, 16-worker 오류 분석, 처리량표, 민감정보 검사는 확인했다. 기준 c는 `WORKERS=0` mixed에서 상한 초과 503을 오류에 포함하므로 통과하지 못한다.
 
 ```text
-PERF_SUMMARY=5/6
+PERF_SUMMARY=4/6 (e pending)
 ```
 
 혼합 성능 목표 `RPS 800 이상 또는 p99 1000ms 미만`은 모든 worker 구성에서 충족했다. 16-worker mixed는 p99가 1038.413ms로 1000ms를 넘었지만 2408.98 RPS였다. SQLite 동시 쓰기 잠금은 남은 위험이다. 원인 분석상 socket reuse 설정을 바꿀 근거는 없었다.
