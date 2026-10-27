@@ -42,6 +42,18 @@ FLValue type_of(FLValue v) {
     }
 }
 
+FLValue str_count(FLValue s, FLValue sub) {
+    if (s.tag != FL_STRING || sub.tag != FL_STRING) return fl_int(0);
+    const char* text = ((FLString*)s.obj)->data;
+    const char* needle = ((FLString*)sub.obj)->data;
+    size_t n = strlen(needle);
+    if (n == 0) return fl_int((int64_t)strlen(text) + 1);
+    int64_t count = 0;
+    const char* at = text;
+    while ((at = strstr(at, needle)) != NULL) { count++; at += n; }
+    return fl_int(count);
+}
+
 /* B-3: String ops */
 FLValue str_replace(FLValue s, FLValue from, FLValue to) {
     if (s.tag!=FL_STRING||from.tag!=FL_STRING||to.tag!=FL_STRING) return s;

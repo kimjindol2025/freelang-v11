@@ -1099,6 +1099,7 @@
   [(= $op "fn?")          (str "fl_fn_p(" (cgc (get $args 0)) ")")]
   [(= $op "type")         (str "type_of(" (cgc (get $args 0)) ")")]
   [(= $op "type-of")      (str "type_of(" (cgc (get $args 0)) ")")]
+  [(= $op "str-count")    (str "str_count(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "empty?")       (cgc-empty? $args)]
   [(= $op "not-empty?")   (str "fl_not_empty_p(" (cgc (get $args 0)) ")")]
   [(= $op "nil-or-empty?") (str "fl_nil_or_empty_p(" (cgc (get $args 0)) ")")]

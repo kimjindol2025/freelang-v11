@@ -245,6 +245,7 @@ FLValue substring(FLValue s, FLValue start, FLValue end);
 FLValue trim(FLValue s);
 FLValue index_of(FLValue vec, FLValue val);
 FLValue str_index_of(FLValue s, FLValue sub);
+FLValue str_count(FLValue s, FLValue sub);
 
 /* ── S26: atom (mutable cell) ── */
 FLValue fl_atom_new(FLValue init);
