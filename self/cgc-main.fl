@@ -1097,6 +1097,7 @@
   [(= $op "vector?")      (str "fl_array_p(" (cgc (get $args 0)) ")")]
   [(= $op "map?")         (str "fl_map_p(" (cgc (get $args 0)) ")")]
   [(= $op "fn?")          (str "fl_fn_p(" (cgc (get $args 0)) ")")]
+  [(= $op "type")         (str "type_of(" (cgc (get $args 0)) ")")]
   [(= $op "type-of")      (str "type_of(" (cgc (get $args 0)) ")")]
   [(= $op "empty?")       (cgc-empty? $args)]
   [(= $op "not-empty?")   (str "fl_not_empty_p(" (cgc (get $args 0)) ")")]
