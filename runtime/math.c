@@ -54,6 +54,18 @@ FLValue str_count(FLValue s, FLValue sub) {
     return fl_int(count);
 }
 
+FLValue fl_style_join(int count, FLValue* parts) {
+    FLValue out = fl_str_val("");
+    int added = 0;
+    for (int i = 0; i < count; i++) {
+        FLValue part = fl_text(parts[i]);
+        if (part.tag == FL_STRING && ((FLString*)part.obj)->len == 0) continue;
+        out = added ? fl_str_n(3, out, fl_str_val(";"), part) : part;
+        added = 1;
+    }
+    return out;
+}
+
 /* B-3: String ops */
 FLValue str_replace(FLValue s, FLValue from, FLValue to) {
     if (s.tag!=FL_STRING||from.tag!=FL_STRING||to.tag!=FL_STRING) return s;

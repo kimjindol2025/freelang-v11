@@ -1015,6 +1015,12 @@
   [(and (= $op "h") (> (length $args) 3))
    (str "h(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", "
         (cgc-str (slice $args 2 (length $args))) ")")]
+  [(and (= $op "h") (< (length $args) 3))
+   (str "h(" (if (> (length $args) 0) (cgc (get $args 0)) "fl_nil()") ", "
+        (if (> (length $args) 1) (cgc (get $args 1)) "fl_nil()") ", fl_nil())")]
+  [(= $op "s")
+   (str "fl_style_join(" (length $args) ", "
+        (if (= (length $args) 0) "NULL" (str "(FLValue[]){" (cgc-args $args) "}")) ")")]
   [(= $op "if")     (cgc-if $args)]
   [(= $op "when")   (cgc-if $args)]
   [(= $op "??")      (cgc-null-coalesce $args)]
