@@ -121,6 +121,14 @@ static void db_error(sqlite3 *db, const char *operation, int code) {
     fl_throw(fl_str_val(message));
 }
 
+static void db_lease_error(FLDbLease lease, const char *operation, int code) {
+    char message[512];
+    snprintf(message, sizeof(message), "%s: %s (sqlite=%d)", operation,
+             sqlite3_errmsg(lease.handle), code);
+    if (lease.owned) sqlite3_close(lease.handle);
+    fl_throw(fl_str_val(message));
+}
+
 static int db_batch_authorizer(void *context, int action, const char *a,
                                const char *b, const char *c, const char *d) {
     (void)context; (void)a; (void)b; (void)c; (void)d;
@@ -277,10 +285,12 @@ FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params) {
     sqlite3_finalize(next);
     if (batch) {
         sqlite3_finalize(statement);
-        if (((FLVector *)params.obj)->len != 0)
+        if (((FLVector *)params.obj)->len != 0) {
+            if (lease.owned) sqlite3_close(db);
             fl_throw(fl_str_val("db-exec: multiple statements cannot use parameters"));
+        }
         int code = sqlite3_exec(db, "SAVEPOINT fl_db_batch", NULL, NULL, NULL);
-        if (code != SQLITE_OK) db_error(db, "db-exec", code);
+        if (code != SQLITE_OK) db_lease_error(lease, "db-exec", code);
         int changed_before = sqlite3_total_changes(db);
         char *error = NULL;
         void (*previous_xfsz)(int) = signal(SIGXFSZ, SIG_IGN);
@@ -299,7 +309,7 @@ FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params) {
         }
         sqlite3_free(error);
         code = sqlite3_exec(db, "RELEASE fl_db_batch", NULL, NULL, NULL);
-        if (code != SQLITE_OK) db_error(db, "db-exec", code);
+        if (code != SQLITE_OK) db_lease_error(lease, "db-exec", code);
         int changed = sqlite3_total_changes(db) - changed_before;
         if (lease.owned) sqlite3_close(db);
         return fl_int(changed);
