@@ -1,0 +1,2 @@
+(println (str_replace_in "a+b+c" "+" " "))
+(println (str_replace_in "hi<br>x" "<[^>]+>" ""))
