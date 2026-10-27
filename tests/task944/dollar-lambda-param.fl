@@ -1,0 +1,1 @@
+(println (get (map (fn [$value] $value) [7]) 0))
