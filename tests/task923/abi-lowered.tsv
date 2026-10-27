@@ -23,7 +23,6 @@ let	Local binding is emitted by the compiler.
 list	Vector construction is emitted by the compiler.
 loop	Loop binding is emitted by the compiler.
 max	Variadic extrema is emitted as compiler-built comparisons.
-min	Variadic extrema is emitted as compiler-built comparisons.
 or	Short-circuit logic is emitted as a conditional expression.
 range	Range construction is emitted by the compiler.
 recur	Tail-call control flow is emitted by the compiler.
