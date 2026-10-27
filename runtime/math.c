@@ -66,6 +66,37 @@ FLValue fl_style_join(int count, FLValue* parts) {
     return out;
 }
 
+FLValue parse_date(FLValue value) {
+    if (value.tag != FL_STRING) return fl_nil();
+    const char* text = ((FLString*)value.obj)->data;
+    int year, month, day, hour = 0, minute = 0, second = 0;
+    int fields = sscanf(text, "%4d-%2d-%2dT%2d:%2d:%2d", &year, &month, &day, &hour, &minute, &second);
+    if (fields < 3) fields = sscanf(text, "%4d-%2d-%2d %2d:%2d:%2d", &year, &month, &day, &hour, &minute, &second);
+    if (fields < 3) return fl_nil();
+    struct tm tm = {0};
+    tm.tm_year = year - 1900; tm.tm_mon = month - 1; tm.tm_mday = day;
+    tm.tm_hour = hour; tm.tm_min = minute; tm.tm_sec = second;
+    time_t epoch = timegm(&tm);
+    int millis = 0;
+    const char* dot = strchr(text, '.');
+    if (dot) {
+        int digits = 0;
+        for (dot++; *dot >= '0' && *dot <= '9' && digits < 3; dot++, digits++) millis = millis * 10 + (*dot - '0');
+        while (digits++ < 3) millis *= 10;
+    }
+    const char* time_part = strchr(text, 'T');
+    if (!time_part) time_part = strchr(text, ' ');
+    const char* zone = time_part ? strpbrk(time_part, "+-") : NULL;
+    if (zone) {
+        int zh = 0, zm = 0;
+        if (sscanf(zone + 1, "%2d:%2d", &zh, &zm) == 2) {
+            int offset = zh * 3600 + zm * 60;
+            epoch += (*zone == '+' ? -offset : offset);
+        }
+    }
+    return fl_int((int64_t)epoch * 1000 + millis);
+}
+
 /* B-3: String ops */
 FLValue str_replace(FLValue s, FLValue from, FLValue to) {
     if (s.tag!=FL_STRING||from.tag!=FL_STRING||to.tag!=FL_STRING) return s;
