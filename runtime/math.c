@@ -635,6 +635,14 @@ FLValue max(FLValue a, FLValue b) {
     return fl_float(m);
 }
 
+FLValue fl_min(FLValue a, FLValue b) {
+    double da = a.tag == FL_FLOAT ? a.f : (double)a.i;
+    double db = b.tag == FL_FLOAT ? b.f : (double)b.i;
+    double m = da < db ? da : db;
+    if (a.tag == FL_INT && b.tag == FL_INT) return fl_int((int64_t)m);
+    return fl_float(m);
+}
+
 FLValue fl_html_escape(FLValue value) {
     char value_buf[128];
     const char *src = value.tag == FL_STRING && value.obj ? ((FLString*)value.obj)->data :
