@@ -435,10 +435,11 @@ X86_SUMMARY=3/6
 branch: v11-x86-seed-public
 start: 56f28ecb
 supplement_start: c65d409a
-current_before_report_commit: 4959818c
+code_head_before_report_commit: 4959818c
+report_commit: 2628a62ccebdb7d75881447c26ba206adfc9c3dc
 seed sha256: 36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2
-Forgejo: pending report commit and push verification
-GitHub: pending report commit and push verification
+Forgejo_HEAD: 2628a62ccebdb7d75881447c26ba206adfc9c3dc (verified)
+GitHub_HEAD: 2628a62ccebdb7d75881447c26ba206adfc9c3dc (verified)
 ```
 
 미확인: `_app.fl`의 전체 빌드·실행과 HTTP 200, 191개 GCC 오류의 잔여 런타임 기능, float 정책, 중단된 전체 빠른 시험의 SUMMARY·execve 집계, 앱 실행 중 실제 UI/요청 경로.
