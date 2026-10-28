@@ -1,4 +1,4 @@
 (define ui-btn "GLOBAL")
-(defn ui-btn [label] label)
+(defn ui_btn [label] label)
 (println "TEMPLATE ${ui-btn}")
-(println (ui-btn "FUNCTION"))
+(println (ui_btn "FUNCTION"))
