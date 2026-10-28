@@ -691,10 +691,10 @@
                   "bool" "true" "false"] $s))
 
 (defn c-name-base [$n]
-  ;; Preserve native C underscores; the registration pass rejects mangling collisions.
+  ;; Preserve native C underscores and keep hyphens distinct.
   (let [[$a (str-replace $n "$" "_dollar_")]
         [$b (str-replace $a "->" "_to_")]
-        [$c (str-replace $b "-" "_")]
+        [$c (str-replace $b "-" "_hyphen_")]
         [$d (str-replace $c "/" "__")]
         [$e (str-replace $d "?" "_p")]
         [$f (str-replace $e "!" "_b")]
