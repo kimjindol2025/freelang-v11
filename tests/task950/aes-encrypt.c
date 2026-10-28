@@ -18,7 +18,7 @@ int main(void) {
     if (!first || !last) return 1;
     int iv_length = (int)(first - (char *)decoded);
     int cipher_length = (int)(last - first - 1);
-    int tag_length = (int)(decoded + decoded_length - last - 1);
+    int tag_length = (int)(decoded_text + decoded_length - last - 1);
     int valid = iv_length == 32 && cipher_length == 14 && tag_length == 32;
     printf("AES_ENCRYPT_FORMAT=%d IV_HEX=%d CIPHER_HEX=%d TAG_HEX=%d\n",
            valid, iv_length, cipher_length, tag_length);
