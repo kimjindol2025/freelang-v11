@@ -1,3 +1,4 @@
+(define task955_collision "global-value")
 (define task955-collision "global-value")
 (defn task955-collision [] "function-value")
 (println task955-collision)
