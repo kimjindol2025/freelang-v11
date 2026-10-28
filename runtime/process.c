@@ -21,6 +21,53 @@
 #include <sys/random.h>
 #include <math.h>
 
+FLValue format_date(FLValue timestamp_ms, FLValue format_value) {
+    if ((timestamp_ms.tag != FL_INT && timestamp_ms.tag != FL_FLOAT) ||
+        format_value.tag != FL_STRING || !format_value.obj)
+        fl_throw(fl_str_val("format_date expects timestamp and format string"));
+    double milliseconds = timestamp_ms.tag == FL_INT ? (double)timestamp_ms.i : timestamp_ms.f;
+    if (!isfinite(milliseconds) || milliseconds < (double)INT64_MIN * 1000.0 ||
+        milliseconds > (double)INT64_MAX * 1000.0)
+        fl_throw(fl_str_val("format_date timestamp out of range"));
+    double seconds = floor(milliseconds / 1000.0);
+    time_t epoch = (time_t)seconds;
+    struct tm date;
+    if (!localtime_r(&epoch, &date)) fl_throw(fl_str_val("format_date timestamp out of range"));
+    int ms = (int)(milliseconds - seconds * 1000.0);
+    char values[7][16];
+    snprintf(values[0], sizeof(values[0]), "%04d", date.tm_year + 1900);
+    snprintf(values[1], sizeof(values[1]), "%02d", date.tm_mon + 1);
+    snprintf(values[2], sizeof(values[2]), "%02d", date.tm_mday);
+    snprintf(values[3], sizeof(values[3]), "%02d", date.tm_hour);
+    snprintf(values[4], sizeof(values[4]), "%02d", date.tm_min);
+    snprintf(values[5], sizeof(values[5]), "%02d", date.tm_sec);
+    snprintf(values[6], sizeof(values[6]), "%03d", ms);
+    static const char *tokens[] = { "YYYY", "MM", "DD", "HH", "mm", "ss", "SSS" };
+    size_t token_lengths[] = { 4, 2, 2, 2, 2, 2, 3 };
+    int replaced[7] = {0};
+    FLString *format = (FLString *)format_value.obj;
+    if (format->len > 4096) fl_throw(fl_str_val("format_date format too long"));
+    size_t capacity = (size_t)format->len + 64;
+    char *output = malloc(capacity);
+    if (!output) fl_throw(fl_str_val("format_date allocation failed"));
+    size_t i = 0, used = 0;
+    while (i < format->len) {
+        int match = -1;
+        for (int t = 0; t < 7; t++)
+            if (!replaced[t] && i + token_lengths[t] <= format->len &&
+                memcmp(format->data + i, tokens[t], token_lengths[t]) == 0) { match = t; break; }
+        if (match >= 0) {
+            size_t length = strlen(values[match]);
+            memcpy(output + used, values[match], length);
+            used += length; i += token_lengths[match]; replaced[match] = 1;
+        } else output[used++] = format->data[i++];
+    }
+    output[used] = '\0';
+    FLValue result = fl_str_val(output);
+    free(output);
+    return result;
+}
+
 FLValue _fl_process_getcwd(void) {
     char buf[4096];
     if (!getcwd(buf, sizeof(buf))) return fl_nil();
