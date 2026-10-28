@@ -33,10 +33,42 @@
 
 수정 전 GCC 기준 기록은 실제 위치 진단 `212`건이며, 과거 느슨한 문자열 grep의 `267`은 문맥 행을 포함한 값입니다. 이 재검증에서는 앞선 GCC 로그와 생성 C를 재사용해 정적 분석했습니다. 단계별 구현 GCC 재측정은 목록 커밋 뒤 각 함수의 회귀 시험 커밋 및 구현 커밋 순서로 진행합니다.
 
-## b–e. 구현 및 검증 기록
+## b. 이번 재검증에서 진행한 구현
 
-아직 실행하지 않았습니다. 각 함수의 회귀 시험과 기대 출력 커밋 후 구현하고, 기존 ARM/FreeLang 결과 비교, 단계별 GCC 오류 수, `/ok`, seed 고정점, 전체 시험 및 별도 exec 추적 결과를 여기에 원문으로 누적합니다.
+`json_str`는 구현 전 시험 실패(`PREIMPLEMENTATION_RC=1`)를 기록한 후 시험을 커밋했고, 기존 `fl_json_stringify`에 위임하도록 구현했습니다. `js_keys`도 같은 순서로 시험·기대 출력을 커밋한 뒤 `fl_map_keys`에 위임했습니다. 보존한 실행 출력은 다음과 같습니다.
+
+```text
+JSON_STR={"a":1} REF_EQUAL=1
+JS_KEYS_LEN=2 REF_EQUAL=1
+```
+
+기존 ARM 실행 결과와의 직접 비교는 하지 않았습니다. 두 시험은 x86 런타임의 기존 동등 함수와 비교합니다.
+
+## c. `_app.fl` GCC 재측정
+
+저장소에 `_app.fl` 원본은 없으며, 이전 작업에서 보존된 생성 C 스냅샷으로만 재측정했습니다. 아래는 그 파일에 현재 런타임 헤더를 적용한 `gcc -fsyntax-only` 결과입니다. 이전 기록의 기준 `212`건과 컴파일 옵션·시점이 동일하다고 증명할 수 없으므로 단계별 감소표로 간주하지 않습니다.
+
+```text
+GCC_ERROR_LINES=177
+     79 incompatible type for argument 3 of ‘fl_map_set’
+     28 lvalue required as left operand of assignment
+     25 incompatible type for argument 1 of ‘fl_fn_call’
+      4 incompatible types when initializing type ‘enum <anonymous>’ using type ‘FLValue (*)(FLValue,  FLValue)’
+      3 ‘_plus’ undeclared (first use in this function)
+```
+
+## d–e. 미확인 항목
+
+GCC 통과가 확인되지 않았으므로 앱 실행 및 `/ok` HTTP 200 검증은 하지 않았습니다. `_app.fl` 원본 부재로 함수별 전체 감소 측정 및 오류 0 판정도 미확인입니다. seed·stage2·stage3·stage4의 새 해시, 전체 시험 통과 수, `CGC_SYMBOL 5/5`, `task920 8/8`, strace 하의 금지 실행 파일 0회, 민감 정보 검사 결과 역시 이 재검증에서 실행하지 않았습니다. 따라서 전체 확인 항목을 완료로 표시하지 않습니다.
+
+## X86_SUMMARY
+
+```text
+X86_SUMMARY 1/5
+```
+
+목록 작성 항목만 완료로 셌습니다. 함수 구현·검증은 일부만 수행되어 나머지 항목은 미확인입니다.
 
 ## 커밋 및 원격
 
-함수 목록만 먼저 커밋합니다. Forgejo 및 GitHub 푸시와 HEAD 확인은 구현·검증 후 기록합니다.
+이번 작업 커밋: 시험 `ead8f108`, `6e3ba517`; 구현 `3cb0fb24`, `a119f70b`. 앞선 작업 커밋은 현재 브랜치에 이어져 있습니다. 원격 푸시는 이 보고서 업데이트 및 모든 검증 완료 전이라 미실행이며, 두 원격 HEAD도 미확인입니다.
