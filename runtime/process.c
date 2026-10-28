@@ -21,8 +21,7 @@
 #include <sys/random.h>
 #include <math.h>
 
-FLValue style(FLValue selector, ...) {
-    (void)selector;
+FLValue style() {
     return fl_nil();
 }
 
