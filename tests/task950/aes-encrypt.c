@@ -12,8 +12,9 @@ int main(void) {
     int decoded_length = EVP_DecodeBlock(decoded, (const unsigned char *)encoded->data, (int)encoded->len);
     if (decoded_length < 0) return 1;
     while (encoded->len && encoded->data[encoded->len - 1] == '=') decoded_length--;
-    char *first = memchr(decoded, ':', (size_t)decoded_length);
-    char *last = first ? memchr(first + 1, ':', (size_t)(decoded + decoded_length - first - 1)) : NULL;
+    char *decoded_text = (char *)decoded;
+    char *first = memchr(decoded_text, ':', (size_t)decoded_length);
+    char *last = first ? memchr(first + 1, ':', (size_t)(decoded_text + decoded_length - first - 1)) : NULL;
     if (!first || !last) return 1;
     int iv_length = (int)(first - (char *)decoded);
     int cipher_length = (int)(last - first - 1);
