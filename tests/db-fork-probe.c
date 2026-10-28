@@ -47,10 +47,11 @@ static void snapshot_names(void) {
     fclose(out);
 }
 
-static int user_tasks(void) {
+static int user_tasks(int *process_count) {
     DIR *processes = opendir("/proc");
     if (!processes) return -1;
     int count = 0;
+    int processes_count = 0;
     struct dirent *process;
     while ((process = readdir(processes))) {
         if (!isdigit((unsigned char)process->d_name[0])) continue;
@@ -61,34 +62,38 @@ static int user_tasks(void) {
         snprintf(path, sizeof(path), "/proc/%s/task", process->d_name);
         DIR *tasks = opendir(path);
         if (!tasks) continue;
+        processes_count++;
         struct dirent *task;
         while ((task = readdir(tasks)))
             if (isdigit((unsigned char)task->d_name[0])) count++;
         closedir(tasks);
     }
     closedir(processes);
+    if (process_count) *process_count = processes_count;
     return count;
 }
 
 __attribute__((constructor)) static void set_probe_limit(void) {
     if (!getenv("DB_FORK_ISOLATED")) return;
-    int tasks = user_tasks();
+    int processes = 0;
+    int tasks = user_tasks(&processes);
     struct rlimit limit;
     if (tasks < 0 || getrlimit(RLIMIT_NPROC, &limit) != 0) _exit(126);
     limit.rlim_cur = (rlim_t)(tasks + 5);
     if (setrlimit(RLIMIT_NPROC, &limit) != 0) _exit(126);
     fprintf(stderr, "DB_FORK_MEASURED_TASKS=%d DB_FORK_SET_LIMIT=%llu\n",
             tasks, (unsigned long long)limit.rlim_cur);
+    fprintf(stderr, "DB_FORK_MEASURED_PROCESSES=%d\n", processes);
 }
 
 pid_t __wrap_fork(void) {
     struct rlimit limit;
     if (getrlimit(RLIMIT_NPROC, &limit) != 0) limit.rlim_cur = 0;
-    int before = user_tasks();
+    int before = user_tasks(NULL);
     pid_t child = __real_fork();
     int saved_errno = errno;
     if (child != 0) {
-        int after = child < 0 ? user_tasks() : -1;
+        int after = child < 0 ? user_tasks(NULL) : -1;
         if (child < 0) snapshot_names();
         fprintf(stderr,
                 "DB_FORK_PRE_TASKS=%d DB_FORK_LIMIT=%llu DB_FORK_RESULT=%s DB_FORK_FAILURE_TASKS=%d DB_FORK_ERRNO=%d\n",

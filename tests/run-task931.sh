@@ -76,11 +76,13 @@ else
   set -e
   parallel_user_tasks="$(sed -n 's/^DB_FORK_MEASURED_TASKS=\([0-9]*\) DB_FORK_SET_LIMIT=.*/\1/p' "$WORK/forkfail.err" | head -n 1)"
   parallel_nproc_limit="$(sed -n 's/^DB_FORK_MEASURED_TASKS=[0-9]* DB_FORK_SET_LIMIT=\([0-9]*\)/\1/p' "$WORK/forkfail.err" | head -n 1)"
-  if test -z "$parallel_user_tasks" || test -z "$parallel_nproc_limit"; then
+  parallel_user_processes="$(sed -n 's/^DB_FORK_MEASURED_PROCESSES=\([0-9]*\)$/\1/p' "$WORK/forkfail.err" | head -n 1)"
+  if test -z "$parallel_user_tasks" || test -z "$parallel_nproc_limit" || test -z "$parallel_user_processes"; then
     printf 'SKIP_REASON=isolated-uid-or-limit-setup-failed\n' >&2
     head -n 1 "$WORK/forkfail.err" >&2 || true
     exit 2
   fi
+  printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
   printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
   printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
   printf 'PARALLEL_EFFECTIVE_ULIMIT_U=%s\n' "$parallel_nproc_limit" >>"$WORK/forkfail.out"
