@@ -4,6 +4,7 @@ set -Eeuo pipefail
 FRONTEND_REPO="${1:?usage: rebuild-task951-app-source.sh <freelang-front-repo> <record-dir>}"
 RECORD_DIR="${2:?usage: rebuild-task951-app-source.sh <freelang-front-repo> <record-dir>}"
 EXPECTED_HEAD=9c1202dae761f1faff777c48887ed19f5960b3c9
+SOURCE_TIMESTAMP=2026-10-26T13:46:12.761Z
 
 actual_head="$(git -C "$FRONTEND_REPO" rev-parse HEAD)"
 if [[ "$actual_head" != "$EXPECTED_HEAD" ]]; then
@@ -19,6 +20,7 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 git -C "$FRONTEND_REPO" archive "$EXPECTED_HEAD" | tar -x -C "$work"
 (cd "$work" && node ./fl-front-build.js) >"$RECORD_DIR/build.log" 2>&1
+sed -i "2c\\; 생성: $SOURCE_TIMESTAMP" "$work/_app.fl"
 cp "$work/_app.fl" "$RECORD_DIR/_app.fl"
 printf 'FRONTEND_HEAD=%s\n' "$actual_head"
 wc -l "$RECORD_DIR/_app.fl"
