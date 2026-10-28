@@ -60,7 +60,12 @@ if test "$fork_mode" = main; then
   parallel_rc=$?
   set -e
 else
-  if ! command -v unshare >/dev/null 2>&1; then
+  if test -n "${FL_FORK_NAMESPACE_PID:-}"; then
+    if ! command -v nsenter >/dev/null 2>&1; then
+      printf 'SKIP_REASON=nsenter-command-missing\n' >&2
+      exit 2
+    fi
+  elif ! command -v unshare >/dev/null 2>&1; then
     printf 'SKIP_REASON=unshare-command-missing\n' >&2
     exit 2
   fi
@@ -70,7 +75,11 @@ else
     trap 'rm -rf -- "$isolated_bin_dir"' EXIT
     chmod 711 "$isolated_bin_dir" || exit 2
     cp "$WORK/forkfail" "$isolated_bin_dir/forkfail" || exit 2
-    DB_FORK_ISOLATED=1 unshare --map-auto --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
+    if test -n "${FL_FORK_NAMESPACE_PID:-}"; then
+      DB_FORK_ISOLATED=1 nsenter --target "$FL_FORK_NAMESPACE_PID" --user --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
+    else
+      DB_FORK_ISOLATED=1 unshare --map-auto --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
+    fi
   ) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
   parallel_rc=$?
   set -e
