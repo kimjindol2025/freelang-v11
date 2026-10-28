@@ -737,6 +737,9 @@
 (defn c-runtime-name [$op]
   (cond
     [(= $op "json_parse") "fl_json_parse"]
+    [(= $op "time-now") "fl_now_ms"]
+    [(= $op "date-now") "fl_now_iso"]
+    [(= $op "req-query-default") "fl_or"]
     [(= $op "vec-push") "fl_vec_push"]
     [(= $op "random") "fl_random"]
     [(= $op "tcp-bind") "fl_tcp_bind"]
@@ -820,6 +823,8 @@
 (defn cgc-runtime-call [$op $args]
   (let [[$name (c-runtime-name $op)]]
     (cond
+      [(= $op "req-query-default")
+        (str "fl_or(server_req_query(" (cgc (get $args 0)) ", " (cgc (get $args 1)) "), " (cgc (get $args 2)) ")")]
       [(or (= $op "comp") (= $op "conj"))
         (if (= (length $args) 0)
           (str $name "(0, NULL)")
