@@ -133,6 +133,7 @@ FLValue fl_db_open(FLValue path);
 FLValue fl_db_close(FLValue db);
 FLValue fl_db_query(FLValue db, FLValue sql, FLValue params);
 FLValue fl_db_exec(FLValue db, FLValue sql, FLValue params);
+FLValue db_one(FLValue db, FLValue sql, FLValue params);
 
 /* ── HTTP server ── */
 FLValue fl_http_start(FLValue port);

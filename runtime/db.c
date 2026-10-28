@@ -243,6 +243,10 @@ FLValue fl_db_query(FLValue handle, FLValue sql, FLValue params) {
     return rows;
 }
 
+FLValue db_one(FLValue handle, FLValue sql, FLValue params) {
+    return fl_vec_first(fl_db_query(handle, sql, params));
+}
+
 FLValue fl_db_exec(FLValue handle, FLValue sql, FLValue params) {
     FLDbLease lease = db_acquire(handle);
     sqlite3 *db = lease.handle;
