@@ -175,6 +175,90 @@ FLValue aes_encrypt(FLValue plaintext_value, FLValue key_value) {
     return result;
 }
 
+static int auth_hex_decode(const char *source, size_t source_length, unsigned char *output) {
+    if (source_length % 2 != 0) return 0;
+    for (size_t i = 0; i < source_length / 2; i++) {
+        unsigned char high = (unsigned char)source[i * 2];
+        unsigned char low = (unsigned char)source[i * 2 + 1];
+        int high_value = high >= '0' && high <= '9' ? high - '0' :
+                         high >= 'a' && high <= 'f' ? high - 'a' + 10 :
+                         high >= 'A' && high <= 'F' ? high - 'A' + 10 : -1;
+        int low_value = low >= '0' && low <= '9' ? low - '0' :
+                        low >= 'a' && low <= 'f' ? low - 'a' + 10 :
+                        low >= 'A' && low <= 'F' ? low - 'A' + 10 : -1;
+        if (high_value < 0 || low_value < 0) return 0;
+        output[i] = (unsigned char)((high_value << 4) | low_value);
+    }
+    return 1;
+}
+
+FLValue aes_decrypt(FLValue ciphertext_value, FLValue key_value) {
+    if (ciphertext_value.tag != FL_STRING || !ciphertext_value.obj ||
+        key_value.tag != FL_STRING || !key_value.obj) return fl_nil();
+    FLString *encoded = (FLString *)ciphertext_value.obj;
+    FLString *key_string = (FLString *)key_value.obj;
+    if (encoded->len < 88 || encoded->len > 2097152 || encoded->len % 4 != 0 || key_string->len > 4096)
+        return fl_nil();
+
+    size_t encoded_length = encoded->len;
+    size_t padding = 0;
+    if (encoded->data[encoded_length - 1] == '=') padding++;
+    if (encoded_length > 1 && encoded->data[encoded_length - 2] == '=') padding++;
+    unsigned char *decoded = malloc(encoded_length / 4 * 3 + 1);
+    if (!decoded) return fl_nil();
+    int decoded_count = EVP_DecodeBlock(decoded, (const unsigned char *)encoded->data, (int)encoded_length);
+    if (decoded_count < 0 || (size_t)decoded_count < padding) { free(decoded); return fl_nil(); }
+    size_t decoded_length = (size_t)decoded_count - padding;
+    char *first = memchr(decoded, ':', decoded_length);
+    char *last = first ? memchr(first + 1, ':', decoded_length - (size_t)(first + 1 - (char *)decoded)) : NULL;
+    if (!first || !last || memchr(last + 1, ':', decoded_length - (size_t)(last + 1 - (char *)decoded)) ||
+        first - (char *)decoded != 32 || last - first - 1 < 0 ||
+        (last - first - 1) % 2 != 0 || (char *)decoded + decoded_length - last - 1 != 32) {
+        free(decoded); return fl_nil();
+    }
+
+    unsigned char iv[16], tag[16], derived_key[32];
+    size_t cipher_hex_length = (size_t)(last - first - 1);
+    size_t cipher_length = cipher_hex_length / 2;
+    unsigned char *cipher = malloc(cipher_length ? cipher_length : 1);
+    unsigned char *plaintext = malloc(cipher_length + 1);
+    if (!cipher || !plaintext || !auth_hex_decode((char *)decoded, 32, iv) ||
+        !auth_hex_decode(first + 1, cipher_hex_length, cipher) ||
+        !auth_hex_decode(last + 1, 32, tag) ||
+        EVP_PBE_scrypt(((FLString *)key_value.obj)->data, key_string->len,
+                       (const unsigned char *)"salt", 4, 16384, 8, 1,
+                       64u * 1024u * 1024u, derived_key, sizeof(derived_key)) != 1) {
+        free(decoded); free(cipher); free(plaintext); return fl_nil();
+    }
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    int first_length = 0, final_length = 0;
+    int ok = ctx && EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) == 1 &&
+             EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, sizeof(iv), NULL) == 1 &&
+             EVP_DecryptInit_ex(ctx, NULL, NULL, derived_key, iv) == 1 &&
+             EVP_DecryptUpdate(ctx, plaintext, &first_length, cipher, (int)cipher_length) == 1 &&
+             EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, sizeof(tag), tag) == 1 &&
+             EVP_DecryptFinal_ex(ctx, plaintext + first_length, &final_length) == 1;
+    EVP_CIPHER_CTX_free(ctx);
+    OPENSSL_cleanse(derived_key, sizeof(derived_key));
+    OPENSSL_cleanse(cipher, cipher_length);
+    free(cipher); free(decoded);
+    if (!ok) { OPENSSL_cleanse(plaintext, cipher_length + 1); free(plaintext); return fl_nil(); }
+
+    size_t plaintext_length = (size_t)(first_length + final_length);
+    FLString *result_string = malloc(sizeof(FLString) + plaintext_length + 1);
+    if (!result_string) { OPENSSL_cleanse(plaintext, cipher_length + 1); free(plaintext); return fl_nil(); }
+    result_string->base.type = FL_STRING;
+    result_string->base.rc = 1;
+    result_string->len = (uint32_t)plaintext_length;
+    memcpy(result_string->data, plaintext, plaintext_length);
+    result_string->data[plaintext_length] = '\0';
+    OPENSSL_cleanse(plaintext, cipher_length + 1);
+    free(plaintext);
+    FLValue result = { .tag = FL_STRING, .obj = (FLObject *)result_string };
+    return result;
+}
+
 FLValue fl_auth_random_int(FLValue min_value, FLValue max_value) {
     if (min_value.tag != FL_INT || max_value.tag != FL_INT || min_value.i > max_value.i)
         fl_throw(fl_str_val("random_int expects ordered integer bounds"));
