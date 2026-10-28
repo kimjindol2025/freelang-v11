@@ -29,9 +29,16 @@ for mode in vector string json; do
 done
 
 "$COMPILER" "$ROOT/tests/task932/forkfail.fl" "$WORK/forkfail.c" >"$WORK/forkfail.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
+probe_link=()
+if test -n "${DB_FORK_SNAPSHOT:-}"; then
+  probe_link=("$ROOT/tests/db-fork-probe.c" -Wl,--wrap=fork)
+fi
+gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" "${probe_link[@]}" -lsqlite3 -lcrypto -lm
 parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
 parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
+if test -n "${DB_FORK_SNAPSHOT:-}"; then
+  ps -u "$(id -u)" -L -o comm= | sed 's/^[[:space:]]*//' >"$DB_FORK_SNAPSHOT.baseline"
+fi
 # RLIMIT_NPROC counts tasks here; leave fewer than eight worker slots after setup.
 parallel_nproc_limit=$((parallel_user_tasks + 5))
 printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
