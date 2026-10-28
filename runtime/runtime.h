@@ -371,6 +371,7 @@ FLValue fl_http_status(FLValue response);
 FLValue fl_http_ok_p(FLValue response);
 FLValue http_ok_p(FLValue response);
 FLValue http_post_json(FLValue url, FLValue headers, FLValue body);
+FLValue http_get_json(FLValue url, FLValue headers);
 FLValue fl_uuid(void);
 FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit);
 FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback);

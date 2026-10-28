@@ -1012,6 +1012,13 @@ FLValue http_post_json(FLValue url, FLValue headers, FLValue body) {
     return fl_json_parse(result_body);
 }
 
+FLValue http_get_json(FLValue url, FLValue headers) {
+    FLValue response = fl_http_get_headers(url, headers);
+    FLValue result_body = fl_map_get(response, fl_str_val("body"));
+    if (result_body.tag != FL_STRING) fl_throw(response);
+    return fl_json_parse(result_body);
+}
+
 FLValue fl_uuid(void) {
     unsigned char bytes[16]; size_t left = sizeof bytes; unsigned char *p = bytes;
     while (left) {
