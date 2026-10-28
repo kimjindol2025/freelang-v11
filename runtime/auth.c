@@ -91,6 +91,23 @@ static int auth_random(void *buffer, size_t length) {
     return 0;
 }
 
+FLValue random_bytes(FLValue count) {
+    if (count.tag != FL_INT || count.i < 0 || count.i > 4096)
+        fl_throw(fl_str_val("random_bytes expects 0 to 4096 bytes"));
+    unsigned char bytes[4096];
+    char hex[8193];
+    size_t length = (size_t)count.i;
+    if (auth_random(bytes, length) != 0) fl_throw(fl_str_val("secure random source failed"));
+    static const char digits[] = "0123456789abcdef";
+    for (size_t i = 0; i < length; i++) {
+        hex[i * 2] = digits[bytes[i] >> 4];
+        hex[i * 2 + 1] = digits[bytes[i] & 15];
+    }
+    hex[length * 2] = '\0';
+    OPENSSL_cleanse(bytes, length);
+    return fl_str_val(hex);
+}
+
 FLValue fl_auth_random_int(FLValue min_value, FLValue max_value) {
     if (min_value.tag != FL_INT || max_value.tag != FL_INT || min_value.i > max_value.i)
         fl_throw(fl_str_val("random_int expects ordered integer bounds"));
