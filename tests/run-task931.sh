@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+if test -n "${DB_FORK_SNAPSHOT:-}"; then
+  trap 'rc=$?; if test "$rc" -ne 0; then printf "D5_SCRIPT_FAILURE_TASKS=%s D5_SCRIPT_FAILURE_LIMIT=%s\n" "$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d " ")" "${parallel_nproc_limit:-unknown}" >"$DB_FORK_SNAPSHOT.final.meta"; ps -u "$(id -u)" -L -o comm= | sed "s/^[[:space:]]*//" >"$DB_FORK_SNAPSHOT.final.names"; fi' EXIT
+fi
+
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 COMPILER="${1:?usage: run-task931.sh <compiler> <work-dir>}"
 WORK="${2:?usage: run-task931.sh <compiler> <work-dir>}"

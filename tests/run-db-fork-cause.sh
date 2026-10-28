@@ -33,7 +33,13 @@ for i in $(seq 1 50); do
       top="$(awk 'NR==FNR {base[$0]++; next} {now[$0]++} END {for (name in now) if (name != "forkfail" && now[name] > base[name]) print name, now[name]-base[name]}' "$run/names.baseline" "$run/names" | sort -k2,2nr -k1,1 | head -n 5 | awk '{printf "%s%s:%s", (NR==1 ? "" : ","), $1, $2} END {print ""}')"
       top="${top:-none}"
     fi
-    printf 'D5_MAIN_FAILURE=%s BASE_TASKS=%s LIMIT=%s %s OTHER_TOP5=%s\n' "$i" "${task_count:-unknown}" "${limit:-unknown}" "${first_failure:-none}" "$top"
+    final="$(cat "$run/names.final.meta" 2>/dev/null || true)"
+    final_top=none
+    if test -s "$run/names.final.names" && test -s "$run/names.baseline"; then
+      final_top="$(awk 'NR==FNR {base[$0]++; next} {now[$0]++} END {for (name in now) if (name != "forkfail" && now[name] > base[name]) print name, now[name]-base[name]}' "$run/names.baseline" "$run/names.final.names" | sort -k2,2nr -k1,1 | head -n 5 | awk '{printf "%s%s:%s", (NR==1 ? "" : ","), $1, $2} END {print ""}')"
+      final_top="${final_top:-none}"
+    fi
+    printf 'D5_MAIN_FAILURE=%s BASE_TASKS=%s LIMIT=%s %s OTHER_TOP5=%s %s FINAL_OTHER_TOP5=%s\n' "$i" "${task_count:-unknown}" "${limit:-unknown}" "${first_failure:-none}" "$top" "${final:-D5_SCRIPT_FAILURE_TASKS=unknown D5_SCRIPT_FAILURE_LIMIT=unknown}" "$final_top"
   fi
 done
 printf 'D5_MAIN_PASS=%s/50\nD5_MAIN_FAIL=%s/50\n' "$main_pass" "$((50 - main_pass))"
