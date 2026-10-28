@@ -18,6 +18,10 @@ static int serve(int listener, const char *method, const char *status) {
     return valid;
 }
 
+static int64_t int_value(FLValue value) {
+    return value.tag == FL_INT ? value.i : -1;
+}
+
 int main(void) {
     int listener = socket(AF_INET, SOCK_STREAM, 0);
     if (listener < 0) return 2;
@@ -42,11 +46,12 @@ int main(void) {
     FLValue del = http_delete(fl_str_val(url));
     int status = 0;
     if (waitpid(child, &status, 0) != child) return 2;
-    int head_ok = head.tag == FL_MAP && fl_to_int(fl_map_get(head, fl_str_val("status"))) == 200;
-    int delete_ok = del.tag == FL_MAP && fl_to_int(fl_map_get(del, fl_str_val("status"))) == 204;
+    int head_status = (int)int_value(fl_map_get(head, fl_str_val("status")));
+    int delete_status = (int)int_value(fl_map_get(del, fl_str_val("status")));
+    int head_ok = head.tag == FL_MAP && head_status == 200;
+    int delete_ok = del.tag == FL_MAP && delete_status == 204;
     printf("HTTP_HEAD_STATUS=%lld HTTP_DELETE_STATUS=%lld SERVER_VALID=%d\n",
-           (long long)fl_to_int(fl_map_get(head, fl_str_val("status"))),
-           (long long)fl_to_int(fl_map_get(del, fl_str_val("status"))),
+           (long long)head_status, (long long)delete_status,
            WIFEXITED(status) && WEXITSTATUS(status) == 0);
     return !head_ok || !delete_ok || !WIFEXITED(status) || WEXITSTATUS(status) != 0;
 }
