@@ -27,17 +27,18 @@ for attempt in 1 2 3 4 5; do
   stat -c 'DB_MODE=%a DB_TYPE=%F DB_SIZE=%s' "$db"
   set +e
   (
-    ulimit -n 4
     fds=("/proc/$BASHPID"/fd/*)
-    printf 'NOFILE_SOFT=%s NOFILE_HARD=%s PREEXEC_FD_COUNT=%s\n' \
-      "$(ulimit -Sn)" "$(ulimit -Hn)" "${#fds[@]}"
+    printf 'REQUESTED_NOFILE=4 TRACER_PREEXEC_FD_COUNT=%s\n' "${#fds[@]}"
     exec strace -f -qq -yy -e trace=open,openat,openat2,close,fcntl,dup,dup2,dup3 \
-      -o "$case_dir/fd.trace" "$WORK/disk" db "$db"
+      -o "$case_dir/fd.trace" prlimit --nofile=4:4 "$WORK/disk" db "$db"
   ) >"$case_dir/stdout.log" 2>"$case_dir/stderr.log"
   rc=$?
   set -e
-  printf 'FDFIX_CASE=fd-limit RC=%s ERROR=%s\n' "$rc" \
-    "$(grep -o 'db-exec: .*' "$case_dir/stderr.log" | tail -n 1 || true)"
+  error="$(grep -o 'db-exec: .*' "$case_dir/stderr.log" | tail -n 1 || true)"
+  printf 'FDFIX_CASE=fd-limit RC=%s ERROR=%s\n' "$rc" "$error"
+  test -s "$case_dir/fd.trace"
+  test "$rc" -eq 1
+  grep -q 'db-exec:' "$case_dir/stderr.log"
   find "$case_dir" -mindepth 1 -maxdepth 1 -printf 'TEMP_ENTRY=%f MODE=%m TYPE=%y SIZE=%s\n' | sort
   printf 'EMFILE_EVENTS='; grep -c 'EMFILE' "$case_dir/fd.trace" || true
 done
