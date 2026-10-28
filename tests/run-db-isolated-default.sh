@@ -26,6 +26,11 @@ passed=0
 for i in $(seq 1 50); do
   rc=0
   bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$WORK/run-$i" >"$WORK/run-$i.log" 2>&1 || rc=$?
+  if ! grep -q '^PARALLEL_USER_PROCESS_COUNT=' "$WORK/run-$i.log" ||
+     grep -q 'unbound variable' "$WORK/run-$i.log"; then
+    printf 'D6_SETUP_ERROR=default-run-incomplete RUN=%s\n' "$i" >&2
+    exit 2
+  fi
   mode="$(grep -m1 '^PARALLEL_MODE=' "$WORK/run-$i.log" || true)"
   case_line="$(grep -m1 '^CASE=process-limit-run-parallel ' "$WORK/run-$i.log" || true)"
   verdict=FAIL
