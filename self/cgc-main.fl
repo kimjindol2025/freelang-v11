@@ -892,7 +892,8 @@
     [(= (get $n :kind) "variable")
       (let [[$name (get $n :name)]
             [$cn   (c-name $name)]
-            [$global (c-global-name $name)]
+            [$raw (if (get $n :dollar) (str "$" $name) $name)]
+            [$global (c-global-name $raw)]
             [$line (get $n :line)]]
         (if (includes-item @outer-params-atom $cn)
           $cn
@@ -1817,7 +1818,7 @@
 ;; ── define (전역 변수) ──
 
 (defn cgc-define [$args]
-  (let [[$raw (cgc-extract-raw-name (get $args 0))]
+  (let [[$raw (cgc-extract-function-name (get $args 0))]
         [$existing (c-global-name $raw)]
         [$base (c-name-base $raw)]
         [$entries @function-c-symbols-atom]
@@ -1835,14 +1836,15 @@
                                          (str-replace (get $entry 0) "-" "_")))
                                true (recur (+ $i 1) $items))))]
         [$alias-conflict (and $conflict
-                          (or (and (= $raw $function-raw) $global-alias)
+                          (or (and (= $raw $function-raw)
+                                   (or $global-alias (= (get (get $args 1) :type) "string")))
                               (and (not (= $raw $function-raw))
                                 (or (= (str-replace $raw "-" "_") $function-raw)
                                     (= (str-replace $function-raw "-" "_") $raw))))]
         [$name (if (not (null? $existing)) $existing
                  (if $alias-conflict (cgc-unique-symbol $base $entries 0) $base))]
         [$val (cgc (get $args 1))]]
-    (if (and (null? $existing) $alias-conflict)
+    (if (and (null? $existing) (or $alias-conflict (not (= $raw $base))))
       (swap! global-c-symbols-atom push [$raw $name]) nil)
     (swap! known-fncall-targets-atom push $name)
     (swap! global-names-atom push (if $alias-conflict $raw $base))
