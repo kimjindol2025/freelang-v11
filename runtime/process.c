@@ -21,6 +21,31 @@
 #include <sys/random.h>
 #include <math.h>
 
+FLValue base64_encode(FLValue text) {
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    if (text.tag != FL_STRING || !text.obj) fl_throw(fl_str_val("base64_encode expects a string"));
+    FLString *input = (FLString *)text.obj;
+    if (input->len > (SIZE_MAX - 2) / 3) fl_throw(fl_str_val("base64_encode input too large"));
+    size_t out_len = ((size_t)input->len + 2) / 3 * 4;
+    char *out = malloc(out_len + 1);
+    if (!out) fl_throw(fl_str_val("base64_encode allocation failed"));
+    size_t i = 0, j = 0;
+    while (i < input->len) {
+        size_t left = (size_t)input->len - i;
+        unsigned a = (unsigned char)input->data[i++];
+        unsigned b = left > 1 ? (unsigned char)input->data[i++] : 0;
+        unsigned c = left > 2 ? (unsigned char)input->data[i++] : 0;
+        out[j++] = alphabet[a >> 2];
+        out[j++] = alphabet[((a & 3) << 4) | (b >> 4)];
+        out[j++] = left > 1 ? alphabet[((b & 15) << 2) | (c >> 6)] : '=';
+        out[j++] = left > 2 ? alphabet[c & 63] : '=';
+    }
+    out[j] = '\0';
+    FLValue result = fl_str_val(out);
+    free(out);
+    return result;
+}
+
 FLValue format_date(FLValue timestamp_ms, FLValue format_value) {
     if ((timestamp_ms.tag != FL_INT && timestamp_ms.tag != FL_FLOAT) ||
         format_value.tag != FL_STRING || !format_value.obj)
