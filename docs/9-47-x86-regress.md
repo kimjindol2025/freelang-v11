@@ -21,9 +21,16 @@ LOAD_STAGE stage=94401 concurrency=1000 created=1000 create_failures=0 duration_
 POOL_BENCH workers=16 route=ok LOAD_STAGE stage=947 concurrency=1000 created=1000 create_failures=0 duration_s=60 elapsed_s=61.977 requests=19923 rps=321.46 p50_ms=3071.729 p99_ms=4100.379 max_ms=5123.874 errors=14946 error_pct=75.019 connect_refused=0 connect_timeout=70 connect_other=0 io_errors=14876 other_http=0 status_503=0 retry_after_missing=0 overload_rejected=0 rejection_pct=0.000 write_http_200=0 send_timeout=0 send_other=0 recv_timeout=14876 recv_other=0 incomplete_response=0 invalid_status=14876 route_counts=ok:19923,static:0,jwt:0,read:0,write:0,slow300:0 status_codes=0:14946,200:4977
 ```
 
-따라서 이번 실행에서 오류 0% 복귀는 확인하지 못했다. 격리 worker16에서는 두 체크포인트 모두 0%였고, 전체 strace 실행은 75.019%였다. 측정 조건에 따라 결과가 달라 원인 커밋과 부하 도구/서버 원인은 **미확인**이다. 커밋별 수치로 원인을 단정하지 않았다.
+기준점 `c65d409a8e37d642ebd7d7e6bebeab1fcbf483e9`에서 같은 `run-task942-pool.sh`도 strace 아래 끝까지 실행한 결과:
 
-기준 커밋의 pool 전체를 strace 아래서 보조 비교하려 한 실행은 잠금 경합으로 시험 진입 전 종료 코드 `73`을 반환했다. 해당 비교 측정값은 없다.
+```text
+POOL_BENCH workers=16 route=ok LOAD_STAGE stage=947 concurrency=1000 created=1000 create_failures=0 duration_s=60 elapsed_s=62.152 requests=20155 rps=324.29 p50_ms=3071.106 p99_ms=4159.118 max_ms=5184.029 errors=12263 error_pct=60.843 connect_refused=0 connect_timeout=57 connect_other=0 io_errors=12206 other_http=0 status_503=0 retry_after_missing=0 overload_rejected=0 rejection_pct=0.000 write_http_200=0 send_timeout=0 send_other=0 recv_timeout=12206 recv_other=0 incomplete_response=0 invalid_status=12206 route_counts=ok:20155,static:0,jwt:0,read:0,write:0,slow300:0 status_codes=0:12263,200:7892
+LOAD2_SUMMARY=10/10
+FDFIX_SUMMARY=5/5
+POOL_SUMMARY=8/8
+```
+
+따라서 전체 pool+strace 조건의 오류는 `c65d409a` 시점에도 재현됐다. 이 범위에서 오류를 처음 만든 커밋은 확인되지 않았고, 9-46의 `90.052` 및 현재 `75.019` 차이의 정확한 원인은 **미확인**이다. 격리 worker16은 기준점·HEAD 모두 `error_pct=0.000`이었다. 부하 도구 또는 서버 어느 쪽이라고도 단정하지 않았다.
 
 ## 2. LOAD2/FDFIX 재현
 
@@ -106,7 +113,7 @@ EXECVE node=0 npm=0 npx=0 JS=0 Python=0
 ## 6. X86_SUMMARY
 
 ```text
-a. PARTIAL — 격리 worker16 측정은 기준점·HEAD 모두 `error_pct=0.000`; 전체 strace pool에서는 `error_pct=75.019`. 9-46의 `90.052` 원인 커밋은 미확인.
+a. PARTIAL — 동일 pool+strace에서 c65 기준점 `60.843%`, HEAD `75.019%`; 오류가 기준점에도 존재해 신규 원인 커밋은 특정되지 않았다. 격리 worker16은 둘 다 `0.000%`; 9-46의 `90.052` 차이 원인은 미확인.
 b. PASS — 최종 전체 pool `LOAD2_SUMMARY=10/10`, `FDFIX_SUMMARY=5/5`.
 c. PASS — task920 전체 ABI `ABI_SUMMARY=8/8`; 기준 ABI 파일 변경 0.
 d. PARTIAL — 입력 재확인 및 빌드 시도 완료. 사용자 심볼 충돌로 GCC 단계에 도달하지 않아 GCC 오류 수 미확인.
