@@ -11,7 +11,8 @@ int main(void) {
     if (encoded->len > 252 || encoded->len % 4 != 0) return 1;
     int decoded_length = EVP_DecodeBlock(decoded, (const unsigned char *)encoded->data, (int)encoded->len);
     if (decoded_length < 0) return 1;
-    while (encoded->len && encoded->data[encoded->len - 1] == '=') decoded_length--;
+    for (uint32_t i = 0; i < encoded->len && i < 2 && encoded->data[encoded->len - 1 - i] == '='; i++)
+        decoded_length--;
     char *decoded_text = (char *)decoded;
     char *first = memchr(decoded_text, ':', (size_t)decoded_length);
     char *last = first ? memchr(first + 1, ':', (size_t)(decoded_text + decoded_length - first - 1)) : NULL;
