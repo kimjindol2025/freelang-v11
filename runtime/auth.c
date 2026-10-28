@@ -108,6 +108,73 @@ FLValue random_bytes(FLValue count) {
     return fl_str_val(hex);
 }
 
+FLValue aes_encrypt(FLValue plaintext_value, FLValue key_value) {
+    const char *plaintext = auth_string(plaintext_value, "aes_encrypt expects string plaintext");
+    const char *key_string = auth_string(key_value, "aes_encrypt expects string key");
+    FLString *plaintext_value_string = (FLString *)plaintext_value.obj;
+    FLString *key_value_string = (FLString *)key_value.obj;
+    if (plaintext_value_string->len > 1048576 || key_value_string->len > 4096)
+        fl_throw(fl_str_val("aes_encrypt input too large"));
+
+    unsigned char key[32], iv[16], tag[16];
+    if (EVP_PBE_scrypt(key_string, key_value_string->len,
+                       (const unsigned char *)"salt", 4, 16384, 8, 1,
+                       64u * 1024u * 1024u, key, sizeof(key)) != 1 ||
+        auth_random(iv, sizeof(iv)) != 0)
+        fl_throw(fl_str_val("aes_encrypt key or IV generation failed"));
+
+    size_t plaintext_length = plaintext_value_string->len;
+    unsigned char *ciphertext = malloc(plaintext_length + 16);
+    if (!ciphertext) {
+        OPENSSL_cleanse(key, sizeof(key));
+        fl_throw(fl_str_val("aes_encrypt allocation failed"));
+    }
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    int first = 0, final = 0;
+    int ok = ctx && EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) == 1 &&
+             EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, sizeof(iv), NULL) == 1 &&
+             EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv) == 1 &&
+             EVP_EncryptUpdate(ctx, ciphertext, &first,
+                               (const unsigned char *)plaintext, (int)plaintext_length) == 1 &&
+             EVP_EncryptFinal_ex(ctx, ciphertext + first, &final) == 1 &&
+             EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, sizeof(tag), tag) == 1;
+    EVP_CIPHER_CTX_free(ctx);
+    OPENSSL_cleanse(key, sizeof(key));
+    if (!ok) {
+        OPENSSL_cleanse(ciphertext, plaintext_length + 16);
+        free(ciphertext);
+        fl_throw(fl_str_val("aes_encrypt failed"));
+    }
+
+    size_t ciphertext_length = (size_t)(first + final);
+    size_t combined_length = 32 + 1 + ciphertext_length * 2 + 1 + 32;
+    char *combined = malloc(combined_length + 1);
+    size_t encoded_capacity = 4 * ((combined_length + 2) / 3) + 1;
+    unsigned char *encoded = malloc(encoded_capacity);
+    if (!combined || !encoded) {
+        free(combined); free(encoded);
+        OPENSSL_cleanse(ciphertext, plaintext_length + 16); free(ciphertext);
+        fl_throw(fl_str_val("aes_encrypt allocation failed"));
+    }
+    static const char digits[] = "0123456789abcdef";
+    size_t offset = 0;
+    for (size_t i = 0; i < sizeof(iv); i++) { combined[offset++] = digits[iv[i] >> 4]; combined[offset++] = digits[iv[i] & 15]; }
+    combined[offset++] = ':';
+    for (size_t i = 0; i < ciphertext_length; i++) { combined[offset++] = digits[ciphertext[i] >> 4]; combined[offset++] = digits[ciphertext[i] & 15]; }
+    combined[offset++] = ':';
+    for (size_t i = 0; i < sizeof(tag); i++) { combined[offset++] = digits[tag[i] >> 4]; combined[offset++] = digits[tag[i] & 15]; }
+    combined[offset] = '\0';
+    int encoded_length = EVP_EncodeBlock(encoded, (const unsigned char *)combined, (int)combined_length);
+    OPENSSL_cleanse(ciphertext, plaintext_length + 16);
+    OPENSSL_cleanse(key, sizeof(key));
+    free(ciphertext); free(combined);
+    if (encoded_length <= 0) { free(encoded); fl_throw(fl_str_val("aes_encrypt encoding failed")); }
+    FLValue result = fl_str_val((const char *)encoded);
+    OPENSSL_cleanse(encoded, (size_t)encoded_length);
+    free(encoded);
+    return result;
+}
+
 FLValue fl_auth_random_int(FLValue min_value, FLValue max_value) {
     if (min_value.tag != FL_INT || max_value.tag != FL_INT || min_value.i > max_value.i)
         fl_throw(fl_str_val("random_int expects ordered integer bounds"));

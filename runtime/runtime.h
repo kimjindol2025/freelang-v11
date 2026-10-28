@@ -155,6 +155,7 @@ FLValue fl_auth_constant_time_equal(FLValue left, FLValue right);
 FLValue hmac_sha256(FLValue key, FLValue message);
 FLValue scrypt_kdf(FLValue password, FLValue salt);
 FLValue random_bytes(FLValue count);
+FLValue aes_encrypt(FLValue plaintext, FLValue key);
 FLValue fl_auth_hash_password(FLValue password);
 FLValue fl_auth_verify_password(FLValue password, FLValue encoded_hash);
 FLValue fl_jwt_sign(FLValue payload, FLValue secret, FLValue expiry_seconds);
