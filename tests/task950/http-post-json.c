@@ -23,7 +23,7 @@ int main(void) {
         int client = accept(listener, NULL, NULL);
         char request[4096] = {0};
         ssize_t received = client >= 0 ? recv(client, request, sizeof(request) - 1, 0) : -1;
-        int valid = received > 0 && strncmp(request, "POST / HTTP/1.1\r\n", 17) == 0 &&
+        int valid = received > 0 && strncmp(request, "POST / HTTP/1.0\r\n", 17) == 0 &&
                     strstr(request, "X-Test: yes\r\n") != NULL && strstr(request, "{\"in\":1}") != NULL;
         const char *body = valid ? "{\"ok\":true,\"n\":7}" : "{\"ok\":false,\"n\":0}";
         char response[256];
