@@ -1,0 +1,4 @@
+(define $task955-global "global-value")
+(defn task955-global [] "function-value")
+(println $task955-global)
+(println (task955-global))
