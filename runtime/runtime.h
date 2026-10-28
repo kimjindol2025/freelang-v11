@@ -158,6 +158,7 @@ FLValue random_bytes(FLValue count);
 FLValue aes_encrypt(FLValue plaintext, FLValue key);
 FLValue aes_decrypt(FLValue ciphertext, FLValue key);
 FLValue format_date(FLValue timestamp_ms, FLValue format);
+FLValue measure_time(FLValue function, FLValue label);
 FLValue fl_auth_hash_password(FLValue password);
 FLValue fl_auth_verify_password(FLValue password, FLValue encoded_hash);
 FLValue fl_jwt_sign(FLValue payload, FLValue secret, FLValue expiry_seconds);

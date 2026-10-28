@@ -68,6 +68,24 @@ FLValue format_date(FLValue timestamp_ms, FLValue format_value) {
     return result;
 }
 
+FLValue measure_time(FLValue function, FLValue label) {
+    if (function.tag != FL_FN) fl_throw(fl_str_val("measure_time expects function"));
+    struct timespec start, end;
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+        fl_throw(fl_str_val("measure_time clock failed"));
+    FLValue result = fl_fn_call(function, 0, NULL);
+    if (clock_gettime(CLOCK_MONOTONIC, &end) != 0)
+        fl_throw(fl_str_val("measure_time clock failed"));
+    double elapsed = (double)(end.tv_sec - start.tv_sec) * 1000.0 +
+                     (double)(end.tv_nsec - start.tv_nsec) / 1000000.0;
+    FLValue values[] = {
+        fl_str_val("result"), result,
+        fl_str_val("label"), label,
+        fl_str_val("duration_ms"), fl_float(elapsed)
+    };
+    return fl_map_from_pairs(values, 3);
+}
+
 FLValue _fl_process_getcwd(void) {
     char buf[4096];
     if (!getcwd(buf, sizeof(buf))) return fl_nil();
