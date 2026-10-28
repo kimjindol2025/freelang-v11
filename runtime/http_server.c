@@ -488,6 +488,10 @@ FLValue fl_resp_redirect_cookie(FLValue location, FLValue cookie) {
     return fl_map_set(response, fl_str_val("set_cookie"), cookie);
 }
 
+FLValue server_redirect_cookie(FLValue location, FLValue cookie) {
+    return fl_resp_redirect_cookie(location, cookie);
+}
+
 FLValue fl_resp_html_cookie(FLValue cookie, FLValue body) {
     const char *value = http_value_string(cookie, "server-html-cookie");
     if (!http_safe_header_value(value) || strlen(value) > 400)
