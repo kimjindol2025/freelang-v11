@@ -214,6 +214,7 @@ FLValue fl_zip_with(FLValue fn, FLValue left, FLValue right);
 
 /* ── S9: 맵 accessor ── */
 FLValue fl_map_keys(FLValue map);
+FLValue js_keys(FLValue map);
 FLValue fl_map_vals(FLValue map);
 FLValue fl_map_entries(FLValue map);
 
