@@ -5,6 +5,7 @@ COMPILER="${1:?usage: run-db-fork-cause.sh <compiler> <empty-work-dir>}"
 WORK="${2:?usage: run-db-fork-cause.sh <compiler> <empty-work-dir>}"
 test ! -e "$WORK" || test -z "$(find "$WORK" -mindepth 1 -print -quit)"
 mkdir -p "$WORK"
+chmod 711 "$(dirname "$WORK")"
 chmod 711 "$WORK"
 
 main_pass=0
@@ -13,6 +14,10 @@ for i in $(seq 1 50); do
   mkdir -p "$run"
   rc=0
   DB_FORK_SNAPSHOT="$run/names" bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$run/test" >"$run/out" 2>&1 || rc=$?
+  if test ! -x "$run/test/oom-memory"; then
+    printf 'D5_SETUP_ERROR=compiler-failed MAIN_RUN=%s\n' "$i" >&2
+    exit 2
+  fi
   verdict=FAIL
   if test "$rc" -eq 0 && grep -Fxq 'FORKFAIL_SUMMARY=9/9' "$run/out"; then
     verdict=PASS
@@ -47,6 +52,10 @@ for i in $(seq 1 50); do
   rc=0
   DB_FORK_ISOLATED=1 unshare --map-auto --setuid 1 --setgid 1 -- "$bin/forkfail" \
     >"$WORK/isolated-$i.out" 2>"$WORK/isolated-$i.err" || rc=$?
+  if test "$rc" -eq 126; then
+    printf 'D5_SETUP_ERROR=isolated-exec-failed ISOLATED_RUN=%s\n' "$i" >&2
+    exit 2
+  fi
   failed="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/isolated-$i.out" || true)"
   succeeded="$(grep -Ec '^SLOT[0-9]+=[0-9]+$' "$WORK/isolated-$i.out" || true)"
   verdict=FAIL
