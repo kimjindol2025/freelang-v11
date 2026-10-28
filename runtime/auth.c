@@ -43,6 +43,30 @@ FLValue hmac_sha256(FLValue key_value, FLValue message_value) {
     return fl_str_val(hex);
 }
 
+FLValue scrypt_kdf(FLValue password_value, FLValue salt_value) {
+    const char *password = auth_string(password_value, "scrypt_kdf expects string password");
+    const char *salt = auth_string(salt_value, "scrypt_kdf expects string salt");
+    FLString *password_string = (FLString *)password_value.obj;
+    FLString *salt_string = (FLString *)salt_value.obj;
+    if (password_string->len > 4096 || salt_string->len > 1024)
+        fl_throw(fl_str_val("scrypt_kdf input too large"));
+    unsigned char digest[32];
+    if (EVP_PBE_scrypt(password, password_string->len,
+                       (const unsigned char *)salt, salt_string->len,
+                       16384, 8, 1, 64u * 1024u * 1024u,
+                       digest, sizeof(digest)) != 1)
+        fl_throw(fl_str_val("scrypt_kdf failed"));
+    char hex[65];
+    static const char digits[] = "0123456789abcdef";
+    for (size_t i = 0; i < sizeof(digest); i++) {
+        hex[i * 2] = digits[digest[i] >> 4];
+        hex[i * 2 + 1] = digits[digest[i] & 15];
+    }
+    hex[64] = '\0';
+    OPENSSL_cleanse(digest, sizeof(digest));
+    return fl_str_val(hex);
+}
+
 static int auth_random(void *buffer, size_t length) {
     unsigned char *p = buffer;
     while (length) {
