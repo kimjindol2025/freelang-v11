@@ -1,0 +1,4 @@
+(defn read-json [raw]
+  (let [parsed (json_parse raw)]
+    (get parsed "ok")))
+(println (read-json (json-stringify {"ok" "yes"})))
