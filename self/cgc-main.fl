@@ -736,6 +736,7 @@
 
 (defn c-runtime-name [$op]
   (cond
+    [(= $op "json_parse") "fl_json_parse"]
     [(= $op "vec-push") "fl_vec_push"]
     [(= $op "random") "fl_random"]
     [(= $op "tcp-bind") "fl_tcp_bind"]
