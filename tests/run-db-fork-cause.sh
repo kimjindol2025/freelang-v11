@@ -13,7 +13,7 @@ for i in $(seq 1 50); do
   run="$WORK/main-$i"
   mkdir -p "$run"
   rc=0
-  DB_FORK_SNAPSHOT="$run/names" bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$run/test" >"$run/out" 2>&1 || rc=$?
+  FL_FORK_LIMIT_MODE=main DB_FORK_SNAPSHOT="$run/names" bash "$ROOT/tests/run-task931.sh" "$COMPILER" "$run/test" >"$run/out" 2>&1 || rc=$?
   if test ! -x "$run/test/oom-memory"; then
     printf 'D5_SETUP_ERROR=compiler-failed MAIN_RUN=%s\n' "$i" >&2
     exit 2

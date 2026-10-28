@@ -33,25 +33,58 @@ for mode in vector string json; do
 done
 
 "$COMPILER" "$ROOT/tests/task932/forkfail.fl" "$WORK/forkfail.c" >"$WORK/forkfail.compile" 2>&1
+fork_mode="${FL_FORK_LIMIT_MODE:-isolated}"
+case "$fork_mode" in
+  isolated|main) ;;
+  *) printf 'FORK_MODE_ERROR=unsupported-mode:%s\n' "$fork_mode" >&2; exit 2 ;;
+esac
+printf 'PARALLEL_MODE=%s\n' "$fork_mode"
 probe_link=()
-if test -n "${DB_FORK_SNAPSHOT:-}"; then
+if test "$fork_mode" = isolated || test -n "${DB_FORK_SNAPSHOT:-}"; then
   probe_link=("$ROOT/tests/db-fork-probe.c" -Wl,--wrap=fork)
 fi
 gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" "${probe_link[@]}" -lsqlite3 -lcrypto -lm
-parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
-parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
-if test -n "${DB_FORK_SNAPSHOT:-}"; then
-  ps -u "$(id -u)" -L -o comm= | sed 's/^[[:space:]]*//' >"$DB_FORK_SNAPSHOT.baseline"
+if test "$fork_mode" = main; then
+  parallel_user_processes="$(ps -u "$(id -u)" -o pid= | wc -l | tr -d ' ')"
+  parallel_user_tasks="$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d ' ')"
+  if test -n "${DB_FORK_SNAPSHOT:-}"; then
+    ps -u "$(id -u)" -L -o comm= | sed 's/^[[:space:]]*//' >"$DB_FORK_SNAPSHOT.baseline"
+  fi
+  # RLIMIT_NPROC counts tasks here; leave fewer than eight worker slots after setup.
+  parallel_nproc_limit=$((parallel_user_tasks + 5))
+  printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
+  printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
+  printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
+  set +e
+  (ulimit -u "$parallel_nproc_limit"; printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u; exec "$WORK/forkfail") >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
+  parallel_rc=$?
+  set -e
+else
+  if ! command -v unshare >/dev/null 2>&1; then
+    printf 'SKIP_REASON=unshare-command-missing\n' >&2
+    exit 2
+  fi
+  set +e
+  (
+    isolated_bin_dir="$(mktemp -d /tmp/fl-task931-fork.XXXXXX)" || exit 2
+    trap 'rm -rf -- "$isolated_bin_dir"' EXIT
+    chmod 711 "$isolated_bin_dir" || exit 2
+    cp "$WORK/forkfail" "$isolated_bin_dir/forkfail" || exit 2
+    DB_FORK_ISOLATED=1 unshare --map-auto --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
+  ) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
+  parallel_rc=$?
+  set -e
+  parallel_user_tasks="$(sed -n 's/^DB_FORK_MEASURED_TASKS=\([0-9]*\) DB_FORK_SET_LIMIT=.*/\1/p' "$WORK/forkfail.err" | head -n 1)"
+  parallel_nproc_limit="$(sed -n 's/^DB_FORK_MEASURED_TASKS=[0-9]* DB_FORK_SET_LIMIT=\([0-9]*\)/\1/p' "$WORK/forkfail.err" | head -n 1)"
+  if test -z "$parallel_user_tasks" || test -z "$parallel_nproc_limit"; then
+    printf 'SKIP_REASON=isolated-uid-or-limit-setup-failed\n' >&2
+    head -n 1 "$WORK/forkfail.err" >&2 || true
+    exit 2
+  fi
+  printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
+  printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
+  printf 'PARALLEL_EFFECTIVE_ULIMIT_U=%s\n' "$parallel_nproc_limit" >>"$WORK/forkfail.out"
 fi
-# RLIMIT_NPROC counts tasks here; leave fewer than eight worker slots after setup.
-parallel_nproc_limit=$((parallel_user_tasks + 5))
-printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
-printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
-printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
-set +e
-(ulimit -u "$parallel_nproc_limit"; printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u; exec "$WORK/forkfail") >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
-parallel_rc=$?
-set -e
 parallel_signal=0; test "$parallel_rc" -gt 128 && parallel_signal=$((parallel_rc - 128)) || true
 test "$parallel_signal" -eq 11 && segv_count=$((segv_count + 1)) || true
 parallel_failed="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/forkfail.out" || true)"
