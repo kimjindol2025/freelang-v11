@@ -1827,8 +1827,9 @@
                            (let [[$entry (get $entries $i)]]
                              (if (= (get $entry 0) $base) (get $entry 1)
                                (recur (+ $i 1))))))]
-        [$alias-conflict (and $conflict (not (= $raw $function-raw))
-                          (or (= (str-replace $raw "-" "_") $function-raw)
+        [$alias-conflict (and $conflict
+                          (or (= $raw $function-raw)
+                              (= (str-replace $raw "-" "_") $function-raw)
                               (= (str-replace $function-raw "-" "_") $raw)))]
         [$name (if (not (null? $existing)) $existing
                  (if $alias-conflict (cgc-unique-symbol $base $entries 0) $base))]
