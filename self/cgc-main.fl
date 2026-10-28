@@ -1815,7 +1815,8 @@
         [$existing (c-global-name $raw)]
         [$base (c-name-base $raw)]
         [$conflict (cgc-symbol-used? @function-c-symbols-atom $base)]
-        [$name (if (not (null? $existing)) $existing $base)]
+        [$name (if (not (null? $existing)) $existing
+                 (if $conflict (cgc-unique-symbol $base @function-c-symbols-atom 0) $base))]
         [$val (cgc (get $args 1))]]
     (if (and (null? $existing) $conflict)
       (swap! global-c-symbols-atom push [$raw $name]) nil)
