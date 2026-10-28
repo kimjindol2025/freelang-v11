@@ -1078,6 +1078,14 @@ FLValue http_get_json(FLValue url, FLValue headers) {
     return fl_json_parse(result_body);
 }
 
+FLValue http_put(FLValue url, FLValue body) {
+    FLValue headers = fl_map_set(fl_map_new(), fl_str_val("Content-Type"), fl_str_val("application/json"));
+    FLValue response = http_client_request("PUT", url, headers, body, fl_nil());
+    FLValue result_body = fl_map_get(response, fl_str_val("body"));
+    if (result_body.tag != FL_STRING) fl_throw(response);
+    return result_body;
+}
+
 FLValue fl_uuid(void) {
     unsigned char bytes[16]; size_t left = sizeof bytes; unsigned char *p = bytes;
     while (left) {
