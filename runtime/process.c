@@ -46,6 +46,49 @@ FLValue base64_encode(FLValue text) {
     return result;
 }
 
+static int base64_digit(unsigned char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+FLValue base64_decode(FLValue text) {
+    if (text.tag != FL_STRING || !text.obj) fl_throw(fl_str_val("base64_decode expects a string"));
+    FLString *input = (FLString *)text.obj;
+    size_t len = input->len;
+    if (len % 4 != 0) fl_throw(fl_str_val("base64_decode invalid input"));
+    size_t padding = len && input->data[len - 1] == '=' ? 1 : 0;
+    if (len > 1 && input->data[len - 2] == '=') padding++;
+    size_t out_len = len / 4 * 3 - padding;
+    char *out = malloc(out_len + 1);
+    if (!out) fl_throw(fl_str_val("base64_decode allocation failed"));
+    size_t at = 0;
+    for (size_t i = 0; i < len; i += 4) {
+        int a = base64_digit((unsigned char)input->data[i]);
+        int b = base64_digit((unsigned char)input->data[i + 1]);
+        int c = input->data[i + 2] == '=' ? 0 : base64_digit((unsigned char)input->data[i + 2]);
+        int d = input->data[i + 3] == '=' ? 0 : base64_digit((unsigned char)input->data[i + 3]);
+        int last = i + 4 == len;
+        if (a < 0 || b < 0 || c < 0 || d < 0 ||
+            ((!last || padding == 0) && (input->data[i + 2] == '=' || input->data[i + 3] == '=')) ||
+            (input->data[i + 2] == '=' && input->data[i + 3] != '=')) {
+            free(out);
+            fl_throw(fl_str_val("base64_decode invalid input"));
+        }
+        unsigned bits = ((unsigned)a << 18) | ((unsigned)b << 12) | ((unsigned)c << 6) | (unsigned)d;
+        if (at < out_len) out[at++] = (char)(bits >> 16);
+        if (at < out_len) out[at++] = (char)(bits >> 8);
+        if (at < out_len) out[at++] = (char)bits;
+    }
+    out[out_len] = '\0';
+    FLValue result = fl_str_val(out);
+    free(out);
+    return result;
+}
+
 FLValue format_date(FLValue timestamp_ms, FLValue format_value) {
     if ((timestamp_ms.tag != FL_INT && timestamp_ms.tag != FL_FLOAT) ||
         format_value.tag != FL_STRING || !format_value.obj)

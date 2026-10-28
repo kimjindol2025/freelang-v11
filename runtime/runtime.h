@@ -377,6 +377,7 @@ FLValue fl_http_get_headers(FLValue url, FLValue headers);
 FLValue http_head(FLValue url);
 FLValue http_delete(FLValue url);
 FLValue base64_encode(FLValue text);
+FLValue base64_decode(FLValue text);
 FLValue fl_http_post(FLValue url, FLValue body);
 FLValue fl_http_post_headers(FLValue url, FLValue headers, FLValue body);
 FLValue fl_http_post_stream(FLValue url, FLValue headers, FLValue body, FLValue callback);
