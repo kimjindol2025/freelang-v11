@@ -18,7 +18,7 @@ fi
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 git -C "$FRONTEND_REPO" archive "$EXPECTED_HEAD" | tar -x -C "$work"
-node "$work/fl-front-build.js" >"$RECORD_DIR/build.log" 2>&1
+(cd "$work" && node ./fl-front-build.js) >"$RECORD_DIR/build.log" 2>&1
 cp "$work/_app.fl" "$RECORD_DIR/_app.fl"
 printf 'FRONTEND_HEAD=%s\n' "$actual_head"
 wc -l "$RECORD_DIR/_app.fl"
