@@ -737,6 +737,7 @@
 (defn c-runtime-name [$op]
   (cond
     [(= $op "vec-push") "fl_vec_push"]
+    [(= $op "random") "fl_random"]
     [(= $op "tcp-bind") "fl_tcp_bind"]
     [(= $op "tcp-listen") "fl_tcp_listen"]
     [(= $op "tcp-accept") "fl_tcp_accept"]

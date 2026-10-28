@@ -22,7 +22,22 @@
 #include <math.h>
 
 FLValue style() {
+    /* The frontend compiler already emits these declarations as static CSS. */
     return fl_nil();
+}
+
+FLValue fl_random(void) {
+    uint64_t value;
+    size_t left = sizeof value;
+    unsigned char *p = (unsigned char *)&value;
+    while (left) {
+        ssize_t n = getrandom(p, left, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) fl_throw(fl_str_val("getrandom failed for random"));
+        p += n;
+        left -= (size_t)n;
+    }
+    return fl_float((double)(value >> 11) * (1.0 / 9007199254740992.0));
 }
 
 FLValue base64_encode(FLValue text) {
