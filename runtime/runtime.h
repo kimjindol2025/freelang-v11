@@ -327,6 +327,7 @@ FLValue fl_sleep_ms(FLValue ms);
 /* ── JSON ── */
 FLValue fl_json_parse(FLValue src);
 FLValue fl_json_stringify(FLValue val);
+FLValue json_str(FLValue val);
 
 /* ── 비트 연산 ── */
 FLValue fl_bit_xor(FLValue a, FLValue b);
