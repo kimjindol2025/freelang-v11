@@ -1827,10 +1827,18 @@
                            (let [[$entry (get $entries $i)]]
                              (if (= (get $entry 0) $base) (get $entry 1)
                                (recur (+ $i 1))))))]
+        [$global-alias (loop [$i 0 $items @global-c-symbols-atom]
+                         (if (>= $i (length $items)) false
+                           (let [[$entry (get $items $i)]]
+                             (if (and (not (= $raw (get $entry 0)))
+                                      (= (str-replace $raw "-" "_")
+                                         (str-replace (get $entry 0) "-" "_")))
+                               true (recur (+ $i 1) $items))))]
         [$alias-conflict (and $conflict
-                          (or (= $raw $function-raw)
-                              (= (str-replace $raw "-" "_") $function-raw)
-                              (= (str-replace $function-raw "-" "_") $raw)))]
+                          (or (and (= $raw $function-raw) $global-alias)
+                              (and (not (= $raw $function-raw))
+                                (or (= (str-replace $raw "-" "_") $function-raw)
+                                    (= (str-replace $function-raw "-" "_") $raw))))]
         [$name (if (not (null? $existing)) $existing
                  (if $alias-conflict (cgc-unique-symbol $base $entries 0) $base))]
         [$val (cgc (get $args 1))]]
