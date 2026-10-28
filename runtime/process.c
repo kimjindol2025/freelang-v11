@@ -21,6 +21,11 @@
 #include <sys/random.h>
 #include <math.h>
 
+FLValue style(FLValue selector, ...) {
+    (void)selector;
+    return fl_nil();
+}
+
 FLValue base64_encode(FLValue text) {
     static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     if (text.tag != FL_STRING || !text.obj) fl_throw(fl_str_val("base64_encode expects a string"));
