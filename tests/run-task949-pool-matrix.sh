@@ -18,6 +18,32 @@ gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread -o "$WORK/load-client" "$ROOT/te
 mkdir -p "$WORK/public"
 printf 'LOAD_STATIC_EXAMPLE_OK\n' >"$WORK/public/sample.txt"
 
+pool_body='
+set -Eeuo pipefail
+run="$1"; public="$2"; server="$3"; client="$4"
+mkdir -p "$run"
+FL_HTTP_WORKERS=16 FL_HTTP_PORT=0 MIXSOAK_DB="$run/bench.sqlite" \
+  "$server" "$public" >"$run/server.log" 2>&1 &
+server_pid=$!
+cleanup() {
+  kill -TERM "$server_pid" 2>/dev/null || true
+  wait "$server_pid" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+port=""
+for _ in $(seq 1 100); do
+  port="$(sed -n 's/^HTTP_LISTENING=127\.0\.0\.1://p' "$run/server.log" | head -n 1)"
+  test -n "$port" && break
+  kill -0 "$server_pid" 2>/dev/null || break
+  sleep 0.05
+done
+test -n "$port" || { printf 'POOL_SERVER_START_FAILED\n'; exit 1; }
+: >"$run/acks.sql"
+"$client" "$port" 1000 60 94901 "$run/acks.sql" ok >"$run/client.log" 2>&1
+cat "$run/client.log"
+cleanup
+trap - EXIT INT TERM
+'
 failures=0
 for mode in standalone pool; do
   for traced in no-strace strace; do
@@ -37,32 +63,13 @@ for mode in standalone pool; do
         fi
         grep '^LOAD_STAGE stage=94401 ' "$log" || true
       else
-        mkdir -p "$run"
-        FL_HTTP_WORKERS=16 FL_HTTP_PORT=0 MIXSOAK_DB="$run/bench.sqlite" \
-          "$WORK/pool-server" "$WORK/public" >"$run/server.log" 2>&1 &
-        server_pid=$!
-        port=""
-        for _ in $(seq 1 100); do
-          port="$(sed -n 's/^HTTP_LISTENING=127\.0\.0\.1://p' "$run/server.log" | head -n 1)"
-          test -n "$port" && break
-          kill -0 "$server_pid" 2>/dev/null || break
-          sleep 0.05
-        done
-        if test -n "$port"; then
-          : >"$run/acks.sql"
-          if [[ "$traced" == strace ]]; then
-            strace -f -e trace=execve -o "$trace" timeout --signal=TERM --kill-after=10s 900s \
-              "$WORK/load-client" "$port" 1000 60 94901 "$run/acks.sql" ok >"$log" 2>&1 || rc=$?
-          else
-            timeout --signal=TERM --kill-after=10s 900s \
-              "$WORK/load-client" "$port" 1000 60 94901 "$run/acks.sql" ok >"$log" 2>&1 || rc=$?
-          fi
+        if [[ "$traced" == strace ]]; then
+          strace -f -e trace=execve -o "$trace" timeout --signal=TERM --kill-after=10s 900s \
+            bash -c "$pool_body" _ "$run" "$WORK/public" "$WORK/pool-server" "$WORK/load-client" >"$log" 2>&1 || rc=$?
         else
-          rc=1
-          printf 'POOL_SERVER_START_FAILED\n' >"$log"
+          timeout --signal=TERM --kill-after=10s 900s \
+            bash -c "$pool_body" _ "$run" "$WORK/public" "$WORK/pool-server" "$WORK/load-client" >"$log" 2>&1 || rc=$?
         fi
-        kill -TERM "$server_pid" 2>/dev/null || true
-        wait "$server_pid" 2>/dev/null || true
         grep '^LOAD_STAGE stage=94901 ' "$log" || true
       fi
       printf 'MATRIX condition=%s-%s repeat=%s rc=%s\n' "$mode" "$traced" "$repeat" "$rc"
