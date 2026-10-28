@@ -173,15 +173,15 @@ v11에 필요한 기능 목록은 이전 기록에서 이어서 갱신하지 않
 
 ## 7. 커밋·원격 HEAD·미확인 항목
 
-작업 HEAD: `e1f8a92e18886a7200c8a9599c9bb944b61a06ef`
+작업 HEAD (보고서 커밋): `0d5e83af10a05318be54058b50ebce7e1ade3fa4`
 
 검증 종료 시 원격 조회 결과:
 
 ```text
-forgejo: fabdd1ae1d69ed45f50a1d8865e849328a7e5e12
-github:  fabdd1ae1d69ed45f50a1d8865e849328a7e5e12
+forgejo: 0d5e83af10a05318be54058b50ebce7e1ade3fa4
+github:  0d5e83af10a05318be54058b50ebce7e1ade3fa4
 ```
 
-보고서 커밋 전 기준 HEAD와 두 원격을 읽었습니다. 보고서 추가 후 Forgejo에 먼저, GitHub에 다음으로 같은 브랜치를 푸시하고 원격 HEAD를 재확인해야 합니다.
+보고서 커밋을 Forgejo에 먼저, GitHub에 다음으로 푸시했으며 두 원격 HEAD가 일치하는지 확인했습니다.
 
 미확인/미완료: `_app.fl` GCC 최다 오류 수정, 수정 후 진단 개수표. 이번에는 `_app.fl` 재컴파일을 수정 후 다시 하지 않았습니다. 첫 행렬 실행은 scope 불일치로 폐기했으나 원문 기록은 보존했습니다.
