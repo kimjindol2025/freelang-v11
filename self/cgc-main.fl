@@ -691,10 +691,10 @@
                   "bool" "true" "false"] $s))
 
 (defn c-name-base [$n]
-  ;; Preserve native C underscores and keep hyphens distinct.
+  ;; Preserve native C underscores; the registration pass handles collisions.
   (let [[$a (str-replace $n "$" "_dollar_")]
         [$b (str-replace $a "->" "_to_")]
-        [$c (str-replace $b "-" "_hyphen_")]
+        [$c (str-replace $b "-" "_")]
         [$d (str-replace $c "/" "__")]
         [$e (str-replace $d "?" "_p")]
         [$f (str-replace $e "!" "_b")]
@@ -722,8 +722,10 @@
           (recur (+ $i 1) $items))))))
 
 (defn c-name [$n]
-  (let [[$override (c-name-override $n)]]
-    (if (null? $override) (c-name-base $n) $override)))
+  (let [[$registered (cgc-symbol-for-raw @function-c-symbols-atom $n)]
+        [$override (c-name-override $n)]]
+    (if (and (not (null? $registered)) (not (= $registered (c-name-base $n)))) $registered
+      (if (null? $override) (c-name-base $n) $override))))
 
 (defn c-global-name [$raw]
   (loop [$i 0 $items @global-c-symbols-atom]
@@ -861,11 +863,17 @@
           (do (swap! function-c-symbols-atom push [$name $raw]) $name)
           (let [[$entry (get $entries $i)]]
             (if (= (get $entry 0) $name)
-              (do
-                (println (str "[CGC-ERR] C symbol collision: " $raw " -> " $name
-                              " conflicts with " (get $entry 1)))
-                (fl-cgc-halt)
-                $name)
+              (if (or (and (not (= $raw (get $entry 1)))
+                           (= (str-replace $raw "-" "_") (get $entry 1)))
+                      (and (not (= $raw (get $entry 1)))
+                           (= (str-replace (get $entry 1) "-" "_") $raw)))
+                (let [[$unique (cgc-unique-symbol $name $entries 0)]]
+                  (do (swap! function-c-symbols-atom push [$unique $raw]) $unique))
+                (do
+                  (println (str "[CGC-ERR] C symbol collision: " $raw " -> " $name
+                                " conflicts with " (get $entry 1)))
+                  (fl-cgc-halt)
+                  $name))
               (recur (+ $i 1)))))))))
 
 ;; ── 메인 dispatch ──
