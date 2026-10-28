@@ -21,6 +21,28 @@ static const char *auth_string(FLValue value, const char *name) {
     return ((FLString *)value.obj)->data;
 }
 
+FLValue hmac_sha256(FLValue key_value, FLValue message_value) {
+    const char *key = auth_string(key_value, "hmac_sha256 expects string key");
+    const char *message = auth_string(message_value, "hmac_sha256 expects string message");
+    FLString *key_string = (FLString *)key_value.obj;
+    FLString *message_string = (FLString *)message_value.obj;
+    if (key_string->len > INT_MAX) fl_throw(fl_str_val("hmac_sha256 key too large"));
+    unsigned char digest[EVP_MAX_MD_SIZE];
+    unsigned int digest_len = 0;
+    if (!HMAC(EVP_sha256(), key, (int)key_string->len,
+              (const unsigned char *)message, message_string->len, digest, &digest_len) || digest_len != 32)
+        fl_throw(fl_str_val("hmac_sha256 failed"));
+    char hex[65];
+    static const char digits[] = "0123456789abcdef";
+    for (size_t i = 0; i < 32; i++) {
+        hex[i * 2] = digits[digest[i] >> 4];
+        hex[i * 2 + 1] = digits[digest[i] & 15];
+    }
+    hex[64] = '\0';
+    OPENSSL_cleanse(digest, sizeof(digest));
+    return fl_str_val(hex);
+}
+
 static int auth_random(void *buffer, size_t length) {
     unsigned char *p = buffer;
     while (length) {
