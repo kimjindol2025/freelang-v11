@@ -2,20 +2,24 @@
 set -Eeuo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-FRONTEND_SOURCE="${1:?usage: recount-task955-app-gcc.sh <freelang-front-repo> <empty-record-dir>}"
-RECORD_DIR="${2:?usage: recount-task955-app-gcc.sh <freelang-front-repo> <empty-record-dir>}"
+APP_SOURCE="${1:?usage: recount-task955-app-gcc.sh <_app.fl> <empty-record-dir>}"
+RECORD_DIR="${2:?usage: recount-task955-app-gcc.sh <_app.fl> <empty-record-dir>}"
+EXPECTED_APP_SHA256=67ce06645151efb7c23011494914b2019a95524f734a174f07d0767801b823ed
 REVISIONS=(f0c7ed67ae29e18e74517cc26dd59627e2a72335 5009f43e87625c376e03088437ed250f65f8b608)
 
 if [[ -e "$RECORD_DIR" && -n "$(find "$RECORD_DIR" -mindepth 1 -print -quit)" ]]; then
   echo 'record directory must be empty' >&2
   exit 2
 fi
-mkdir -p "$RECORD_DIR"
-
-git clone --quiet --shared --no-checkout "$FRONTEND_SOURCE" "$RECORD_DIR/frontend"
-git -C "$RECORD_DIR/frontend" checkout --quiet --detach 9c1202dae761f1faff777c48887ed19f5960b3c9
-bash "$ROOT/scripts/rebuild-task951-app-source.sh" \
-  "$RECORD_DIR/frontend" "$RECORD_DIR/source" >"$RECORD_DIR/source-rebuild.log" 2>&1
+mkdir -p "$RECORD_DIR/source"
+cp "$APP_SOURCE" "$RECORD_DIR/source/_app.fl"
+sha256sum "$RECORD_DIR/source/_app.fl" >"$RECORD_DIR/source.sha256"
+actual_app_sha256="$(awk '{print $1}' "$RECORD_DIR/source.sha256")"
+if [[ "$actual_app_sha256" != "$EXPECTED_APP_SHA256" ]]; then
+  printf 'APP_SOURCE_SHA256_MISMATCH expected=%s actual=%s\n' \
+    "$EXPECTED_APP_SHA256" "$actual_app_sha256" >&2
+  exit 2
+fi
 
 for revision in "${REVISIONS[@]}"; do
   tree="$RECORD_DIR/${revision:0:8}"
