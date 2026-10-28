@@ -1001,6 +1001,10 @@ FLValue fl_http_ok_p(FLValue response) {
     return fl_bool(ok.tag == FL_BOOL && ok.b);
 }
 
+FLValue http_ok_p(FLValue response) {
+    return fl_http_ok_p(response);
+}
+
 FLValue fl_uuid(void) {
     unsigned char bytes[16]; size_t left = sizeof bytes; unsigned char *p = bytes;
     while (left) {
