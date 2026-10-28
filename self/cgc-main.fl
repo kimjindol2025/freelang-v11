@@ -1814,14 +1814,23 @@
   (let [[$raw (cgc-extract-raw-name (get $args 0))]
         [$existing (c-global-name $raw)]
         [$base (c-name-base $raw)]
-        [$conflict (cgc-symbol-used? @function-c-symbols-atom $base)]
+        [$entries @function-c-symbols-atom]
+        [$conflict (cgc-symbol-used? $entries $base)]
+        [$function-raw (loop [$i 0]
+                         (if (>= $i (length $entries)) null
+                           (let [[$entry (get $entries $i)]]
+                             (if (= (get $entry 0) $base) (get $entry 1)
+                               (recur (+ $i 1))))))]
+        [$alias-conflict (and $conflict (not (= $raw $function-raw))
+                          (or (= (str-replace $raw "-" "_") $function-raw)
+                              (= (str-replace $function-raw "-" "_") $raw)))]
         [$name (if (not (null? $existing)) $existing
-                 (if $conflict (cgc-unique-symbol $base @function-c-symbols-atom 0) $base))]
+                 (if $alias-conflict (cgc-unique-symbol $base $entries 0) $base))]
         [$val (cgc (get $args 1))]]
-    (if (and (null? $existing) $conflict)
+    (if (and (null? $existing) $alias-conflict)
       (swap! global-c-symbols-atom push [$raw $name]) nil)
     (swap! known-fncall-targets-atom push $name)
-    (swap! global-names-atom push (if $conflict $raw $base))
+    (swap! global-names-atom push (if $alias-conflict $raw $base))
     (swap! global-decls-atom push (str "static FLValue " $name ";"))
     (str $name " = " $val ";")))
 
