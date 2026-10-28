@@ -1062,6 +1062,9 @@ FLValue fl_http_get_headers(FLValue url, FLValue headers) {
 FLValue http_head(FLValue url) {
     return http_client_request("HEAD", url, fl_map_new(), fl_str_val(""), fl_nil());
 }
+FLValue http_delete(FLValue url) {
+    return http_client_request("DELETE", url, fl_map_new(), fl_str_val(""), fl_nil());
+}
 FLValue fl_http_post(FLValue url, FLValue body) {
     return http_client_request("POST", url, fl_map_new(), body, fl_nil());
 }
