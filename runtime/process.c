@@ -368,6 +368,17 @@ FLValue shell(FLValue command) {
     return fl_map_get(value, fl_str_val("stdout"));
 }
 
+FLValue shell_exec_stdout(FLValue command) {
+    FLValue args[2] = { fl_str_val("-c"), command };
+    FLValue result = process_spawn(fl_str_val("sh"), fl_vec_from(args, 2));
+    FLValue tag = fl_map_get(result, fl_str_val("_tag"));
+    if (tag.tag != FL_STRING || strcmp(((FLString *)tag.obj)->data, "Ok") != 0) return fl_nil();
+    FLValue value = fl_map_get(result, fl_str_val("value"));
+    FLValue code = fl_map_get(value, fl_str_val("code"));
+    if (code.tag != FL_INT || code.i != 0) return fl_nil();
+    return fl_map_get(value, fl_str_val("stdout"));
+}
+
 /* OS boundary only: the FreeLang callback owns assertions and JSON encoding.
    A fatal runtime error, signal, missing payload or timeout cannot become PASS. */
 FLValue _fl_test_isolate(FLValue callback) {
