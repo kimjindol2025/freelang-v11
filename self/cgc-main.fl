@@ -863,6 +863,16 @@
         (if (= (get $entry 1) $raw) (get $entry 0)
           (recur (+ $i 1)))))))
 
+(defn cgc-route-handler [$node]
+  (if (and (= (get $node :kind) "literal")
+           (= (get $node :type) "string"))
+    (let [[$raw (get $node :value)]
+          [$name (cgc-symbol-for-raw @function-c-symbols-atom $raw)]]
+      (if (and (not (null? $name)) (includes-item @known-defns-atom $name))
+        (str "fl_fn_new(__fl_wrap_" $name ", 0, NULL)")
+        (cgc $node)))
+    (cgc $node)))
+
 (defn cgc-register-function [$raw]
   (let [[$name (c-name-base $raw)]
         [$entries @function-c-symbols-atom]
@@ -1345,9 +1355,9 @@
   [(= $op "server-redirect")    (str "fl_resp_redirect(" (cgc (get $args 0)) ")")]
   [(= $op "server-html-cookie") (str "fl_resp_html_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "server-set-cookie")  (str "fl_resp_set_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "server-route")       (str "fl_http_route(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "server-get")         (str "fl_http_route(fl_str_val(\"GET\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "server-post")        (str "fl_http_route(fl_str_val(\"POST\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-route")       (str "fl_http_route(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc-route-handler (get $args 2)) ")")]
+  [(= $op "server-get")         (str "fl_http_route(fl_str_val(\"GET\"), " (cgc (get $args 0)) ", " (cgc-route-handler (get $args 1)) ")")]
+  [(= $op "server-post")        (str "fl_http_route(fl_str_val(\"POST\"), " (cgc (get $args 0)) ", " (cgc-route-handler (get $args 1)) ")")]
   ;; N-06: SQLite3 DB
   [(= $op "db-open")   (str "fl_db_open(" (cgc (get $args 0)) ")")]
   [(= $op "db-close")  (str "fl_db_close(" (cgc (get $args 0)) ")")]
