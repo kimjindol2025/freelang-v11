@@ -36,7 +36,8 @@ build_variant() {
 }
 
 run_case() {
-  local label="$1" repetition="$2" dir="$RECORD_DIR/$label/run-$repetition" log="$RECORD_DIR/$label-run-$repetition.log" rc
+  local label="$1" repetition="$2" rc
+  local dir="$RECORD_DIR/$label/run-$repetition" log="$RECORD_DIR/$label-run-$repetition.log"
   mkdir -p "$dir"
   set +e
   FL_TOOLS_DISPATCH_ROOT="$TOOLS" FREELANG_V11_RUNTIME="$RUNTIME" FL_TEST_CONTINUE=1 \
