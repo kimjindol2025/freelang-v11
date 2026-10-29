@@ -682,17 +682,17 @@ FLValue fl_builtin_add(void) {
     return fl_fn_new(fl_builtin_binary_add_call, 0, NULL);
 }
 
-static FLValue fl_builtin_binary_str_call(FLClosure *self, int argc, FLValue *argv) {
+static FLValue fl_builtin_str_call(FLClosure *self, int argc, FLValue *argv) {
     (void)self;
-    if (argc != 2) {
-        fl_throw(fl_str_val("str expects two arguments"));
-        return fl_nil();
+    FLValue result = fl_str_n(0);
+    for (int i = 0; i < argc; i++) {
+        result = fl_str_n(2, result, argv[i]);
     }
-    return fl_str_n(2, argv[0], argv[1]);
+    return result;
 }
 
 FLValue fl_builtin_str(void) {
-    return fl_fn_new(fl_builtin_binary_str_call, 0, NULL);
+    return fl_fn_new(fl_builtin_str_call, 0, NULL);
 }
 
 static int fl_validation_number(FLValue value, double *out) {
