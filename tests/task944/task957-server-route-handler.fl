@@ -1,0 +1,2 @@
+(defn task957_handler [req] "ok")
+(println (server-get "/ok" "task957_handler"))
