@@ -132,7 +132,7 @@ ERROR_PCT="$(sed -n 's/.*error_pct=\([0-9.]*\).*/\1/p' "$WORK/resources.client.l
 awk -v p="$ERROR_PCT" 'BEGIN{printf "POOL_KILL_ERROR_PCT=%.3f\n", p; exit !(p < 1.0)}'
 test -n "$RESTART_LINE"
 curl --silent --show-error --max-time 3 -o /dev/null -w 'POOL_KILL_RECOVERY_HTTP=%{http_code}\n' \
-  "http://127.0.0.1:$PORT/ok" | grep -Fx 'POOL_KILL_RECOVERY_HTTP=200'
+  "http://127.0.0.1:$PORT/about" | grep -Fx 'POOL_KILL_RECOVERY_HTTP=200'
 snapshot "$SERVER_PID"
 RSS_END=$SNAP_RSS; FD_END=$SNAP_FD
 RESOURCE_STABLE=0

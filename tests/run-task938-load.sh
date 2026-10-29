@@ -275,7 +275,7 @@ for concurrency in 10 50 100 200 500 1000; do
   if (( concurrency <= 200 )) && [[ -n "$error_pct" ]] && awk -v p="$error_pct" 'BEGIN{exit !(p>=1.0)}'; then LOW_LOAD_OK=0; fi
   if (( concurrency >= 500 && ${errors:-0} > 0 )) &&
      { [[ -z "$reject_pct" ]] || ! awk -v p="$reject_pct" 'BEGIN{exit !(p>=90.0)}'; }; then HIGH_REJECTION_OK=0; fi
-  recovery="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ok" 2>/dev/null || echo 000)"
+  recovery="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/about" 2>/dev/null || echo 000)"
   printf 'LOAD_RECOVERY concurrency=%s HTTP_STATUS=%s\n' "$concurrency" "$recovery"
   [[ "$recovery" == 200 ]] && RECOVERIES=$((RECOVERIES + 1))
   if kill -0 "$SERVER_PID" 2>/dev/null && [[ "$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}')" != Z* ]]; then
@@ -392,7 +392,7 @@ CAP_IO_ERRORS="$(sed -n 's/.*io_errors=\([0-9]*\).*/\1/p' <<<"$CAP_LINE")"
 CAP_OTHER_ERRORS=$((CAP_OTHER_HTTP + CAP_REFUSED + CAP_TIMEOUT + CAP_CONNECT_OTHER + CAP_IO_ERRORS))
 CAP_ALIVE=0
 kill -0 "$CAP_SERVER_PID" 2>/dev/null && CAP_ALIVE=1
-CAP_RECOVERY="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$CAP_PORT/ok" 2>/dev/null || echo 000)"
+CAP_RECOVERY="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$CAP_PORT/about" 2>/dev/null || echo 000)"
 CAP_ZOMBIE_AFTER="$(ps -o stat= --ppid "$CAP_SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}' || true)"
 CAP_ZOMBIE_DELTA=$((CAP_ZOMBIE_AFTER - CAP_ZOMBIE_BEFORE))
 kill "$CAP_SERVER_PID"

@@ -42,7 +42,7 @@ URL="http://127.0.0.1:$PORT"
 worker() {
   local end=$(( $(date +%s) + DURATION ))
   while (( $(date +%s) < end )); do
-    curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code} %{time_total}\n' "$URL/ok" >>"$WORK/logs/health.log" 2>&1 || echo '000 10.000000' >>"$WORK/logs/health.log"
+    curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code} %{time_total}\n' "$URL/about" >>"$WORK/logs/health.log" 2>&1 || echo '000 10.000000' >>"$WORK/logs/health.log"
     curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code} %{time_total}\n' "$URL/static/sample.txt" >>"$WORK/logs/static.log" 2>&1 || echo '000 10.000000' >>"$WORK/logs/static.log"
     curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code} %{time_total}\n' -d 'soak-example-password-only' "$URL/login" >>"$WORK/logs/login.log" 2>&1 || echo '000 10.000000' >>"$WORK/logs/login.log"
     curl --silent --show-error --max-time 10 -o /dev/null -w '%{http_code} %{time_total}\n' "$URL/jwt" >>"$WORK/logs/jwt.log" 2>&1 || echo '000 10.000000' >>"$WORK/logs/jwt.log"
@@ -124,7 +124,7 @@ FD_STABLE="$(awk -v base="$FIRST30_FD" '$1>1800 && $6>base {bad=1} END {print ba
 (( FINAL_RSS <= FIRST30_RSS + 1024 )) || RSS_STABLE=0
 (( FINAL_FD <= FIRST30_FD )) || FD_STABLE=0
 SERVER_ALIVE=0; kill -0 "$SERVER_PID" && SERVER_ALIVE=1
-HEALTH_AFTER="$(curl --silent --show-error --max-time 3 -o /dev/null -w '%{http_code}' "$URL/ok" || echo 000)"
+HEALTH_AFTER="$(curl --silent --show-error --max-time 3 -o /dev/null -w '%{http_code}' "$URL/about" || echo 000)"
 printf 'MIXSOAK_DURATION_S=%s\nMIXSOAK_FAILURES=%s\nMIXSOAK_5XX=%s\nMIXSOAK_HEALTH_FAILURES=%s\nMIXSOAK_ATTACK_FAILURES=%s\n' \
   "$((END-START))" "$TOTAL_FAILURES" "$TOTAL_5XX" "$HEALTH_FAILURES" "$ATTACK_FAILURES"
 printf 'MIXSOAK_WRITES_SENT=%s\nMIXSOAK_DB_ROWS=%s\nMIXSOAK_DB_INTEGRITY=%s\n' "$WRITES_SENT" "$DB_ROWS" "$DB_CHECK"

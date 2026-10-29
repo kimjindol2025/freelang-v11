@@ -30,6 +30,7 @@
   (server-json {"results" (run-parallel [(fn [] (+ 1 2)) (fn [] "ok")])}))
 (server-static (get $ARGS 0) "/static/")
 (server-get "/ok" ok)
+(server-get "/about" ok)
 (server-get "/__slow" slow)
 (server-get "/__slow300" slow300)
 (server-post "/login" login)
