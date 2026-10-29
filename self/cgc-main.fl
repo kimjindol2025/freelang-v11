@@ -1834,13 +1834,13 @@
                              (if (and (not (= $raw (get $entry 0)))
                                       (= (str-replace $raw "-" "_")
                                          (str-replace (get $entry 0) "-" "_")))
-                               true (recur (+ $i 1) $items))))]
+                               true (recur (+ $i 1) $items)))))]
         [$alias-conflict (and $conflict
                           (or (and (= $raw $function-raw)
                                    (or $global-alias (= (get (get $args 1) :type) "string")))
                               (and (not (= $raw $function-raw))
                                 (or (= (str-replace $raw "-" "_") $function-raw)
-                                    (= (str-replace $function-raw "-" "_") $raw))))]
+                                    (= (str-replace $function-raw "-" "_") $raw)))))]
         [$name (if (not (null? $existing)) $existing
                  (if $alias-conflict (cgc-unique-symbol $base $entries 0) $base))]
         [$val (cgc (get $args 1))]]
