@@ -5,7 +5,6 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CURRENT_COMPILER="${1:?usage: run-task959-concurrency-evidence.sh <current-compiler> <empty-record-dir>}"
 RECORD_DIR="${2:?usage: run-task959-concurrency-evidence.sh <current-compiler> <empty-record-dir>}"
 TOOLS="${FL_TOOLS_ROOT:-$(cd -- "$ROOT/../freelang-tools" && pwd -P)}"
-BASELINE_COMPILER="$TOOLS/scripts/cgc-native"
 RUNTIME="$ROOT/runtime"
 if [[ -e "$RECORD_DIR" && -n "$(find "$RECORD_DIR" -mindepth 1 -print -quit)" ]]; then
   echo 'task959 record directory must be empty' >&2
@@ -18,17 +17,22 @@ link_sources=()
 for name in "${sources[@]}"; do link_sources+=("$RUNTIME/$name"); done
 
 build_variant() {
-  local label="$1" compiler="$2" dir="$RECORD_DIR/$1"
+  local label="$1" compiler="$2" http_runtime="$3" dir="$RECORD_DIR/$1"
+  local -a variant_sources=()
   mkdir -p "$dir"
+  for name in "${sources[@]}"; do
+    if [[ "$name" == http_server.c ]]; then variant_sources+=("$http_runtime");
+    else variant_sources+=("$RUNTIME/$name"); fi
+  done
   "$compiler" "$ROOT/examples/erp-vendors/app.fl" "$dir/app.c" >"$dir/app.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$dir/app" "$dir/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm >"$dir/app.build" 2>&1
+  gcc -w -I "$RUNTIME" -o "$dir/app" "$dir/app.c" "${variant_sources[@]}" -lsqlite3 -lcrypto -lm >"$dir/app.build" 2>&1
   "$compiler" "$ROOT/examples/erp-vendors/create-user.fl" "$dir/create-user.c" >"$dir/create-user.compile" 2>&1
   gcc -w -I "$RUNTIME" -o "$dir/create-user" "$dir/create-user.c" \
     "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
     "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" \
     "$RUNTIME/db.c" "$RUNTIME/auth.c" -lsqlite3 -lcrypto -lm >"$dir/create-user.build" 2>&1
   "$compiler" "$ROOT/examples/erp-vendors/test-concurrency.fl" "$dir/concurrency.c" >"$dir/concurrency.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$dir/concurrency" "$dir/concurrency.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm >"$dir/concurrency.build" 2>&1
+  gcc -w -I "$RUNTIME" -o "$dir/concurrency" "$dir/concurrency.c" "${variant_sources[@]}" -lsqlite3 -lcrypto -lm >"$dir/concurrency.build" 2>&1
 }
 
 run_case() {
@@ -56,7 +60,9 @@ gcc -Wno-unused -I "$RUNTIME" -o "$RECORD_DIR/tester-registry-native" "$RECORD_D
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm \
   >"$RECORD_DIR/tester-registry.build" 2>&1
 
-build_variant current "$CURRENT_COMPILER"
-build_variant baseline "$BASELINE_COMPILER"
+mkdir -p "$RECORD_DIR/baseline"
+git -C "$ROOT" show 5b620b4e:runtime/http_server.c >"$RECORD_DIR/baseline/http_server.c"
+build_variant current "$CURRENT_COMPILER" "$RUNTIME/http_server.c"
+build_variant baseline "$CURRENT_COMPILER" "$RECORD_DIR/baseline/http_server.c"
 for repetition in 1 2 3; do run_case current "$repetition"; done
 run_case baseline 1
