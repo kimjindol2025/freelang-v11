@@ -202,4 +202,13 @@ X86_SUMMARY=4/5
 
 ## 7. 커밋 및 원격 상태
 
-보고서 커밋 이후 Forgejo를 먼저, GitHub를 다음으로 푸시하고 두 원격 HEAD를 기록한다. 미확인 사항: 전체 legacy DB 잠금과 TASK946 한 건 실패의 원인, full check 통과 여부.
+푸시 순서: Forgejo 다음 GitHub. 커밋 및 양쪽 원격 HEAD 원문:
+
+```text
+86aa88adb3982bed2acb08f1e0cb6b7c2e23b5c6	refs/heads/v11-x86-seed-public
+86aa88adb3982bed2acb08f1e0cb6b7c2e23b5c6	refs/heads/v11-x86-seed-public
+```
+
+GitHub 보고서: https://github.com/kimjindol2025/freelang-v11/blob/v11-x86-seed-public/docs/9-59-post-loss.md
+
+미확인 사항: 전체 legacy DB 잠금과 TASK946 한 건 실패의 원인, full check 통과 여부.
