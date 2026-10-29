@@ -1,0 +1,4 @@
+(define fixed (random_int 4 4))
+(define bounded (random_int -3 7))
+(println fixed)
+(println (and (>= bounded -3) (<= bounded 7)))

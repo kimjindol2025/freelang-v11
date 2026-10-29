@@ -1,0 +1,6 @@
+PATH=/users
+QUERY=needle
+PARAM=42
+COOKIE=abc
+FILES=2
+REDIRECT=302|/next|sid=1

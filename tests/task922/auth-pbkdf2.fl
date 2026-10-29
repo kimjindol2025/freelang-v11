@@ -1,0 +1,2 @@
+(define digest (auth-pbkdf2 "sample-password" "0123456789abcdef0123456789abcdef"))
+(if (= (length digest) 64) (println "PASS auth-pbkdf2") (throw "FAIL auth-pbkdf2"))

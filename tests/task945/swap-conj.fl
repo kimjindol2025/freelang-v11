@@ -1,0 +1,3 @@
+(define value (atom [1]))
+(swap! value conj 2)
+(println (length (deref value)))

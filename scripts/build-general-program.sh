@@ -35,6 +35,8 @@ RUNTIME_MODULES=(
   "error.c"
   "process.c"
   "json.c"
+  "db.c"
+  "http_server.c"
 )
 
 for module in "${RUNTIME_MODULES[@]}"; do
@@ -56,7 +58,7 @@ gcc -Wall -Wextra \
   -o "$OUTPUT_BIN" \
   "$INPUT_C" \
   $RUNTIME_SOURCES \
-  -lm
+  -lm -lsqlite3
 
 if [[ $? -eq 0 ]]; then
   echo "✅ 성공: $OUTPUT_BIN ($(stat --format=%s "$OUTPUT_BIN") bytes)"

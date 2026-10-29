@@ -1,0 +1,4 @@
+(defn badge [] "PLAIN")
+(defn $badge [] "DOLLAR")
+(println (badge))
+(println ($badge))

@@ -24,6 +24,8 @@ const char* _strval(FLValue v) {
     return "";
 }
 
+#include "fs_io.inc"
+
 FLValue _fl_file_append(FLValue path, FLValue content) {
     FILE* f = fopen(_strval(path), "ab");
     if (!f) return fl_bool(false);
@@ -73,6 +75,28 @@ FLValue _fl_file_is_dir(FLValue path) {
     return fl_bool(S_ISDIR(st.st_mode));
 }
 
+FLValue file_is_file(FLValue path) { return _fl_file_is_file(path); }
+FLValue dir_exists_p(FLValue path) { return _fl_file_is_dir(path); }
+
+FLValue dir_list(FLValue path) {
+    const char* p = _strval(path);
+    DIR* d = opendir(p);
+    if (!d) {
+        char msg[512];
+        snprintf(msg, sizeof msg, "Directory not found: '%s'", p);
+        fl_throw(fl_str_val(msg));
+        return fl_vec_new();
+    }
+    FLValue r = fl_vec_new();
+    struct dirent* e;
+    while ((e = readdir(d))) {
+        if (strcmp(e->d_name, ".") && strcmp(e->d_name, ".."))
+            r = fl_vec_push(r, fl_str_val(e->d_name));
+    }
+    closedir(d);
+    return r;
+}
+
 /* ── _fl_env_* ── */
 #include <stdlib.h>
 extern char** environ;
@@ -80,6 +104,12 @@ extern char** environ;
 FLValue _fl_env_get(FLValue key) {
     const char* v = getenv(_strval(key));
     return v ? fl_str_val(v) : fl_nil();
+}
+/* bootstrap.js shell_env: 없거나 빈 문자열이면 null */
+FLValue shell_env(FLValue varname) {
+    const char* v = getenv(_strval(varname));
+    if (!v || v[0] == '\0') return fl_nil();
+    return fl_str_val(v);
 }
 FLValue _fl_env_set(FLValue key, FLValue val) {
     return fl_bool(setenv(_strval(key), _strval(val), 1) == 0);
@@ -112,7 +142,7 @@ FLValue str_join(FLValue sep, FLValue vec) {
         total += strlen(fl_to_str(v->data[i], tmp, sizeof(tmp)));
         if (i + 1 < v->len) total += slen;
     }
-    char* buf = malloc(total + 1); buf[0] = '\0';
+    char* buf = fl_malloc(total + 1); buf[0] = '\0';
     for (uint32_t i = 0; i < v->len; i++) {
         strcat(buf, fl_to_str(v->data[i], tmp, sizeof(tmp)));
         if (i + 1 < v->len) strcat(buf, s);

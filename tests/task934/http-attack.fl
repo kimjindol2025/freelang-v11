@@ -1,0 +1,13 @@
+(load "../../lib/evidence/evidence.fl")
+
+(let [[args (cli-args)]
+      [result (evidence-run (get args 0) [(get args 1)])]]
+  (if (= (get result "code") 0)
+    (do
+      (print (get result "stdout"))
+      (if (>= (_fl_str_index_of (get result "stdout") "HTTPATK_SUMMARY=21/21") 0)
+        (println "HTTPATK_NATIVE_RUNNER=PASS")
+        (throw "HTTPATK summary missing")))
+    (do
+      (print (get result "stdout"))
+      (throw (str "HTTP attack client failed: " (get result "stderr"))))))

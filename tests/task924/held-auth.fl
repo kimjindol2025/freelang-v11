@@ -1,0 +1,3 @@
+(if (= (run-parallel []) [])
+  (println "PASS run-parallel-empty")
+  (throw "FAIL run-parallel-empty"))

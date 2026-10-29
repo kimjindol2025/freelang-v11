@@ -1,7 +1,8 @@
 ;; tests/unit/stdlib/math.test.fl — Math Library Unit Tests
-;; 16개 테스트 (산술 함수)
+;; 17개 assertion (산술 함수)
 
 (load "../../lib/assert.fl")
+(load "../../../stdlib/native-compat.fl")
 
 (test-section "Math Tests")
 
@@ -25,5 +26,7 @@
 (assert-eq (abs 5) 5 "abs positive")
 (assert-eq (max 3 7 2) 7 "max")
 (assert-eq (min 3 7 2) 2 "min")
+(assert-eq (min 3 7) 3 "min normal")
+(assert-eq (min -4 -4) -4 "min equal negative boundary")
 
 (println "✅ Math tests passed")

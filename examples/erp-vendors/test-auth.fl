@@ -1,0 +1,131 @@
+(load "../../lib/evidence/evidence.fl")
+
+(defn out [command args]
+  (let [[r (evidence-run command args)]]
+    (if (= (get r "code") 0) (get r "stdout")
+      (throw (str "command failed: " command " " (get r "stderr"))))))
+(defn has [text needle] (>= (_fl_str_index_of text needle) 0))
+(defn check [condition name]
+  (if condition (do (println (str "PASS " name)) true)
+    (do (println (str "FAIL " name)) false)))
+(defn csrf-from [work filename]
+  (str-trim (out "sed" ["-n" "s/.*name=\"_csrf\" value=\"\\([^\"]*\\)\".*/\\1/p" (str work "/" filename)])))
+(defn login-page [url jar work filename]
+  (do
+    (out "curl" ["--silent" "--show-error" "--include" "--cookie-jar" jar "--output" (str work "/" filename) (str url "/login")])
+    (out "cat" [(str work "/" filename)])))
+(defn login-post [url jar csrf username password-file]
+  (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar "--cookie-jar" jar
+    "--data-urlencode" (str "_csrf=" csrf) "--data-urlencode" (str "username=" username)
+    "--data-urlencode" (str "password@" password-file) (str url "/login")]))
+(defn token-from-jar [jar]
+  (str-trim (out "sh" ["-c" "awk '$6==\"erp_session\" {print $7}' \"$1\"" "auth-token" jar])))
+(defn csrf-cookie-from-jar [jar]
+  (str-trim (out "sh" ["-c" "awk '$6==\"erp_csrf\" {print $7}' \"$1\"" "csrf-cookie" jar])))
+(defn cookie-length [jar]
+  (length (token-from-jar jar)))
+(defn launch-server [work port app creator]
+  (out "sh" ["-c"
+    "work=$1; port=$2; app=$3; creator=$4; umask 077; openssl rand -hex 32 | tr -d '\\n' >\"$work/pass-a\"; openssl rand -hex 32 | tr -d '\\n' >\"$work/pass-b\"; openssl rand -hex 32 | tr -d '\\n' >\"$work/wrong\"; ERP_DB_PATH=\"$work/auth.sqlite\" ERP_NEW_USERNAME=\"o'neil\" ERP_NEW_PASSWORD=\"$(cat \"$work/pass-a\")\" \"$creator\" >/dev/null || exit 1; ERP_DB_PATH=\"$work/auth.sqlite\" ERP_NEW_USERNAME=\"<script>\" ERP_NEW_PASSWORD=\"$(cat \"$work/pass-a\")\" \"$creator\" >/dev/null || exit 1; ERP_DB_PATH=\"$work/auth.sqlite\" ERP_SESSION_SECONDS=60 ERP_LOCK_SECONDS=2 FL_HTTP_PORT=\"$port\" \"$app\" >\"$work/server.out\" 2>\"$work/server.err\" & echo $!"
+    "erp-auth-test" work (str port) app creator]))
+(defn curl-get [url jar path]
+  (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar (str url path)]))
+(defn generic-failure [response]
+  (and (has response "아이디 또는 비밀번호가 틀립니다")
+       (not (has response "Set-Cookie: erp_session="))))
+
+(let [[work (get (cli-args) 0)] [app (get (cli-args) 1)] [creator (get (cli-args) 2)]
+      [listener (tcp-listen "127.0.0.1" 0)] [port (tcp-local-port listener)]]
+  (tcp-close listener)
+  (let [[pid (str-trim (launch-server work port app creator))]
+        [url (str "http://127.0.0.1:" port)] [database (str work "/auth.sqlite")]
+        [jar-a (str work "/a.cookies")] [jar-b (str work "/b.cookies")] [jar-c (str work "/c.cookies")]
+        [pass-a (str work "/pass-a")] [pass-b (str work "/pass-b")] [wrong (str work "/wrong")]]
+    (do
+      (out "sleep" ["0.1"])
+      (let [[anon (out "curl" ["--silent" "--show-error" "--include" (str url "/vendors")])]
+            [login-a (login-page url jar-a work "login-a.html")]
+            [csrf-a (csrf-from work "login-a.html")]
+            [bad (login-post url jar-a csrf-a "o'neil" wrong)]
+            [unknown (login-post url jar-a csrf-a "nobody" wrong)]
+            [bad-no-csrf (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" "username=o'neil" "--data-urlencode" (str "password@" wrong) (str url "/login")])]
+            [injection (login-post url jar-a csrf-a "' OR 1=1 --" wrong)]
+            [successful (login-post url jar-a csrf-a "o'neil" pass-a)]
+            [session-a (token-from-jar jar-a)]
+            [csrf-a-cookie (csrf-cookie-from-jar jar-a)]
+            [bad-empty-csrf (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" "_csrf=" "--data-urlencode" "username=o'neil" "--data-urlencode" (str "password@" wrong) (str url "/login")])]
+            [bad-mismatch-csrf (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" "_csrf=wrong-token" "--data-urlencode" "username=o'neil" "--data-urlencode" (str "password@" wrong) (str url "/login")])]
+            [bad-length-csrf (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" "_csrf=wrong-token-with-different-length" "--data-urlencode" "username=o'neil" "--data-urlencode" (str "password@" wrong) (str url "/login")])]
+            [vendors (curl-get url jar-a "/vendors")]
+            [missing-csrf (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" "name=CSRF-Should-Not-Insert" "--data-urlencode" "phone=000" "--data-urlencode" "memo=example" (str url "/vendors")])]
+            [empty-protected-csrf (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" "_csrf=" "--data-urlencode" "name=CSRF-Should-Not-Insert" (str url "/vendors")])]
+            [mismatched-protected-csrf (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" "_csrf=wrong-token" "--data-urlencode" "name=CSRF-Should-Not-Insert" (str url "/vendors")])]
+            [vendor-count (out "sqlite3" [database "SELECT count(*) FROM vendors;"])]
+            [logout (out "curl" ["--silent" "--show-error" "--include" "--cookie" jar-a "--data-urlencode" (str "_csrf=" csrf-a-cookie) (str url "/logout")])]
+            [after-logout (curl-get url jar-a "/vendors")]
+            [login-b (login-page url jar-b work "login-b.html")]
+            [csrf-b (csrf-from work "login-b.html")]
+            [xss-user (login-post url jar-b csrf-b "<script>" pass-a)]
+            [login-c (login-page url jar-c work "login-c.html")]
+            [csrf-c (csrf-from work "login-c.html")]
+            [locked-attempts (out "sh" ["-c" "for i in 1 2 3 4 5 6; do curl --silent --show-error --output \"$1/lock-$i.body\" --write-out '%{http_code}' --cookie \"$2\" --cookie-jar \"$2\" --data-urlencode \"_csrf=$3\" --data-urlencode username=\"o'neil\" --data-urlencode \"password@$4\" \"$5/login\" >\"$1/lock-$i.code\"; done; cat \"$1/lock-5.body\"; cat \"$1/lock-6.body\"; printf '\\nLOCK_HTTP_5_6='; cat \"$1/lock-5.code\" \"$1/lock-6.code\""
+              "auth-lock" work jar-c csrf-c wrong url])]
+            [lock-still-blocked (not (has locked-attempts "Set-Cookie: erp_session="))]
+            [unlocked (out "sh" ["-c" "sleep 2.2; curl --silent --show-error --include --cookie \"$1\" --cookie-jar \"$1\" --data-urlencode \"_csrf=$2\" --data-urlencode username=\"o'neil\" --data-urlencode \"password@$3\" \"$4/login\"" "auth-unlock" jar-c csrf-c pass-a url])]
+            [salt-info (out "sqlite3" [database "SELECT count(*)||'|'||min(length(pw_hash))||'|'||min(length(pw_salt))||'|'||count(DISTINCT pw_salt) FROM users;"])]
+            [legacy-salt "0123456789abcdef0123456789abcdef"]
+            [legacy-password (str-trim (out "cat" [pass-a]))]
+            [legacy-digest (auth-pbkdf2 legacy-password legacy-salt)]
+            [legacy-row (out "sqlite3" [database (str "INSERT INTO users(username,pw_hash,pw_salt,created_at) VALUES('legacy-test','" legacy-digest "','" legacy-salt "',strftime('%Y-%m-%dT%H:%M:%fZ','now'));" )])]
+            [legacy-page (login-page url (str work "/legacy.cookies") work "legacy-login.html")]
+            [legacy-csrf (csrf-from work "legacy-login.html")]
+            [legacy-login (login-post url (str work "/legacy.cookies") legacy-csrf "legacy-test" pass-a)]
+            [legacy-vendors (curl-get url (str work "/legacy.cookies") "/vendors")]
+            [plaintext-columns (out "sqlite3" [database "SELECT count(*) FROM pragma_table_info('users') WHERE name IN ('password','plain_password');"])]
+            [expire-result (out "sh" ["-c" "token=$(awk '$6==\"erp_session\"{print $7}' \"$1\"); sqlite3 \"$2\" \"UPDATE sessions SET expires_at=0 WHERE token='$token';\"; curl --silent --show-error --include --cookie \"$1\" \"$3/vendors\"" "auth-expire" jar-c database url])]
+            [no-exp-token "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJub19leHAifQ.8gl19_xTju96-fibCO4hcXoBu7jT8st7ZLF-i4lR5C0"]
+            [jwt-key "security-test-key-32-bytes-minimum-123"]
+            [non-numeric-exp (auth-jwt-sign {:sub "bad-exp" :exp "soon"} jwt-key 3600)]
+            [negative-exp (auth-jwt-sign {:sub "negative-exp" :exp -1} jwt-key 3600)]
+            [valid-exp (auth-jwt-sign {:sub "valid-exp" :exp (+ (floor (/ (now-ms) 1000)) 300)} jwt-key 3600)]
+            [checks [
+              (check (and (has anon "HTTP/1.1 303") (has anon "Location: /login")) "anonymous vendors redirects to login")
+              (check (and (has login-a "erp_csrf=") (has login-a "HttpOnly") (has login-a "SameSite=Strict") (has login-a "Path=/")) "login GET sets protected CSRF cookie")
+              (check (and (generic-failure bad) (generic-failure unknown) (has bad "아이디 또는 비밀번호가 틀립니다") (has unknown "아이디 또는 비밀번호가 틀립니다")) "wrong and unknown users share one failure message and no session cookie")
+              (check (has bad-no-csrf "HTTP/1.1 403") "login POST without CSRF returns 403")
+              (check (has injection "아이디 또는 비밀번호가 틀립니다") "SQL-like username is safely rejected")
+              (check (and (has successful "HTTP/1.1 303") (has successful "Location: /vendors") (has successful "HttpOnly") (has successful "SameSite=Strict") (has successful "Path=/") (>= (length session-a) 64)) "valid login issues a 256-bit session cookie")
+              (check (and (has vendors "HTTP/1.1 200") (has legacy-login "HTTP/1.1 303")
+                          (has legacy-vendors "HTTP/1.1 200")) "new and legacy split-column hashes authenticate")
+              (check (and (has missing-csrf "HTTP/1.1 403") (= vendor-count "0\n")) "protected POST without CSRF leaves database unchanged")
+              (check (and (has logout "HTTP/1.1 303") (has logout "Max-Age=0") (has after-logout "HTTP/1.1 303")) "logout expires cookie and revokes session")
+              (check (and (has xss-user "HTTP/1.1 303") (has (curl-get url jar-b "/vendors") "HTTP/1.1 200")) "script-like username authenticates without HTML injection")
+              (check (= salt-info "2|64|32|2\n") "users store distinct random salts and 256-bit PBKDF2 hashes")
+              (check (= plaintext-columns "0\n") "users table has no plaintext password column")
+              (check (and (has locked-attempts "아이디 또는 비밀번호가 틀립니다") lock-still-blocked) "five failures temporarily block the account")
+              (check (and (has unlocked "HTTP/1.1 303") (has unlocked "Location: /vendors")) "account unlocks after the configured delay")
+              (check (and (has expire-result "HTTP/1.1 303") (has expire-result "Location: /login")) "expired session is rejected")
+              (check (not (has (out "sqlite3" [database "SELECT group_concat(name, ',') FROM pragma_table_info('users');"]) "password-value")) "user schema does not expose a plaintext field")
+            ]]
+            [sec-checks [
+              (check (nil? (auth-jwt-verify no-exp-token jwt-key)) "JWT without exp rejected")
+              (check (nil? (auth-jwt-verify non-numeric-exp jwt-key)) "JWT nonnumeric exp rejected")
+              (check (nil? (auth-jwt-verify negative-exp jwt-key)) "JWT negative exp rejected")
+              (check (not (nil? (auth-jwt-verify valid-exp jwt-key))) "JWT numeric nonnegative exp accepted")
+              (check (auth-constant-time-equal "same" "same") "constant-time compare accepts identical values")
+              (check (not (auth-constant-time-equal "same" "samf")) "constant-time compare rejects content mismatch")
+              (check (not (auth-constant-time-equal "same" "same-longer")) "constant-time compare rejects length mismatch")
+              (check (and (= (length csrf-a-cookie) 64) (not (= csrf-a-cookie session-a))) "CSRF cookie is separate 256-bit random value")
+              (check (not (has vendors session-a)) "authenticated HTML does not contain session cookie value")
+              (check (and (has login-a csrf-a) (not (has login-a session-a))) "login form does not expose session cookie value")
+              (check (and (has bad-no-csrf "HTTP/1.1 403") (has bad-empty-csrf "HTTP/1.1 403")) "login rejects absent and empty CSRF")
+              (check (and (has bad-mismatch-csrf "HTTP/1.1 403") (has bad-length-csrf "HTTP/1.1 403")) "login rejects mismatched and different-length CSRF")
+              (check (and (has missing-csrf "HTTP/1.1 403") (has empty-protected-csrf "HTTP/1.1 403")) "protected POST rejects absent and empty CSRF")
+              (check (has mismatched-protected-csrf "HTTP/1.1 403") "protected POST rejects mismatched CSRF")
+            ]]
+            [passed (length (filter (fn [result] result) checks))]]
+        (do
+          (out "sh" ["-c" "kill \"$1\" 2>/dev/null || true" "auth-stop" pid])
+          (let [[sec-passed (length (filter (fn [result] result) sec-checks))]]
+            (println (str "SEC_SUMMARY=" sec-passed "/" (length sec-checks))))
+          (println (str "AUTH_SUMMARY=" passed "/" (length checks))))))))

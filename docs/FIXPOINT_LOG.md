@@ -1,0 +1,713 @@
+# v11 Fixpoint Log
+
+2026-10-23, TASK 9-11b: 6b25957a에서 고정점이 이전 `cb61631e3ac0ed993e9aadc399ecddffa560219698fd68f376326de163f2a6b6`에서 새 `1114b23942fc8239ad78e32a47df79c12f519310101dca25d600b723403efc32`로 바뀌었다. 고정 시드가 `str-join`을 매핑하지 않는 문제를 피해 `cgc-load-key`가 기존 `join`을 쓰도록 수정했다. 시드는 바꾸지 않았다.
+
+2026-10-15, 작업 위치 `/tmp/v11-selfhost-recheck-seed.D38cUQ`: 출발점은 `bin/cgc-bin-x86_64-backup`이었고, `ir_err`의 마지막 `false`가 2번 출력에서 누락되어 2번과 3번이 달랐다. 새 x86 불씨 `bin/cgc-bin-x86_64-seed-v11`의 SHA-256은 `36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2`, 2번·3번·4번 지문은 각각 `c7a81a61436a70a9912c2e8c6278d85cc453503be549af8457a6930583440604`, `c7a81a61436a70a9912c2e8c6278d85cc453503be549af8457a6930583440604`, `c7a81a61436a70a9912c2e8c6278d85cc453503be549af8457a6930583440604`, `CMP_2_3_EXIT=0`, `CMP_3_4_EXIT=0`, 반칙 검사 `NODE_EXEC_COUNT=0`, `NPM_EXEC_COUNT=0`, `TS_EXEC_COUNT=0`, `JS_EXEC_COUNT=0`, `FX_OR_AFJ_OPENAT_COUNT=0`이다. 처음부터 다시 돌리는 명령어: `ROOT=/home/kim/kim/tmp/v11-source-audit-20260929/server25-freelang-v11; SEED="$ROOT/bin/cgc-bin-x86_64-seed-v11"; B=$(mktemp -d /tmp/v11-selfhost-recheck.XXXXXX); cp -a "$ROOT/." "$B/repo"; R="$B/repo/runtime"; mkdir -p "$B/bin" "$B/trace"; INBIN="$SEED"; for N in 1 2 3; do OUT="$B/result-$((N+1)).c"; (cd "$B/repo" && /usr/bin/strace -f -e trace=execve,openat -o "$B/trace/step$N-to-$((N+1)).log" env -i PATH=/nonexistent "$INBIN" self/cgc-main.fl "$OUT"); if [ "$N" -lt 3 ]; then env -i PATH=/usr/bin:/bin /usr/bin/strace -f -e trace=execve,openat -o "$B/trace/build-$((N+1)).log" gcc -Wall -Wextra -I "$R" -o "$B/bin/translator-$((N+1))" "$OUT" "$R/core.c" "$R/collection.c" "$R/io.c" "$R/math.c" "$R/error.c" "$R/process.c" "$R/json.c" "$R/cgc-bridge.c" -lm; INBIN="$B/bin/translator-$((N+1))"; fi; done; sha256sum "$B/result-2.c" "$B/result-3.c" "$B/result-4.c"`.
+
+2026-10-17, 8-2에서 `self/cgc-main.fl`에 `case` 코드 생성과 `shell_env`, `throw` 연결을 넣은 뒤 2·3·4를 다시 돌렸다. 직전 지문 `c7a81a61436a70a9912c2e8c6278d85cc453503be549af8457a6930583440604`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+150217ae91e718dbeb0a9e140edd4a7f320289392ef6bb046508de403f8fba16  /tmp/v11-selfhost-8-2.nwp979/result-2.c
+150217ae91e718dbeb0a9e140edd4a7f320289392ef6bb046508de403f8fba16  /tmp/v11-selfhost-8-2.nwp979/result-3.c
+150217ae91e718dbeb0a9e140edd4a7f320289392ef6bb046508de403f8fba16  /tmp/v11-selfhost-8-2.nwp979/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+
+2026-10-17, 8-4에서 `self/cgc-main.fl`에 괄호·문자열 균형 검사를 넣었다. 깨진 소스는 `[CGC-ERR]`를 찍고 종료 코드 1로 끝난다. 직전 지문 `150217ae91e718dbeb0a9e140edd4a7f320289392ef6bb046508de403f8fba16`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+9b8605ffd55e0a3681a6e3b152dd20b13c3c9ebd89621505a900a04cfbe63332  /tmp/v11-selfhost-8-4.fJNTWL/result-2.c
+9b8605ffd55e0a3681a6e3b152dd20b13c3c9ebd89621505a900a04cfbe63332  /tmp/v11-selfhost-8-4.fJNTWL/result-3.c
+9b8605ffd55e0a3681a6e3b152dd20b13c3c9ebd89621505a900a04cfbe63332  /tmp/v11-selfhost-8-4.fJNTWL/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-5에서 `self/cgc-main.fl`에 `not=` 코드 생성을 넣었다. bootstrap의 `!=`와 같이 `fl_neq`로 내보낸다. 직전 지문 `9b8605ffd55e0a3681a6e3b152dd20b13c3c9ebd89621505a900a04cfbe63332`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+3f899b8e1a02f53b3f092af7f3c8e4bd405d7771ec8f9f060aba198986c080c7  /tmp/v11-selfhost-8-5.Qx0G5k/result-2.c
+3f899b8e1a02f53b3f092af7f3c8e4bd405d7771ec8f9f060aba198986c080c7  /tmp/v11-selfhost-8-5.Qx0G5k/result-3.c
+3f899b8e1a02f53b3f092af7f3c8e4bd405d7771ec8f9f060aba198986c080c7  /tmp/v11-selfhost-8-5.Qx0G5k/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-6에서 `self/cgc-main.fl`에 `now_iso`와 `text` 호출, 함수 매개변수 등록, 심볼 캡처를 넣었다. 런타임에 `fl_str_to_num`, `fl_concat`, `fl_now_iso`, `fl_text`를 넣었다. 직전 지문 `3f899b8e1a02f53b3f092af7f3c8e4bd405d7771ec8f9f060aba198986c080c7`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+d2db9cb297664369688b138cd0c86243e52a320751ec35296eb6febba278144a  /tmp/v11-selfhost-8-6.24uGIZ/result-2.c
+d2db9cb297664369688b138cd0c86243e52a320751ec35296eb6febba278144a  /tmp/v11-selfhost-8-6.24uGIZ/result-3.c
+d2db9cb297664369688b138cd0c86243e52a320751ec35296eb6febba278144a  /tmp/v11-selfhost-8-6.24uGIZ/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-7에서 `self/cgc-main.fl`에 Map 캡처, `json-parse` 값, `str-join`을 넣었다. 런타임에 str-split, str-trim, sort, dir-list, 술어, mapcat 등을 넣었다. 직전 지문 `d2db9cb297664369688b138cd0c86243e52a320751ec35296eb6febba278144a`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+e5362bf4d4e4cdf797f84805515a19d2ced2187f7f5d85ca65655b421de91121  /tmp/v11-selfhost-8-7b.WaFmza/result-2.c
+e5362bf4d4e4cdf797f84805515a19d2ced2187f7f5d85ca65655b421de91121  /tmp/v11-selfhost-8-7b.WaFmza/result-3.c
+e5362bf4d4e4cdf797f84805515a19d2ced2187f7f5d85ca65655b421de91121  /tmp/v11-selfhost-8-7b.WaFmza/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-8에서 `process_spawn`, capability, `git_*`, `http_get`을 cgc와 런타임에 넣었다. 직전 지문 `e5362bf4d4e4cdf797f84805515a19d2ced2187f7f5d85ca65655b421de91121`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+ff5f21a2fce40a645c143ab1590ae406be3ba76960a9968aa9cefd6a55b9d4fc  /tmp/v11-selfhost-8-8.DE2StU/result-2.c
+ff5f21a2fce40a645c143ab1590ae406be3ba76960a9968aa9cefd6a55b9d4fc  /tmp/v11-selfhost-8-8.DE2StU/result-3.c
+ff5f21a2fce40a645c143ab1590ae406be3ba76960a9968aa9cefd6a55b9d4fc  /tmp/v11-selfhost-8-8.DE2StU/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-9에서 cgc에 `try` 번역과 중첩 람다 캡처를 넣었다. json-parse 실패는 throw 한다. 직전 지문 `ff5f21a2fce40a645c143ab1590ae406be3ba76960a9968aa9cefd6a55b9d4fc`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+a743861153052a3f1dd2ec868eb8c77d4f24672bcaadf415822502bd96e0fa17  /tmp/v11-selfhost-8-9.inH4JS/result-2.c
+a743861153052a3f1dd2ec868eb8c77d4f24672bcaadf415822502bd96e0fa17  /tmp/v11-selfhost-8-9.inH4JS/result-3.c
+a743861153052a3f1dd2ec868eb8c77d4f24672bcaadf415822502bd96e0fa17  /tmp/v11-selfhost-8-9.inH4JS/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-10에서 json-parse/file-write 반환, evidence-manifest 파일 목록, 알 수 없는 IR은 [CGC-ERR] 후 중단, ir-validate 실패 중단을 넣었다. 직전 지문 `a743861153052a3f1dd2ec868eb8c77d4f24672bcaadf415822502bd96e0fa17`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+b57a72adff53c0fd6d1a06d84a86ab833e38f8ee3695f5a59929ca2a76491667  /tmp/v11-selfhost-8-10.QAddvz/result-2.c
+b57a72adff53c0fd6d1a06d84a86ab833e38f8ee3695f5a59929ca2a76491667  /tmp/v11-selfhost-8-10.QAddvz/result-3.c
+b57a72adff53c0fd6d1a06d84a86ab833e38f8ee3695f5a59929ca2a76491667  /tmp/v11-selfhost-8-10.QAddvz/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-12에서 template-string 번역, try 밖 catch는 컴파일러가 [CGC-ERR] 후 중단, 미지 kind도 컴파일러 중단을 넣었다. 직전 지문 `b57a72adff53c0fd6d1a06d84a86ab833e38f8ee3695f5a59929ca2a76491667`에서 아래 지문으로 바뀌었다. 2번과 3번이 같아서 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.Lc0RN4/result-2.c
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.Lc0RN4/result-3.c
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.Lc0RN4/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-17, 8-13에서 마지막 값 출력은 fl-cgc-run이 생성 C만 감싸게 했고 cgc-main.fl은 8-12와 같다. 고정점 재실행 지문도 같다. 불씨 교체 없음.
+
+```text
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.lO4jHZ/result-2.c
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.lO4jHZ/result-3.c
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.lO4jHZ/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+
+2026-10-17, 8-11에서 cgc-main.fl은 바꾸지 않고 고정점만 다시 돌렸다. 지문은 8-10과 같고 불씨 `bin/cgc-bin-x86_64-seed-v11`은 교체하지 않았다.
+
+```text
+b57a72adff53c0fd6d1a06d84a86ab833e38f8ee3695f5a59929ca2a76491667  /tmp/v11-selfhost-8-11.MNaI1v/result-2.c
+b57a72adff53c0fd6d1a06d84a86ab833e38f8ee3695f5a59929ca2a76491667  /tmp/v11-selfhost-8-11.MNaI1v/result-3.c
+b57a72adff53c0fd6d1a06d84a86ab833e38f8ee3695f5a59929ca2a76491667  /tmp/v11-selfhost-8-11.MNaI1v/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-14에서 throw 미처리 출력 형식·`process_argv`·bound template rewrite는 runtime/`fl-cgc-run`에만 넣었고 `cgc-main.fl`은 8-12/8-13과 같다. 고정점 재실행 지문도 같다. 불씨 교체 없음.
+
+```text
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.VHDrCf/result-2.c
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.VHDrCf/result-3.c
+ca531292a0a57c74f1c4dddfb95a1b24402ac4c7168a7fb3fab8ce9f539bcc4a  /tmp/v11-selfhost-8-12.VHDrCf/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-15에서 template bound는 cgc-main.fl `fl_template_bound` + runtime, `is=`/`deftest`/`try-call`/`trace_effects`를 cgc·runtime에 넣었다. 불씨 교체 없음. 2번과 3번이 같다.
+
+```text
+a46596785841282007a3faff797bde95542810a776a2e3faf2aac54cf2dd0e7d  /tmp/v11-selfhost-8-15.p7aMNu/result-2.c
+a46596785841282007a3faff797bde95542810a776a2e3faf2aac54cf2dd0e7d  /tmp/v11-selfhost-8-15.p7aMNu/result-3.c
+a46596785841282007a3faff797bde95542810a776a2e3faf2aac54cf2dd0e7d  /tmp/v11-selfhost-8-15.p7aMNu/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-16에서 사용자 프로그램 last-value wrap을 generate-c로 옮기고(`cgc-main.fl` 자기 자신은 감싸지 않음), python 후처리를 없앴다. `trace_effects` 빈 껍데기는 뺐다. 불씨 교체 없음. 2번과 3번이 같다.
+
+```text
+60de5c5ef88d84ba0d605badbdb4af5c88483c90d50b7a32c9c673b48605af0a  /tmp/v11-selfhost-8-16.KVl0Lx/result-2.c
+60de5c5ef88d84ba0d605badbdb4af5c88483c90d50b7a32c9c673b48605af0a  /tmp/v11-selfhost-8-16.KVl0Lx/result-3.c
+60de5c5ef88d84ba0d605badbdb4af5c88483c90d50b7a32c9c673b48605af0a  /tmp/v11-selfhost-8-16.KVl0Lx/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-17에서 last-value wrap은 `--print-last` 명령줄만 따른다. 파일 이름 분기를 뺐다. 불씨 교체 없음. 2번과 3번이 같다.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-17.zLUt3O/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-17.zLUt3O/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-17.zLUt3O/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-18에서 cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17과 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-18.M0csTf/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-18.M0csTf/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-18.M0csTf/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-19에서 cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17/8-18과 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-19.tsu35f/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-19.tsu35f/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-19.tsu35f/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-20에서 cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-20.x0trw6/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-20.x0trw6/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-20.x0trw6/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-21에서 cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-21.iGX1gv/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-21.iGX1gv/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-21.iGX1gv/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-22에서 runtime/process.c의 process_spawn이 stdout·stderr를 select로 같이 비운다. cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.AjJznQ/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.AjJznQ/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.AjJznQ/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-23에서 cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.UQlLJH/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.UQlLJH/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.UQlLJH/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-24에서 cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.ArsBf0/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.ArsBf0/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-22.ArsBf0/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-25에서 runtime/collection.c에 `fl_vec_rest`와 `drop_while`을 넣었다. cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다(생성 C는 cgc-main.fl에서만 바뀜). 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-25.TXSNQb/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-25.TXSNQb/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-25.TXSNQb/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-26에서 runtime/math.c에 `fl_fn_p`를 넣었다(`fn_p`와 같이 `v.tag==FL_FN`). cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-26.M2TnB9/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-26.M2TnB9/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-26.M2TnB9/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-27에서 runtime/collection.c에 `fl_sort_by`를 넣었다(키 함수로 벡터 정렬). cgc-main.fl은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-27.cBW5dz/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-27.cBW5dz/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-27.cBW5dz/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-28에서 cgc-main.fl과 runtime은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-28.ZFPJ4u/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-28.ZFPJ4u/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-28.ZFPJ4u/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-29에서 cgc-main.fl과 runtime은 바꾸지 않았다. fl-cgc-run이 a.out을 `$TOOLS_ROOT` cwd에서 실행한다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-29.yvRzC7/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-29.yvRzC7/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-29.yvRzC7/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-30에서 cgc-main.fl과 runtime은 바꾸지 않았다. 작업 저장소 `fl-cgc-run`은 8-29와 같다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-30.Lsg0IN/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-30.Lsg0IN/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-30.Lsg0IN/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+2026-10-18, 8-31에서 cgc-main.fl과 runtime은 바꾸지 않았다. 고정점 재실행 지문은 8-17부터와 같다. 불씨 교체 없음.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-31.F4xhid/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-31.F4xhid/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  /tmp/v11-selfhost-8-31.F4xhid/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+TS_EXEC_COUNT=0
+FX_OR_AFJ_OPENAT_COUNT=0
+```
+
+
+2026-10-18, 8-32a evidence follow-up. No source/runtime or seed file changed. The seeded strace run was blocked by sandbox ptrace restrictions; independent direct executions (without syscall tracing) produced identical result-2/3/4 hashes and both cmp exits 0. Strace-based syscall counts are therefore unavailable for this run. Evidence: <tmp>/fl-8-32/out/fixpoint.log and <tmp>/fl-8-32/fixpoint/direct.log. Status: PARTIAL.
+
+```text
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  <tmp>/fl-8-32/fixpoint/result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  <tmp>/fl-8-32/fixpoint/result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  <tmp>/fl-8-32/fixpoint/result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
+
+2026-10-18, 8-44 수정 전 기준. cgc-main.fl을 기존 시드로 2·3·4단계 재생성했으며 세 출력 해시는 같고 두 cmp 종료 코드는 0이다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  result-2.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  result-3.c
+70ac32640723267361729e2056baa72dcbe6190e067068a3a20e0484c108c552  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
+
+2026-10-18, 8-44 수정 후 고정점. 기존 시드로 cgc-main.fl을 2·3·4단계 빌드했고 세 결과 해시가 같으며 cmp 두 종료 코드는 0이다. 시드 교체 없음.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-2.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-3.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
+
+2026-10-18, 8-60 수정 전 기준. 수정 전 `self/cgc-main.fl`을 기존 시드로 2·3·4단계 생성해 기준 지문을 기록했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-2.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-3.c
+62a7f567e5fda9d0061771c4c885d0bd65d60652c2742a41455d1ac22984a1f2  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
+
+2026-10-18, 8-60 수정 후 고정점. 기존 시드를 유지하고 `range/1`, 다중 인자 `max`/`min`의 C 코드 생성을 추가했다. 수정 후 stage 2·3·4 결과가 같고 두 비교가 통과했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+e0eb4960665102ae806a243cbfe2c169b0794ecfb2a9a97aae514564e58b8010  result-2.c
+e0eb4960665102ae806a243cbfe2c169b0794ecfb2a9a97aae514564e58b8010  result-3.c
+e0eb4960665102ae806a243cbfe2c169b0794ecfb2a9a97aae514564e58b8010  result-4.c
+CMP_2_3_EXIT=0
+CMP_3_4_EXIT=0
+```
+
+2026-10-19, TASK 9-2 ①에서 `char-from-byte`를 런타임에 연결했다. 문자열의 NUL 경계 시험은 `STORED_LEN=2`, `LENGTH_RESULT=0`으로 끝났으므로 JSON의 NUL escape는 `UNSUPPORTED_NUL`로 거부한다. 컴파일러는 새 바이트 호출을 생성하지만 시드는 수정하지 않았다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+5357a65c417218e5c2896772d4482b0046a4f1b69f095d5f8ad3166a1b3e1a39  stage2.c
+5357a65c417218e5c2896772d4482b0046a4f1b69f095d5f8ad3166a1b3e1a39  stage3.c
+5357a65c417218e5c2896772d4482b0046a4f1b69f095d5f8ad3166a1b3e1a39  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+
+
+2026-10-19, TASK 9-2 ② JSON 이후 고정점. 시드는 유지했다. `[FUNC]` 선언을 forward declaration 목록에 포함해 표준 라이브러리의 `json-parse`/`json-stringify`가 FreeLang 구현으로 연결되게 했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+dd5528735a6a2beb16aea40b7b09954817caa2e39b25b91b78c1e1c545f7ee3f  stage2.c
+dd5528735a6a2beb16aea40b7b09954817caa2e39b25b91b78c1e1c545f7ee3f  stage3.c
+dd5528735a6a2beb16aea40b7b09954817caa2e39b25b91b78c1e1c545f7ee3f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-23, TASK 9-13에서 C 심볼 이름 충돌을 막고 생성 C의 GCC 문법 검사를 성공 조건에 포함했다. DB FreeLang 헬퍼는 기존 SQLite 런타임 함수만 사용한다. 이전 고정점 `1114b23942fc8239ad78e32a47df79c12f519310101dca25d600b723403efc32`, 새 고정점 `55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f`.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f  stage2.c
+55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f  stage3.c
+55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-23, 중복으로 등록된 DB 기본 연산 분기 3개를 정리한 뒤 다시 부트스트랩했다. 이전 고정점 `55779c613c7ae1f4cf80eff122c030ebcc5701b0ddc369a075bb18191ee7db7f`, 새 고정점 `3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132`.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132  stage2.c
+3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132  stage3.c
+3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-23, TASK 9-13에서 native 저장소 패키지 호환에 필요한 `when`, `??`, `empty?`, 기존 문자열 술어 코드 생성을 바로잡고 회귀 시험을 추가했다. 이전 고정점 `3641c58c9fedeadca3ee6afa28d649723b7a55f7ec4c315942cd66216af16132`, 새 고정점 `6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d  stage2.c
+6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d  stage3.c
+6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+같은 TASK 9-13의 추가 검토에서 `empty?`와 `str-blank?`의 입력을 한 번만 평가하도록 lowering을 보완했다. 직전 고정점 `6c3fb41bd37381efeb9405c86c85f79d2296bd05cf1cc25040dd318e2772fd2d`, 새 고정점 `b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b`.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b  stage2.c
+b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b  stage3.c
+b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-24, TASK 9-18에서 인증 런타임 함수의 native 코드 생성 이름을 등록한 뒤 다시 부트스트랩했다. 이전 고정점 `b695d4c8c5f73820bb759ea8ed6635e38f4f444f49c4758235bd22591a5ac60b`, 새 고정점 `862c3fdf44016036d57b4e100b67119523211611e2d5717a6eab868279070443`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+862c3fdf44016036d57b4e100b67119523211611e2d5717a6eab868279070443  stage2.c
+862c3fdf44016036d57b4e100b67119523211611e2d5717a6eab868279070443  stage3.c
+862c3fdf44016036d57b4e100b67119523211611e2d5717a6eab868279070443  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-24, TASK 9-19에서 loop 바인딩을 코드 생성기 이름 분석 범위에 포함했다. 이전 고정점 `862c3fdf44016036d57b4e100b67119523211611e2d5717a6eab868279070443`, 새 고정점 `5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32`. 불변 seed는 기존 미정의 이름 오진 594건을 출력하지만, stage2와 stage3 컴파일에서는 경고가 0건이다. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32  stage2.c
+5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32  stage3.c
+5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-24, TASK 9-22에서 TCP·인증 내장 함수의 런타임 심볼 선택을 `c-runtime-name` 한 곳으로 모으고 `vec-push`를 `fl_vec_push`에 연결했다. 시험 빌드의 `-D` 별칭은 제거했다. 이전 고정점 `5241232a7d6e6d99b16b72950e99edd9d14c2c1a4bad46bcc6e1eed257a2ce32`, 새 고정점 `c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93  stage2.c
+c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93  stage3.c
+c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-24, TASK 9-23에서 `c-runtime-name`에 실제 정의가 있는 컬렉션·문자열 내장 심볼을 추가하고, 누락된 실수 판별 및 take/drop 런타임 함수를 구현했다. 누락 구현은 보류 목록과 dispatch 자동 대조 시험으로 추적한다. 이전 고정점 `c5ba496262267cee7eff15edabafc0707db07d46d41cb9d7d61ac864d66ece93`, 새 고정점 `b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f  stage2.c
+b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f  stage3.c
+b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+
+2026-10-24, TASK 9-24에서 ABI 보류 목록을 컴파일러 오류 처리와 ABI 시험이 함께 읽게 하고, HTML 이스케이프·패딩·반복·빈 값 판별·중복 제거·flatten·zip·sleep 런타임 구현을 추가했다. 컴파일 오류에 호출 줄 정보가 포함되고 새 내장 심볼은 `fl_` 접두어를 쓴다. 이전 고정점 `b3e970ce7715959710dd1834f8859d7fe52750693db29aa37f3e1559f6f2ce0f`, 새 고정점 `ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682  stage2.c
+ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682  stage3.c
+ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+
+2026-10-24, TASK 9-25에서 map/filter/reduce와 동일한 `FLClosure`·`fl_fn_call` 경로를 이용해 함수형 컬렉션 내장 함수 16개를 구현하고 ABI 보류 목록에서 제거했다. 이전 고정점 `ec98c291fd6315a8cf047e906ffdddad7ecd4826bb0dcfbcc157237452605682`, 새 고정점 `334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d  stage2.c
+334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d  stage3.c
+334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-24, TASK 9-26에서 기존 `_fl_http_exchange` bounded loopback HTTP transport를 재사용해 POST/헤더 응답 래퍼를 추가하고, UUID v4는 `getrandom`으로 생성하도록 구현했다. `run-parallel`은 FreeLang 클로저를 fork 자식에 전달해 결과를 안전하게 회수할 직렬화/IPC 계약이 없어 보류를 유지했다. 이전 고정점 `334143053dcd9114eede2e6510c11e4fe7efcc4133499866c676b98c7b2b739d`, 새 고정점 `93b5976d85762b60e9beb1cd84399d25dc853f58c925d43b556d73a5e68dbf97`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+93b5976d85762b60e9beb1cd84399d25dc853f58c925d43b556d73a5e68dbf97  stage2.c
+93b5976d85762b60e9beb1cd84399d25dc853f58c925d43b556d73a5e68dbf97  stage3.c
+93b5976d85762b60e9beb1cd84399d25dc853f58c925d43b556d73a5e68dbf97  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-24, TASK 9-27에서 기존 PBKDF2·무작위 토큰·상수 시간 비교 헬퍼만 조합해 버전 문자열 비밀번호 해시와 검증 내장 함수를 추가했다. 기존 2인자 `auth-pbkdf2` 호출은 100000회 기본값을 사용하고, 검증은 인코딩된 10000~1000000 반복수를 전달한다. ERP는 새 해시를 기존 `pw_hash`/`pw_salt` 컬럼으로 분리 저장하고, 로그인 때 같은 포맷으로 검증해 기존 사용자 데이터를 보존한다. 이전 고정점 `93b5976d85762b60e9beb1cd84399d25dc853f58c925d43b556d73a5e68dbf97`, 새 고정점 `1fbbb7f87643e5e7daef08ade746bcd1a97cb28a9a9f2dbc9ad480f436833257`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+1fbbb7f87643e5e7daef08ade746bcd1a97cb28a9a9f2dbc9ad480f436833257  stage2.c
+1fbbb7f87643e5e7daef08ade746bcd1a97cb28a9a9f2dbc9ad480f436833257  stage3.c
+1fbbb7f87643e5e7daef08ade746bcd1a97cb28a9a9f2dbc9ad480f436833257  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+
+2026-10-25, TASK 9-28에서 JWT 네이티브 이름을 단일 `c-runtime-name` 매핑에 연결하고 OpenSSL HMAC-SHA256과 strict base64url 검증으로 HS256 sign/verify/decode/expired를 구현했다. `auth-jwt-decode`는 미검증 claims만 반환하며 인증 판단에 쓰지 말라는 경고를 헤더와 문서에 추가했다. JWT 시험에서 숫자 claim 정밀도 손실을 발견해 JSON float 직렬화를 왕복 가능한 17자리 정밀도로 고쳤다. 이전 고정점 `1fbbb7f87643e5e7daef08ade746bcd1a97cb28a9a9f2dbc9ad480f436833257`, 새 고정점 `1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03  stage2.c
+1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03  stage3.c
+1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+```
+
+2026-10-25, TASK 9-29에서 `http-post-stream`과 `http-stream-collect`를 `c-runtime-name` 단일 매핑에 연결해 ABI hold에서 제거했다. 컴파일러 출력이 달라져 기존 고정점 `1be193b4ac06e078fb0220dd91070c952ad6262a6b1d56c51b1faf445b54cf03`에서 새 고정점 `4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f`로 변경됐다. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f  stage2.c
+4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f  stage3.c
+4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-25, TASK 9-30에서 `(run-parallel jobs [workers])`를 기존 `fl_fn_call`과 JSON 직렬화/파싱으로 구현하고, 작업당 5초·2 MiB 및 최대 8개 자식 제한을 적용했다. 부모가 입력 순서대로 결과를 복원하고 각 자식을 `waitpid`로 회수한다. 2 MiB 결과를 지원하려고 기존 JSON 직렬화를 동적 버퍼로 바꾸고 제어 문자 escape를 왕복 처리했다. 이전 고정점 `4a0295b41fde64446679349c359c865aed31ff5139d9fd1daaa7e652b950415f`, 새 고정점 `9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c`. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage2.c
+9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage3.c
+9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```
+
+2026-10-25, TASK 9-35에서 server-static을 native 런타임에 추가했다. URL 경로를 한 번 엄격히 디코드하고 각 구성요소를 루트 디렉터리 파일 디스크립터 기준 openat(O_NOFOLLOW)로 열어 경로 이탈과 심볼릭 링크 탈출을 막는다. 헤더/본문 deadline을 각각 설정할 수 있게 해 기존 기본값 500ms를 유지했다. 이전 고정점 9f31a1b8c8235ee2e21f35f5ad9b6c4a6fe1cd627377dd68976eb5ee16ea179c, 새 고정점 ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba. 시드는 유지했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  cgc-bin-x86_64-seed-v11
+ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba  stage2.c
+ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba  stage3.c
+ae2655249d62f6120210454bc2a608764a82f53d4872e1c52721d44e247f31ba  stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+```

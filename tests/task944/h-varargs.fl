@@ -1,0 +1,2 @@
+(defn h [tag attrs content] (str tag attrs content))
+(println (h "<div>" "a" "b" "c"))

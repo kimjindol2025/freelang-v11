@@ -1,0 +1,16 @@
+(defn raw-request [request]
+  (fl-resp-html (get request "raw")))
+(defn measure-request [request]
+  (fl-resp-html
+    (str "CL=" (get (get request "headers") "content-length")
+         ";RX=" (length (get request "body")))))
+(defn slow-request [request]
+  (do (sleep 6000) (fl-resp-html "late")))
+(defn not-found [request]
+  (fl-resp-status 404 "missing"))
+(fl-http-route "POST" "/inspect" raw-request)
+(fl-http-route "GET" "/inspect" raw-request)
+(fl-http-route "POST" "/measure" measure-request)
+(fl-http-route "GET" "/slow" slow-request)
+(fl-http-route "GET" "/missing" not-found)
+(fl-http-start 0)

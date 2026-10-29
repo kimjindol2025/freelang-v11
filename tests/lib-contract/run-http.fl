@@ -1,0 +1,74 @@
+;; Native HTTP supervisor; shell owns only child lifetime and readiness waiting.
+(load "../../lib/test/test.fl")
+(load "../../lib/evidence/evidence.fl")
+(defn runner-check [condition message]
+  (let [[summary (test-run [{"name" message "run" (fn [] (assert-true condition message))}])]]
+    (if (= (get summary "failed") 0) true (throw message))))
+(defn run [command args]
+  (evidence-run "timeout" (concat ["--kill-after=2s" "60s" command] args)))
+(defn success [command args]
+  (let [[r (run command args)]]
+    (if (= (get r "code") 0) (get r "stdout")
+      (throw (str (get r "stdout") (get r "stderr"))))))
+(defn options [args i result]
+  (if (>= i (length args)) result
+    (if (and (includes-item ["--root" "--compiler"] (get args i)) (< (+ i 1) (length args)))
+      (options args (+ i 2) (assoc result (get args i) (get args (+ i 1))))
+      (throw "Usage: run-http [--root PATH] [--compiler PATH]"))))
+(define units ["core" "collection" "io" "math" "error" "process" "json" "db" "http_server" "cgc-bridge"])
+(defn compile-one [root compiler work name source]
+  (let [[r (run "sh" ["-c" "cd \"$1\" || exit 125; shift; exec \"$@\"" "runner" root compiler
+          (str root "/tests/lib-contract/" source) (str work "/" name ".c")])]
+        [text (str (get r "stdout") (get r "stderr"))]]
+    (runner-check (and (= (get r "code") 0) (not (str-includes text "[load]"))
+      (not (str-includes text "[CGC-ERR]"))) text)
+    (success "gcc" (concat ["-Wno-unused" "-I" (str root "/runtime") (str work "/" name ".c")]
+      (concat (map (fn [unit] (str root "/runtime/" unit ".c")) units)
+        ["-lm" "-lsqlite3" "-o" (str work "/" name)])))))
+(defn session [args]
+  (let [[work (get args 1)] [refused (get args 2)] [pid (str-to-num (get args 3))]
+        [line (str-trim (_fl_file_read (str work "/server.out")))]]
+    (runner-check (str-starts-with line "HTTP_LISTENING=127.0.0.1:") "FreeLang HTTP server failed to bind")
+    (println "HTTP_LISTENING=127.0.0.1:<가림>")
+    (let [[port (get (_fl_str_split line ":") 1)]
+          [r (evidence-run "timeout" ["--kill-after=2s" "20s" (str work "/client")
+            (str "http://127.0.0.1:" port) (str "http://127.0.0.1:" refused)])]
+          ;; kill(pid, 0) also succeeds for zombies; match Popen.poll(), not
+          ;; merely PID existence, by checking the actual process state.
+          [state (run "ps" ["-o" "stat=" "-p" (str pid)])]
+          [alive (and (= (get state "code") 0)
+            (not (= (str-trim (get state "stdout")) ""))
+            (not (str-starts-with (str-trim (get state "stdout")) "Z"))
+            (_fl_process_exists pid))]]
+      (print (get r "stdout")) (print (get r "stderr"))
+      (println (str "HTTP_EXIT=" (get r "code")))
+      (println (str "SERVER_ALIVE=" (if alive "True" "False")))
+      (runner-check (and (= (get r "code") 0)
+        (= (- (length (_fl_str_split (get r "stdout") "PASS ")) 1) 26)) "HTTP client contract")
+      (runner-check alive "server died after client timeout"))))
+(defn supervise [root compiler work]
+  (compile-one root compiler work "client" "http.test.fl")
+  (compile-one root compiler work "server" "http-server.fl")
+  (let [[guard (tcp-bind "127.0.0.1" 0)]]
+    (runner-check (number? guard) "bind-only guard")
+    (try
+      (let [[self (str-trim (success "readlink" [(str "/proc/" (_fl_process_pid) "/exe")]))]
+            [r (run "sh" ["-c"
+              "work=$1; runner=$2; refused=$3; \"$work/server\" >\"$work/server.out\" 2>\"$work/server.err\" & pid=$!; trap 'kill \"$pid\" 2>/dev/null; wait \"$pid\" 2>/dev/null' EXIT; trap 'exit 124' TERM INT; timeout 5 sh -c 'while ! test -s \"$1/server.out\"; do kill -0 \"$2\" || exit 1; sleep 0.01; done' ready \"$work\" \"$pid\" || exit 1; \"$runner\" --session \"$work\" \"$refused\" \"$pid\"; result=$?; exit \"$result\""
+              "http-supervisor" work self (str (tcp-local-port guard))])]]
+        (tcp-close guard)
+        (print (get r "stdout"))
+        (runner-check (= (get r "code") 0) (str "HTTP session: " (get r "stderr"))))
+      (catch e (do (tcp-close guard) (throw e))))))
+(try
+  (if (= (get (cli-args) 0) "--session") (session (cli-args))
+    (let [[opts (options (cli-args) 0 {})]
+          [root (str-trim (success "realpath" [(if (get opts "--root") (get opts "--root")
+            (str-trim (success "git" ["rev-parse" "--show-toplevel"])))]))]
+          [compiler (str-trim (success "realpath" [(if (get opts "--compiler") (get opts "--compiler")
+            (if (_fl_env_get "FREELANG_HTTP_CGC") (_fl_env_get "FREELANG_HTTP_CGC")
+              (str root "/../freelang-tools/scripts/cgc-native")))]))]
+          [work (str-trim (success "mktemp" ["-d" "/tmp/fl-http-test-XXXXXXXX"]))]]
+      (try (do (supervise root compiler work) (success "rm" ["-r" "--" work]) nil)
+        (catch e (do (success "rm" ["-r" "--" work]) (throw e))))))
+  (catch e (do (println (str "RUNNER_ERROR: " e)) (_fl_exit 1))))

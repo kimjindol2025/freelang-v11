@@ -1,0 +1,91 @@
+;; Native contract supervisor. Run from the repository or pass --root.
+;; Usage: runner --compiler /absolute/compiler [--root /absolute/repository]
+(load "../../lib/test/test.fl")
+(load "../../lib/evidence/evidence.fl")
+(defn runner-options [args index options]
+  (if (>= index (length args)) options
+    (let [[key (get args index)]]
+      (if (and (includes-item ["--compiler" "--root"] key) (< (+ index 1) (length args)))
+        (runner-options args (+ index 2) (assoc options key (get args (+ index 1))))
+        (throw "Usage: runner --compiler PATH [--root PATH]")))))
+(defn runner-check [condition message]
+  (let [[summary (test-run [{"name" message "run" (fn [] (assert-true condition message))}])]]
+    (if (= (get summary "failed") 0) true (throw message))))
+(defn runner-command [command args]
+  (evidence-run "timeout" (concat ["--kill-after=5s" "60s" command] args)))
+(defn runner-success [command args]
+  (let [[result (runner-command command args)]]
+    (if (= (get result "code") 0) (get result "stdout")
+      (throw (str command ": " (get result "stdout") (get result "stderr"))))))
+(defn runner-absolute [path]
+  (str-trim (runner-success "realpath" ["--" path])))
+(defn runner-in [work command args]
+  ;; Only this fixed script goes through the shell; all user paths stay in argv.
+  (runner-command "sh" (concat ["-c" "cd \"$1\" || exit 125; shift; exec \"$@\"" "runner" work command] args)))
+(define runner-units ["core" "collection" "io" "math" "error" "process" "json" "db" "http_server" "cgc-bridge"])
+(defn fs-build [root compiler work source name]
+  (let [[compiled (runner-in work compiler [(str root "/tests/lib-contract/" source) (str work "/" name ".c")])]
+        [diagnostics (str (get compiled "stdout") (get compiled "stderr"))]]
+    (runner-check (and (= (get compiled "code") 0) (not (str-includes diagnostics "[load]"))
+      (not (str-includes diagnostics "[CGC-ERR]"))) diagnostics)
+    (let [[linked (runner-command "gcc" (concat (if (= name "fs") ["-Wall" "-Wextra"] [])
+            (concat ["-Wno-unused" "-I" (str root "/runtime") (str work "/" name ".c")]
+              (concat (map (fn [unit] (str root "/runtime/" unit ".c")) runner-units)
+                ["-lm" "-lsqlite3" "-o" (str work "/" name)]))))]]
+      (print (get linked "stdout"))
+      (runner-check (get (file-write (str work "/link.stderr") (get linked "stderr")) "ok") "cannot preserve link stderr")
+      ;; process-run captures stdout and inherits stderr. This path comes only
+      ;; from mktemp's fixed template, never from an argument supplied by a user.
+      (process-run (str "cat \"" work "/link.stderr\" >&2"))
+      (runner-check (= (get linked "code") 0) "gcc failed"))))
+(defn fs-cleanup [work]
+  (runner-success "sh" ["-c" "set -eu; if test -d \"$1/fixtures/locked\"; then chmod 755 \"$1/fixtures/locked\"; fi; if test -f \"$1/fixtures/denied\"; then chmod 600 \"$1/fixtures/denied\"; fi" "cleanup" work])
+  (runner-success "rm" ["-r" "--" work]))
+(defn fs-no-leaks [fixtures]
+  (runner-check (= (runner-success "find" [fixtures "-name" "*.fs-*" "-print"]) "") "atomic temp leaked"))
+(defn fs-in [work command args]
+  (evidence-run "timeout" (concat ["--kill-after=5s" "30s" "sh" "-c"
+    "cd \"$1\" || exit 125; shift; exec \"$@\"" "runner" work command] args)))
+(defn fs-contract [root compiler]
+  (let [[work (str-trim (runner-success "mktemp" ["-d" "/tmp/fl-fs-test-XXXXXXXX"]))]
+        [fixtures (str work "/fixtures")]]
+    (try
+      (do
+        (fs-build root compiler work "fs.test.fl" "fs")
+        (fs-build root compiler work "fs-atomic-failure.test.fl" "atomic")
+        (runner-success "sh" ["-c"
+          "set -eu; mkdir -p \"$1/locked\"; head -c 1048577 /dev/zero | tr '\\000' x > \"$1/large\"; printf denied > \"$1/denied\"; printf old > \"$1/locked/target\"; ln -s \"$1\" \"$1/loop\"; chmod 0 \"$1/denied\"; chmod 555 \"$1/locked\""
+          "fixture" fixtures])
+        (let [[root-user (= (str-trim (runner-success "id" ["-u"])) "0")]]
+          (if root-user (runner-success "chown" ["nobody" work fixtures (str fixtures "/locked")
+            (str fixtures "/large") (str fixtures "/locked/target")]) nil)
+          (let [[result (if root-user
+                  (fs-in work "setpriv" ["--reuid=nobody" (str "--regid=" (str-trim (runner-success "id" ["-g" "nobody"]))) "--clear-groups" (str work "/fs") fixtures])
+                  (fs-in work (str work "/fs") [fixtures]))]
+                [passes (length (filter (fn [line] (str-starts-with line "PASS ")) (_fl_str_split (get result "stdout") "\n")))]]
+            (print (get result "stdout")) (print (get result "stderr"))
+            (println (str "FS_EXIT=" (get result "code")))
+            (runner-check (and (= (get result "code") 0) (>= passes 25)
+              (str-includes (get result "stdout") (str "FS_SUMMARY=" passes "/" passes))) "FreeLang FS checks failed")))
+        (fs-no-leaks fixtures)
+        (println "FS_ATOMIC_TEMP_LEAKS=0")
+        (runner-check (= (runner-success "cat" [(str fixtures "/locked/target")]) "old") "original changed")
+        (println "FS_ORIGINAL_PRESERVED=true")
+        (runner-success "sh" ["-c" "printf old > \"$1/atomic-target\"" "fixture" fixtures])
+        (let [[atomic (fs-in work "sh" ["-c" "trap '' XFSZ; exec prlimit --fsize=1024:1024 -- \"$1\" \"$2\"" "atomic" (str work "/atomic") fixtures])]]
+          (print (get atomic "stdout")) (print (get atomic "stderr"))
+          (println (str "FS_ATOMIC_EXIT=" (get atomic "code")))
+          (runner-check (and (= (get atomic "code") 0)
+            (= (length (filter (fn [line] (str-starts-with line "PASS ")) (_fl_str_split (get atomic "stdout") "\n"))) 4)) "atomic failure checks failed"))
+        (fs-no-leaks fixtures)
+        (println "FS_PARTIAL_WRITE_TEMP_LEAKS=0")
+        (fs-cleanup work))
+      (catch error (do (fs-cleanup work) (throw error))))))
+(try
+  (let [[options (runner-options (cli-args) 0 {})]
+        [root (runner-absolute (if (get options "--root") (get options "--root")
+          (str-trim (runner-success "git" ["rev-parse" "--show-toplevel"]))))]
+        [compiler-path (if (get options "--compiler") (get options "--compiler")
+          (str root "/../freelang-tools/scripts/cgc-native"))]]
+    (fs-contract root (runner-absolute compiler-path)))
+  (catch error (do (println (str "RUNNER_ERROR: " error)) (_fl_exit 1))))

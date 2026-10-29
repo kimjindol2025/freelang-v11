@@ -1,0 +1,2 @@
+(println (reduce + 0 [1 2 3]))
+(println (reduce str "" [1 2 3]))

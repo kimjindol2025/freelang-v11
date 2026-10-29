@@ -1,0 +1,1 @@
+(println (get (map (fn [[$key $value]] (str $key ":" $value)) [["a" 1]]) 0))

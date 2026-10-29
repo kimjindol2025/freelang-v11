@@ -1,0 +1,125 @@
+(load "../../self/stdlib/json.fl")
+
+(defn http-error [code message]
+  {"ok" false "error" {"code" code "message" message}})
+(defn http-option [opts key fallback]
+  (let [[value (get opts key)]] (if (= value nil) fallback value)))
+(defn http-control? [text index]
+  (if (>= index (length text)) false
+    (let [[code (char-code-at text index)]]
+      (if (or (<= code 32) (= code 127)) true (http-control? text (+ index 1))))))
+(defn http-token? [text index]
+  (if (>= index (length text)) (> index 0)
+    (let [[code (char-code-at text index)]]
+      (if (or (and (>= code 65) (<= code 90))
+              (or (and (>= code 97) (<= code 122))
+                  (or (and (>= code 48) (<= code 57))
+                      (>= (_fl_str_index_of "!#$%&'*+-.^_`|~" (substring text index (+ index 1))) 0))))
+        (http-token? text (+ index 1)) false))))
+(defn http-digits? [text index]
+  (if (>= index (length text)) (> index 0)
+    (let [[code (char-code-at text index)]]
+      (if (and (>= code 48) (<= code 57)) (http-digits? text (+ index 1)) false))))
+(defn http-url [url]
+  (if (not (string? url)) (http-error "INVALID_URL" "URL must be a string")
+    (if (str-starts-with url "https://") (http-error "HTTPS_UNSUPPORTED" "HTTPS 미지원")
+      (if (or (not (str-starts-with url "http://")) (http-control? url 0))
+        (http-error "INVALID_URL" "expected HTTP URL without spaces or controls")
+        (let [[rest (substring url 7 (length url))]
+              [slash (_fl_str_index_of rest "/")]
+              [query (_fl_str_index_of rest "?")]
+              [slash-end (if (< slash 0) (length rest) slash)]
+              [end (if (and (>= query 0) (< query slash-end)) query slash-end)]
+              [authority (substring rest 0 end)]
+              [tail (substring rest end (length rest))]
+              [path (if (= tail "") "/" (if (str-starts-with tail "?") (str "/" tail) tail))]
+              [parts (_fl_str_split authority ":")]
+              [host (get parts 0)]
+              [port-text (if (= (length parts) 1) "80" (get parts 1))]]
+          (if (or (= host "") (or (> (length parts) 2)
+              (or (>= (_fl_str_index_of authority "@") 0)
+              (or (>= (_fl_str_index_of url "#") 0) (not (http-digits? port-text 0))))))
+            (http-error "INVALID_URL" "invalid host, port or fragment")
+            (let [[port (str-to-num port-text)]]
+              (if (or (= port nil) (or (< port 1) (> port 65535)))
+                (http-error "INVALID_URL" "port out of range")
+                {"ok" true "host" host "port" port "authority" authority "path" path}))))))))
+(defn http-header-wire [headers names index wire]
+  (if (>= index (length names)) {"ok" true "value" wire}
+    (let [[name (get names index)] [value (get headers name)]]
+      (if (or (not (string? name)) (not (string? value)))
+        (http-error "INVALID_REQUEST" "headers must be strings")
+        (let [[lower (str-lower name)]]
+          (if (or (not (http-token? name 0))
+                  (or (>= (_fl_str_index_of value "\r") 0) (>= (_fl_str_index_of value "\n") 0)))
+            (http-error "INVALID_REQUEST" "invalid header")
+            (if (or (= lower "host") (or (= lower "connection")
+                  (or (= lower "content-length") (= lower "transfer-encoding"))))
+              (http-error "INVALID_REQUEST" "framing headers are managed by client")
+              (http-header-wire headers names (+ index 1) (str wire name ": " value "\r\n")))))))))
+(defn http-parse-headers [lines index headers]
+  (if (>= index (length lines)) {"ok" true "value" headers}
+    (let [[line (get lines index)] [colon (_fl_str_index_of line ":")]]
+      (if (<= colon 0) (http-error "HTTP_PROTOCOL" "malformed response header")
+        (http-parse-headers lines (+ index 1)
+          (assoc headers (str-lower (substring line 0 colon))
+            (_fl_str_trim (substring line (+ colon 1) (length line)))))))))
+(defn http-response [method raw]
+  (let [[boundary (_fl_str_index_of raw "\r\n\r\n")]]
+    (if (< boundary 0) (http-error "HTTP_PROTOCOL" "missing response headers")
+      (let [[lines (_fl_str_split (substring raw 0 boundary) "\r\n")]
+            [status-line (_fl_str_split (get lines 0) " ")]
+            [status-text (get status-line 1)]
+            [parsed (http-parse-headers lines 1 {})]
+            [body (substring raw (+ boundary 4) (length raw))]]
+        (if (or (not (string? status-text)) (not (get parsed "ok")))
+          (http-error "HTTP_PROTOCOL" "invalid response")
+          (if (or (not (http-digits? status-text 0)) (!= (length status-text) 3))
+            (http-error "HTTP_PROTOCOL" "invalid status")
+            (let [[status (str-to-num status-text)] [headers (get parsed "value")]
+                  [size (get headers "content-length")]]
+              (if (or (< status 100) (> status 599)) (http-error "HTTP_PROTOCOL" "invalid status")
+                (if (!= (get headers "transfer-encoding") nil)
+                  (http-error "HTTP_PROTOCOL" "transfer encoding unsupported in v0.1")
+                  (if (and (!= method "HEAD") (and (!= size nil)
+                        (or (not (http-digits? size 0)) (!= (str-to-num size) (length body)))))
+                    (http-error "HTTP_PROTOCOL" "content length mismatch")
+                    {"ok" (and (>= status 200) (< status 300)) "status" status
+                     "headers" headers "body" (if (= method "HEAD") "" body)}))))))))))
+(defn http-request [method url headers body opts]
+  (if (or (not (string? method)) (or (not (string? body))
+          (or (not (map? headers)) (not (map? opts)))))
+    (http-error "INVALID_REQUEST" "expected method, URL, headers, body, options")
+    (if (not (http-token? method 0)) (http-error "INVALID_REQUEST" "invalid method")
+      (let [[target (http-url url)] [timeout (http-option opts "timeout-ms" 5000)]
+            [request-limit (http-option opts "max-request-bytes" 1048576)]
+            [response-limit (http-option opts "max-response-bytes" 1048576)]]
+        (if (not (get target "ok")) target
+          (if (or (not (number? timeout)) (or (not (number? request-limit)) (not (number? response-limit))))
+            (http-error "INVALID_OPTIONS" "numeric limits required")
+            (if (or (< timeout 1) (or (> timeout 60000)
+                  (or (!= timeout (floor timeout))
+                  (or (< request-limit 1) (or (> request-limit 16777216)
+                  (or (!= request-limit (floor request-limit))
+                  (or (< response-limit 1) (or (> response-limit 16777216)
+                      (!= response-limit (floor response-limit))))))))))
+              (http-error "INVALID_OPTIONS" "limits out of range")
+              (let [[extra (http-header-wire headers (keys headers) 0 "")]]
+                (if (not (get extra "ok")) extra
+                  (let [[wire (str method " " (get target "path") " HTTP/1.0\r\nHost: "
+                          (get target "authority") "\r\nConnection: close\r\nContent-Length: "
+                          (length body) "\r\n" (get extra "value") "\r\n" body)]]
+                    (if (> (length wire) request-limit)
+                      (http-error "REQUEST_TOO_LARGE" "request byte limit exceeded")
+                      (let [[raw (_fl_http_exchange (get target "host") (get target "port") wire timeout response-limit)]]
+                        (if (get raw "ok") (http-response method (get raw "value")) raw)))))))))))))
+(defn http-get [url] (http-request "GET" url {} "" {}))
+(defn http-post [url body] (http-request "POST" url {} body {}))
+(defn http-json [method url value opts]
+  (let [[encoded (json-stringify value)]]
+    (if (not (get encoded "ok")) encoded
+      (let [[response (http-request method url {"Content-Type" "application/json"}
+                      (if (= method "GET") "" (get encoded "value")) opts)]]
+        (if (= (get response "status") nil) response
+          (let [[decoded (json-parse (get response "body"))]]
+            (if (get decoded "ok") (assoc response "body" (get decoded "value")) decoded)))))))

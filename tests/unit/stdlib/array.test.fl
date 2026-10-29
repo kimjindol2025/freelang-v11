@@ -1,7 +1,8 @@
 ;; tests/unit/stdlib/array.test.fl — Array Library Unit Tests
-;; 13개 테스트 (배열 함수)
+;; 16개 assertion (배열 함수)
 
 (load "../../lib/assert.fl")
+(load "../../../stdlib/native-compat.fl")
 
 (test-section "Array Tests")
 
@@ -20,7 +21,11 @@
 (assert-eq (push [1 2] 3) [1 2 3] "push")
 (assert-eq (reverse [1 2 3]) [3 2 1] "reverse")
 (assert-eq (take 2 [1 2 3 4]) [1 2] "take")
+(assert-eq (take 2 []) [] "take empty")
+(assert-eq (take 0 [1 2]) [] "take zero")
 (assert-eq (drop 2 [1 2 3 4]) [3 4] "drop")
+(assert-eq (drop 2 []) [] "drop empty")
+(assert-eq (drop 9 [1 2]) [] "drop past end")
 
 ;; 범위
 (assert-eq (range 3) [0 1 2] "range n")

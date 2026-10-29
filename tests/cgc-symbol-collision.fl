@@ -1,0 +1,2 @@
+(defn store/define [] 1)
+(defn store__define [] 2)

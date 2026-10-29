@@ -1,0 +1,43 @@
+(defn check [condition name]
+  (if condition (println (str "PASS " name)) (throw (str "FAIL " name))))
+(define base (get (cli-args) 0))
+(define refused (get (cli-args) 1))
+(define host (substring base 7 (length base)))
+(let [[post (http-post (str base "/inspect") "body")]
+      [post-raw (str "POST /inspect HTTP/1.0\r\nHost: " host
+        "\r\nConnection: close\r\nContent-Length: 4\r\n\r\nbody")]]
+  (check (and (= (get post "status") 200) (get post "ok")) "POST status")
+  (check (= (get post "body") post-raw) "POST exact request echo")
+  (println "RAW_POST_BEGIN") (print (get post "body")) (println "") (println "RAW_POST_END"))
+(let [[get-response (http-get-headers (str base "/inspect") {"X-Probe" "yes"})]
+      [get-raw (str "GET /inspect HTTP/1.0\r\nHost: " host
+        "\r\nConnection: close\r\nContent-Length: 0\r\nX-Probe: yes\r\n\r\n")]]
+  (check (= (get get-response "body") get-raw) "GET user header")
+  (println "RAW_HEADER_BEGIN") (print (get get-response "body")) (println "RAW_HEADER_END"))
+(let [[post-response (http-post-headers (str base "/inspect") {"X-Probe" "post"} "hey")]
+      [expected (str "POST /inspect HTTP/1.0\r\nHost: " host
+        "\r\nConnection: close\r\nContent-Length: 3\r\nX-Probe: post\r\n\r\nhey")]]
+  (check (= (get post-response "body") expected) "POST user header"))
+(let [[empty-response (http-post (str base "/measure") "")]]
+  (check (= (get empty-response "body") "CL=0;RX=0") "empty POST body"))
+(let [[large-body (str-repeat "x" 1048576)]
+      [large-response (http-post (str base "/measure") large-body)]]
+  (check (= (get large-response "body") "CL=1048576;RX=1048576") "one megabyte Content-Length"))
+(let [[bad-header (http-post-headers (str base "/inspect") {"X-Probe" "bad\r\nInjected: yes"} "x")]]
+  (check (= (get (get bad-header "error") "code") "INVALID_REQUEST") "CRLF header rejected"))
+(let [[reserved (http-get-headers (str base "/inspect") {"Content-Length" "99"})]]
+  (check (= (get (get reserved "error") "code") "INVALID_REQUEST") "reserved header rejected"))
+(let [[closed (http-get-headers refused {})]]
+  (check (= (get (get closed "error") "code") "CONNECT") "closed port refused"))
+(let [[slow (http-get-headers (str base "/slow") {})]]
+  (check (= (get (get slow "error") "code") "TIMEOUT") "response timeout"))
+(let [[invalid (http-post "https://127.0.0.1/" "body")]]
+  (check (= (get (get invalid "error") "code") "INVALID_URL") "invalid URL rejected"))
+(let [[invalid-header (http-get-headers (str base "/inspect") {"Bad Header" "x"})]]
+  (check (= (get (get invalid-header "error") "code") "INVALID_REQUEST") "invalid header name rejected"))
+(let [[not-found (http-get-headers (str base "/missing") {})]]
+  (check (and (= (get not-found "status") 404) (= (get not-found "ok") false)) "non-2xx status preserved")
+  (check (= (get not-found "body") "missing") "non-2xx response body preserved"))
+(loop [i 0]
+  (if (>= i 1000) nil
+    (do (println (str "UUID=" (uuid))) (recur (+ i 1)))))

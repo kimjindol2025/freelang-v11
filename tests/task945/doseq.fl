@@ -1,0 +1,4 @@
+(define total (atom 0))
+(doseq [item [1 2 3]]
+  (swap! total + item))
+(println (deref total))

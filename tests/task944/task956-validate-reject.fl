@@ -1,0 +1,6 @@
+(try
+  (validate_range 6 1 5 "value")
+  (catch [err] (println "RANGE_REJECTED")))
+(try
+  (validate_length "x" 2 5 "name")
+  (catch [err] (println "LENGTH_REJECTED")))

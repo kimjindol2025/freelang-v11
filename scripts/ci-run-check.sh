@@ -45,7 +45,7 @@ set -e
 end_epoch=$(date +%s)
 echo "CI_CHECK_END name=${name} utc=$(date -u +%Y-%m-%dT%H:%M:%SZ) exit_code=${status} duration_seconds=$((end_epoch - start_epoch))" | tee -a "$log_file"
 
-writer=(node scripts/ci-write-result.js --name "$name" --output-dir "$output_dir" --exit-code "$status")
+writer=(bash scripts/ci-write-result.sh --name "$name" --output-dir "$output_dir" --exit-code "$status")
 if [[ -n "$source_json" ]]; then writer+=(--source-json "$source_json"); fi
 "${writer[@]}"
 exit "$status"

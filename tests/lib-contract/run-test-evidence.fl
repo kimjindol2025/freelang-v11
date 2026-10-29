@@ -1,0 +1,64 @@
+;; Native contract supervisor. Run from the repository or pass --root.
+;; Usage: runner --compiler /absolute/compiler [--root /absolute/repository]
+(load "../../lib/test/test.fl")
+(load "../../lib/evidence/evidence.fl")
+(defn runner-options [args index options]
+  (if (>= index (length args)) options
+    (let [[key (get args index)]]
+      (if (and (includes-item ["--compiler" "--root"] key) (< (+ index 1) (length args)))
+        (runner-options args (+ index 2) (assoc options key (get args (+ index 1))))
+        (throw "Usage: runner --compiler PATH [--root PATH]")))))
+(defn runner-check [condition message]
+  (let [[summary (test-run [{"name" message "run" (fn [] (assert-true condition message))}])]]
+    (if (= (get summary "failed") 0) true (throw message))))
+(defn runner-command [command args]
+  (evidence-run "timeout" (concat ["--kill-after=5s" "60s" command] args)))
+(defn runner-success [command args]
+  (let [[result (runner-command command args)]]
+    (if (= (get result "code") 0) (get result "stdout")
+      (throw (str command ": " (get result "stdout") (get result "stderr"))))))
+(defn runner-absolute [path]
+  (str-trim (runner-success "realpath" ["--" path])))
+(defn runner-in [work command args]
+  ;; Only this fixed script goes through the shell; all user paths stay in argv.
+  (runner-command "sh" (concat ["-c" "cd \"$1\" || exit 125; shift; exec \"$@\"" "runner" work command] args)))
+(define runner-units ["core" "collection" "io" "math" "error" "process" "json" "db" "http_server" "cgc-bridge"])
+(defn runner-case [root compiler name expected summary]
+  (let [[work (str-trim (runner-success "mktemp" ["-d" "/tmp/fl-test-evidence-XXXXXXXX"]))]]
+    (try
+      (let [[compiled (runner-in work compiler [(str root "/tests/lib-contract/" name ".test.fl") (str work "/out.c")])]
+            [diagnostics (str (get compiled "stdout") (get compiled "stderr"))]]
+        (runner-check (and (= (get compiled "code") 0)
+          (not (str-includes diagnostics "[CGC-ERR]"))
+          (not (str-includes diagnostics "[load] 파일 없음"))) diagnostics)
+        (runner-success "gcc" (concat ["-I" (str root "/runtime") "-o" (str work "/test") (str work "/out.c")]
+          (concat (map (fn [unit] (str root "/runtime/" unit ".c")) runner-units) ["-lm" "-lsqlite3"])))
+        (let [[result (runner-in work (str work "/test") [])]]
+          (print (get result "stdout"))
+          (println (str name ": EXIT=" (get result "code")))
+          (runner-check (and (= (get result "code") expected)
+            (includes-item (_fl_str_split (get result "stdout") "\n") summary))
+            (str name ": " (get result "stderr")))
+          (if (= name "test-report-fail")
+            (runner-check (str-includes (get result "stdout") "FAIL deliberate expected=1 actual=2") "Missing failure details") nil)
+          (if (= name "test-evidence")
+            (let [[hash (runner-in work "sha256sum" ["--" "hash-input.txt"])]]
+              (runner-check (and (= (get hash "code") 0)
+                (= (get (_fl_str_split (get hash "stdout") " ") 0)
+                  "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"))
+                "Independent sha256sum mismatch")) nil))
+        (runner-success "rm" ["-r" "--" work]))
+      (catch error
+        (do (runner-success "rm" ["-r" "--" work]) (throw error))))))
+(try
+  (let [[options (runner-options (cli-args) 0 {})]
+        [compiler-path (get options "--compiler")]]
+    (runner-check (string? compiler-path) "--compiler is required")
+    (let [[compiler (runner-absolute compiler-path)]
+          [root (runner-absolute (if (get options "--root") (get options "--root")
+            (str-trim (runner-success "git" ["rev-parse" "--show-toplevel"]))))]]
+      (runner-case root compiler "test-evidence" 0 "TEST_EVIDENCE_SUMMARY=53/53")
+      (runner-case root compiler "test-report-pass" 0 "PASS 1/1")
+      (runner-case root compiler "test-report-fail" 1 "PASS 0/1")
+      (println "TEST_EVIDENCE_CONTRACT_EXIT=0")))
+  (catch error (do (println (str "RUNNER_ERROR: " error)) (_fl_exit 1))))

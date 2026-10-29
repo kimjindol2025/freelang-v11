@@ -166,12 +166,12 @@
         (respond-ok $req {"deleted" 1})))
     (unauthorized $req)))
 
-(server-get "/health" "handle-health")
-(server-get "/api/items" "handle-list")
-(server-get "/api/items/:id" "handle-get")
-(server-post "/api/items" "handle-create")
-(server-put "/api/items/:id" "handle-update")
-(server-delete "/api/items/:id" "handle-delete")
+(server-get "/health" (fn [$req] (handle-health $req)))
+(server-get "/api/items" (fn [$req] (handle-list $req)))
+(server-get "/api/items/:id" (fn [$req] (handle-get $req)))
+(server-post "/api/items" (fn [$req] (handle-create $req)))
+(server-put "/api/items/:id" (fn [$req] (handle-update $req)))
+(server-delete "/api/items/:id" (fn [$req] (handle-delete $req)))
 
 (server-body-limit 4096)
 (server-rate-limit 100 60000)

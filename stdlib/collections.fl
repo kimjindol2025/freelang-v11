@@ -1,0 +1,33 @@
+;; Public collection operations. Map updates preserve their inputs and key order.
+(load "native-compat.fl")
+
+(defn values-loop [items names index result]
+  (if (>= index (length names)) result
+    (values-loop items names (+ index 1)
+      (push result (get items (get names index))))))
+
+(defn values [items]
+  (if (map? items) (values-loop items (keys items) 0 []) []))
+
+(defn has-key-loop [names key index]
+  (if (>= index (length names)) false
+    (if (= (get names index) key) true
+      (has-key-loop names key (+ index 1)))))
+
+(defn has-key? [items key]
+  (if (map? items) (has-key-loop (keys items) key 0) false))
+
+(defn map-set [items key value]
+  (if (map? items) (assoc items key value) {}))
+
+(defn map-delete [items key]
+  (if (map? items) (dissoc items key) {}))
+
+(defn merge-loop [result items names index]
+  (if (>= index (length names)) result
+    (let [[key (get names index)]]
+      (merge-loop (map-set result key (get items key)) items names (+ index 1)))))
+
+(defn merge [left right]
+  (let [[result (if (map? left) left {})]]
+    (if (map? right) (merge-loop result right (keys right) 0) result)))

@@ -1,0 +1,3 @@
+(defn apply-one [f x]
+  (map (fn [item] (f item)) [x]))
+(println (get (apply-one (fn [n] (+ n 1)) 4) 0))

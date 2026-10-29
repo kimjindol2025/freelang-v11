@@ -140,35 +140,21 @@ describe("FreeLang v11 self-hosting", () => {
   );
 });
 
-// Phase C-4: 전체 verify-self-host.sh 를 Jest 에서 실행해 결과 집계 검증.
-// bash 스크립트 1 회 실행 = 전 파이프라인 (91 케이스) 검증.
-// fast config 에서 과도하게 오래 걸리지 않도록 별도 describe + 90s timeout.
-describe("FreeLang v11 full verify-self-host harness", () => {
+// The legacy JS suite is retired; the supported gate is the native stage 2-4 proof.
+describe("FreeLang v11 native fixed-point harness", () => {
   test(
-    "scripts/verify-self-host.sh tier2 → PASS 91 / FAIL 0 / SKIP 0",
+    "scripts/verify-self-host.sh routes to the native fixed-point proof",
     () => {
       const script = join(REPO_ROOT, "scripts", "verify-self-host.sh");
       const out = execSync(`bash ${JSON.stringify(script)} tier2`, {
         cwd: REPO_ROOT,
         encoding: "utf8",
-        timeout: 300_000,
+        timeout: 120_000,
       });
-      // 필수 섹션 존재 확인
-      expect(out).toContain("결정론 OK");
-      expect(out).toContain("fixed-point OK (5 단계 전원 일치)");
-      // 결과 수치
-      const passMatch = out.match(/^PASS:\s*(\d+)/m);
-      const failMatch = out.match(/^FAIL:\s*(\d+)/m);
-      const skipMatch = out.match(/^SKIP:\s*(\d+)/m);
-      expect(passMatch).not.toBeNull();
-      expect(failMatch).not.toBeNull();
-      expect(skipMatch).not.toBeNull();
-      // PASS는 task 추가에 따라 75 이상 (v11.3.4 이후 기준)
-      expect(Number(passMatch![1])).toBeGreaterThanOrEqual(75);
-      expect(Number(failMatch![1])).toBeLessThanOrEqual(15);
-      // SKIP: KNOWN_STAGE1_CODEGEN_GAP 분류된 advisory (mongodb/binary 등)
-      expect(Number(skipMatch![1])).toBeLessThanOrEqual(10);
+      expect(out).toContain("NATIVE_FIXED_POINT=PASS");
+      expect(out).toContain("CMP_2_3=0");
+      expect(out).toContain("CMP_3_4=0");
     },
-    300_000
+    120_000
   );
 });

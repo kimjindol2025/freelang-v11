@@ -1,0 +1,50 @@
+;; SQLite CRUD helpers over the native handle/path database primitives.
+(defn db_identifier [value]
+  (str "\"" (str-replace value "\"" "\"\"") "\""))
+
+(defn db_query [database sql params]
+  (db-query database sql params))
+
+(defn db_execute [database sql params]
+  (db-exec database sql params))
+
+(defn db_create [database sql]
+  (db_execute database sql []))
+
+(defn db_insert [database table data]
+  (let [columns (keys data)]
+    (if (= (length columns) 0)
+      (db_execute database (str "INSERT INTO " (db_identifier table) " DEFAULT VALUES") [])
+      (db_execute database
+        (str "INSERT INTO " (db_identifier table) " ("
+          (str-join (map db_identifier columns) ", ") ") VALUES ("
+          (str-join (map (fn [column] "?") columns) ", ") ")")
+        (map (fn [column] (get data column)) columns)))))
+
+(defn db_where [where]
+  (let [columns (keys where)]
+    {:sql (if (= (length columns) 0) "" (str " WHERE "
+      (str-join (map (fn [column] (str (db_identifier column) " = ?")) columns) " AND ")))
+     :params (map (fn [column] (get where column)) columns)}))
+
+(defn db_update [database table data where]
+  (let [columns (keys data) condition (db_where where)]
+    (if (or (= (length columns) 0) (= (length (keys where)) 0))
+      0
+      (db_execute database
+        (str "UPDATE " (db_identifier table) " SET "
+          (str-join (map (fn [column] (str (db_identifier column) " = ?")) columns) ", ")
+          (get condition :sql))
+        (concat (map (fn [column] (get data column)) columns) (get condition :params))))))
+
+(defn db_delete_row [database table where]
+  (let [condition (db_where where)]
+    (if (= (length (keys where)) 0)
+      0
+      (db_execute database
+        (str "DELETE FROM " (db_identifier table) (get condition :sql))
+        (get condition :params))))
+
+(defn db_count [database table]
+  (let [rows (db_query database (str "SELECT COUNT(*) AS count FROM " (db_identifier table)) [])]
+    (get (first rows) "count")))

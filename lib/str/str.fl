@@ -1,0 +1,113 @@
+(load "../unicode/unicode.fl")
+(defn st-ok [v] {"ok" true "value" v})
+(defn st-error [code] {"ok" false "error" {"code" code "message" code}})
+(defn st-text [xs] (get (utf8-encode-list xs 0 "") "value"))
+(defn st-at? [xs needle i]
+  (and (>= i 0) (<= (+ i (length needle)) (length xs))
+    (= (slice xs i (+ i (length needle))) needle)))
+(defn st-index [xs needle i]
+  (if (> (+ i (length needle)) (length xs)) -1
+    (if (st-at? xs needle i) i (st-index xs needle (+ i 1)))))
+(defn st-pair [a b]
+  (let [[x (utf8-decode a)] [y (utf8-decode b)]]
+    (if (not (get x "ok")) x (if (not (get y "ok")) y
+      (st-ok [(get x "value") (get y "value")])))))
+(defn st-split [xs sep i start acc]
+  (if (> (+ i (length sep)) (length xs))
+    (push acc (st-text (slice xs start (length xs))))
+    (if (st-at? xs sep i)
+      (st-split xs sep (+ i (length sep)) (+ i (length sep)) (push acc (st-text (slice xs start i))))
+      (st-split xs sep (+ i 1) start acc))))
+(defn st-chars [xs i acc]
+  (if (>= i (length xs)) acc (st-chars xs (+ i 1) (push acc (st-text [(get xs i)])))))
+(defn str-split [text sep]
+  (let [[r (st-pair text sep)]]
+    (if (not (get r "ok")) r
+      (let [[xs (get (get r "value") 0)] [ss (get (get r "value") 1)]]
+        (st-ok (if (= (length ss) 0) (st-chars xs 0 []) (st-split xs ss 0 0 [])))))))
+(defn st-join [xs sep i acc]
+  (if (>= i (length xs)) (st-ok acc)
+    (let [[r (utf8-decode (get xs i))]]
+      (if (not (get r "ok")) (st-error "INVALID_ARGUMENT")
+        (st-join xs sep (+ i 1) (str acc (if (= i 0) "" sep) (get xs i)))))))
+(defn str-join [xs sep]
+  (let [[r (utf8-decode sep)]]
+    (if (not (get r "ok")) r
+      (if (not (list? xs)) (st-error "INVALID_ARGUMENT") (st-join xs sep 0 "")))))
+(defn st-space? [cp]
+  (or (includes-item [9 10 11 12 13 32 133 160 5760 8232 8233 8239 8287 12288] cp)
+      (and (>= cp 8192) (<= cp 8202))))
+(defn st-left [xs i]
+  (if (and (< i (length xs)) (st-space? (get xs i))) (st-left xs (+ i 1)) i))
+(defn st-right [xs i]
+  (if (and (> i 0) (st-space? (get xs (- i 1)))) (st-right xs (- i 1)) i))
+(defn str-trim [text side]
+  (let [[r (utf8-decode text)]]
+    (if (not (get r "ok")) r
+      (if (not (includes-item ["left" "right" "both"] side)) (st-error "INVALID_ARGUMENT")
+        (let [[xs (get r "value")]
+              [a (if (= side "right") 0 (st-left xs 0))]
+              [b (if (= side "left") (length xs) (st-right xs (length xs)))]]
+          (st-ok (st-text (slice xs a (max a b)))))))))
+(defn st-replace [xs old replacement mode i acc]
+  (if (>= i (length xs)) (st-ok acc)
+    (if (st-at? xs old i)
+      (if (= mode "first") (st-ok (str acc replacement (st-text (slice xs (+ i (length old)) (length xs)))))
+        (st-replace xs old replacement mode (+ i (length old)) (str acc replacement)))
+      (st-replace xs old replacement mode (+ i 1) (str acc (st-text [(get xs i)]))))))
+(defn str-replace [text old replacement mode]
+  (let [[r (st-pair text old)] [v (utf8-decode replacement)]]
+    (if (not (get r "ok")) r (if (not (get v "ok")) v
+      (let [[xs (get (get r "value") 0)] [needle (get (get r "value") 1)]]
+        (if (or (= (length needle) 0) (not (includes-item ["all" "first"] mode))) (st-error "INVALID_ARGUMENT")
+          (st-replace xs needle replacement mode 0 "")))))))
+(defn str-index-of [text needle]
+  (let [[r (st-pair text needle)]]
+    (if (get r "ok") (st-ok (st-index (get (get r "value") 0) (get (get r "value") 1) 0)) r)))
+(defn str-contains? [text needle]
+  (let [[r (str-index-of text needle)]] (if (get r "ok") (st-ok (>= (get r "value") 0)) r)))
+(defn str-starts? [text needle]
+  (let [[r (str-index-of text needle)]] (if (get r "ok") (st-ok (= (get r "value") 0)) r)))
+(defn str-ends? [text needle]
+  (let [[r (st-pair text needle)]]
+    (if (get r "ok")
+      (let [[xs (get (get r "value") 0)] [ns (get (get r "value") 1)]]
+        (st-ok (st-at? xs ns (- (length xs) (length ns))))) r)))
+(defn st-padding [xs n i acc]
+  (if (>= i n) acc (st-padding xs n (+ i 1) (str acc (st-text [(get xs (% i (length xs)))])))))
+(defn st-pad [text width padding left]
+  (let [[r (st-pair text padding)]]
+    (if (not (get r "ok")) r
+      (let [[xs (get (get r "value") 0)] [ps (get (get r "value") 1)]]
+        (if (or (not (integer? width)) (< width 0) (> width 10000) (= (length ps) 0)) (st-error "INVALID_ARGUMENT")
+          (let [[pad (st-padding ps (max 0 (- width (length xs))) 0 "")]]
+            (st-ok (if left (str pad text) (str text pad)))))))))
+(defn str-pad-left [text width padding] (st-pad text width padding true))
+(defn str-pad-right [text width padding] (st-pad text width padding false))
+(defn st-repeat [text n acc] (if (= n 0) acc (st-repeat text (- n 1) (str acc text))))
+(defn str-repeat [text n]
+  (let [[r (utf8-decode text)]]
+    (if (not (get r "ok")) r
+      (if (or (not (integer? n)) (< n 0) (> n 10000)) (st-error "INVALID_ARGUMENT")
+        (st-ok (st-repeat text n ""))))))
+(defn str-lines [text]
+  (let [[r (str-replace text "\r\n" "\n" "all")]]
+    (if (not (get r "ok")) r
+      (if (= text "") (st-ok [])
+        (str-split (get (str-replace (get r "value") "\r" "\n" "all") "value") "\n")))))
+(defn st-format [xs fields i acc]
+  (if (>= i (length xs)) (st-ok acc)
+    (if (= (get xs i) 123)
+      (let [[end (st-index xs [125] (+ i 1))]]
+        (if (< end 0) (st-error "INVALID_FORMAT")
+          (let [[key (st-text (slice xs (+ i 1) end))]]
+            (if (not (includes-item (keys fields) key)) (st-error "MISSING_KEY")
+              (let [[v (utf8-decode (get fields key))]]
+                (if (not (get v "ok")) (st-error "INVALID_ARGUMENT")
+                  (st-format xs fields (+ end 1) (str acc (get fields key)))))))))
+      (if (= (get xs i) 125) (st-error "INVALID_FORMAT")
+        (st-format xs fields (+ i 1) (str acc (st-text [(get xs i)])))))))
+(defn str-format [text fields]
+  (let [[r (utf8-decode text)]]
+    (if (not (get r "ok")) r (if (not (map? fields)) (st-error "INVALID_ARGUMENT")
+      (st-format (get r "value") fields 0 "")))))

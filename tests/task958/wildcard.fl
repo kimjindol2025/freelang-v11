@@ -1,0 +1,3 @@
+(defn task958_wildcard [request] (server-html "WILDCARD_ROUTE_MATCHED"))
+(server-get "/*" task958_wildcard)
+(server-start 0)

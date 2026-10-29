@@ -1,0 +1,341 @@
+;; Small loopback-only vendor screen. Set ERP_DB_PATH and FL_HTTP_PORT to isolate a run.
+(load "../../lib/db/db.fl")
+(define DB (db-open (or (_fl_env_get "ERP_DB_PATH") "vendors.sqlite3")))
+(db_execute DB "PRAGMA foreign_keys = ON" [])
+(db_create DB "CREATE TABLE IF NOT EXISTS vendors (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT NOT NULL, memo TEXT NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, unit TEXT NOT NULL, vendor_id INTEGER NOT NULL REFERENCES vendors(id) ON DELETE RESTRICT, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS stock_moves (id INTEGER PRIMARY KEY AUTOINCREMENT, item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE RESTRICT, qty INTEGER NOT NULL CHECK(typeof(qty) = 'integer' AND qty >= 1), kind TEXT NOT NULL CHECK(kind IN ('in', 'out')), memo TEXT NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE, pw_hash TEXT NOT NULL, pw_salt TEXT NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL, created_at TEXT NOT NULL)")
+(db_create DB "CREATE TABLE IF NOT EXISTS login_attempts (username TEXT PRIMARY KEY, failures INTEGER NOT NULL, locked_until INTEGER NOT NULL)")
+
+(defn cookie-value [request wanted]
+  (let [[parts (_fl_str_split (get (get request "headers") "cookie") ";")]]
+    (cookie-value-parts parts 0 wanted)))
+(defn cookie-value-parts [parts index wanted]
+  (if (>= index (length parts)) ""
+    (let [[part (trim (get parts index))] [equal (str-index-of part "=")]]
+      (if (and (>= equal 0) (= (substring part 0 equal) wanted))
+        (substring part (+ equal 1) (length part))
+        (cookie-value-parts parts (+ index 1) wanted)))))
+(defn session-row [request]
+  (let [[token (cookie-value request "erp_session")]]
+    (if (= token "") nil
+      (first (db-query DB "SELECT user_id, token FROM sessions WHERE token = ? AND expires_at > CAST(strftime('%s','now') AS INTEGER)" [token])))))
+(defn csrf-input [token]
+  (str "<input type=\"hidden\" name=\"_csrf\" value=\"" (escapehtml token) "\">"))
+(defn protected-get [handler request]
+  (if (= (session-row request) nil) (server-redirect "/login")
+    (handler (assoc request "_csrf_token" (cookie-value request "erp_csrf")))))
+(defn protected-post [handler request]
+  (let [[session (session-row request)] [form (request-form request)]
+        [cookie (cookie-value request "erp_csrf")] [token (formvalue form "_csrf")]]
+    (if (= session nil) (server-redirect "/login")
+      (if (or (= cookie "") (= token "") (not (auth-constant-time-equal cookie token)))
+        (server-status 403 "CSRF token이 올바르지 않습니다.")
+        (handler (assoc request "_csrf_token" cookie))))))
+(defn login-page [message csrf]
+  (server-html (page "로그인"
+    (str (if (= message "") "" (str "<p role=\"alert\">" message "</p>"))
+      "<form method=\"post\" action=\"/login\">" (csrf-input csrf)
+      "<label>아이디<input name=\"username\" autocomplete=\"username\" required></label>"
+      "<label>비밀번호<input type=\"password\" name=\"password\" autocomplete=\"current-password\" required></label><button>로그인</button></form>"))))
+(defn login-get [request]
+  (let [[csrf (auth-random-token 32)]]
+    (server-html-cookie (str "erp_csrf=" csrf "; Path=/; HttpOnly; SameSite=Strict")
+      (page "로그인" (str "<form method=\"post\" action=\"/login\">" (csrf-input csrf)
+        "<label>아이디<input name=\"username\" autocomplete=\"username\" required></label>"
+        "<label>비밀번호<input type=\"password\" name=\"password\" autocomplete=\"current-password\" required></label><button>로그인</button></form>")))))
+(defn auth-positive-env [key fallback]
+  (let [[raw (_fl_env_get key)] [value (str-to-num raw)]]
+    (if (and (number? value) (integer? value) (> value 0) (<= value 86400)) value fallback)))
+(defn login-failed [username]
+  (db_execute DB "INSERT INTO login_attempts(username,failures,locked_until) VALUES(?,1,0) ON CONFLICT(username) DO UPDATE SET failures=CASE WHEN locked_until<=CAST(strftime('%s','now') AS INTEGER) THEN 1 ELSE failures+1 END, locked_until=CASE WHEN (CASE WHEN locked_until<=CAST(strftime('%s','now') AS INTEGER) THEN 1 ELSE failures+1 END)>=5 THEN CAST(strftime('%s','now') AS INTEGER)+? ELSE 0 END" [username (auth-positive-env "ERP_LOCK_SECONDS" 30)]))
+(defn login-post [request]
+  (let [[form (request-form request)] [username (formvalue form "username")]
+        [password (formvalue form "password")] [csrf-cookie (cookie-value request "erp_csrf")]
+        [csrf-form (formvalue form "_csrf")]
+        [row (first (db-query DB "SELECT id, pw_hash, pw_salt FROM users WHERE username = ?" [username]))]
+        [salt (if (= row nil) "00000000000000000000000000000000" (get row "pw_salt"))]
+        [expected (if (= row nil) "0000000000000000000000000000000000000000000000000000000000000000" (get row "pw_hash"))]
+        [matches (auth-verify-password password (str "pbkdf2-sha256$100000$" salt "$" expected))]
+        [attempt (first (db-query DB "SELECT locked_until > CAST(strftime('%s','now') AS INTEGER) AS blocked FROM login_attempts WHERE username = ?" [username]))]
+        [blocked (if (= attempt nil) false (= (get attempt "blocked") 1))]]
+    (if (or (= csrf-cookie "") (= csrf-form "") (not (auth-constant-time-equal csrf-cookie csrf-form)))
+      (server-status 403 "CSRF token이 올바르지 않습니다.")
+      (if (or blocked (= row nil) (not matches))
+        (do (login-failed username) (login-page "아이디 또는 비밀번호가 틀립니다" csrf-cookie))
+        (do
+          (db_execute DB "DELETE FROM login_attempts WHERE username = ?" [username])
+          (let [[token (auth-random-token 32)]]
+            (db_execute DB "INSERT INTO sessions(token,user_id,expires_at,created_at) VALUES(?,?,CAST(strftime('%s','now') AS INTEGER)+?,?)"
+              [token (get row "id") (auth-positive-env "ERP_SESSION_SECONDS" 28800) (now-iso)])
+            (server-set-cookie (server-redirect "/vendors") "erp_session" token)))))))
+(defn logout-post [request]
+  (let [[token (cookie-value request "erp_session")]]
+    (do (db_execute DB "DELETE FROM sessions WHERE token = ?" [token])
+      (server-set-cookie (server-redirect "/login") "erp_session" ""))))
+
+(defn escapehtml [value]
+  (str-replace (str-replace (str-replace (str-replace (str-replace value "&" "&amp;") "<" "&lt;") ">" "&gt;") "\"" "&quot;") "'" "&#39;"))
+
+(defn hexdigit [code]
+  (if (and (>= code 48) (<= code 57)) (- code 48)
+    (if (and (>= code 65) (<= code 70)) (+ 10 (- code 65))
+      (if (and (>= code 97) (<= code 102)) (+ 10 (- code 97)) -1))))
+
+(defn formdecode [text index result]
+  (if (>= index (length text)) result
+    (let [[char (substring text index (+ index 1))]]
+      (if (= char "+") (formdecode text (+ index 1) (str result " "))
+        (if (= char "%")
+          (if (>= (+ index 2) (length text)) ""
+            (let [[a (hexdigit (char-code-at text (+ index 1)))] [b (hexdigit (char-code-at text (+ index 2)))]]
+              (if (or (< a 0) (< b 0)) ""
+                (let [[byte (char-from-byte (+ (* a 16) b))]]
+                  (if (get byte "ok") (formdecode text (+ index 3) (str result (get byte "value"))) "")))))
+          (formdecode text (+ index 1) (str result char)))))))
+
+(defn formfields [parts index result]
+  (if (>= index (length parts)) result
+    (let [[part (get parts index)] [equal (str-index-of part "=")]]
+      (if (< equal 0) (formfields parts (+ index 1) result)
+        (formfields parts (+ index 1)
+          (assoc result (formdecode (substring part 0 equal) 0 "")
+            (formdecode (substring part (+ equal 1) (length part)) 0 "")))))))
+
+(defn request-form [request]
+  (formfields (_fl_str_split (get request "body") "&") 0 {}))
+(defn request-query [request]
+  (formfields (_fl_str_split (get request "query") "&") 0 {}))
+(defn formvalue [form key]
+  (let [[value (get form key)]] (if (= value nil) "" value)))
+(defn like-literal [text]
+  (str-replace (str-replace (str-replace text "\\" "\\\\") "%" "\\%") "_" "\\_"))
+
+(defn page [title content]
+  (str "<!doctype html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"utf-8\">\n<title>"
+    title "</title>\n<style>body{font:16px sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;width:100%}td,th{border:1px solid #bbb;padding:.5rem;text-align:left}label{display:block;margin:.8rem 0}input,textarea{display:block;width:100%;padding:.4rem}form.inline{display:inline}</style>\n</head>\n<body>\n<h1>"
+    title "</h1>\n" content "\n</body>\n</html>\n"))
+
+(defn vendorrow [rows index html csrf]
+  (if (>= index (length rows)) html
+    (let [[row (get rows index)] [id (str (get row "id"))]]
+      (vendorrow rows (+ index 1)
+        (str html "<tr><td>" id "</td><td>" (escapehtml (get row "name"))
+          "</td><td>" (escapehtml (get row "phone")) "</td><td>" (escapehtml (get row "memo"))
+          "</td><td><a href=\"/vendors/" id "/edit\">수정</a> <form class=\"inline\" method=\"post\" action=\"/vendors/" id "/delete\">" (csrf-input csrf) "<button>삭제</button></form></td></tr>\n") csrf))))
+
+(defn page-number [text]
+  (let [[value (str-to-num text)]]
+    (if (and (digits-only? text 0) (number? value) (integer? value) (> value 0)) value 1)))
+(defn query-value [text]
+  (str-replace (str-replace (str-replace (str-replace (str-replace (str-replace text "%" "%25") "&" "%26") "#" "%23") "+" "%2B") " " "%20") "?" "%3F"))
+(defn page-links [path page total q]
+  (let [[prev (if (> page 1) (- page 1) 1)] [next (if (< (* page 50) total) (+ page 1) page)]
+        [search (if (= q "") "" (str "&amp;q=" (escapehtml (query-value q))))]]
+    (str "<p>전체 " (str total) "건 | <a href=\"" path "?page=" (str prev) search "\">이전</a> | "
+      (str page) "쪽 | <a href=\"" path "?page=" (str next) search "\">다음</a></p>")))
+
+(defn handle-list [request]
+  (let [[query (request-query request)] [q (formvalue query "q")] [page-no (page-number (formvalue query "page"))]
+        [offset (* (- page-no 1) 50)] [pattern (str "%" (like-literal q) "%")]
+        [rows (if (= q "")
+          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors ORDER BY id LIMIT ? OFFSET ?" [50 offset])
+          (db-query DB "SELECT id, name, phone, memo, created_at FROM vendors WHERE name LIKE ? ESCAPE '\\' OR memo LIKE ? ESCAPE '\\' ORDER BY id LIMIT ? OFFSET ?"
+            [pattern pattern 50 offset]))]
+        [count-row (if (= q "") (first (db-query DB "SELECT count(*) AS count FROM vendors" []))
+          (first (db-query DB "SELECT count(*) AS count FROM vendors WHERE name LIKE ? ESCAPE '\\' OR memo LIKE ? ESCAPE '\\'" [pattern pattern])))]
+        [total (get count-row "count")]]
+    (server-html (page "거래처 관리"
+    (str "<form method=\"post\" action=\"/logout\">" (csrf-input (get request "_csrf_token")) "<button>로그아웃</button></form><form method=\"get\" action=\"/vendors\"><label>검색<input name=\"q\" value=\"" (escapehtml q) "\"></label><button>검색</button></form>\n"
+        "<p><a href=\"/vendors/new\">추가</a></p>\n<table>\n<thead><tr><th>ID</th><th>이름</th><th>전화</th><th>메모</th><th>동작</th></tr></thead>\n<tbody>\n"
+        (vendorrow rows 0 "" (get request "_csrf_token")) "\n</tbody>\n</table>"
+        (page-links "/vendors" page-no total q))))))
+
+(defn vendor-form [action name phone memo message csrf]
+  (page "거래처 입력"
+    (str (if (= message "") "" (str "<p role=\"alert\">" message "</p>"))
+      "<form method=\"post\" action=\"" action "\">" (csrf-input csrf) "<label>이름<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
+      "<label>전화<input name=\"phone\" value=\"" (escapehtml phone) "\"></label>"
+      "<label>메모<textarea name=\"memo\">" (escapehtml memo) "</textarea></label><button>저장</button></form><p><a href=\"/vendors\">목록</a></p>")))
+
+(defn handle-new [request]
+  (server-html (vendor-form "/vendors" "" "" "" "" (get request "_csrf_token"))))
+
+(defn handle-create [request]
+  (let [[form (request-form request)] [name (formvalue form "name")] [phone (formvalue form "phone")] [memo (formvalue form "memo")]]
+    (if (= (trim name) "")
+      (server-html (vendor-form "/vendors" name phone memo "이름을 입력하세요." (get request "_csrf_token")))
+      (do
+        (db_insert DB "vendors" {"name" name "phone" phone "memo" memo "created_at" (now-iso)})
+        (server-redirect "/vendors")))))
+
+(defn handle-edit [request]
+  (let [[id (str-to-num (get (get request "params") "id"))]
+        [row (first (db-query DB "SELECT id, name, phone, memo FROM vendors WHERE id = ?" [id]))]]
+    (if (= row nil) (server-status 404 "거래처를 찾을 수 없습니다.")
+      (server-html (vendor-form (str "/vendors/" id) (get row "name") (get row "phone") (get row "memo") "" (get request "_csrf_token"))))))
+
+(defn handle-update [request]
+  (let [[id (str-to-num (get (get request "params") "id"))]
+        [row (first (db-query DB "SELECT id FROM vendors WHERE id = ?" [id]))]
+        [form (request-form request)] [name (formvalue form "name")] [phone (formvalue form "phone")] [memo (formvalue form "memo")]]
+    (if (= row nil) (server-status 404 "거래처를 찾을 수 없습니다.")
+      (if (= (trim name) "")
+        (server-html (vendor-form (str "/vendors/" id) name phone memo "이름을 입력하세요." (get request "_csrf_token")))
+        (do
+          (db_update DB "vendors" {"name" name "phone" phone "memo" memo} {"id" id})
+          (server-redirect "/vendors"))))))
+
+(defn handle-delete [request]
+  (let [[id (str-to-num (get (get request "params") "id"))]
+        [items (db-query DB "SELECT id FROM items WHERE vendor_id = ?" [id])]]
+    (if (> (length items) 0)
+      (server-status 409 "품목이 연결된 거래처는 삭제할 수 없습니다.")
+      (do
+        (db_delete_row DB "vendors" {"id" id})
+        (server-redirect "/vendors")))))
+
+(defn item-record [id]
+  (first (db-query DB "SELECT i.id, i.name, i.unit, i.vendor_id, v.name AS vendor_name, COALESCE(SUM(CASE WHEN m.kind = 'in' THEN m.qty WHEN m.kind = 'out' THEN -m.qty ELSE 0 END), 0) AS stock FROM items i JOIN vendors v ON v.id = i.vendor_id LEFT JOIN stock_moves m ON m.item_id = i.id WHERE i.id = ? GROUP BY i.id, i.name, i.unit, i.vendor_id, v.name" [id])))
+
+(defn item-list-rows [limit offset]
+  (db-query DB "SELECT i.id, i.name, i.unit, i.vendor_id, v.name AS vendor_name, COALESCE(SUM(CASE WHEN m.kind = 'in' THEN m.qty WHEN m.kind = 'out' THEN -m.qty ELSE 0 END), 0) AS stock FROM items i JOIN vendors v ON v.id = i.vendor_id LEFT JOIN stock_moves m ON m.item_id = i.id GROUP BY i.id, i.name, i.unit, i.vendor_id, v.name ORDER BY i.id LIMIT ? OFFSET ?" [limit offset]))
+
+(defn item-moves [id]
+  (db-query DB "SELECT id, kind, qty, memo, created_at FROM stock_moves WHERE item_id = ? ORDER BY id DESC" [id]))
+
+(defn item-stock [id]
+  (get (item-record id) "stock"))
+
+(defn item-row-html [row]
+  (let [[id (str (get row "id"))]]
+    (str "<tr><td><a href=\"/items/" id "\">" id "</a></td><td>" (escapehtml (get row "name"))
+      "</td><td>" (escapehtml (get row "unit")) "</td><td>" (escapehtml (get row "vendor_name"))
+      "</td><td>" (str (get row "stock")) "</td></tr>\n")))
+
+(defn vendor-options [rows index selected html]
+  (if (>= index (length rows)) html
+    (let [[row (get rows index)] [id (str (get row "id"))]]
+      (vendor-options rows (+ index 1) selected
+        (str html "<option value=\"" id "\"" (if (= id selected) " selected" "") ">"
+          (escapehtml (get row "name")) "</option>")))))
+
+(defn item-form [name unit vendor-id message csrf]
+  (let [[vendors (db-query DB "SELECT id, name FROM vendors ORDER BY name" [])]]
+    (server-html (page "품목 추가"
+      (str (if (= message "") "" (str "<p role=\"alert\">" (escapehtml message) "</p>"))
+        "<form method=\"post\" action=\"/items\">" (csrf-input csrf) "<label>품목명<input name=\"name\" value=\"" (escapehtml name) "\" required></label>"
+        "<label>단위<input name=\"unit\" value=\"" (escapehtml unit) "\"></label><label>거래처<select name=\"vendor_id\" required><option value=\"\">선택</option>"
+        (vendor-options vendors 0 vendor-id "") "</select></label><button>저장</button></form><p><a href=\"/items\">목록</a></p>")))))
+
+(defn item-moves-html [rows index html]
+  (if (>= index (length rows)) html
+    (let [[row (get rows index)]]
+      (item-moves-html rows (+ index 1)
+        (str html "<tr><td>" (escapehtml (get row "kind")) "</td><td>" (str (get row "qty"))
+          "</td><td>" (escapehtml (get row "memo")) "</td><td>" (escapehtml (get row "created_at")) "</td></tr>\n")))))
+
+(defn item-detail-page [item message qty kind memo csrf]
+  (let [[id (str (get item "id"))] [moves (item-moves (get item "id"))]]
+    (server-html (page "품목 상세"
+      (str "<p><a href=\"/items\">품목 목록</a></p><p>품목: " (escapehtml (get item "name"))
+        " / 단위: " (escapehtml (get item "unit")) " / 거래처: " (escapehtml (get item "vendor_name"))
+        " / 현재 재고: " (str (get item "stock")) "</p>"
+        (if (= message "") "" (str "<p role=\"alert\">" (escapehtml message) "</p>"))
+        "<form method=\"post\" action=\"/items/" id "/moves\">" (csrf-input csrf) "<label>구분<select name=\"kind\"><option value=\"in\"" (if (= kind "in") " selected" "") ">입고</option><option value=\"out\"" (if (= kind "out") " selected" "") ">출고</option></select></label>"
+        "<label>수량<input type=\"number\" name=\"qty\" min=\"1\" step=\"1\" value=\"" (escapehtml qty) "\"></label>"
+        "<label>메모<textarea name=\"memo\">" (escapehtml memo) "</textarea></label><button>기록</button></form>"
+        "<h2>입출고 기록</h2><table><thead><tr><th>구분</th><th>수량</th><th>메모</th><th>시간</th></tr></thead><tbody>"
+        (item-moves-html moves 0 "") "</tbody></table>")))))
+
+(defn handle-items [request]
+  (let [[query (request-query request)] [page-no (page-number (formvalue query "page"))]
+        [rows (item-list-rows 50 (* (- page-no 1) 50))]
+        [count-row (first (db-query DB "SELECT count(*) AS count FROM items" []))]
+        [total (get count-row "count")]]
+    (server-html (page "품목 목록"
+      (str "<form method=\"post\" action=\"/logout\">" (csrf-input (get request "_csrf_token")) "<button>로그아웃</button></form><p><a href=\"/items/new\">품목 추가</a></p><table><thead><tr><th>ID</th><th>품목명</th><th>단위</th><th>거래처</th><th>재고</th></tr></thead><tbody>"
+        (str-join (map item-row-html rows) "") "</tbody></table>" (page-links "/items" page-no total ""))))))
+
+(defn item-all-html [offset chunks]
+  (let [[rows (item-list-rows 50 offset)]]
+(if (= (length rows) 0) (str-join chunks "")
+      (item-all-html (+ offset 50) (append chunks (str-join (map item-row-html rows) ""))))))
+(defn handle-test-items-all [request]
+  (server-html (page "품목 목록 시험" (str "<table><tbody>" (item-all-html 0 []) "</tbody></table>"))))
+
+(defn handle-new-item [request]
+  (item-form "" "" "" "" (get request "_csrf_token")))
+
+(defn handle-create-item [request]
+  (let [[form (request-form request)] [name (formvalue form "name")] [unit (formvalue form "unit")]
+        [vendor-text (formvalue form "vendor_id")] [vendor-id (str-to-num vendor-text)]
+        [vendor (first (db-query DB "SELECT id FROM vendors WHERE id = ?" [vendor-id]))]]
+    (if (= (trim name) "")
+      (item-form name unit vendor-text "품목명을 입력하세요." (get request "_csrf_token"))
+      (if (= vendor nil)
+        (item-form name unit vendor-text "거래처를 선택하세요." (get request "_csrf_token"))
+        (do
+          (db_insert DB "items" {"name" name "unit" unit "vendor_id" vendor-id "created_at" (now-iso)})
+          (server-redirect "/items"))))))
+
+(defn digits-only? [text index]
+  (if (= (length text) 0) false
+    (if (>= index (length text)) true
+      (let [[code (char-code-at text index)]]
+        (and (>= code 48) (<= code 57) (digits-only? text (+ index 1)))))))
+
+(defn handle-item-detail [request]
+  (let [[id (str-to-num (get (get request "params") "id"))] [item (item-record id)]]
+    (if (= item nil) (server-status 404 "품목을 찾을 수 없습니다.")
+      (item-detail-page item "" "" "in" "" (get request "_csrf_token")))))
+
+(defn handle-stock-move [request]
+  (let [[id (str-to-num (get (get request "params") "id"))] [item (item-record id)]
+        [form (request-form request)] [raw-qty (formvalue form "qty")] [qty (str-to-num raw-qty)]
+        [kind (formvalue form "kind")] [memo (formvalue form "memo")]]
+    (if (= item nil) (server-status 404 "품목을 찾을 수 없습니다.")
+      (if (not (and (digits-only? raw-qty 0) (number? qty) (integer? qty) (> qty 0)))
+        (server-status 400 "수량은 1 이상의 정수여야 합니다.")
+        (if (not (or (= kind "in") (= kind "out")))
+          (server-status 400 "입출고 구분이 올바르지 않습니다.")
+          (do
+            (db_execute DB "BEGIN IMMEDIATE" [])
+            (let [[current (item-stock id)]]
+              (if (and (= kind "out") (< current qty))
+                (do
+                  (db_execute DB "ROLLBACK" [])
+                  (server-status 409 "재고가 부족합니다."))
+                (do
+                  (db_insert DB "stock_moves" {"item_id" id "qty" qty "kind" kind "memo" memo "created_at" (now-iso)})
+                  (db_execute DB "COMMIT" [])
+                  (server-redirect (str "/items/" id)))))))))))
+
+;; This route exists only in isolated concurrency tests.
+(defn handle-test-slow [request]
+  (do (_fl_process_run_args "/bin/sleep" ["2"]) (server-html "slow")))
+(if (= (_fl_env_get "FL_HTTP_TEST_SLOW") "1")
+  (server-get "/__slow" handle-test-slow))
+(if (= (_fl_env_get "FL_HTTP_TEST_FULL_ITEMS") "1")
+  (server-get "/__test/items-all" (fn [request] (protected-get handle-test-items-all request))))
+
+(server-get "/items/new" (fn [request] (protected-get handle-new-item request)))
+(server-post "/items" (fn [request] (protected-post handle-create-item request)))
+(server-get "/items/:id" (fn [request] (protected-get handle-item-detail request)))
+(server-post "/items/:id/moves" (fn [request] (protected-post handle-stock-move request)))
+
+(server-get "/about" (fn [request] (server-html (page "ERP vendors" "Application is running."))))
+(server-get "/login" login-get)
+(server-post "/login" login-post)
+(server-post "/logout" (fn [request] (protected-post logout-post request)))
+(server-get "/items" (fn [request] (protected-get handle-items request)))
+(server-get "/vendors" (fn [request] (protected-get handle-list request)))
+(server-get "/vendors/new" (fn [request] (protected-get handle-new request)))
+(server-post "/vendors" (fn [request] (protected-post handle-create request)))
+(server-get "/vendors/:id/edit" (fn [request] (protected-get handle-edit request)))
+(server-post "/vendors/:id" (fn [request] (protected-post handle-update request)))
+(server-post "/vendors/:id/delete" (fn [request] (protected-post handle-delete request)))
+(server-workers 128)
+(server-start 0)

@@ -1,0 +1,17 @@
+;; Compatibility helpers for the original SQLite store package.
+(defn str [value] (str value))
+(defn store-format-loop [template values index]
+  (let [position (str-index-of template "%")]
+    (if (or (>= index (length values)) (< position 0))
+      template
+      (str (substring template 0 position)
+           (str (get values index))
+           (store-format-loop (substring template (+ position 2) (length template)) values (+ index 1))))))
+(defn str-format [template values]
+  (store-format-loop template values 0))
+(defn re-match [pattern text]
+  (error "sqlite-store regex validation is not supported by native cgc"))
+(defn q/from [table]
+  {:table table :cols "*" :params []})
+(defn q/build-select [query]
+  (str "SELECT " (get query :cols) " FROM " (get query :table)))

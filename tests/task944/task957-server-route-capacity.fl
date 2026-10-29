@@ -1,0 +1,7 @@
+(defn task957_handler [req] "ok")
+(loop [i 0]
+  (if (>= i 129)
+    (println "PASS route capacity")
+    (do
+      (server-get (str "/task957/" i) "task957_handler")
+      (recur (+ i 1)))))

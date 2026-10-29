@@ -1,0 +1,17 @@
+(load "../../self/stdlib/time.fl")
+(defn check [actual expected name]
+  (if (= actual expected) (println (str "PASS " name)) (throw (str "FAIL " name))))
+(let [[t (now-ms)]
+      [clock (now)]
+      [parts (date-parts 86400000)]]
+  (check (number? t) true "now milliseconds numeric")
+  (check (> t 0) true "now milliseconds positive")
+  (check (number? (now-s)) true "now seconds numeric")
+  (check (time-diff-ms 10 25) 15 "time difference")
+  (check (>= (time-elapsed clock) 0) true "elapsed nonnegative")
+  (check (get parts "s") 86400 "date parts seconds")
+  (check (get parts "m") 1440 "date parts minutes")
+  (check (ts-to-s 2500) 2 "timestamp to seconds")
+  (check (s-to-ts 2) 2000 "seconds to timestamp")
+  (check (time-ago (- clock 3000)) "3s ago" "time ago seconds"))
+(println "TIME_SUMMARY=10/10")

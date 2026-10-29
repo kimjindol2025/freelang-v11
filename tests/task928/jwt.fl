@@ -1,0 +1,37 @@
+(defn check [condition name]
+  (if condition (println (str "PASS " name)) (throw (str "FAIL " name))))
+
+(let [[key "jwt-test-key-32-bytes-minimum-123456"]
+      [base (auth-jwt-sign {:sub "sample" :role "reader"} key 3600)]
+      [parts (str-split base ".")]
+      [sig (get parts 2)]
+      [last-char (substring sig (- (length sig) 1) (length sig))]
+      [changed-sig (str (substring sig 0 (- (length sig) 1)) (if (= last-char "A") "B" "A"))]
+      [tampered-sig (str (get parts 0) "." (get parts 1) "." changed-sig)]
+      [changed-body (str-replace (get parts 1) "e" "f")]
+      [tampered-body (str (get parts 0) "." changed-body "." (get parts 2))]
+      [expired (auth-jwt-sign {:sub "old" :exp 1} key 3600)]
+      [future (auth-jwt-sign {:sub "future" :nbf (+ (floor (/ (now-ms) 1000)) 120)} key 3600)]
+      [skew (auth-jwt-sign {:sub "skew" :nbf (+ (floor (/ (now-ms) 1000)) 30)
+                            :exp (- (floor (/ (now-ms) 1000)) 30)} key 3600)]]
+  (do
+    (check (and (string? base) (not (nil? (auth-jwt-verify base key)))) "normal sign and verify")
+    (check (= (get (auth-jwt-verify base key) "role") "reader") "payload round trip")
+    (check (nil? (auth-jwt-verify tampered-sig key)) "signature character tamper")
+    (check (nil? (auth-jwt-verify tampered-body key)) "payload tamper")
+    (check (nil? (auth-jwt-verify base "wrong-test-key-32-bytes-minimum-123")) "different key")
+    (check (nil? (auth-jwt-verify "eyJhbGciOiJub25lIn0.e30.AAAA" key)) "alg none rejected")
+    (check (nil? (auth-jwt-verify "eyJhbGciOiJIUzUxMiJ9.e30.AAAA" key)) "alg HS512 rejected")
+    (check (nil? (auth-jwt-verify "eyJ0eXAiOiJKV1QifQ.e30.AAAA" key)) "missing alg rejected")
+    (check (nil? (auth-jwt-verify ".e30.AAAA" key)) "missing header segment rejected")
+    (check (nil? (auth-jwt-verify expired key)) "expired token rejected")
+    (check (nil? (auth-jwt-verify future key)) "future nbf rejected")
+    (check (not (nil? (auth-jwt-verify skew key))) "sixty-second clock skew accepted")
+    (check (nil? (auth-jwt-sign {:sub "short"} "short-key" 3600)) "short key sign rejected")
+    (check (nil? (auth-jwt-verify base "short-key")) "short key verify rejected")
+    (check (nil? (auth-jwt-verify "only.two" key)) "wrong segment count rejected")
+    (check (nil? (auth-jwt-verify "!!!!.e30.AAAA" key)) "invalid base64url rejected")
+    (check (= (get (auth-jwt-decode base) "sub") "sample") "decode payload only")
+    (check (not (auth-jwt-expired base)) "expired helper live token")
+    (check (auth-jwt-expired expired) "expired helper expired token")
+    (println "JWT_SUMMARY=19/19")))

@@ -1,0 +1,10 @@
+(load "../../lib/evidence/evidence.fl")
+
+(let [[args (cli-args)] [listener (tcp-listen "127.0.0.1" 0)] [port (tcp-local-port listener)]]
+  (do
+    (tcp-close listener)
+    (let [[result (evidence-run "bash" [(get args 0) (get args 1) (get args 2) (get args 3) (str port)])]]
+      (do
+        (print (get result "stdout"))
+        (if (= (get result "code") 0) nil
+          (throw (str "response inspection failed: " (get result "stderr"))))))))

@@ -1,0 +1,4 @@
+(println (number? (time-now)))
+(println (string? (date-now)))
+(println (req-query-default {"query" {"page" ["2"]}} "page" ""))
+(println (req-query-default {"query" {}} "page" "default"))

@@ -1,0 +1,5 @@
+(define m {"a" 1 "b" 2})
+(if (and (= (get (dissoc m "a") "b") 2)
+         (nil? (get (dissoc m "a") "a")))
+  (println "PASS dissoc")
+  (throw "FAIL dissoc"))

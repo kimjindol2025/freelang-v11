@@ -1,0 +1,1 @@
+(if (auth-constant-time-equal "same-value" "same-value") (println "PASS auth-constant-time-equal") (throw "FAIL auth-constant-time-equal"))

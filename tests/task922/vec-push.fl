@@ -1,0 +1,7 @@
+(define values (vec-push (vec-push (vec-push [] 3) 5) 8))
+(if (and (= (length values) 3)
+         (= (get values 0) 3)
+         (= (get values 1) 5)
+         (= (get values 2) 8))
+  (println "PASS vec-push")
+  (throw "FAIL vec-push"))

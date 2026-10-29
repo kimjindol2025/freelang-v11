@@ -1,0 +1,5 @@
+(let [db (db-open ":memory:")]
+  (db-exec db "CREATE TABLE task956(value INTEGER)")
+  (db-exec db "INSERT INTO task956(value) VALUES (1)")
+  (println (length (db-query db "SELECT value FROM task956")))
+  (db-close db))

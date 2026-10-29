@@ -1,0 +1,42 @@
+(define $ARGS (cli-args))
+(define $DB (db-open (or (_fl_env_get "MIXSOAK_DB") "mixsoak.sqlite")))
+(define $PASSWORD-HASH (auth-hash-password "soak-example-password-only"))
+(define $JWT-KEY (auth-random-token 32))
+(db-exec $DB "CREATE TABLE IF NOT EXISTS soak_writes (request_id TEXT PRIMARY KEY, value TEXT NOT NULL)" [])
+(db-exec $DB "CREATE TABLE IF NOT EXISTS acknowledged_ids (request_id TEXT PRIMARY KEY)" [])
+(println (str "DB_BUSY_TIMEOUT_MS=" (get (first (db-query $DB "PRAGMA busy_timeout" [])) "timeout")))
+(println (str "DB_JOURNAL_MODE=" (get (first (db-query $DB "PRAGMA journal_mode" [])) "journal_mode")))
+
+(defn ok [$req] (server-json {"ok" true}))
+(defn slow [$req] (do (sleep 1500) (server-json {"ok" true})))
+(defn slow300 [$req] (do (sleep 300) (server-json {"ok" true})))
+(defn login [$req]
+  (if (auth-verify-password (get $req "body") $PASSWORD-HASH)
+    (server-html-cookie (str "mixsoak=" (auth-random-token 32) "; Path=/; HttpOnly; SameSite=Strict") "LOGIN_OK")
+    (server-status 401 "login failed")))
+(defn jwt [$req]
+  (let [token (auth-jwt-sign {"sub" "soak-example" "exp" (+ (floor (/ (now-ms) 1000)) 300)} $JWT-KEY 300)]
+    (server-json {"verified" (not (nil? (auth-jwt-verify token $JWT-KEY)))})))
+(defn write-db [$req]
+  (let [[request-id (server-req-header $req "x-request-id")]]
+    (if (nil? request-id)
+      (server-status 400 "missing request id")
+      (do
+        (db-exec $DB "INSERT INTO soak_writes(request_id,value) VALUES(?,?)" [request-id "example"])
+        (server-json {"ok" true "request_id" request-id})))))
+(defn read-db [$req]
+  (server-json {"count" (get (first (db-query $DB "SELECT count(*) AS n FROM soak_writes" [])) "n")}))
+(defn parallel [$req]
+  (server-json {"results" (run-parallel [(fn [] (+ 1 2)) (fn [] "ok")])}))
+(server-static (get $ARGS 0) "/static/")
+(server-get "/ok" ok)
+(server-get "/about" ok)
+(server-get "/__slow" slow)
+(server-get "/__slow300" slow300)
+(server-post "/login" login)
+(server-get "/jwt" jwt)
+(server-post "/write" write-db)
+(server-get "/read" read-db)
+(server-get "/parallel" parallel)
+(server-workers 256)
+(server-start 0)

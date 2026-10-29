@@ -1,0 +1,48 @@
+(load "../../stdlib/collections.fl")
+(defn check [actual expected name]
+  (if (= actual expected) (println (str "PASS " name))
+    (throw (str "FAIL " name " expected=" expected " actual=" actual))))
+
+(check (take 2 [1 2 3]) [1 2] "take prefix")
+(check (take 0 [1 2]) [] "take zero")
+(check (take -1 [1 2]) [] "take negative clamps")
+(check (take 9 [1 2]) [1 2] "take oversized clamps")
+(check (take 2 nil) [] "take invalid collection")
+(check (drop 1 [1 2 3]) [2 3] "drop prefix")
+(check (drop 0 [1 2]) [1 2] "drop zero")
+(check (drop -1 [1 2]) [1 2] "drop negative clamps")
+(check (drop 9 [1 2]) [] "drop oversized clamps")
+(check (drop 2 nil) [] "drop invalid collection")
+(check (values {"a" 1 "b" nil "c" false}) [1 nil false] "values insertion order")
+(check (values {}) [] "values empty map")
+(check (values [1 2]) [] "values invalid map")
+(check (has-key? {"a" nil} "a") true "has key with nil value")
+(check (has-key? {"a" false} "a") true "has key with false value")
+(check (has-key? {"a" 1} "b") false "missing key")
+(check (has-key? nil "a") false "has key invalid map")
+(let [[original {"a" 1}]
+      [added (map-set original "b" 2)]
+      [replaced (map-set original "a" 3)]]
+  (check added {"a" 1 "b" 2} "map set adds")
+  (check replaced {"a" 3} "map set replaces")
+  (check original {"a" 1} "map set preserves source")
+  (check (keys added) ["a" "b"] "map set key order"))
+(check (map-set nil "a" 1) {} "map set invalid map")
+(let [[original {"a" 1 "b" 2}]
+      [removed (map-delete original "a")]]
+  (check removed {"b" 2} "map delete removes")
+  (check (map-delete original "c") original "map delete missing key")
+  (check original {"a" 1 "b" 2} "map delete preserves source"))
+(check (map-delete nil "a") {} "map delete invalid map")
+(let [[left {"a" 1 "b" 2}]
+      [right {"b" 3 "c" 4}]
+      [combined (merge left right)]]
+  (check combined {"a" 1 "b" 3 "c" 4} "merge right wins")
+  (check (keys combined) ["a" "b" "c"] "merge preserves key order")
+  (check left {"a" 1 "b" 2} "merge preserves left")
+  (check right {"b" 3 "c" 4} "merge preserves right"))
+(check (merge {} {}) {} "merge empty maps")
+(check (merge nil {"a" 1}) {"a" 1} "merge invalid left")
+(check (merge {"a" 1} nil) {"a" 1} "merge invalid right")
+(check (merge nil nil) {} "merge invalid both")
+(println "COLLECTIONS_SUMMARY=34/34")

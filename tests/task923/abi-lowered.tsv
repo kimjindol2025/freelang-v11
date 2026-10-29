@@ -1,0 +1,37 @@
+# builtin<TAB>lowering reason
+*	Variadic multiplication is emitted as a compiler-built binary chain.
++	Variadic addition is emitted as a compiler-built binary chain.
+-	Unary and chained subtraction are emitted as compiler-built expressions.
+??	Null coalescing is emitted as a conditional expression.
+and	Short-circuit logic is emitted as a conditional expression.
+case	Pattern dispatch is emitted by the compiler.
+catch	Rejected outside try by the compiler.
+cond	Conditional branches are emitted by the compiler.
+define	Definition registration is emitted by the compiler.
+defn	Function registration is emitted by the compiler.
+doseq	Collection iteration is emitted as compiler-generated loop control flow.
+deftest	Test registration is emitted by the compiler.
+do	Sequential expressions are emitted by the compiler.
+empty?	The compiler emits type-specific emptiness checks.
+error	The compiler emits a fl_throw sequence.
+h	The compiler emits an h helper call expression.
+fn	Closure construction is emitted by the compiler.
+if	Conditional branches are emitted by the compiler.
+json-parse	Runtime call is conditional on user-defined override resolution.
+json-stringify	Runtime call is conditional on user-defined override resolution.
+let	Local binding is emitted by the compiler.
+list	Vector construction is emitted by the compiler.
+loop	Loop binding is emitted by the compiler.
+max	Variadic extrema is emitted as compiler-built comparisons.
+or	Short-circuit logic is emitted as a conditional expression.
+range	Range construction is emitted by the compiler.
+recur	Tail-call control flow is emitted by the compiler.
+set!	Mutation is emitted as a compiler-built assignment.
+s	The compiler emits fl_style_join for style fragments.
+str	String concatenation is emitted by the compiler.
+str-blank?	Whitespace checking is emitted by the compiler.
+swap!	Atomic update is emitted by the compiler.
+text	Zero-argument and value forms have different compiler output.
+throw	The compiler emits a fl_throw sequence.
+when	Conditional branches are emitted by the compiler.
+while	Loop control flow is emitted by the compiler.

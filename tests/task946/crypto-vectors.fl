@@ -1,0 +1,3 @@
+(println (hmac_sha256 "Hi There" "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"))
+(println (base64_encode "foobar"))
+(println (base64_decode "Zm9vYmFy"))

@@ -1,0 +1,5 @@
+(define sock (tcp-bind "127.0.0.1" 0))
+(if (not (number? sock)) (throw "could not reserve loopback port"))
+(define port (tcp-local-port sock))
+(tcp-close sock)
+(println port)

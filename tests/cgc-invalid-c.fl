@@ -1,0 +1,2 @@
+(define broken 1)
+(defn broken [] 2)

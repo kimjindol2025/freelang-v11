@@ -1,0 +1,12 @@
+;; The supervisor connects with bash /dev/tcp, then waits for this process.
+(define listener (tcp-listen "127.0.0.1" 0))
+(if (not (number? listener)) (throw "listen failed") nil)
+(_fl_file_write (get (cli-args) 0) (str (tcp-local-port listener)))
+(define connection (tcp-accept listener 5000))
+(if (not (number? connection)) (throw "accept failed") nil)
+(println "PASS accept connection")
+(if (!= (tcp-close connection) true) (throw "close accepted failed") nil)
+(println "PASS close accepted")
+(if (!= (tcp-close listener) true) (throw "close listener failed") nil)
+(println "PASS close listener after accept")
+(println "TCP_ACCEPT_SUMMARY=3/3")

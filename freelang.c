@@ -621,7 +621,7 @@ static int is_runtime_builtin(const char* name) {
         /* array */
         "first","last","rest","push","pop","reverse","flatten",
         "take","drop","sort","sort_by","flat_map","zip",
-        "char_at","char_code_at","includes_item",
+        "char_at","char_from_byte","char_code_at","includes_item",
         /* map */
         "map_entries","map_keys","map_vals",
         "fl_map_get","fl_map_set","fl_map_new","fl_map_len",

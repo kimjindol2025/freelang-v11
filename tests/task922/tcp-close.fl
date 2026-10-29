@@ -1,0 +1,2 @@
+(define socket (tcp-bind "127.0.0.1" 0))
+(if (tcp-close socket) (println "PASS tcp-close") (throw "FAIL tcp-close"))

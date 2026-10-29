@@ -7,26 +7,42 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 E2E_DIR="${SCRIPT_DIR}/tests/e2e"
-GOLDEN_DIR="${SCRIPT_DIR}/tests/golden"
-RUNNER="${SCRIPT_DIR}/bootstrap.js"
-COMPILER="${SCRIPT_DIR}/self/cgc-main.fl"
+TOOLS_ROOT="${FL_TOOLS_DISPATCH_ROOT:-${SCRIPT_DIR}/../freelang-tools}"
+CGC="${TOOLS_ROOT}/scripts/cgc-native"
+RUNNER="${TOOLS_ROOT}/scripts/fl-cgc-run"
+RUNTIME="${FREELANG_V11_RUNTIME:-${SCRIPT_DIR}/runtime}"
 TOTAL_PASS=0
 TOTAL_FAIL=0
+TOTAL_BLOCKED=0
 
 # E2E 테스트 파일 목록
 E2E_TESTS=(hello loop fib factorial)
 
-if [[ ! -f "$COMPILER" ]]; then
-  echo "❌ Compiler not found: $COMPILER"
-  exit 1
+if [[ ! -x "$CGC" ]]; then
+  echo "E2E=BLOCKED"
+  echo "CAUSE=native-compiler-missing" >&2
+  exit 2
 fi
 
 echo "Running E2E tests..."
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/fl-v11-native-e2e.XXXXXX")"
+cleanup() {
+  local file
+  for file in "$WORK_DIR"/*; do
+    [[ -e "$file" ]] && rm -f -- "$file"
+  done
+  rmdir -- "$WORK_DIR"
+}
+trap cleanup EXIT INT TERM
 
 for test_name in "${E2E_TESTS[@]}"; do
   test_file="${E2E_DIR}/${test_name}.fl"
-  golden_file="${GOLDEN_DIR}/${test_name}.expected.c"
-  temp_file="/tmp/${test_name}-e2e-gen.c"
+  first_c="${WORK_DIR}/${test_name}-1.c"
+  second_c="${WORK_DIR}/${test_name}-2.c"
+  executable="${WORK_DIR}/${test_name}"
+  expected_output="${WORK_DIR}/${test_name}-runner.out"
+  actual_output="${WORK_DIR}/${test_name}-native.out"
+gcc_log="${WORK_DIR}/${test_name}-gcc.log"
 
   if [[ ! -f "$test_file" ]]; then
     echo "  ⚠ Test file not found: $test_file"
@@ -34,36 +50,53 @@ for test_name in "${E2E_TESTS[@]}"; do
     continue
   fi
 
-  if [[ ! -f "$golden_file" ]]; then
-    echo "  ⚠ Golden file not found: $golden_file"
-    TOTAL_FAIL=$((TOTAL_FAIL + 1))
-    continue
-  fi
-
-  # C 코드 생성
-  if ! node --stack-size=8192 "$RUNNER" run "$COMPILER" "$test_file" "$temp_file" 2>&1 | grep -q "Compiled"; then
+  if ! "$CGC" "$test_file" "$first_c" --print-last >/dev/null 2>&1 || \
+     ! "$CGC" "$test_file" "$second_c" --print-last >/dev/null 2>&1; then
     echo "  ✗ $test_name (compile error)"
     TOTAL_FAIL=$((TOTAL_FAIL + 1))
     continue
   fi
 
-  # Golden 파일과 비교
-  if diff -q "$golden_file" "$temp_file" >/dev/null 2>&1; then
-    echo "  ✓ $test_name"
-    TOTAL_PASS=$((TOTAL_PASS + 1))
-  else
-    echo "  ✗ $test_name (golden mismatch)"
-    echo "    Golden: $(sha256sum "$golden_file" | cut -d' ' -f1)"
-    echo "    Gen:    $(sha256sum "$temp_file" | cut -d' ' -f1)"
+  if ! cmp -s "$first_c" "$second_c"; then
+    echo "  ✗ $test_name (native C output is not deterministic)"
     TOTAL_FAIL=$((TOTAL_FAIL + 1))
+    continue
   fi
 
-  # 임시 파일 정리
-  rm -f "$temp_file"
+  if ! gcc -Wno-unused -I "$RUNTIME" -o "$executable" "$first_c" \
+      "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" \
+      "$RUNTIME/math.c" "$RUNTIME/error.c" "$RUNTIME/process.c" \
+      "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm >"$gcc_log" 2>&1; then
+    if grep -Fq "too few arguments to function ‘range’" "$gcc_log"; then
+      echo "  ! $test_name (native runtime does not support legacy range/1 form)"
+      TOTAL_BLOCKED=$((TOTAL_BLOCKED + 1))
+    else
+      echo "  ✗ $test_name (native C link error)"
+      TOTAL_FAIL=$((TOTAL_FAIL + 1))
+    fi
+    continue
+  fi
+
+  if ! FREELANG_V11_RUNTIME="$RUNTIME" "$RUNNER" "$test_file" >"$expected_output" 2>&1 || \
+     ! "$executable" >"$actual_output" 2>&1 || \
+     ! cmp -s "$expected_output" "$actual_output"; then
+    echo "  ✗ $test_name (native execution mismatch)"
+    TOTAL_FAIL=$((TOTAL_FAIL + 1))
+    continue
+  fi
+
+  echo "  ✓ $test_name (deterministic C and native output match)"
+  TOTAL_PASS=$((TOTAL_PASS + 1))
 done
 
 echo ""
-echo "E2E: ${TOTAL_PASS} passed, ${TOTAL_FAIL} failed"
+echo "E2E: ${TOTAL_PASS} passed, ${TOTAL_FAIL} failed, ${TOTAL_BLOCKED} blocked"
+
+if [[ "$TOTAL_BLOCKED" -gt 0 ]]; then
+  echo 'E2E=BLOCKED'
+  echo 'CAUSE=native-runtime-lacks-legacy-range-arity' >&2
+  exit 2
+fi
 
 if [[ $TOTAL_FAIL -eq 0 ]]; then
   exit 0

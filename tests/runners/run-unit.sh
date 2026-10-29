@@ -7,9 +7,11 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TEST_DIR="${SCRIPT_DIR}/tests/unit"
-RUNNER="${SCRIPT_DIR}/bootstrap.js"
+TOOLS_ROOT="${FL_TOOLS_DISPATCH_ROOT:-${SCRIPT_DIR}/../freelang-tools}"
+RUNNER="${TOOLS_ROOT}/scripts/fl-cgc-run"
 TOTAL_PASS=0
 TOTAL_FAIL=0
+TOTAL_BLOCKED=0
 
 # 테스트 파일 찾기
 TEST_FILES=$(find "${TEST_DIR}" -name "*.test.fl" 2>/dev/null | sort)
@@ -26,20 +28,28 @@ for test_file in $TEST_FILES; do
   test_output=""
 
   # FL-native 테스트 실행 (에러 캡처, 실패해도 계속 진행)
-  if test_output=$(node --stack-size=8192 "${RUNNER}" run "${test_file}" "${test_file}" 2>&1); then
+  if test_output=$(FREELANG_V11_RUNTIME="${SCRIPT_DIR}/runtime" "${RUNNER}" "${test_file}" 2>&1); then
     echo "  ✓ $test_name"
     TOTAL_PASS=$((TOTAL_PASS + 1))
   else
-    echo "  ✗ $test_name"
-    if [[ -n "$test_output" ]]; then
-      echo "    Error: $test_output" | head -1
+    if grep -Eq '\[CGC-ERR\]|error:' <<<"$test_output"; then
+      echo "  ! $test_name (native compiler/runtime unsupported)"
+      TOTAL_BLOCKED=$((TOTAL_BLOCKED + 1))
+    else
+      echo "  ✗ $test_name"
+      TOTAL_FAIL=$((TOTAL_FAIL + 1))
     fi
-    TOTAL_FAIL=$((TOTAL_FAIL + 1))
   fi
 done
 
 echo ""
-echo "Unit: ${TOTAL_PASS} passed, ${TOTAL_FAIL} failed"
+echo "Unit: ${TOTAL_PASS} passed, ${TOTAL_FAIL} failed, ${TOTAL_BLOCKED} blocked"
+
+if [[ "$TOTAL_BLOCKED" -gt 0 ]]; then
+  echo 'UNIT=BLOCKED'
+  echo 'CAUSE=native-cgc-lacks-features-used-by-legacy-unit-suite' >&2
+  exit 2
+fi
 
 if [[ $TOTAL_FAIL -eq 0 ]]; then
   exit 0

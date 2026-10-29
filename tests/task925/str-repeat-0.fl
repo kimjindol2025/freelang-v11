@@ -1,0 +1,3 @@
+(define value (str-repeat "x" 0))
+(println (str "STR_REPEAT_ZERO_LEN=" (length value)))
+(if (= (length value) 0) (println "PASS str-repeat-zero") (throw "FAIL str-repeat-zero"))

@@ -1,0 +1,105 @@
+(load "test-auth-helper.fl")
+(load "../../lib/http/http.fl")
+
+(defn out [command args]
+  (let [[r (evidence-run command args)]]
+    (if (= (get r "code") 0) (get r "stdout")
+      (throw (str "command failed: " command " " (get r "stderr"))))))
+
+(defn has [text needle] (>= (_fl_str_index_of text needle) 0))
+(defn count-rows [text index count]
+  (let [[found (_fl_str_index_of (substring text index (length text)) "<tr><td>")]]
+    (if (< found 0) count (count-rows text (+ index found 8) (+ count 1)))))
+(defn check [condition name]
+  (if condition (do (println (str "PASS " name)) true)
+    (do (println (str "FAIL " name)) false)))
+(defn sqlite-rows [database]
+  (out "sqlite3" [database "select id||'|'||name||'|'||phone||'|'||memo from vendors order by id;"]))
+(defn show-sqlite [label result]
+  (do (println label) (print result) result))
+(defn start-server [work port binary]
+  (erp-start-auth-server work port binary (get (cli-args) 2) "vendors.sqlite" "0"))
+(defn wait-server [url attempts]
+  (if (= attempts 0) false
+    (let [[r (evidence-run "curl" ["--silent" "--show-error" url])]]
+      (if (= (get r "code") 0) true
+        (do (evidence-run "sleep" ["0.05"]) (wait-server url (- attempts 1)))))))
+(defn request [url path args]
+  (out "curl" (concat
+    (concat (concat ["--silent" "--show-error" "--include"] args)
+      (if (> (length args) 0)
+        ["--cookie" (erp-test-cookie-jar url) "--data-urlencode" (str "_csrf=" (out "cat" [(str (erp-test-cookie-jar url) ".csrf")]))]
+        ["--cookie" (erp-test-cookie-jar url)]))
+    [(str url path)])))
+(defn count-output [database]
+  (out "sqlite3" [database "select count(*) from vendors;"]))
+
+(let [[work (get (cli-args) 0)] [binary (get (cli-args) 1)]
+      [refused-guard (tcp-bind "127.0.0.1" 0)]
+      [refused-port (tcp-local-port refused-guard)]
+      [listener (tcp-listen "127.0.0.1" 0)]
+      [port (tcp-local-port listener)]]
+  (tcp-close listener)
+  (let [[pid (str-trim (start-server work port binary))]
+        [url (str "http://127.0.0.1:" port)]
+        [database (str work "/vendors.sqlite")]]
+    (if (not (wait-server (str url "/vendors") 100)) (throw "server did not start")
+      (let [[empty (request url "/vendors" [])]
+            [empty-count (show-sqlite "SQLITE_EMPTY:" (count-output database))]
+            [new-form (request url "/vendors/new" [])]
+            [created1 (request url "/vendors" ["--data-urlencode" "name=Acme" "--data-urlencode" "phone=111" "--data-urlencode" "memo=first"])]
+            [rows1 (show-sqlite "SQLITE_AFTER_CREATE_1:" (sqlite-rows database))]
+            [created2 (request url "/vendors" ["--data-urlencode" "name=Beta" "--data-urlencode" "phone=222" "--data-urlencode" "memo=second"])]
+            [rows2 (show-sqlite "SQLITE_AFTER_CREATE_2:" (sqlite-rows database))]
+            [created3 (request url "/vendors" ["--data-urlencode" "name=Cedar" "--data-urlencode" "phone=333" "--data-urlencode" "memo=third"])]
+            [rows3 (show-sqlite "SQLITE_AFTER_CREATE_3:" (sqlite-rows database))]
+            [list3 (request url "/vendors" [])]
+            [html-list3 (request url "/vendors" [])]
+            [edit-form (request url "/vendors/2/edit" [])]
+            [updated (request url "/vendors/2" ["--data-urlencode" "name=Beta Updated" "--data-urlencode" "phone=222" "--data-urlencode" "memo=second"])]
+            [rows-updated (show-sqlite "SQLITE_AFTER_UPDATE:" (sqlite-rows database))]
+            [list-updated (request url "/vendors" [])]
+            [deleted (request url "/vendors/1/delete" ["--request" "POST"])]
+            [rows-deleted (show-sqlite "SQLITE_AFTER_DELETE:" (sqlite-rows database))]
+            [list-deleted (request url "/vendors" [])]
+            [blank (request url "/vendors" ["--data-urlencode" "name=" "--data-urlencode" "phone=000" "--data-urlencode" "memo=blank"])]
+            [blank-count (show-sqlite "SQLITE_AFTER_BLANK_REJECT:" (count-output database))]
+            [missing-name (request url "/vendors" ["--data-urlencode" "phone=000" "--data-urlencode" "memo=missing"])]
+            [missing-name-count (show-sqlite "SQLITE_AFTER_MISSING_NAME_REJECT:" (count-output database))]
+            [xss (request url "/vendors" ["--data-urlencode" "name=<script>&\"'" "--data-urlencode" "phone=444" "--data-urlencode" "memo=literal"])]
+            [rows-xss (show-sqlite "SQLITE_AFTER_ESCAPED_INPUT:" (sqlite-rows database))]
+            [list-xss (request url "/vendors" [])]
+            [missing-get (request url "/vendors/999/edit" [])]
+            [missing-post (request url "/vendors/999" ["--data-urlencode" "name=Ghost" "--data-urlencode" "phone=" "--data-urlencode" "memo="])]
+            [checks [
+              (check (has empty "HTTP/1.1 200") "empty list returns 200")
+              (check (= empty-count "0\n") "empty database has zero vendors")
+              (check (has new-form "HTTP/1.1 200") "new vendor form returns 200")
+              (check (and (has created1 "HTTP/1.1 303") (has created1 "Location: /vendors")) "create one redirects 303")
+              (check (= rows1 "1|Acme|111|first\n") "sqlite reads first created row")
+              (check (and (has created2 "HTTP/1.1 303") (= rows2 "1|Acme|111|first\n2|Beta|222|second\n")) "second create persists")
+              (check (and (has created3 "HTTP/1.1 303") (= rows3 "1|Acme|111|first\n2|Beta|222|second\n3|Cedar|333|third\n")) "third create persists")
+              (check (= (count-rows list3 0 0) 3) "list shows three vendors")
+              (check (has list3 "Acme") "list renders vendor names")
+              (check (has edit-form "HTTP/1.1 200") "edit form returns 200")
+              (check (and (has updated "HTTP/1.1 303") (= rows-updated "1|Acme|111|first\n2|Beta Updated|222|second\n3|Cedar|333|third\n")) "update persists and redirects")
+              (check (has list-updated "Beta Updated") "updated name appears in list")
+              (check (and (has deleted "HTTP/1.1 303") (= rows-deleted "2|Beta Updated|222|second\n3|Cedar|333|third\n")) "delete persists and redirects")
+              (check (= (count-rows list-deleted 0 0) 2) "list shows two after delete")
+              (check (= blank-count "2\n") "blank name leaves database unchanged")
+              (check (has blank "이름을 입력하세요.") "blank name shows form error")
+              (check (and (= missing-name-count "2\n") (has missing-name "이름을 입력하세요.")) "missing name is rejected without a row")
+              (check (and (has xss "HTTP/1.1 303") (= rows-xss "2|Beta Updated|222|second\n3|Cedar|333|third\n4|<script>&\"'|444|literal\n")) "escaped input is stored literally")
+              (check (and (has list-xss "&lt;script&gt;&amp;&quot;&#39;") (not (has list-xss "<script>&\"'"))) "HTML output escapes five special characters")
+              (check (has missing-get "HTTP/1.1 404") "missing edit is 404")
+              (check (has missing-post "HTTP/1.1 404") "missing update is 404")
+              (check (= (get (get (http-get (str "http://127.0.0.1:" refused-port)) "error") "code") "CONNECT") "bind-only socket refuses connection")
+            ]]
+            [passed (length (filter (fn [result] result) checks))]]
+        (do
+          (println "LIST_HTML_FIRST_30_LINES:")
+          (print html-list3)
+          (tcp-close refused-guard)
+          (out "/bin/kill" [pid])
+          (println (str "ERP_SUMMARY=" passed "/" (length checks)))
+          (if (= passed (length checks)) nil (_fl_exit 1)))))))

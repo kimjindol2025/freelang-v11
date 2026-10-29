@@ -1,5 +1,9 @@
 # FreeLang v11 — 보안 감사 보고서
 
+`auth-jwt-decode` returns claims without checking signature or time claims. Its result is untrusted and must never make authentication or authorization decisions; use `auth-jwt-verify` with a trusted key.
+
+`auth-jwt-verify` returns `nil` for a token whose `exp` claim is missing, is not a finite number, or is negative. Tokens that fail signature, algorithm, or time-claim validation are rejected the same way.
+
 > **감사 일자**: 2026-05-13  
 > **감사 버전**: v11.7.4 (commit ad7f3515)  
 > **패치 완료**: v11.7.5 (commit a7208404)  

@@ -1,0 +1,123 @@
+(defn tm-floor [v] (str-to-num (floor v)))
+(defn tm-substr [s i n] (substring s i (+ i n)))
+;; Proleptic Gregorian calendar, UTC milliseconds, years 0001..9999.
+;; Public fallible operations return {ok,value} or {ok,error}.
+(defn tm-ok [v] {"ok" true "value" (if (number? v) (str-to-num v) v)})
+(defn tm-error [code] {"ok" false "error" {"code" code "message" code "position" 0}})
+(defn tm-mod [n d] (- n (* d (tm-floor (/ n d)))))
+(defn tm-leap [y] (and (= (tm-mod y 4) 0) (or (not (= (tm-mod y 100) 0)) (= (tm-mod y 400) 0))))
+(defn tm-days [y m] (if (= m 2) (if (tm-leap y) 29 28) (if (includes-item [4 6 9 11] m) 30 31)))
+(defn tm-year? [y] (and (integer? y) (>= y 1) (<= y 9999)))
+(defn tm-time? [t] (and (integer? t) (>= t -62135596800000) (<= t 253402300799999)))
+(defn tm-offset? [z] (and (integer? z) (>= z -1439) (<= z 1439)))
+(defn leap-year? [y] (if (tm-year? y) (tm-ok (tm-leap y)) (tm-error "INVALID_TIME")))
+(defn days-in-month [y m]
+  (if (and (tm-year? y) (integer? m) (>= m 1) (<= m 12)) (tm-ok (tm-days y m)) (tm-error "INVALID_TIME")))
+;; Constant-time civil date conversion, 400-year Gregorian eras.
+(defn tm-civil-days [y m d]
+  (let [[yy (- y (if (<= m 2) 1 0))] [era (tm-floor (/ yy 400))]
+        [yoe (- yy (* era 400))] [mp (+ m (if (> m 2) -3 9))]
+        [doy (+ (tm-floor (/ (+ (* 153 mp) 2) 5)) (- d 1))]
+        [doe (+ (* yoe 365) (tm-floor (/ yoe 4)) (- (tm-floor (/ yoe 100))) doy)]]
+    (- (+ (* era 146097) doe) 719468)))
+(defn tm-parts [t]
+  (let [[days (tm-floor (/ t 86400000))] [z (+ days 719468)]
+        [era (tm-floor (/ z 146097))] [doe (- z (* era 146097))]
+        [yoe (tm-floor (/ (+ doe (- (tm-floor (/ doe 1460))) (tm-floor (/ doe 36524)) (- (tm-floor (/ doe 146096)))) 365))]
+        [y (+ yoe (* era 400))]
+        [doy (- doe (+ (* 365 yoe) (tm-floor (/ yoe 4)) (- (tm-floor (/ yoe 100)))))]
+        [mp (tm-floor (/ (+ (* 5 doy) 2) 153))]
+        [d (+ (- doy (tm-floor (/ (+ (* 153 mp) 2) 5))) 1)]
+        [m (+ mp (if (< mp 10) 3 -9))]
+        [rem (- t (* days 86400000))]]
+    [(+ y (if (<= m 2) 1 0)) m d (tm-floor (/ rem 3600000))
+     (tm-floor (/ (tm-mod rem 3600000) 60000)) (tm-floor (/ (tm-mod rem 60000) 1000)) (tm-mod rem 1000)]))
+(defn tm-stamp [y m d h minute s ms]
+  (+ (* (tm-civil-days y m d) 86400000) (* h 3600000) (* minute 60000) (* s 1000) ms))
+(defn tm-digits [s i end acc]
+  (if (>= i end) acc
+    (let [[c (char-code-at s i)]]
+      (if (or (< c 48) (> c 57)) -1 (tm-digits s (+ i 1) end (+ (* acc 10) (- c 48)))))))
+(defn tm-num [s a b] (if (> b (length s)) -1 (tm-digits s a b 0)))
+(defn tm-sep? [s i x] (= (tm-substr s i 1) x))
+(defn tm-fraction-end [s i]
+  (if (>= i (length s)) i
+    (let [[c (char-code-at s i)]]
+      (if (and (>= c 48) (<= c 57)) (tm-fraction-end s (+ i 1)) i))))
+(defn tm-zone [s pos]
+  (let [[n (length s)] [sign (tm-substr s pos 1)] [h (tm-num s (+ pos 1) (+ pos 3))] [m (tm-num s (+ pos 4) (+ pos 6))]]
+    (cond [(= pos n) (tm-ok 0)]
+      [(and (= (+ pos 1) n) (= sign "Z")) (tm-ok 0)]
+      [(and (= (+ pos 6) n) (includes-item ["+" "-"] sign) (tm-sep? s (+ pos 3) ":")
+            (>= h 0) (<= h 23) (>= m 0) (<= m 59))
+        (tm-ok (* (if (= sign "-") -1 1) (+ (* h 60) m)))]
+      [true (tm-error "INVALID_TIME")])) )
+(defn tm-parse-tail [s y m d]
+  (let [[n (length s)] [has-time (tm-sep? s 10 "T")]
+        [h (if has-time (tm-num s 11 13) 0)] [mi (if has-time (tm-num s 14 16) 0)]
+        [sec (if has-time (tm-num s 17 19) 0)]
+        [frac (and has-time (tm-sep? s 19 "."))]
+        [end (if frac (tm-fraction-end s 20) 19)] [digits (- end 20)]
+        [ms (if frac (* (tm-num s 20 end) (cond [(= digits 1) 100] [(= digits 2) 10] [true 1])) 0)]
+        [pos (if has-time (if frac end 19) 10)]
+        [zone (tm-zone s pos)]]
+    (if (or (not (get zone "ok")) (< h 0) (> h 23) (< mi 0) (> mi 59) (< sec 0) (> sec 59) (< ms 0)
+          (and frac (or (< digits 1) (> digits 3)))
+          (and has-time (or (< n 19) (not (tm-sep? s 13 ":")) (not (tm-sep? s 16 ":")))))
+      (tm-error "INVALID_TIME")
+      (let [[t (- (tm-stamp y m d h mi sec ms) (* (get zone "value") 60000))]]
+        (if (tm-time? t) (tm-ok t) (tm-error "INVALID_TIME"))))))
+(defn time-parse [s]
+  (if (not (string? s)) (tm-error "INVALID_ARGUMENT")
+    (if (or (< (length s) 10) (> (length s) 29)) (tm-error "INVALID_TIME")
+      (let [[y (tm-num s 0 4)] [m (tm-num s 5 7)] [d (tm-num s 8 10)]]
+        (if (and (tm-year? y) (>= m 1) (<= m 12) (>= d 1) (<= d (tm-days y m))
+                 (tm-sep? s 4 "-") (tm-sep? s 7 "-"))
+          (tm-parse-tail s y m d) (tm-error "INVALID_TIME"))))))
+(defn tm-pad [n width]
+  (let [[s (str (str-to-num n))]] (if (>= (length s) width) s (str "0" (tm-pad n (- width 1))))))
+(defn tm-zone-text [z]
+  (let [[a (abs z)]] (str (if (< z 0) "-" "+") (tm-pad (tm-floor (/ a 60)) 2) ":" (tm-pad (tm-mod a 60) 2))))
+(defn tm-format-loop [f p z i out]
+  (if (>= i (length f)) out
+    (let [[four (tm-substr f i 4)] [three (tm-substr f i 3)] [two (tm-substr f i 2)] [one (tm-substr f i 1)]
+          [token (cond [(= four "YYYY") [(tm-pad (get p 0) 4) 4]]
+            [(= three "SSS") [(tm-pad (get p 6) 3) 3]]
+            [(= two "MM") [(tm-pad (get p 1) 2) 2]]
+            [(= two "DD") [(tm-pad (get p 2) 2) 2]]
+            [(= two "HH") [(tm-pad (get p 3) 2) 2]]
+            [(= two "mm") [(tm-pad (get p 4) 2) 2]]
+            [(= two "ss") [(tm-pad (get p 5) 2) 2]]
+            [(= one "Z") [(tm-zone-text z) 1]] [true [one 1]])]]
+      (tm-format-loop f p z (+ i (get token 1)) (str out (get token 0))))))
+(defn time-format [t pattern offset]
+  (if (and (tm-time? t) (string? pattern) (tm-offset? offset))
+    (if (or (> (length pattern) 1024) (not (tm-time? (+ t (* offset 60000))))) (tm-error "INVALID_TIME")
+      (tm-ok (tm-format-loop pattern (tm-parts (+ t (* offset 60000))) offset 0 "")))
+    (tm-error "INVALID_ARGUMENT")))
+(defn now-s [] (tm-floor (/ (now-ms) 1000)))
+(defn now-iso [] (str (get (time-format (now-ms) "YYYY-MM-DDTHH:mm:ss.SSS" 0) "value") "Z"))
+(defn weekday [t] (if (tm-time? t) (tm-ok (tm-mod (+ (tm-floor (/ t 86400000)) 4) 7)) (tm-error "INVALID_TIME")))
+(defn time-diff [a b] (if (and (tm-time? a) (tm-time? b)) (tm-ok (- a b)) (tm-error "INVALID_TIME")))
+(defn tm-add-months [t n]
+  (let [[p (tm-parts t)] [total (+ (* (get p 0) 12) (- (get p 1) 1) n)]
+        [y (tm-floor (/ total 12))] [m (+ (tm-mod total 12) 1)]]
+    (if (tm-year? y)
+      (tm-ok (tm-stamp y m (if (< (get p 2) (tm-days y m)) (get p 2) (tm-days y m)) (get p 3) (get p 4) (get p 5) (get p 6)))
+      (tm-error "INVALID_TIME"))))
+(defn time-add [t n unit]
+  (if (and (tm-time? t) (integer? n) (>= n -1000000000) (<= n 1000000000) (includes-item ["s" "m" "h" "d" "month" "year"] unit))
+    (if (includes-item ["month" "year"] unit) (tm-add-months t (* n (if (= unit "year") 12 1)))
+      (let [[factor (get {"s" 1000 "m" 60000 "h" 3600000 "d" 86400000} unit)] [v (+ t (* n factor))]]
+        (if (tm-time? v) (tm-ok v) (tm-error "INVALID_TIME")))) (tm-error "INVALID_ARGUMENT")))
+(defn duration-format [ms style]
+  (if (and (integer? ms) (>= ms 0) (<= ms 253402300799999) (includes-item ["ko" "short"] style))
+    (let [[s (tm-floor (/ ms 1000))] [h (tm-floor (/ s 3600))] [m (tm-floor (/ (tm-mod s 3600) 60))] [sec (tm-mod s 60)]
+          [ko (= style "ko")]
+          [out (str (if (> h 0) (str h (if ko "시간" "h")) "")
+            (if (> m 0) (str (if (and ko (> h 0)) " " "") m (if ko "분" "m")) "")
+            (if (> sec 0) (str (if (and ko (or (> h 0) (> m 0))) " " "") sec (if ko "초" "s")) ""))]]
+      (tm-ok (if (= out "") (if ko "0초" "0s") out))) (tm-error "INVALID_ARGUMENT")))
+(defn stopwatch-start [] (now-ms))
+(defn stopwatch-elapsed [start]
+  (let [[end (now-ms)]] (if (and (tm-time? start) (<= start end)) (tm-ok (- end start)) (tm-error "INVALID_TIME"))))
