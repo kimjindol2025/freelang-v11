@@ -1,0 +1,2 @@
+(println (validate_range 3 1 5 "value"))
+(println (validate_length "abc" 2 5 "name"))
