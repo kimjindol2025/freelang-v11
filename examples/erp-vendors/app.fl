@@ -336,5 +336,5 @@
 (server-get "/vendors/:id/edit" (fn [request] (protected-get handle-edit request)))
 (server-post "/vendors/:id" (fn [request] (protected-post handle-update request)))
 (server-post "/vendors/:id/delete" (fn [request] (protected-post handle-delete request)))
-(server-workers 16)
+(server-workers 128)
 (server-start 0)
