@@ -166,7 +166,14 @@ TASK920_RC=0
 - `runtime/math.c:710-742`, `runtime/runtime.h` — `validate_range`, `validate_length`.
 - 기능별 수정 전 민감정보 diff 검사 출력은 `SENSITIVE_DIFF_MATCHES=0`이었다.
 
-작업 커밋은 `5e6b65b8`, `cf44c831`, `f366d84b`, `1ad1eaa4`, `7ad48944`, `2e3ccc17`, `c198fb1c`, `bf1a1ba5`, `0b0f2450` 순이다. 보고서 커밋 및 Forgejo·GitHub HEAD는 푸시 후 이 문서와 최종 응답에 명령 출력 원문으로 기록한다.
+작업 커밋은 `5e6b65b8`, `cf44c831`, `f366d84b`, `1ad1eaa4`, `7ad48944`, `2e3ccc17`, `c198fb1c`, `bf1a1ba5`, `0b0f2450` 순이다. 첫 보고서 커밋 `673387c1`을 푸시한 직후 양 원격 HEAD는 다음과 같았다.
+
+```text
+673387c1f9c94aa170bd0c0d500f5b71554df683	refs/heads/v11-x86-seed-public
+673387c1f9c94aa170bd0c0d500f5b71554df683	refs/heads/v11-x86-seed-public
+```
+
+위 출력 순서는 Forgejo, GitHub다. 보고서의 최신본은 [GitHub에서 확인](https://github.com/kimjindol2025/freelang-v11/blob/v11-x86-seed-public/docs/9-56-gcc-zero.md)할 수 있다. 최신 보고서 커밋 이후 최종 양 원격 HEAD는 최종 응답에 기록한다.
 
 ## X86_SUMMARY
 
