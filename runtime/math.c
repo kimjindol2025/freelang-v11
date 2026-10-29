@@ -656,6 +656,19 @@ FLValue fl_builtin_min(void) {
     return fl_fn_new(fl_builtin_min_call, 0, NULL);
 }
 
+static FLValue fl_builtin_binary_max_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    if (argc != 2) {
+        fl_throw(fl_str_val("max expects two arguments"));
+        return fl_nil();
+    }
+    return max(argv[0], argv[1]);
+}
+
+FLValue fl_builtin_max(void) {
+    return fl_fn_new(fl_builtin_binary_max_call, 0, NULL);
+}
+
 static FLValue fl_builtin_binary_add_call(FLClosure *self, int argc, FLValue *argv) {
     (void)self;
     if (argc != 2) {

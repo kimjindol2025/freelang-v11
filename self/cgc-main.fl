@@ -949,6 +949,7 @@
                         [(or (= $v "nil") (= $v "null")) "fl_nil()"]
                         [(= $v "json-parse") "fl_fn_new(json_parse_wrap, 0, NULL)"]
                         [(= $v "min") "fl_builtin_min()"]
+                        [(= $v "max") "fl_builtin_max()"]
                         [(= $v "+") "fl_builtin_add()"]
                         [(= $v "str") "fl_builtin_str()"]
                         [true (let [[$cn (c-name $v)] [$global (c-global-name $v)]]
