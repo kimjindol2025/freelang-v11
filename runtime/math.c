@@ -695,6 +695,52 @@ FLValue fl_builtin_str(void) {
     return fl_fn_new(fl_builtin_binary_str_call, 0, NULL);
 }
 
+static int fl_validation_number(FLValue value, double *out) {
+    if (value.tag == FL_INT) {
+        *out = (double)value.i;
+        return 1;
+    }
+    if (value.tag == FL_FLOAT) {
+        *out = value.f;
+        return 1;
+    }
+    return 0;
+}
+
+FLValue validate_range(FLValue value, FLValue minimum, FLValue maximum, FLValue field) {
+    double v, lo, hi;
+    if (!fl_validation_number(value, &v) || !fl_validation_number(minimum, &lo) ||
+        !fl_validation_number(maximum, &hi) || v < lo || v > hi) {
+        fl_throw(fl_str_n(5, field, fl_str_val(" must be between "), minimum,
+                          fl_str_val(" and "), maximum));
+        return fl_nil();
+    }
+    return fl_bool(true);
+}
+
+FLValue validate_length(FLValue value, FLValue minimum, FLValue maximum, FLValue field) {
+    double lo, hi;
+    uint32_t length;
+    if (!fl_validation_number(minimum, &lo) || !fl_validation_number(maximum, &hi)) {
+        fl_throw(fl_str_n(2, field, fl_str_val(" length bounds must be numbers")));
+        return fl_nil();
+    }
+    if (value.tag == FL_STRING && value.obj) {
+        length = ((FLString *)value.obj)->len;
+    } else if (value.tag == FL_VECTOR && value.obj) {
+        length = ((FLVector *)value.obj)->len;
+    } else {
+        fl_throw(fl_str_n(2, field, fl_str_val(" must be a string or array")));
+        return fl_nil();
+    }
+    if ((double)length < lo || (double)length > hi) {
+        fl_throw(fl_str_n(5, field, fl_str_val(" length must be between "), minimum,
+                          fl_str_val(" and "), maximum));
+        return fl_nil();
+    }
+    return fl_bool(true);
+}
+
 FLValue fl_html_escape(FLValue value) {
     char value_buf[128];
     const char *src = value.tag == FL_STRING && value.obj ? ((FLString*)value.obj)->data :

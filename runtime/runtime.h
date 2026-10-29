@@ -88,6 +88,8 @@ FLValue fl_builtin_min(void);
 FLValue fl_builtin_max(void);
 FLValue fl_builtin_add(void);
 FLValue fl_builtin_str(void);
+FLValue validate_range(FLValue value, FLValue minimum, FLValue maximum, FLValue field);
+FLValue validate_length(FLValue value, FLValue minimum, FLValue maximum, FLValue field);
 
 /* ── 비교 ── */
 FLValue fl_eq(FLValue a, FLValue b);
