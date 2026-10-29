@@ -85,6 +85,8 @@ FLValue fl_quot(FLValue a, FLValue b);
 FLValue fl_rem(FLValue a, FLValue b);
 FLValue fl_min(FLValue a, FLValue b);
 FLValue fl_builtin_min(void);
+FLValue fl_builtin_add(void);
+FLValue fl_builtin_str(void);
 
 /* ── 비교 ── */
 FLValue fl_eq(FLValue a, FLValue b);

@@ -656,6 +656,32 @@ FLValue fl_builtin_min(void) {
     return fl_fn_new(fl_builtin_min_call, 0, NULL);
 }
 
+static FLValue fl_builtin_binary_add_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    if (argc != 2) {
+        fl_throw(fl_str_val("+ expects two arguments"));
+        return fl_nil();
+    }
+    return fl_add(argv[0], argv[1]);
+}
+
+FLValue fl_builtin_add(void) {
+    return fl_fn_new(fl_builtin_binary_add_call, 0, NULL);
+}
+
+static FLValue fl_builtin_binary_str_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    if (argc != 2) {
+        fl_throw(fl_str_val("str expects two arguments"));
+        return fl_nil();
+    }
+    return fl_str_n(2, argv[0], argv[1]);
+}
+
+FLValue fl_builtin_str(void) {
+    return fl_fn_new(fl_builtin_binary_str_call, 0, NULL);
+}
+
 FLValue fl_html_escape(FLValue value) {
     char value_buf[128];
     const char *src = value.tag == FL_STRING && value.obj ? ((FLString*)value.obj)->data :
