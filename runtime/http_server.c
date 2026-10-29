@@ -24,7 +24,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define HTTP_ROUTE_MAX 128
+#define HTTP_ROUTE_MAX 256
 #define HTTP_HEADER_MAX 65536
 #define HTTP_HEADER_COUNT_MAX 128
 #define HTTP_DEFAULT_HEADER_TIMEOUT_MS 500
