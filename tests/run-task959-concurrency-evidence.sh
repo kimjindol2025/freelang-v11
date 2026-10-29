@@ -4,8 +4,8 @@ set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CURRENT_COMPILER="${1:?usage: run-task959-concurrency-evidence.sh <current-compiler> <empty-record-dir>}"
 RECORD_DIR="${2:?usage: run-task959-concurrency-evidence.sh <current-compiler> <empty-record-dir>}"
-BASELINE_COMPILER="$ROOT/bin/cgc-bin-x86_64-seed-v11"
 TOOLS="${FL_TOOLS_ROOT:-$(cd -- "$ROOT/../freelang-tools" && pwd -P)}"
+BASELINE_COMPILER="$TOOLS/scripts/cgc-native"
 RUNTIME="$ROOT/runtime"
 if [[ -e "$RECORD_DIR" && -n "$(find "$RECORD_DIR" -mindepth 1 -print -quit)" ]]; then
   echo 'task959 record directory must be empty' >&2
