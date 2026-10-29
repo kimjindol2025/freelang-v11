@@ -977,7 +977,9 @@ static int http_match_path(const char *pattern, const char *path, FLValue *param
         const char *q_end = strchr(q, '/');
         size_t p_len = p_end ? (size_t)(p_end - p) : strlen(p);
         size_t q_len = q_end ? (size_t)(q_end - q) : strlen(q);
-        if (p_len > 0 && p[0] == ':') {
+        if (p_len == 1 && p[0] == '*') {
+            return p_end == NULL;
+        } else if (p_len > 0 && p[0] == ':') {
             char key[256];
             if (p_len >= sizeof(key) || q_len >= 2048) return 0;
             memcpy(key, p + 1, p_len - 1);
