@@ -9,6 +9,8 @@ import { suggestSimilar, KNOWN_ALIASES } from "./error-formatter";
 import { FunctionNotFoundError } from "./errors";
 import { isTailCall } from "./tco";
 import { globalProfiler } from "./profiler";
+import { vmFunctionRegistry } from "./vm-eligible"; // Phase 3-E
+import { VM } from "./vm"; // Phase 3-E
 import { ReturnSignal, isReturnSignal } from "./return-signal";
 import { checkBudget, hasBudget } from "./runtime-budget";
 import {
@@ -17,6 +19,8 @@ import {
   enforceCall as _enforceEffect,
   resolveFnAllowed as _resolveFnAllowed,
 } from "./effect-enforcer";
+
+const _callVM = new VM(); // Phase 3-E
 
 // Minimal Interpreter interface (순환 import 방지)
 interface InterpreterLike {
@@ -139,13 +143,58 @@ export function callUserFunction(interp: InterpreterLike, name: string, args: an
     return callUserFunctionTCO(interp, name, args);
   }
 
-  // === C4-1: effect gate ===
+  // === C4-1: effect gate (VM mode 분기 전에) ===
   // caller frame 이 이 호출을 허용하는가 검사 → 위반 시 즉시 throw.
   // 통과 시 새 frame push. finally 에서 정확히 한 번 pop.
   const _effBase = name.replace(/\[.*$/, "");
   _enforceEffect(_effBase);
 
-  // === interpreter path frame ===
+  // Phase 3-E: VM 함수 호출
+  if (process.env.FL_VM === "1" && vmFunctionRegistry.has(name)) {
+    const _vmAllowed = _resolveFnAllowed(_effBase);
+    _pushEffectFrame(_effBase, _vmAllowed);
+    let _vmOk = false;
+    let _vmResult: any;
+    try {
+      try {
+        const vmFunc = vmFunctionRegistry.get(name)!;
+        const initialVars = new Map<string, any>();
+
+        // closure가 있으면 사용, 없으면 현재 변수 스냅샷
+        if (vmFunc._closure && Array.isArray(vmFunc._closure) && vmFunc._closure.length > 0) {
+          for (const [k, v] of vmFunc._closure) {
+            initialVars.set(k, v);
+          }
+        } else {
+          const snapshot = interp.context.variables.snapshot();
+          for (const [k, v] of snapshot) {
+            initialVars.set(k, v);
+          }
+        }
+
+        // 모든 VM 함수를 변수로 포함 (재귀 호출 지원)
+        for (const [vmName, vmFuncObj] of vmFunctionRegistry) {
+          initialVars.set("$" + vmName, vmFuncObj);
+          initialVars.set(vmName, vmFuncObj); // op 위치에서 직접 참조
+        }
+
+        // 파라미터 바인딩: fnValue.params는 $ 없는 형태 (fn의 params 정규화 참고)
+        for (let i = 0; i < vmFunc._params.length; i++) {
+          initialVars.set(vmFunc._params[i], args[i] ?? null);
+        }
+
+        _vmResult = _callVM.run(vmFunc._chunk, initialVars);
+        _vmOk = true;
+      } catch {
+        // fallback to interpreter path — frame은 finally 에서 pop, interpreter path에서 다시 push
+      }
+    } finally {
+      _popEffectFrame();
+    }
+    if (_vmOk) return _vmResult;
+  }
+
+  // === interpreter path frame (VM fallback 또는 VM 미사용 시) ===
   const _interpAllowed = _resolveFnAllowed(_effBase);
   _pushEffectFrame(_effBase, _interpAllowed);
   try {
