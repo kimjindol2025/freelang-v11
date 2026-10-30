@@ -126,14 +126,14 @@ Failure classification:
 | fd-limit negative path | Test environment | `FDFIX_CASE=fd-limit RC=1 SIGNAL=0 ERROR=db-exec: unable to open database file (sqlite=14)`; recovery: `FDFIX_RECOVERY_RC=0 ROWS=1`. |
 | x86-origin failures | x86 cause | `0` |
 
-The pool suite passed `POOL_SUMMARY=8/8`, native symbol tests passed `CGC_SYMBOL_SUMMARY=5/5`, and ABI tests passed `ABI_SUMMARY=8/8`. No DB code, test expectation, or seed was changed. The whole check still returned nonzero because the legacy DB-lock case failed: `FULL_CHECK_RC=1`. Under instruction f, GitHub master was therefore not advanced.
+The pool suite passed `POOL_SUMMARY=8/8`, native symbol tests passed `CGC_SYMBOL_SUMMARY=5/5`, and ABI tests passed `ABI_SUMMARY=8/8`. No DB code, test expectation, or seed was changed. The whole check still returned nonzero because the legacy DB-lock case failed: `FULL_CHECK_RC=1`. At the time of the initial G-3 run, GitHub master was not advanced; the later G-3a decision is recorded below.
 
 ## f. Push decision and remote state
 
 ```text
-GitHub master before verification:
+GitHub master after initial G-3 verification, before the G-3a decision:
 b49cc9194a00649b8cf58e1d6e8ee38ffce770d4	refs/heads/master
-GitHub master after verification:
+GitHub master at that same point:
 b49cc9194a00649b8cf58e1d6e8ee38ffce770d4	refs/heads/master
 GITHUB_MASTER_PUSHED=NO
 REASON=FULL_CHECK_RC=1
@@ -149,3 +149,44 @@ SERVER_ADDRESS_MATCHES=0
 WORKSPACE_PATH_MATCHES=0
 KEY_MATCHES=0
 ```
+
+## G-3a. 결정, fast-forward push, 남은 실패
+
+사장님 결정(2026-10-30): legacy DB 잠금 실패(`LOAD2_SUMMARY=9/10`)는 DB 담당이 처리하며, x86 원인 실패가 0건이므로 master에 올린다.
+
+후보/보고서 커밋 확인:
+
+```text
+git rev-parse x86-merge-check
+c8d03799c564eb3f3a30f569b3a61e4fcf25b5c3
+
+git merge-base --is-ancestor 2f4f6292 c8d03799
+CANDIDATE_ANCESTOR_RC=0
+
+git merge-base --is-ancestor c8d03799 x86-merge-check
+REPORT_ANCESTOR_RC=0
+```
+
+GitHub master는 지시된 기준 HEAD `b49cc9194a00649b8cf58e1d6e8ee38ffce770d4`에서 변경되지 않은 것을 확인한 뒤 일반 fast-forward push했다. Push 결과:
+
+```text
+git push origin x86-merge-check:refs/heads/master
+b49cc919..c8d03799  x86-merge-check -> master
+```
+
+Push 후 원격 HEAD와 백업 태그:
+
+```text
+git ls-remote origin refs/heads/master
+c8d03799c564eb3f3a30f569b3a61e4fcf25b5c3	refs/heads/master
+
+git show -s --format='%H %cI %s' origin/master
+c8d03799c564eb3f3a30f569b3a61e4fcf25b5c3 2026-10-30T01:39:18+09:00 docs: record G-3 x86 merge candidate verification
+
+git ls-remote origin refs/tags/pre-x86-merge-20261030 'refs/tags/pre-x86-merge-20261030^{}'
+b13f68407423f86a48a583554ba616e7f8459c10	refs/tags/pre-x86-merge-20261030
+b49cc9194a00649b8cf58e1d6e8ee38ffce770d4	refs/tags/pre-x86-merge-20261030^{}
+```
+
+남은 실패: legacy DB 잠금, DB 담당 처리 예정.
+Forgejo master는 변경하지 않았다.
