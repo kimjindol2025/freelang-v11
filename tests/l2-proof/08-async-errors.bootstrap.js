@@ -137,6 +137,6 @@ const _fl_server_get = (path,fn) => { __fl_routes.push({method:'GET',path,fn}); 
 const _fl_server_start = (port) => { const http=require('http'); http.createServer(async(req,res)=>{ const r=__fl_routes.find(r=>r.method===req.method&&r.path===require('url').parse(req.url).pathname); if(r){const result=await(typeof r.fn==='string'?eval(r.fn):r.fn)(req);res.end(String(result));}else{res.statusCode=404;res.end('Not Found');} }).listen(port);console.log('Server on '+port); };
 const server_get = _fl_server_get;
 const server_start = _fl_server_start;
-defun(safe_divide,[a,b],null);
+defun(safe_divide,[a,b],(()=>{try{return ((b===0)?throw_("division by zero"):(a/b))}catch(err){let _=err;return _fl_str("error: ",e);}})());
 defun(test_errors,[],list(safe_divide(10,2),safe_divide(10,0)));
 _fl_print(test_errors());
