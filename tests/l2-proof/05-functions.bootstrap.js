@@ -139,5 +139,5 @@ const server_get = _fl_server_get;
 const server_start = _fl_server_start;
 defun(add,[a,b],(a+b));
 defun(apply_twice,[f,x],f(f(x)));
-defun(test_functions,[],list(add(3,4),unknown(5),apply_twice((({"fn":"extract-name","args":[{"kind":"literal","type":"symbol","value":"x","line":14}]}) => (x+1)),5)));
+defun(test_functions,[],list(add(3,4),(()=>{((x) => (x*2));return 5;})(),apply_twice(((x) => (x+1)),5)));
 _fl_print(test_functions());
