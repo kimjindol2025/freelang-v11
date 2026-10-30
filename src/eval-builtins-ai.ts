@@ -11,18 +11,18 @@
 // (eval-builtins.ts에서 lines 5162-6793 분리)
 
 import { Interpreter } from "./interpreter";
-import { PruneResult } from "./prune";
-import { SelfRefactorer, globalRefactorer, RefactorSuggestion, RefactorResult } from "./refactor-self";
-import { AlignmentSystem, globalAlignment, Goal, Value, Action } from "./align";
-import { globalEthics, EthicsChecker, EthicsViolation, EthicsCheckResult, EthicsPrinciple, EthicsFramework } from "./ethics-check";
-import { CuriosityEngine, globalCuriosity, KnowledgeGap, ExplorationResult, CuriosityState } from "./curiosity";
-import { WisdomEngine, globalWisdom, Experience, Heuristic, WisdomJudgment } from "./wisdom";
-import { CausalGraph, globalCausal, CausalNode, CausalEdge, CausalChain, CausalExplanation, whyCaused } from "./causal";
-import { globalExplainer, DecisionExplanation, FeatureImportance, LocalExplanation } from "./explain";
-import { globalWorldModel } from "./world-model";
-import { globalCounterfactual, CounterfactualReasoner, Scenario } from "./counterfactual";
-import { globalPredictor } from "./predict";
-import { SelfBenchmark, globalBenchmark, BenchmarkResult, ComparisonResult, BenchmarkSuite } from "./benchmark-self";
+import { PruneResult } from "./experiments/prune";
+import { SelfRefactorer, globalRefactorer, RefactorSuggestion, RefactorResult } from "./experiments/refactor-self";
+import { AlignmentSystem, globalAlignment, Goal, Value, Action } from "./experiments/align";
+import { globalEthics, EthicsChecker, EthicsViolation, EthicsCheckResult, EthicsPrinciple, EthicsFramework } from "./experiments/ethics-check";
+import { CuriosityEngine, globalCuriosity, KnowledgeGap, ExplorationResult, CuriosityState } from "./experiments/curiosity";
+import { WisdomEngine, globalWisdom, Experience, Heuristic, WisdomJudgment } from "./experiments/wisdom";
+import { CausalGraph, globalCausal, CausalNode, CausalEdge, CausalChain, CausalExplanation, whyCaused } from "./experiments/causal";
+import { globalExplainer, DecisionExplanation, FeatureImportance, LocalExplanation } from "./experiments/explain";
+import { globalWorldModel } from "./experiments/world-model";
+import { globalCounterfactual, CounterfactualReasoner, Scenario } from "./experiments/counterfactual";
+import { globalPredictor } from "./experiments/predict";
+import { SelfBenchmark, globalBenchmark, BenchmarkResult, ComparisonResult, BenchmarkSuite } from "./experiments/benchmark-self";
 
 // Phase 136: PruneResult → Map 변환 헬퍼
 function pruneResultToMap<T>(result: PruneResult<T>): Map<string, any> {
