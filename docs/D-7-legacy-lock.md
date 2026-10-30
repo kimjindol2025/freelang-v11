@@ -759,4 +759,121 @@ index 21446e46..db6ca7e9 100644
 
 ### a3 결과
 
-`--no-ff` 병합을 진행 중이며, 병합 커밋은 스크립트 해결·보고서 기록을 stage한 뒤 생성합니다. 충돌 해결 외 추가 충돌은 없습니다.
+```text
+6e7d42ab31e4a908ea29648447f5392ca3d9699d Merge GitHub master into db-stability for D-7
+parent 1: c7e19161c56024dd4c8dc6682166fa1ad77a54cc
+parent 2: 29c57e38b3bd014822cf33fe3df8c1815fee707e
+```
+
+`tests/run-task931.sh`만 충돌했다. 해결 전후 원문 diff는 위에 기록했다. `bash -n tests/run-task931.sh` 종료 코드는 `0`이었다.
+
+### a4. run-task931.sh 1회 실행
+
+실행 위치: `<가림>`.
+
+```text
+<가림>/oom-memory.c:24:466: error: implicit declaration of function ‘throw’ [-Wimplicit-function-declaration]
+<가림>/oom-memory.c:24:464: error: type mismatch in conditional expression
+RUN_TASK931_RC=1
+```
+
+직접 1회 실행은 seed compiler로 시작했고 C 출력이 gcc에서 실패해 process-limit 검사 두 개에 도달하지 못했다. 전체 시험의 stage2 compiler 실행 결과로 두 검사 각각을 확인했다.
+
+```text
+CASE=process-limit-run-parallel-isolated SKIP_REASON=isolated-uid-or-limit-setup-failed
+ISOLATED_MAIN_SUMMARY=SKIP reason=isolated-uid-or-limit-setup-failed
+CASE=process-limit-run-parallel-same-uid-headroom-retry RC=0 SIGNAL=0 FAILED_SLOTS=16 SUCCESSFUL_SLOTS=4 ERROR=E_RUN_PARALLEL_FORK
+CASE=http-descriptor-limit-30-requests SERVER_RC=0 SIGNAL=0 ERROR=none RESPONSES=30/30 HTTP_200=0 HTTP_503=30
+OOM_SUMMARY=12/12
+FORKFAIL_SUMMARY=SKIP/9 reason=isolated-uid-or-limit-setup-failed
+```
+
+다른 same-UID 표본은 `FAILED_SLOTS=10 SUCCESSFUL_SLOTS=10`, `FAILED_SLOTS=18 SUCCESSFUL_SLOTS=2`였다. 세 표본 모두 `RC=0`, `SIGNAL=0`이고 합계 20이다. 격리 검사 skip을 통과로 세지 않아 `FORKFAIL_SUMMARY=9/9`는 아니다.
+
+### b. legacy와 pool DB 사용 방식
+
+| 항목 | legacy | pool | 근거 |
+|---|---|---|---|
+| open flags | `SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX` | 동일 | `runtime/db.c:38-42` |
+| busy timeout | `sqlite3_busy_timeout(db, 30000)` | 동일 | `runtime/db.c:50` |
+| journal/write | 최초 open에서 `PRAGMA journal_mode = WAL`, 실패 시 `DELETE` fallback | 동일한 open 함수 | `runtime/db.c:52-76` |
+| fork 후 연결 | PID 변경 시 child에서 path로 재개방, `configure_wal=false`; WAL은 파일에 유지 | pool child도 같은 PID 재개방 | `runtime/db.c:87-114` |
+| 요청 처리 | accept 뒤 요청별 fork, 처리 후 child 종료 | worker가 accept/처리를 반복하고 종료 시 교체 | `runtime/http_server.c:219-240, 299-329, 1347-1361` |
+| 연결 수 | server cap `256`; parent 및 동시 요청 child가 연결 보유 가능 | parent와 pool worker별 연결 재사용 | `tests/task936/soak-server.fl:41`; `runtime/http_server.c:1340-1361` |
+
+실제 연결 수는 동시 요청량과 제한에 달린다. 연결 수 문장은 소스 구조에서 도출한 추론이다. open flags, 30초 busy timeout, WAL 구성에서 legacy/pool 차이는 확인되지 않았다.
+
+### c-d. 기존 실패 시험과 세 차례 측정
+
+실패 검출 시험의 마지막 변경은 DB 소스 변경보다 앞선 커밋이다.
+
+```text
+826af7930a7400b14b67794e2c675de61e4efb3a 2026-10-29T20:53:13+09:00 test: use about route for liveness probes
+```
+
+DB 구현은 수정하지 않았다. 세 번의 `run-task942-all.sh`에서 legacy `LOAD_DATABASE_IS_LOCKED=0`이었고, pool 단독 2회와 trial 3 pool 실행도 lock은 0이었다.
+
+```text
+trial 1 legacy: LOAD_DATABASE_IS_LOCKED=0 LOAD2_SUMMARY=9/10 FDFIX_SUMMARY=4/5 LOAD_RESOURCE_STABLE=0
+trial 2 legacy: LOAD_DATABASE_IS_LOCKED=0 LOAD2_SUMMARY=9/10 FDFIX_SUMMARY=4/5 LOAD_RESOURCE_STABLE=0
+trial 3 legacy: LOAD_DATABASE_IS_LOCKED=0 LOAD2_SUMMARY=10/10 FDFIX_SUMMARY=5/5 LOAD_RESOURCE_STABLE=1
+trial 3 pool: LOAD_DATABASE_IS_LOCKED=0 LOAD2_SUMMARY=10/10 FDFIX_SUMMARY=5/5 POOL_SUMMARY=8/8 TASK942_ALL=PASS
+pool standalone trial 1: LOAD_DATABASE_IS_LOCKED=0 LOAD2_SUMMARY=10/10 FDFIX_SUMMARY=5/5 POOL_SUMMARY=8/8
+pool standalone trial 2: LOAD_DATABASE_IS_LOCKED=0 LOAD2_SUMMARY=10/10 FDFIX_SUMMARY=5/5 POOL_SUMMARY=8/8
+```
+
+첫 두 legacy `LOAD2_SUMMARY=9/10`은 `LOAD_RESOURCE_STABLE=0`이었다. lock 카운터는 모두 0이어서 이번에는 lock 오류를 재현하지 못했고 DB 수정 근거가 없었다.
+
+### e. 전체 빠른 시험·고정점·분류
+
+실행 위치: `<가림>`. 전체 시험은 실행 전 `ACTIVE_DB_OR_LOAD_TESTS=0`, `ACTIVE_BUILD_PROCESSES=0`을 확인하고 `flock -o /tmp/fl-heavy.lock` 및 `strace -f -e trace=execve` 아래 1회 실행했다.
+
+```text
+36a806b0aa9639ce34c4b5c3d04807944db9df3bfec3ae4e4780f22e8428edb2  <가림>/bin/cgc-bin-x86_64-seed-v11
+1d70ead09560b908672a572165f62b41b114b336e9fbbcf9c540de2417596448  <가림>/stage2.c
+1d70ead09560b908672a572165f62b41b114b336e9fbbcf9c540de2417596448  <가림>/stage3.c
+1d70ead09560b908672a572165f62b41b114b336e9fbbcf9c540de2417596448  <가림>/stage4.c
+CMP_2_3=0
+CMP_3_4=0
+NATIVE_FIXED_POINT=PASS
+FULL_CHECK_RC=1
+FULL_FAST_RC=1
+LOAD2_SUMMARY=10/10
+TASK942_LEGACY_RC=1
+TASK942_POOL_RC=2
+TASK946_FAST_SUMMARY=0/2
+NATIVE_FORMS_SUMMARY=18/18
+CGC_SYMBOL_SUMMARY=5/5
+CGC_SYMBOL_RC=0
+ABI_SUMMARY=8/8
+TASK920_RC=0
+NODE_EXEC_COUNT=0
+NPM_EXEC_COUNT=0
+NPX_EXEC_COUNT=0
+JS_EXEC_COUNT=0
+PYTHON_EXEC_COUNT=0
+TRACE_EXECVE_LINES=68353
+```
+
+legacy/pool run-task931은 격리 UID 검사가 `SKIP`이어서 `FORKFAIL_SUMMARY=SKIP/9`로 실패했다. 이는 격리 UID/namespace가 준비되지 않은 시험 환경 실패다. `docs/9-53-fdlimit-gcc.md`는 fd-limit 시험에서 다음 결과를 5회 기록했다.
+
+```text
+FDFIX_CASE=fd-limit RC=1 ERROR=db-exec: unable to open database file (sqlite=14)
+EMFILE_EVENTS=4
+```
+
+이 fd-limit 결과는 시험 환경의 파일 descriptor 한도 항목으로 분류한다. 이번 full pool 부하 원문은 다음과 같다.
+
+```text
+POOL_BENCH workers=16 route=ok LOAD_STAGE stage=947 concurrency=1000 created=1000 create_failures=0 duration_s=60 elapsed_s=62.068 requests=19845 rps=319.73 p50_ms=3071.766 p99_ms=4097.875 max_ms=5183.637 errors=15153 error_pct=76.357 connect_refused=0 connect_timeout=14 connect_other=0 io_errors=15139 other_http=0 status_503=0 retry_after_missing=0 overload_rejected=0 rejection_pct=0.000 write_http_200=0 send_timeout=0 send_other=0 recv_timeout=15139 recv_other=0 incomplete_response=0 invalid_status=15139 route_counts=ok:19845,static:0,jwt:0,read:0,write:0,slow300:0 status_codes=0:15153,200:4692
+POOL_BENCH workers=16 route=mixed LOAD_STAGE stage=948 concurrency=1000 created=1000 create_failures=0 duration_s=60 elapsed_s=61.442 requests=26972 rps=438.98 p50_ms=2243.895 p99_ms=2933.634 max_ms=3426.162 errors=225 error_pct=0.834 connect_refused=0 connect_timeout=0 connect_other=0 io_errors=225 other_http=0 status_503=0 retry_after_missing=0 overload_rejected=0 rejection_pct=0.000 write_http_200=5173 send_timeout=0 send_other=0 recv_timeout=225 recv_other=0 incomplete_response=0 invalid_status=225 route_counts=ok:5390,static:5392,jwt:5396,read:5396,write:5398,slow300:0 status_codes=0:225,200:26747
+```
+
+`TASK942_POOL_RC=2` 및 `TASK946_FAST_SUMMARY=0/2`는 통과가 아니다. 16-worker 요청 손실 원인은 이 실행에서 더 추적하지 않아 미확인이다. lock 카운터는 0이었다.
+
+### D-7b 판정
+
+- 충돌 파일 양쪽 검사 방식을 모두 보존했다. 격리 UID 검사 skip은 pass로 세지 않는다.
+- 관측한 여섯 lock 집계 모두 `LOAD_DATABASE_IS_LOCKED=0`; lock 실패는 재현되지 않아 DB 구현 변경은 하지 않았다.
+- 전체 빠른 시험은 실패했다. namespace 및 fd-limit은 시험 환경 항목, 16-worker pool 오류 원인은 미확인이다.
+- 실행 위치: `<가림>`.
