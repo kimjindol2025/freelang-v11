@@ -9,6 +9,7 @@
 
 (defn ok [$req] (server-json {"ok" true}))
 (defn slow [$req] (do (sleep 1500) (server-json {"ok" true})))
+(defn slow300 [$req] (do (sleep 300) (server-json {"ok" true})))
 (defn login [$req]
   (if (auth-verify-password (get $req "body") $PASSWORD-HASH)
     (server-html-cookie (str "mixsoak=" (auth-random-token 32) "; Path=/; HttpOnly; SameSite=Strict") "LOGIN_OK")
@@ -29,7 +30,9 @@
   (server-json {"results" (run-parallel [(fn [] (+ 1 2)) (fn [] "ok")])}))
 (server-static (get $ARGS 0) "/static/")
 (server-get "/ok" ok)
+(server-get "/about" ok)
 (server-get "/__slow" slow)
+(server-get "/__slow300" slow300)
 (server-post "/login" login)
 (server-get "/jwt" jwt)
 (server-post "/write" write-db)

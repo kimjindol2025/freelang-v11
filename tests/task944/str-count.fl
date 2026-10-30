@@ -1,0 +1,2 @@
+(println (str-count "banana" "an"))
+(println (str-count "banana" "z"))

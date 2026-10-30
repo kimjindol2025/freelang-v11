@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,11 +17,14 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+#include <sys/resource.h>
+#endif
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
-#define HTTP_ROUTE_MAX 128
+#define HTTP_ROUTE_MAX 256
 #define HTTP_HEADER_MAX 65536
 #define HTTP_HEADER_COUNT_MAX 128
 #define HTTP_DEFAULT_HEADER_TIMEOUT_MS 500
@@ -52,6 +56,9 @@ static volatile sig_atomic_t http_stopping = 0;
 static volatile sig_atomic_t http_child_changed = 0;
 static int http_worker_limit = HTTP_MAX_WORKERS;
 static int http_max_conn = 256;
+static int http_pool_workers = 0;
+static int http_pool_max_requests = 10000;
+static unsigned http_pool_restarts = 0;
 static pid_t http_workers[HTTP_MAX_WORKERS];
 static size_t http_worker_count = 0;
 typedef struct {
@@ -60,12 +67,44 @@ typedef struct {
     int count;
     volatile int active_connections;
     volatile int max_active_connections;
+    volatile int total_requests;
+    int worker_active[HTTP_MAX_WORKERS];
 } FLHttpRateState;
 static FLHttpRateState *http_rate_shared;
 static int64_t http_now_ms(void);
+static void http_handle_client(int fd);
+static void http_send_busy(int fd);
+static void http_send_status(int fd, int status, const char *message);
 
-static void http_connection_enter(void) {
-    int active = __sync_add_and_fetch(&http_rate_shared->active_connections, 1);
+static void http_shared_lock(void) {
+    // shortcut: reclaim dead PID owners; use a robust process-shared mutex if PID reuse must be excluded.
+    int pid = (int)getpid();
+    for (;;) {
+        int owner = __sync_val_compare_and_swap(&http_rate_shared->lock, 0, 0);
+        if (owner == 0) {
+            if (__sync_bool_compare_and_swap(&http_rate_shared->lock, 0, pid)) return;
+        } else if (kill(owner, 0) != 0 && errno == ESRCH) {
+            (void)__sync_bool_compare_and_swap(&http_rate_shared->lock, owner, 0);
+        } else {
+            sched_yield();
+        }
+    }
+}
+
+static void http_shared_unlock(void) {
+    (void)__sync_bool_compare_and_swap(&http_rate_shared->lock, (int)getpid(), 0);
+}
+
+static int http_connection_enter(void) {
+    int active = __sync_val_compare_and_swap(&http_rate_shared->active_connections, 0, 0);
+    for (;;) {
+        if (active >= http_max_conn) return 0;
+        int previous = __sync_val_compare_and_swap(
+            &http_rate_shared->active_connections, active, active + 1);
+        if (previous == active) break;
+        active = previous;
+    }
+    active++;
     int peak = __sync_val_compare_and_swap(&http_rate_shared->max_active_connections, 0, 0);
     while (active > peak) {
         int previous = __sync_val_compare_and_swap(
@@ -73,6 +112,39 @@ static void http_connection_enter(void) {
         if (previous == peak) break;
         peak = previous;
     }
+    return 1;
+}
+
+static int http_pool_connection_enter(size_t slot) {
+    http_shared_lock();
+    if (http_rate_shared->active_connections >= http_max_conn) {
+        http_shared_unlock();
+        return 0;
+    }
+    http_rate_shared->worker_active[slot] = 1;
+    int active = ++http_rate_shared->active_connections;
+    if (active > http_rate_shared->max_active_connections)
+        http_rate_shared->max_active_connections = active;
+    http_shared_unlock();
+    return 1;
+}
+
+static void http_pool_connection_leave(size_t slot) {
+    http_shared_lock();
+    if (http_rate_shared->worker_active[slot]) {
+        http_rate_shared->worker_active[slot] = 0;
+        if (http_rate_shared->active_connections > 0)
+            http_rate_shared->active_connections--;
+    }
+    http_shared_unlock();
+}
+
+static int http_pool_request_count(void) {
+    return __sync_val_compare_and_swap(&http_rate_shared->total_requests, 0, 0);
+}
+
+static void http_pool_request_enter(void) {
+    (void)__sync_add_and_fetch(&http_rate_shared->total_requests, 1);
 }
 
 static void http_stop_signal(int signal_number) {
@@ -120,6 +192,189 @@ static void http_stop_workers(void) {
     }
 }
 
+static void http_drain_workers(void) {
+    int64_t deadline_ms = http_now_ms() + 5000;
+    while (http_worker_count > 0 && http_now_ms() < deadline_ms) {
+        http_reap_workers();
+        if (http_worker_count == 0) break;
+        struct timespec pause = {.tv_sec = 0, .tv_nsec = 10 * 1000 * 1000};
+        while (nanosleep(&pause, &pause) != 0 && errno == EINTR) {}
+    }
+}
+
+static int http_env_integer(const char *name, int fallback, int minimum, int maximum) {
+    const char *text = getenv(name);
+    if (!text || !*text) return fallback;
+    char *end = NULL;
+    long value = strtol(text, &end, 10);
+    if (!end || *end || value < minimum || value > maximum) {
+        char message[160];
+        snprintf(message, sizeof(message), "%s must be between %d and %d",
+                 name, minimum, maximum);
+        fl_throw(fl_str_val(message));
+    }
+    return (int)value;
+}
+
+static void http_pool_worker_loop(int server, size_t slot) {
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_handler = http_stop_signal;
+    sigemptyset(&action.sa_mask);
+    (void)sigaction(SIGINT, &action, NULL);
+    (void)sigaction(SIGTERM, &action, NULL);
+    (void)signal(SIGCHLD, SIG_DFL);
+    http_stopping = 0;
+    int served = 0;
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+    uint64_t accept_wait_ns = 0;
+    uint64_t accept_wait_max_ns = 0;
+    struct rusage usage_start, usage_end;
+    (void)getrusage(RUSAGE_SELF, &usage_start);
+#endif
+    while (!http_stopping && served < http_pool_max_requests) {
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+        struct timespec accept_started, accept_finished;
+        (void)clock_gettime(CLOCK_MONOTONIC, &accept_started);
+#endif
+        int client = accept(server, NULL, NULL);
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+        (void)clock_gettime(CLOCK_MONOTONIC, &accept_finished);
+        int64_t accept_elapsed =
+            (int64_t)(accept_finished.tv_sec - accept_started.tv_sec) * 1000000000ll +
+            (int64_t)accept_finished.tv_nsec - (int64_t)accept_started.tv_nsec;
+        uint64_t accept_elapsed_ns = accept_elapsed > 0 ? (uint64_t)accept_elapsed : 0;
+        accept_wait_ns += accept_elapsed_ns;
+        if (accept_elapsed_ns > accept_wait_max_ns) accept_wait_max_ns = accept_elapsed_ns;
+#endif
+        if (client < 0) {
+            if (errno == EINTR || errno == ECONNABORTED || errno == EPROTO ||
+                errno == EAGAIN || errno == EWOULDBLOCK) continue;
+            if (errno == EMFILE || errno == ENFILE || errno == ENOBUFS || errno == ENOMEM) {
+                struct timespec retry = {.tv_sec = 0, .tv_nsec = 10 * 1000 * 1000};
+                while (nanosleep(&retry, &retry) != 0 && errno == EINTR && !http_stopping) {}
+                continue;
+            }
+            break;
+        }
+        served++;
+        http_pool_request_enter();
+        if (http_pool_connection_enter(slot)) {
+            http_handle_client(client);
+            http_pool_connection_leave(slot);
+        } else {
+            http_send_busy(client);
+        }
+        close(client);
+    }
+#ifdef FL_HTTP_PERF_DIAGNOSTICS
+    (void)getrusage(RUSAGE_SELF, &usage_end);
+    fprintf(stderr,
+        "HTTP_PERF_WORKER slot=%zu pid=%ld served=%d accept_wait_ns=%llu accept_wait_max_ns=%llu nvcsw=%ld nivcsw=%ld\n",
+        slot, (long)getpid(), served,
+        (unsigned long long)accept_wait_ns,
+        (unsigned long long)accept_wait_max_ns,
+        usage_end.ru_nvcsw - usage_start.ru_nvcsw,
+        usage_end.ru_nivcsw - usage_start.ru_nivcsw);
+    fflush(stderr);
+#endif
+    _exit(!http_stopping && served >= http_pool_max_requests ? 75 : 0);
+}
+
+static pid_t http_spawn_pool_worker(int server, size_t slot) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        (void)setpgid(0, 0);
+        http_pool_worker_loop(server, slot);
+    }
+    if (pid > 0) {
+        (void)setpgid(pid, pid);
+        http_workers[slot] = pid;
+        fprintf(stderr, "HTTP_WORKER_STARTED slot=%zu pid=%ld\n", slot, (long)pid);
+        fflush(stderr);
+    }
+    return pid;
+}
+
+static void http_run_pool(int server, int max_requests) {
+    size_t size = (size_t)http_pool_workers;
+    http_worker_count = 0;
+    for (size_t i = 0; i < size; i++) {
+        if (http_spawn_pool_worker(server, i) > 0) http_worker_count++;
+    }
+    while (!http_stopping && (max_requests == 0 || http_pool_request_count() < max_requests)) {
+        int status;
+        pid_t ended;
+        while ((ended = waitpid(-1, &status, WNOHANG)) > 0) {
+            for (size_t slot = 0; slot < size; slot++) {
+                if (http_workers[slot] != ended) continue;
+                http_pool_connection_leave(slot);
+                const char *reason = WIFSIGNALED(status) ? "signal" :
+                    (WIFEXITED(status) && WEXITSTATUS(status) == 75 ? "request-limit" : "exit");
+                int detail = WIFSIGNALED(status) ? WTERMSIG(status) :
+                    (WIFEXITED(status) ? WEXITSTATUS(status) : status);
+                http_workers[slot] = 0;
+                if (http_worker_count) http_worker_count--;
+                if (!http_stopping) {
+                    pid_t replacement = http_spawn_pool_worker(server, slot);
+                    http_pool_restarts++;
+                    fprintf(stderr,
+                        "HTTP_WORKER_RESTART slot=%zu old_pid=%ld reason=%s detail=%d count=%u new_pid=%ld\n",
+                        slot, (long)ended, reason, detail, http_pool_restarts,
+                        (long)(replacement > 0 ? replacement : 0));
+                    fflush(stderr);
+                    if (replacement > 0) http_worker_count++;
+                }
+                break;
+            }
+        }
+        if (http_child_changed) http_child_changed = 0;
+        for (size_t slot = 0; slot < size && !http_stopping; slot++) {
+            if (http_workers[slot] != 0) continue;
+            pid_t replacement = http_spawn_pool_worker(server, slot);
+            if (replacement > 0) {
+                http_worker_count++;
+                http_pool_restarts++;
+                fprintf(stderr,
+                    "HTTP_WORKER_RESTART slot=%zu old_pid=0 reason=spawn-retry detail=0 count=%u new_pid=%ld\n",
+                    slot, http_pool_restarts, (long)replacement);
+                fflush(stderr);
+            }
+        }
+        if (http_rate_shared->active_connections >= http_max_conn) {
+            struct pollfd listener = {.fd = server, .events = POLLIN};
+            int ready = poll(&listener, 1, 50);
+            if (ready > 0 && (listener.revents & POLLIN)) {
+                int client = accept(server, NULL, NULL);
+                if (client >= 0) {
+                    http_send_busy(client);
+                    close(client);
+                    http_pool_request_enter();
+                }
+            }
+        } else {
+            struct timespec pause = {.tv_sec = 0, .tv_nsec = 10 * 1000 * 1000};
+            while (nanosleep(&pause, &pause) != 0 && errno == EINTR && !http_stopping) {}
+        }
+    }
+}
+
+static void http_stop_pool(void) {
+    for (size_t i = 0; i < (size_t)http_pool_workers; i++) {
+        if (http_workers[i] > 0) {
+            (void)kill(-http_workers[i], SIGTERM);
+            (void)kill(http_workers[i], SIGTERM);
+        }
+    }
+    for (size_t i = 0; i < (size_t)http_pool_workers; i++) {
+        if (http_workers[i] > 0) {
+            while (waitpid(http_workers[i], NULL, 0) < 0 && errno == EINTR) {}
+            http_workers[i] = 0;
+        }
+    }
+    http_worker_count = 0;
+}
+
 static int http_rate_limited(void) {
     if (http_rate_max <= 0) return 0;
     if (!http_rate_shared) {
@@ -130,14 +385,14 @@ static int http_rate_limited(void) {
         }
         return ++http_rate_count > http_rate_max;
     }
-    while (__sync_lock_test_and_set(&http_rate_shared->lock, 1)) { }
+    http_shared_lock();
     int64_t now = http_now_ms();
     if (now - http_rate_shared->window_start >= http_rate_window_ms) {
         http_rate_shared->window_start = now;
         http_rate_shared->count = 0;
     }
     int limited = ++http_rate_shared->count > http_rate_max;
-    __sync_lock_release(&http_rate_shared->lock);
+    http_shared_unlock();
     return limited;
 }
 
@@ -196,6 +451,45 @@ static int http_safe_header_value(const char *text) {
     for (const unsigned char *p = (const unsigned char *)text; *p; p++)
         if (*p == '\r' || *p == '\n') return 0;
     return 1;
+}
+
+static int http_safe_header_name(const char *text) {
+    if (!*text) return 0;
+    for (const unsigned char *p = (const unsigned char *)text; *p; p++)
+        if (!(isalnum(*p) || strchr("!#$%&'*+-.^_`|~", *p))) return 0;
+    return 1;
+}
+
+static int http_reserved_header(const char *text) {
+    return strcasecmp(text, "Content-Length") == 0 || strcasecmp(text, "Content-Type") == 0 ||
+        strcasecmp(text, "Connection") == 0 || strcasecmp(text, "Location") == 0 ||
+        strcasecmp(text, "Set-Cookie") == 0 || strcasecmp(text, "X-Freelang") == 0;
+}
+
+FLValue fl_resp_header(FLValue response, FLValue name, FLValue value) {
+    const char *key = http_value_string(name, "server-header");
+    const char *text = http_value_string(value, "server-header");
+    if (response.tag != FL_MAP || !fl_truthy(fl_map_get(response, fl_str_val("_fl_http_response"))) ||
+        strlen(key) > 64 || strlen(text) > 400 || !http_safe_header_name(key) ||
+        http_reserved_header(key) || !http_safe_header_value(text))
+        fl_throw(fl_str_val("server-header expects a response and a safe short header"));
+    FLValue headers = fl_map_get(response, fl_str_val("headers"));
+    if (headers.tag != FL_MAP) headers = fl_map_new();
+    headers = fl_map_set(headers, name, value);
+    return fl_map_set(response, fl_str_val("headers"), headers);
+}
+
+FLValue fl_resp_redirect_cookie(FLValue location, FLValue cookie) {
+    const char *text = http_value_string(cookie, "server-redirect-cookie");
+    if (strlen(text) > 400 || !http_safe_header_value(text))
+        fl_throw(fl_str_val("server-redirect-cookie expects a safe cookie"));
+    FLValue response = fl_resp_redirect(location);
+    response = fl_map_set(response, fl_str_val("status"), fl_int(302));
+    return fl_map_set(response, fl_str_val("set_cookie"), cookie);
+}
+
+FLValue server_redirect_cookie(FLValue location, FLValue cookie) {
+    return fl_resp_redirect_cookie(location, cookie);
 }
 
 FLValue fl_resp_html_cookie(FLValue cookie, FLValue body) {
@@ -329,6 +623,58 @@ FLValue server_req_json(FLValue request) {
     return fl_nil();
 }
 
+FLValue server_req_path(FLValue request) {
+    return fl_map_get(request, fl_str_val("path"));
+}
+
+FLValue server_req_query(FLValue request, FLValue name) {
+    FLValue value = fl_map_get(fl_map_get(request, fl_str_val("query")), name);
+    return value.tag == FL_VECTOR ? fl_vec_first(value) : value;
+}
+
+FLValue server_req_param(FLValue request, FLValue name) {
+    return fl_map_get(fl_map_get(request, fl_str_val("params")), name);
+}
+
+FLValue server_req_files(FLValue request) {
+    FLValue files = fl_map_get(fl_map_get(request, fl_str_val("body")), fl_str_val("files"));
+    return files.tag == FL_VECTOR ? files : fl_vec_new();
+}
+
+FLValue server_req_cookie(FLValue request, FLValue name_value) {
+    FLValue header = server_req_header(request, fl_str_val("cookie"));
+    if (header.tag != FL_STRING || !header.obj) return fl_nil();
+    const char *name = http_value_string(name_value, "server-req-cookie");
+    FLString *text = (FLString *)header.obj;
+    const char *cursor = text->data;
+    size_t name_len = strlen(name);
+    while (*cursor) {
+        while (*cursor == ' ' || *cursor == '\t' || *cursor == ';') cursor++;
+        const char *end = strchr(cursor, ';');
+        if (!end) end = cursor + strlen(cursor);
+        const char *equals = memchr(cursor, '=', (size_t)(end - cursor));
+        if (equals) {
+            const char *key_end = equals;
+            while (key_end > cursor && (key_end[-1] == ' ' || key_end[-1] == '\t')) key_end--;
+            if ((size_t)(key_end - cursor) == name_len && memcmp(cursor, name, name_len) == 0) {
+                const char *value = equals + 1;
+                while (value < end && (*value == ' ' || *value == '\t')) value++;
+                while (end > value && (end[-1] == ' ' || end[-1] == '\t')) end--;
+                size_t value_len = (size_t)(end - value);
+                char *copy = malloc(value_len + 1);
+                if (!copy) return fl_nil();
+                memcpy(copy, value, value_len);
+                copy[value_len] = '\0';
+                FLValue result = fl_str_val(copy);
+                free(copy);
+                return result;
+            }
+        }
+        cursor = *end ? end + 1 : end;
+    }
+    return fl_nil();
+}
+
 static void http_send_all(int fd, const char *buffer, size_t length) {
     size_t sent = 0;
     while (sent < length) {
@@ -361,18 +707,48 @@ static const char *http_reason(int status) {
 }
 
 static void http_send_raw(int fd, int status, const char *content_type,
-                          const char *location, const char *set_cookie,
+                          const char *location, const char *set_cookie, FLValue extra_headers,
                           const char *body, size_t body_length) {
-    char header[1024];
+    char header[8192];
     char location_header[256] = "";
     char cookie_header[512] = "";
     if (location) snprintf(location_header, sizeof(location_header), "Location: %s\r\n", location);
     if (set_cookie) snprintf(cookie_header, sizeof(cookie_header), "Set-Cookie: %s\r\n", set_cookie);
     int length = snprintf(header, sizeof(header),
-        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n%s%s"
-        "Connection: close\r\nX-Freelang: native\r\n\r\n",
+        "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n%s%s",
         status, http_reason(status), content_type, body_length, location_header, cookie_header);
     if (length < 0 || (size_t)length >= sizeof(header)) return;
+    if (extra_headers.tag == FL_MAP && extra_headers.obj) {
+        FLMap *headers = (FLMap *)extra_headers.obj;
+        for (uint32_t i = 0; i < headers->len; i++) {
+            FLValue key = headers->entries[i].key, value = headers->entries[i].val;
+            if (key.tag != FL_STRING || value.tag != FL_STRING || !key.obj || !value.obj) {
+                http_send_status(fd, 500, "invalid response header");
+                return;
+            }
+            const char *name = ((FLString *)key.obj)->data;
+            const char *text = ((FLString *)value.obj)->data;
+            if (strlen(name) > 64 || strlen(text) > 400 ||
+                !http_safe_header_name(name) || http_reserved_header(name) ||
+                !http_safe_header_value(text)) {
+                http_send_status(fd, 500, "invalid response header");
+                return;
+            }
+            int n = snprintf(header + length, sizeof(header) - (size_t)length, "%s: %s\r\n", name, text);
+            if (n < 0 || (size_t)n >= sizeof(header) - (size_t)length) {
+                http_send_status(fd, 500, "response headers too large");
+                return;
+            }
+            length += n;
+        }
+    }
+    int ending = snprintf(header + length, sizeof(header) - (size_t)length,
+                          "Connection: close\r\nX-Freelang: native\r\n\r\n");
+    if (ending < 0 || (size_t)ending >= sizeof(header) - (size_t)length) {
+        http_send_status(fd, 500, "response headers too large");
+        return;
+    }
+    length += ending;
     if (length > 0) http_send_all(fd, header, (size_t)length);
     if (body_length) http_send_all(fd, body, body_length);
 }
@@ -381,7 +757,7 @@ static void http_send_status(int fd, int status, const char *message) {
     char body[256];
     int length = snprintf(body, sizeof(body), "{\"error\":\"%s\"}", message);
     if (length < 0) return;
-    http_send_raw(fd, status, "application/json", NULL, NULL, body, (size_t)length);
+    http_send_raw(fd, status, "application/json", NULL, NULL, fl_nil(), body, (size_t)length);
 }
 
 static void http_send_busy(int fd) {
@@ -601,7 +977,9 @@ static int http_match_path(const char *pattern, const char *path, FLValue *param
         const char *q_end = strchr(q, '/');
         size_t p_len = p_end ? (size_t)(p_end - p) : strlen(p);
         size_t q_len = q_end ? (size_t)(q_end - q) : strlen(q);
-        if (p_len > 0 && p[0] == ':') {
+        if (p_len == 1 && p[0] == '*') {
+            return p_end == NULL;
+        } else if (p_len > 0 && p[0] == ':') {
             char key[256];
             if (p_len >= sizeof(key) || q_len >= 2048) return 0;
             memcpy(key, p + 1, p_len - 1);
@@ -817,6 +1195,7 @@ static void http_handle_client(int fd) {
     FLValue type = fl_map_get(response, fl_str_val("content_type"));
     FLValue location_value = fl_map_get(response, fl_str_val("location"));
     FLValue cookie_value = fl_map_get(response, fl_str_val("set_cookie"));
+    FLValue extra_headers = fl_map_get(response, fl_str_val("headers"));
     const char *body_text = body.tag == FL_STRING && body.obj ? ((FLString *)body.obj)->data : "";
     const char *content_type = type.tag == FL_STRING && type.obj ? ((FLString *)type.obj)->data : "application/octet-stream";
     const char *location = location_value.tag == FL_STRING && location_value.obj
@@ -826,7 +1205,7 @@ static void http_handle_client(int fd) {
     int response_status = fl_map_get(response, fl_str_val("status")).tag == FL_INT
         ? (int)fl_map_get(response, fl_str_val("status")).i : status;
     size_t body_length = body.tag == FL_STRING && body.obj ? ((FLString *)body.obj)->len : strlen(body_text);
-    http_send_raw(fd, response_status, content_type, location, cookie, body_text, body_length);
+    http_send_raw(fd, response_status, content_type, location, cookie, extra_headers, body_text, body_length);
 }
 
 static int http_timeout_setting(const char *name, int default_value) {
@@ -845,6 +1224,8 @@ static int http_timeout_setting(const char *name, int default_value) {
 FLValue fl_http_start(FLValue port_value) {
     http_header_timeout_ms = http_timeout_setting("FL_HTTP_HEADER_TIMEOUT_MS", HTTP_DEFAULT_HEADER_TIMEOUT_MS);
     http_body_timeout_ms = http_timeout_setting("FL_HTTP_BODY_TIMEOUT_MS", HTTP_DEFAULT_BODY_TIMEOUT_MS);
+    http_pool_workers = http_env_integer("FL_HTTP_WORKERS", 0, 0, HTTP_MAX_WORKERS);
+    http_pool_max_requests = http_env_integer("FL_HTTP_WORKER_MAX_REQ", 10000, 1, INT_MAX);
     int port = port_value.tag == FL_INT ? (int)port_value.i : -1;
     const char *override = getenv("FL_HTTP_PORT");
     if (override && *override) {
@@ -908,6 +1289,8 @@ FLValue fl_http_start(FLValue port_value) {
     fprintf(stderr, "HTTP_LISTEN_BACKLOG=%d\n", HTTP_LISTEN_BACKLOG);
     fprintf(stderr, "HTTP_MAX_CONN=%d\n", http_max_conn);
     fprintf(stderr, "HTTP_WORKER_LIMIT=%d\n", http_worker_limit);
+    fprintf(stderr, "FL_HTTP_WORKERS=%d\n", http_pool_workers);
+    fprintf(stderr, "FL_HTTP_WORKER_MAX_REQ=%d\n", http_pool_max_requests);
     fflush(stdout);
     struct sigaction stop_action, child_action, old_int, old_term, old_child;
     memset(&stop_action, 0, sizeof(stop_action));
@@ -916,13 +1299,30 @@ FLValue fl_http_start(FLValue port_value) {
     memset(&child_action, 0, sizeof(child_action));
     child_action.sa_handler = http_child_signal;
     sigemptyset(&child_action.sa_mask);
-    child_action.sa_flags = SA_NOCLDWAIT;
+    child_action.sa_flags = http_pool_workers > 0 ? 0 : SA_NOCLDWAIT;
     http_stopping = 0;
     http_child_changed = 0;
     http_worker_count = 0;
     (void)sigaction(SIGINT, &stop_action, &old_int);
     (void)sigaction(SIGTERM, &stop_action, &old_term);
     (void)sigaction(SIGCHLD, &child_action, &old_child);
+    if (http_pool_workers > 0) {
+        http_run_pool(server, max_requests);
+        close(server);
+        http_stop_pool();
+        fprintf(stderr, "HTTP_WORKER_RESTARTS_TOTAL=%u\n", http_pool_restarts);
+        fprintf(stderr, "HTTP_ACTIVE_CONNECTIONS_MAX=%d\n",
+                http_rate_shared->max_active_connections);
+        (void)sigaction(SIGINT, &old_int, NULL);
+        (void)sigaction(SIGTERM, &old_term, NULL);
+        (void)sigaction(SIGCHLD, &old_child, NULL);
+        (void)munmap(http_rate_shared, sizeof(*http_rate_shared));
+        http_rate_shared = NULL;
+        printf("HTTP_SERVER_STOPPED worker_pool=%d restarts=%u\n",
+               http_pool_workers, http_pool_restarts);
+        fflush(stdout);
+        return fl_int(0);
+    }
     int served = 0;
     while (!http_stopping && (max_requests == 0 || served < max_requests)) {
         if (http_child_changed) http_reap_workers();
@@ -951,9 +1351,12 @@ FLValue fl_http_start(FLValue port_value) {
             (void)signal(SIGINT, SIG_DFL);
             (void)signal(SIGTERM, SIG_DFL);
             (void)signal(SIGCHLD, SIG_DFL);
-            http_connection_enter();
-            http_handle_client(client);
-            (void)__sync_sub_and_fetch(&http_rate_shared->active_connections, 1);
+            if (http_connection_enter()) {
+                http_handle_client(client);
+                (void)__sync_sub_and_fetch(&http_rate_shared->active_connections, 1);
+            } else {
+                http_send_busy(client);
+            }
             close(client);
             _exit(0);
         }
@@ -968,6 +1371,8 @@ FLValue fl_http_start(FLValue port_value) {
         served++;
     }
     close(server);
+    if (!http_stopping && max_requests > 0 && served >= max_requests)
+        http_drain_workers();
     http_stop_workers();
     fprintf(stderr, "HTTP_ACTIVE_CONNECTIONS_MAX=%d\n",
             http_rate_shared->max_active_connections);

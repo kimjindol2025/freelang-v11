@@ -1,0 +1,6 @@
+(define ok-response {:ok true :status 201 :body "created"})
+(define bad-response {:ok false :status 404 :body "missing"})
+(println (http_body ok-response))
+(println (http_status ok-response))
+(println (http_ok_p ok-response))
+(println (http_ok_p bad-response))

@@ -21,6 +21,158 @@
 #include <sys/random.h>
 #include <math.h>
 
+FLValue style() {
+    /* The frontend compiler already emits these declarations as static CSS. */
+    return fl_nil();
+}
+
+FLValue fl_random(void) {
+    uint64_t value;
+    size_t left = sizeof value;
+    unsigned char *p = (unsigned char *)&value;
+    while (left) {
+        ssize_t n = getrandom(p, left, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) fl_throw(fl_str_val("getrandom failed for random"));
+        p += n;
+        left -= (size_t)n;
+    }
+    return fl_float((double)(value >> 11) * (1.0 / 9007199254740992.0));
+}
+
+FLValue base64_encode(FLValue text) {
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    if (text.tag != FL_STRING || !text.obj) fl_throw(fl_str_val("base64_encode expects a string"));
+    FLString *input = (FLString *)text.obj;
+    if (input->len > (SIZE_MAX - 2) / 3) fl_throw(fl_str_val("base64_encode input too large"));
+    size_t out_len = ((size_t)input->len + 2) / 3 * 4;
+    char *out = malloc(out_len + 1);
+    if (!out) fl_throw(fl_str_val("base64_encode allocation failed"));
+    size_t i = 0, j = 0;
+    while (i < input->len) {
+        size_t left = (size_t)input->len - i;
+        unsigned a = (unsigned char)input->data[i++];
+        unsigned b = left > 1 ? (unsigned char)input->data[i++] : 0;
+        unsigned c = left > 2 ? (unsigned char)input->data[i++] : 0;
+        out[j++] = alphabet[a >> 2];
+        out[j++] = alphabet[((a & 3) << 4) | (b >> 4)];
+        out[j++] = left > 1 ? alphabet[((b & 15) << 2) | (c >> 6)] : '=';
+        out[j++] = left > 2 ? alphabet[c & 63] : '=';
+    }
+    out[j] = '\0';
+    FLValue result = fl_str_val(out);
+    free(out);
+    return result;
+}
+
+static int base64_digit(unsigned char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+FLValue base64_decode(FLValue text) {
+    if (text.tag != FL_STRING || !text.obj) fl_throw(fl_str_val("base64_decode expects a string"));
+    FLString *input = (FLString *)text.obj;
+    size_t len = input->len;
+    if (len % 4 != 0) fl_throw(fl_str_val("base64_decode invalid input"));
+    size_t padding = len && input->data[len - 1] == '=' ? 1 : 0;
+    if (len > 1 && input->data[len - 2] == '=') padding++;
+    size_t out_len = len / 4 * 3 - padding;
+    char *out = malloc(out_len + 1);
+    if (!out) fl_throw(fl_str_val("base64_decode allocation failed"));
+    size_t at = 0;
+    for (size_t i = 0; i < len; i += 4) {
+        int a = base64_digit((unsigned char)input->data[i]);
+        int b = base64_digit((unsigned char)input->data[i + 1]);
+        int c = input->data[i + 2] == '=' ? 0 : base64_digit((unsigned char)input->data[i + 2]);
+        int d = input->data[i + 3] == '=' ? 0 : base64_digit((unsigned char)input->data[i + 3]);
+        int last = i + 4 == len;
+        if (a < 0 || b < 0 || c < 0 || d < 0 ||
+            ((!last || padding == 0) && (input->data[i + 2] == '=' || input->data[i + 3] == '=')) ||
+            (input->data[i + 2] == '=' && input->data[i + 3] != '=')) {
+            free(out);
+            fl_throw(fl_str_val("base64_decode invalid input"));
+        }
+        unsigned bits = ((unsigned)a << 18) | ((unsigned)b << 12) | ((unsigned)c << 6) | (unsigned)d;
+        if (at < out_len) out[at++] = (char)(bits >> 16);
+        if (at < out_len) out[at++] = (char)(bits >> 8);
+        if (at < out_len) out[at++] = (char)bits;
+    }
+    out[out_len] = '\0';
+    FLValue result = fl_str_val(out);
+    free(out);
+    return result;
+}
+
+FLValue format_date(FLValue timestamp_ms, FLValue format_value) {
+    if ((timestamp_ms.tag != FL_INT && timestamp_ms.tag != FL_FLOAT) ||
+        format_value.tag != FL_STRING || !format_value.obj)
+        fl_throw(fl_str_val("format_date expects timestamp and format string"));
+    double milliseconds = timestamp_ms.tag == FL_INT ? (double)timestamp_ms.i : timestamp_ms.f;
+    if (!isfinite(milliseconds) || milliseconds < (double)INT64_MIN * 1000.0 ||
+        milliseconds > (double)INT64_MAX * 1000.0)
+        fl_throw(fl_str_val("format_date timestamp out of range"));
+    double seconds = floor(milliseconds / 1000.0);
+    time_t epoch = (time_t)seconds;
+    struct tm date;
+    if (!localtime_r(&epoch, &date)) fl_throw(fl_str_val("format_date timestamp out of range"));
+    int ms = (int)(milliseconds - seconds * 1000.0);
+    char values[7][16];
+    snprintf(values[0], sizeof(values[0]), "%04d", date.tm_year + 1900);
+    snprintf(values[1], sizeof(values[1]), "%02d", date.tm_mon + 1);
+    snprintf(values[2], sizeof(values[2]), "%02d", date.tm_mday);
+    snprintf(values[3], sizeof(values[3]), "%02d", date.tm_hour);
+    snprintf(values[4], sizeof(values[4]), "%02d", date.tm_min);
+    snprintf(values[5], sizeof(values[5]), "%02d", date.tm_sec);
+    snprintf(values[6], sizeof(values[6]), "%03d", ms);
+    static const char *tokens[] = { "YYYY", "MM", "DD", "HH", "mm", "ss", "SSS" };
+    size_t token_lengths[] = { 4, 2, 2, 2, 2, 2, 3 };
+    int replaced[7] = {0};
+    FLString *format = (FLString *)format_value.obj;
+    if (format->len > 4096) fl_throw(fl_str_val("format_date format too long"));
+    size_t capacity = (size_t)format->len + 64;
+    char *output = malloc(capacity);
+    if (!output) fl_throw(fl_str_val("format_date allocation failed"));
+    size_t i = 0, used = 0;
+    while (i < format->len) {
+        int match = -1;
+        for (int t = 0; t < 7; t++)
+            if (!replaced[t] && i + token_lengths[t] <= format->len &&
+                memcmp(format->data + i, tokens[t], token_lengths[t]) == 0) { match = t; break; }
+        if (match >= 0) {
+            size_t length = strlen(values[match]);
+            memcpy(output + used, values[match], length);
+            used += length; i += token_lengths[match]; replaced[match] = 1;
+        } else output[used++] = format->data[i++];
+    }
+    output[used] = '\0';
+    FLValue result = fl_str_val(output);
+    free(output);
+    return result;
+}
+
+FLValue measure_time(FLValue function, FLValue label) {
+    if (function.tag != FL_FN) fl_throw(fl_str_val("measure_time expects function"));
+    struct timespec start, end;
+    if (clock_gettime(CLOCK_MONOTONIC, &start) != 0)
+        fl_throw(fl_str_val("measure_time clock failed"));
+    FLValue result = fl_fn_call(function, 0, NULL);
+    if (clock_gettime(CLOCK_MONOTONIC, &end) != 0)
+        fl_throw(fl_str_val("measure_time clock failed"));
+    double elapsed = (double)(end.tv_sec - start.tv_sec) * 1000.0 +
+                     (double)(end.tv_nsec - start.tv_nsec) / 1000000.0;
+    FLValue values[] = {
+        fl_str_val("result"), result,
+        fl_str_val("label"), label,
+        fl_str_val("duration_ms"), fl_float(elapsed)
+    };
+    return fl_map_from_pairs(values, 3);
+}
+
 FLValue _fl_process_getcwd(void) {
     char buf[4096];
     if (!getcwd(buf, sizeof(buf))) return fl_nil();
@@ -307,6 +459,29 @@ FLValue process_spawn(FLValue cmd, FLValue args) {
     };
     free(out); free(err);
     return fl_ok(fl_map_from_pairs(kv, 4));
+}
+
+FLValue shell(FLValue command) {
+    FLValue args[2] = { fl_str_val("-c"), command };
+    FLValue result = process_spawn(fl_str_val("sh"), fl_vec_from(args, 2));
+    FLValue tag = fl_map_get(result, fl_str_val("_tag"));
+    if (tag.tag != FL_STRING || strcmp(((FLString *)tag.obj)->data, "Ok") != 0)
+        fl_throw(result);
+    FLValue value = fl_map_get(result, fl_str_val("value"));
+    FLValue code = fl_map_get(value, fl_str_val("code"));
+    if (code.tag != FL_INT || code.i != 0) fl_throw(fl_map_get(value, fl_str_val("stderr")));
+    return fl_map_get(value, fl_str_val("stdout"));
+}
+
+FLValue shell_exec_stdout(FLValue command) {
+    FLValue args[2] = { fl_str_val("-c"), command };
+    FLValue result = process_spawn(fl_str_val("sh"), fl_vec_from(args, 2));
+    FLValue tag = fl_map_get(result, fl_str_val("_tag"));
+    if (tag.tag != FL_STRING || strcmp(((FLString *)tag.obj)->data, "Ok") != 0) return fl_nil();
+    FLValue value = fl_map_get(result, fl_str_val("value"));
+    FLValue code = fl_map_get(value, fl_str_val("code"));
+    if (code.tag != FL_INT || code.i != 0) return fl_nil();
+    return fl_map_get(value, fl_str_val("stdout"));
 }
 
 /* OS boundary only: the FreeLang callback owns assertions and JSON encoding.
@@ -971,6 +1146,12 @@ static FLValue http_client_request(const char *method, FLValue url, FLValue head
 FLValue fl_http_get_headers(FLValue url, FLValue headers) {
     return http_client_request("GET", url, headers, fl_str_val(""), fl_nil());
 }
+FLValue http_head(FLValue url) {
+    return http_client_request("HEAD", url, fl_map_new(), fl_str_val(""), fl_nil());
+}
+FLValue http_delete(FLValue url) {
+    return http_client_request("DELETE", url, fl_map_new(), fl_str_val(""), fl_nil());
+}
 FLValue fl_http_post(FLValue url, FLValue body) {
     return http_client_request("POST", url, fl_map_new(), body, fl_nil());
 }
@@ -985,6 +1166,55 @@ FLValue fl_http_stream_collect(FLValue url, FLValue headers, FLValue body) {
     FLValue response = http_client_request("POST", url, headers, body, fl_nil());
     if (!fl_truthy(fl_map_get(response, fl_str_val("ok")))) return response;
     return fl_map_get(response, fl_str_val("body"));
+}
+
+FLValue fl_http_body(FLValue response) {
+    return response.tag == FL_MAP ? fl_map_get(response, fl_str_val("body")) : fl_nil();
+}
+
+FLValue fl_http_status(FLValue response) {
+    FLValue status = response.tag == FL_MAP ? fl_map_get(response, fl_str_val("status")) : fl_nil();
+    return status.tag == FL_INT ? status : fl_int(0);
+}
+
+FLValue fl_http_ok_p(FLValue response) {
+    FLValue ok = response.tag == FL_MAP ? fl_map_get(response, fl_str_val("ok")) : fl_nil();
+    return fl_bool(ok.tag == FL_BOOL && ok.b);
+}
+
+FLValue http_ok_p(FLValue response) {
+    return fl_http_ok_p(response);
+}
+
+FLValue http_post_json(FLValue url, FLValue headers, FLValue body) {
+    FLValue response = fl_http_post_headers(url, headers, body);
+    FLValue result_body = fl_map_get(response, fl_str_val("body"));
+    if (result_body.tag != FL_STRING) fl_throw(response);
+    return fl_json_parse(result_body);
+}
+
+FLValue http_get_json(FLValue url, FLValue headers) {
+    FLValue response = fl_http_get_headers(url, headers);
+    FLValue result_body = fl_map_get(response, fl_str_val("body"));
+    if (result_body.tag != FL_STRING) fl_throw(response);
+    return fl_json_parse(result_body);
+}
+
+FLValue http_put(FLValue url, FLValue body) {
+    FLValue headers = fl_map_set(fl_map_new(), fl_str_val("Content-Type"), fl_str_val("application/json"));
+    FLValue response = http_client_request("PUT", url, headers, body, fl_nil());
+    FLValue result_body = fl_map_get(response, fl_str_val("body"));
+    if (result_body.tag != FL_STRING) fl_throw(response);
+    return result_body;
+}
+
+FLValue http_post_form(FLValue url, FLValue body) {
+    FLValue headers = fl_map_set(fl_map_new(), fl_str_val("Content-Type"),
+                                 fl_str_val("application/x-www-form-urlencoded"));
+    FLValue response = http_client_request("POST", url, headers, body, fl_nil());
+    FLValue result_body = fl_map_get(response, fl_str_val("body"));
+    if (result_body.tag != FL_STRING) fl_throw(response);
+    return result_body;
 }
 
 FLValue fl_uuid(void) {

@@ -326,6 +326,7 @@
 (server-get "/items/:id" (fn [request] (protected-get handle-item-detail request)))
 (server-post "/items/:id/moves" (fn [request] (protected-post handle-stock-move request)))
 
+(server-get "/about" (fn [request] (server-html (page "ERP vendors" "Application is running."))))
 (server-get "/login" login-get)
 (server-post "/login" login-post)
 (server-post "/logout" (fn [request] (protected-post logout-post request)))
@@ -336,5 +337,5 @@
 (server-get "/vendors/:id/edit" (fn [request] (protected-get handle-edit request)))
 (server-post "/vendors/:id" (fn [request] (protected-post handle-update request)))
 (server-post "/vendors/:id/delete" (fn [request] (protected-post handle-delete request)))
-(server-workers 16)
+(server-workers 128)
 (server-start 0)

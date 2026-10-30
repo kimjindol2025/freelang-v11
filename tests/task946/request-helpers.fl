@@ -1,0 +1,7 @@
+(println (str "PATH=" (server_req_path {"path" "/users"})))
+(println (str "QUERY=" (server_req_query {"query" {"q" "needle"}} "q")))
+(println (str "PARAM=" (server_req_param {"params" {"id" "42"}} "id")))
+(println (str "COOKIE=" (server_req_cookie {"headers" {"cookie" "sid=abc; theme=dark"}} "sid")))
+(println (str "FILES=" (length (server_req_files {"body" {"files" [1 2]}}))))
+(define redirect (server_redirect_cookie "/next" "sid=1"))
+(println (str "REDIRECT=" (get redirect "status") "|" (get redirect "location") "|" (get redirect "set_cookie")))

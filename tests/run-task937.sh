@@ -43,7 +43,7 @@ PORT=""
 for _ in $(seq 1 100); do PORT="$(sed -n 's/^HTTP_LISTENING=127\.0\.0\.1://p' "$WORK/fuzz-http-server.log" | head -n 1)"; test -n "$PORT" && break; sleep 0.02; done
 test -n "$PORT"
 "$WORK/fuzz-http-client" "$PORT" "$FUZZ_COUNT" >"$WORK/fuzz-http.log" 2>&1
-curl --silent --show-error --max-time 3 --output /dev/null --write-out 'HTTP_FUZZ_RECOVERY=%{http_code}\n' "http://127.0.0.1:$PORT/ok" | grep -Fx 'HTTP_FUZZ_RECOVERY=200'
+curl --silent --show-error --max-time 3 --output /dev/null --write-out 'HTTP_FUZZ_RECOVERY=%{http_code}\n' "http://127.0.0.1:$PORT/about" | grep -Fx 'HTTP_FUZZ_RECOVERY=200'
 kill "$SERVER_PID"; wait "$SERVER_PID"; trap - EXIT INT TERM
 
 gcc -std=c11 -O2 -Wall -Wextra -Werror -o "$WORK/compiler-fuzz" "$ROOT/tests/task937/compiler-fuzz.c"

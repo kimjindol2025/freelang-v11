@@ -6,6 +6,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <errno.h>
+#include <regex.h>
 
 FLValue fl_floor(FLValue x) { return x.tag==FL_FLOAT ? fl_float(floor(x.f)) : x; }
 FLValue fl_ceil(FLValue x)  { return x.tag==FL_FLOAT ? fl_float(ceil(x.f))  : x; }
@@ -40,6 +41,94 @@ FLValue type_of(FLValue v) {
         case FL_FN:     return fl_str_val("function");
         default:        return fl_str_val("unknown");
     }
+}
+
+FLValue str_count(FLValue s, FLValue sub) {
+    if (s.tag != FL_STRING || sub.tag != FL_STRING) return fl_int(0);
+    const char* text = ((FLString*)s.obj)->data;
+    const char* needle = ((FLString*)sub.obj)->data;
+    size_t n = strlen(needle);
+    if (n == 0) return fl_int((int64_t)strlen(text) + 1);
+    int64_t count = 0;
+    const char* at = text;
+    while ((at = strstr(at, needle)) != NULL) { count++; at += n; }
+    return fl_int(count);
+}
+
+/* shortcut: replacement is literal and does not expand backreferences; add expansion if a caller needs it. */
+FLValue str_replace_in(FLValue s, FLValue pattern, FLValue replacement) {
+    if (s.tag != FL_STRING || pattern.tag != FL_STRING || replacement.tag != FL_STRING) return s;
+    regex_t regex;
+    if (regcomp(&regex, ((FLString*)pattern.obj)->data, REG_EXTENDED) != 0)
+        return str_replace(s, pattern, replacement);
+    const char* src = ((FLString*)s.obj)->data;
+    const char* repl = ((FLString*)replacement.obj)->data;
+    size_t cap = strlen(src) + strlen(repl) + 32, used = 0;
+    char* out = fl_malloc(cap);
+    const char* cur = src;
+    regmatch_t match;
+    while (regexec(&regex, cur, 1, &match, 0) == 0) {
+        size_t before = (size_t)match.rm_so, rlen = strlen(repl);
+        while (used + before + rlen + 1 > cap) { cap *= 2; out = fl_realloc(out, cap); }
+        memcpy(out + used, cur, before); used += before;
+        memcpy(out + used, repl, rlen); used += rlen;
+        cur += match.rm_eo;
+        if (match.rm_so == match.rm_eo) {
+            if (*cur == '\0') break;
+            if (used + 2 > cap) { cap *= 2; out = fl_realloc(out, cap); }
+            out[used++] = *cur++;
+        }
+    }
+    size_t rest = strlen(cur);
+    while (used + rest + 1 > cap) { cap *= 2; out = fl_realloc(out, cap); }
+    memcpy(out + used, cur, rest); out[used + rest] = '\0';
+    regfree(&regex);
+    FLValue result = fl_str_val(out);
+    free(out);
+    return result;
+}
+
+FLValue fl_style_join(int count, FLValue* parts) {
+    FLValue out = fl_str_val("");
+    int added = 0;
+    for (int i = 0; i < count; i++) {
+        FLValue part = fl_text(parts[i]);
+        if (part.tag == FL_STRING && ((FLString*)part.obj)->len == 0) continue;
+        out = added ? fl_str_n(3, out, fl_str_val(";"), part) : part;
+        added = 1;
+    }
+    return out;
+}
+
+FLValue parse_date(FLValue value) {
+    if (value.tag != FL_STRING) return fl_nil();
+    const char* text = ((FLString*)value.obj)->data;
+    int year, month, day, hour = 0, minute = 0, second = 0;
+    int fields = sscanf(text, "%4d-%2d-%2dT%2d:%2d:%2d", &year, &month, &day, &hour, &minute, &second);
+    if (fields < 3) fields = sscanf(text, "%4d-%2d-%2d %2d:%2d:%2d", &year, &month, &day, &hour, &minute, &second);
+    if (fields < 3) return fl_nil();
+    struct tm tm = {0};
+    tm.tm_year = year - 1900; tm.tm_mon = month - 1; tm.tm_mday = day;
+    tm.tm_hour = hour; tm.tm_min = minute; tm.tm_sec = second;
+    time_t epoch = timegm(&tm);
+    int millis = 0;
+    const char* dot = strchr(text, '.');
+    if (dot) {
+        int digits = 0;
+        for (dot++; *dot >= '0' && *dot <= '9' && digits < 3; dot++, digits++) millis = millis * 10 + (*dot - '0');
+        while (digits++ < 3) millis *= 10;
+    }
+    const char* time_part = strchr(text, 'T');
+    if (!time_part) time_part = strchr(text, ' ');
+    const char* zone = time_part ? strpbrk(time_part, "+-") : NULL;
+    if (zone) {
+        int zh = 0, zm = 0;
+        if (sscanf(zone + 1, "%2d:%2d", &zh, &zm) == 2) {
+            int offset = zh * 3600 + zm * 60;
+            epoch += (*zone == '+' ? -offset : offset);
+        }
+    }
+    return fl_int((int64_t)epoch * 1000 + millis);
 }
 
 /* B-3: String ops */
@@ -544,6 +633,112 @@ FLValue max(FLValue a, FLValue b) {
     double m = da > db ? da : db;
     if (a.tag == FL_INT && b.tag == FL_INT) return fl_int((int64_t)m);
     return fl_float(m);
+}
+
+FLValue fl_min(FLValue a, FLValue b) {
+    double da = a.tag == FL_FLOAT ? a.f : (double)a.i;
+    double db = b.tag == FL_FLOAT ? b.f : (double)b.i;
+    double m = da < db ? da : db;
+    if (a.tag == FL_INT && b.tag == FL_INT) return fl_int((int64_t)m);
+    return fl_float(m);
+}
+
+static FLValue fl_builtin_min_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    if (argc != 2) {
+        fl_throw(fl_str_val("min expects two arguments"));
+        return fl_nil();
+    }
+    return fl_min(argv[0], argv[1]);
+}
+
+FLValue fl_builtin_min(void) {
+    return fl_fn_new(fl_builtin_min_call, 0, NULL);
+}
+
+static FLValue fl_builtin_binary_max_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    if (argc != 2) {
+        fl_throw(fl_str_val("max expects two arguments"));
+        return fl_nil();
+    }
+    return max(argv[0], argv[1]);
+}
+
+FLValue fl_builtin_max(void) {
+    return fl_fn_new(fl_builtin_binary_max_call, 0, NULL);
+}
+
+static FLValue fl_builtin_binary_add_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    if (argc != 2) {
+        fl_throw(fl_str_val("+ expects two arguments"));
+        return fl_nil();
+    }
+    return fl_add(argv[0], argv[1]);
+}
+
+FLValue fl_builtin_add(void) {
+    return fl_fn_new(fl_builtin_binary_add_call, 0, NULL);
+}
+
+static FLValue fl_builtin_str_call(FLClosure *self, int argc, FLValue *argv) {
+    (void)self;
+    FLValue result = fl_str_n(0);
+    for (int i = 0; i < argc; i++) {
+        result = fl_str_n(2, result, argv[i]);
+    }
+    return result;
+}
+
+FLValue fl_builtin_str(void) {
+    return fl_fn_new(fl_builtin_str_call, 0, NULL);
+}
+
+static int fl_validation_number(FLValue value, double *out) {
+    if (value.tag == FL_INT) {
+        *out = (double)value.i;
+        return 1;
+    }
+    if (value.tag == FL_FLOAT) {
+        *out = value.f;
+        return 1;
+    }
+    return 0;
+}
+
+FLValue validate_range(FLValue value, FLValue minimum, FLValue maximum, FLValue field) {
+    double v, lo, hi;
+    if (!fl_validation_number(value, &v) || !fl_validation_number(minimum, &lo) ||
+        !fl_validation_number(maximum, &hi) || v < lo || v > hi) {
+        fl_throw(fl_str_n(5, field, fl_str_val(" must be between "), minimum,
+                          fl_str_val(" and "), maximum));
+        return fl_nil();
+    }
+    return fl_bool(true);
+}
+
+FLValue validate_length(FLValue value, FLValue minimum, FLValue maximum, FLValue field) {
+    double lo, hi;
+    uint32_t length;
+    if (!fl_validation_number(minimum, &lo) || !fl_validation_number(maximum, &hi)) {
+        fl_throw(fl_str_n(2, field, fl_str_val(" length bounds must be numbers")));
+        return fl_nil();
+    }
+    if (value.tag == FL_STRING && value.obj) {
+        length = ((FLString *)value.obj)->len;
+    } else if (value.tag == FL_VECTOR && value.obj) {
+        length = ((FLVector *)value.obj)->len;
+    } else {
+        fl_throw(fl_str_n(2, field, fl_str_val(" must be a string or array")));
+        return fl_nil();
+    }
+    if ((double)length < lo || (double)length > hi) {
+        fl_throw(fl_str_n(5, field, fl_str_val(" length must be between "), minimum,
+                          fl_str_val(" and "), maximum));
+        return fl_nil();
+    }
+    return fl_bool(true);
 }
 
 FLValue fl_html_escape(FLValue value) {

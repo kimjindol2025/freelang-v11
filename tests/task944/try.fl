@@ -1,0 +1,4 @@
+(try
+  (throw "example error")
+  (catch [err]
+    (println "TRY_CAUGHT")))

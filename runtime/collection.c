@@ -438,6 +438,8 @@ FLValue fl_map_keys(FLValue map) {
     return r;
 }
 
+FLValue js_keys(FLValue map) { return fl_map_keys(map); }
+
 FLValue fl_map_vals(FLValue map) {
     if (map.tag != FL_MAP) return fl_vec_new();
     FLMap* m = (FLMap*)map.obj;

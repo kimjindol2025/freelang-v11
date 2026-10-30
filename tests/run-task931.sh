@@ -15,6 +15,22 @@ SOURCES=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c d
 LINK=(); for source in "${SOURCES[@]}"; do LINK+=("$RUNTIME/$source"); done
 segv_count=0
 
+wait_server_bounded() {
+  local pid="$1" seconds="$2" state
+  for _ in $(seq 1 "$((seconds * 10))"); do
+    state="$(ps -o stat= -p "$pid" 2>/dev/null || true)"
+    if [[ -z "$state" || "$state" == Z* ]]; then
+      wait "$pid"
+      return $?
+    fi
+    sleep 0.1
+  done
+  printf 'SERVER_WAIT_TIMEOUT pid=%s seconds=%s\n' "$pid" "$seconds"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  return 124
+}
+
 for mode in vector string json; do
   "$COMPILER" "$ROOT/tests/task931/memory.fl" "$WORK/oom-memory.c" >"$WORK/oom-memory.compile" 2>&1
   gcc -w -I "$RUNTIME" -o "$WORK/oom-memory" "$WORK/oom-memory.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
@@ -60,57 +76,112 @@ if test "$fork_mode" = main; then
   parallel_rc=$?
   set -e
 else
+  isolated_skip_reason=""
   if test -n "${FL_FORK_NAMESPACE_PID:-}"; then
     if ! command -v nsenter >/dev/null 2>&1; then
-      printf 'SKIP_REASON=nsenter-command-missing\n' >&2
-      exit 2
+      isolated_skip_reason=nsenter-command-missing
     fi
   elif ! command -v unshare >/dev/null 2>&1; then
-    printf 'SKIP_REASON=unshare-command-missing\n' >&2
-    exit 2
+    isolated_skip_reason=unshare-command-missing
   fi
-  set +e
-  (
-    isolated_bin_dir="$(mktemp -d /tmp/fl-task931-fork.XXXXXX)" || exit 2
-    trap 'rm -rf -- "$isolated_bin_dir"' EXIT
-    chmod 711 "$isolated_bin_dir" || exit 2
-    cp "$WORK/forkfail" "$isolated_bin_dir/forkfail" || exit 2
-    if test -n "${FL_FORK_NAMESPACE_PID:-}"; then
-      DB_FORK_ISOLATED=1 nsenter --target "$FL_FORK_NAMESPACE_PID" --user --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
-    else
-      DB_FORK_ISOLATED=1 unshare --map-auto --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
+  if test -z "$isolated_skip_reason"; then
+    set +e
+    (
+      isolated_bin_dir="$(mktemp -d /tmp/fl-task931-fork.XXXXXX)" || exit 2
+      trap 'rm -rf -- "$isolated_bin_dir"' EXIT
+      chmod 711 "$isolated_bin_dir" || exit 2
+      cp "$WORK/forkfail" "$isolated_bin_dir/forkfail" || exit 2
+      if test -n "${FL_FORK_NAMESPACE_PID:-}"; then
+        DB_FORK_ISOLATED=1 nsenter --target "$FL_FORK_NAMESPACE_PID" --user --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
+      else
+        DB_FORK_ISOLATED=1 unshare --map-auto --setuid 1 --setgid 1 -- "$isolated_bin_dir/forkfail"
+      fi
+    ) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
+    parallel_rc=$?
+    set -e
+    parallel_user_tasks="$(sed -n 's/^DB_FORK_MEASURED_TASKS=\([0-9]*\) DB_FORK_SET_LIMIT=.*/\1/p' "$WORK/forkfail.err" | head -n 1)"
+    parallel_nproc_limit="$(sed -n 's/^DB_FORK_MEASURED_TASKS=[0-9]* DB_FORK_SET_LIMIT=\([0-9]*\)/\1/p' "$WORK/forkfail.err" | head -n 1)"
+    parallel_user_processes="$(sed -n 's/^DB_FORK_MEASURED_PROCESSES=\([0-9]*\)$/\1/p' "$WORK/forkfail.err" | head -n 1)"
+    if test -z "$parallel_user_tasks" || test -z "$parallel_nproc_limit" || test -z "$parallel_user_processes"; then
+      isolated_skip_reason=isolated-uid-or-limit-setup-failed
+      head -n 1 "$WORK/forkfail.err" >&2 || true
     fi
-  ) >"$WORK/forkfail.out" 2>"$WORK/forkfail.err"
-  parallel_rc=$?
-  set -e
-  parallel_user_tasks="$(sed -n 's/^DB_FORK_MEASURED_TASKS=\([0-9]*\) DB_FORK_SET_LIMIT=.*/\1/p' "$WORK/forkfail.err" | head -n 1)"
-  parallel_nproc_limit="$(sed -n 's/^DB_FORK_MEASURED_TASKS=[0-9]* DB_FORK_SET_LIMIT=\([0-9]*\)/\1/p' "$WORK/forkfail.err" | head -n 1)"
-  parallel_user_processes="$(sed -n 's/^DB_FORK_MEASURED_PROCESSES=\([0-9]*\)$/\1/p' "$WORK/forkfail.err" | head -n 1)"
-  if test -z "$parallel_user_tasks" || test -z "$parallel_nproc_limit" || test -z "$parallel_user_processes"; then
-    printf 'SKIP_REASON=isolated-uid-or-limit-setup-failed\n' >&2
-    head -n 1 "$WORK/forkfail.err" >&2 || true
-    exit 2
   fi
-  printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
-  printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
-  printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
-  printf 'PARALLEL_EFFECTIVE_ULIMIT_U=%s\n' "$parallel_nproc_limit" >>"$WORK/forkfail.out"
+  if test -n "$isolated_skip_reason"; then
+    printf 'CASE=process-limit-run-parallel-isolated SKIP_REASON=%s\n' "$isolated_skip_reason"
+    printf 'ISOLATED_MAIN_SUMMARY=SKIP reason=%s\n' "$isolated_skip_reason"
+    printf 'SKIP_REASON=%s\n' "$isolated_skip_reason"
+  else
+    printf 'PARALLEL_USER_PROCESS_COUNT=%s\n' "$parallel_user_processes"
+    printf 'PARALLEL_USER_TASK_COUNT=%s\n' "$parallel_user_tasks"
+    printf 'PARALLEL_ULIMIT_U=%s\n' "$parallel_nproc_limit"
+    printf 'PARALLEL_EFFECTIVE_ULIMIT_U=%s\n' "$parallel_nproc_limit" >>"$WORK/forkfail.out"
+  fi
 fi
-parallel_signal=0; test "$parallel_rc" -gt 128 && parallel_signal=$((parallel_rc - 128)) || true
-test "$parallel_signal" -eq 11 && segv_count=$((segv_count + 1)) || true
-parallel_failed="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/forkfail.out" || true)"
-parallel_succeeded="$(grep -Ec '^SLOT[0-9]+=[0-9]+$' "$WORK/forkfail.out" || true)"
-grep '^PARALLEL_EFFECTIVE_ULIMIT_U=' "$WORK/forkfail.out"
-printf 'CASE=process-limit-run-parallel RC=%s SIGNAL=%s FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK\n' "$parallel_rc" "$parallel_signal" "$parallel_failed" "$parallel_succeeded"
-grep '^SLOT[0-9]*=' "$WORK/forkfail.out"
-test "$parallel_rc" -eq 0 && test "$parallel_signal" -eq 0
-test "$parallel_failed" -gt 0 && test "$parallel_succeeded" -gt 0
-test $((parallel_failed + parallel_succeeded)) -eq 20
-grep -Fxq 'PARALLEL_DONE' "$WORK/forkfail.out"
-parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
-parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
-printf 'FORKFAIL_CASE=run-parallel FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$parallel_failed" "$parallel_succeeded" "$parallel_rc" "$parallel_signal" "$parallel_zombie_delta"
-test "$parallel_zombie_delta" -eq 0
+if test "$fork_mode" = main || test -z "${isolated_skip_reason:-}"; then
+  parallel_signal=0; test "$parallel_rc" -gt 128 && parallel_signal=$((parallel_rc - 128)) || true
+  test "$parallel_signal" -eq 11 && segv_count=$((segv_count + 1)) || true
+  parallel_failed="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/forkfail.out" || true)"
+  parallel_succeeded="$(grep -Ec '^SLOT[0-9]+=[0-9]+$' "$WORK/forkfail.out" || true)"
+  grep '^PARALLEL_EFFECTIVE_ULIMIT_U=' "$WORK/forkfail.out"
+  printf 'CASE=process-limit-run-parallel-isolated-or-main RC=%s SIGNAL=%s FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK\n' "$parallel_rc" "$parallel_signal" "$parallel_failed" "$parallel_succeeded"
+  printf 'CASE=process-limit-run-parallel RC=%s SIGNAL=%s FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK\n' "$parallel_rc" "$parallel_signal" "$parallel_failed" "$parallel_succeeded"
+  grep '^SLOT[0-9]*=' "$WORK/forkfail.out"
+  test "$parallel_rc" -eq 0 && test "$parallel_signal" -eq 0
+  test "$parallel_failed" -gt 0 && test "$parallel_succeeded" -gt 0
+  test $((parallel_failed + parallel_succeeded)) -eq 20
+  grep -Fxq 'PARALLEL_DONE' "$WORK/forkfail.out"
+  parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+  parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
+  printf 'FORKFAIL_CASE=run-parallel FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$parallel_failed" "$parallel_succeeded" "$parallel_rc" "$parallel_signal" "$parallel_zombie_delta"
+  test "$parallel_zombie_delta" -eq 0
+fi
+
+mkdir -p "$WORK/same-uid-headroom"
+set +e
+same_uid_selected=0
+same_uid_rc=1
+for headroom in $(seq 1 32); do
+  (
+    current_uid="$(id -u)"
+    same_uid_tasks="$(ps -u "$current_uid" -L -o lwp= | wc -l | tr -d ' ')"
+    same_uid_processes="$(ps -u "$current_uid" -o pid= | wc -l | tr -d ' ')"
+    same_uid_limit=$((same_uid_tasks + headroom))
+    printf '%s\n' "$same_uid_limit" >"$WORK/same-uid-headroom/limit"
+    printf '%s\n' "$same_uid_tasks" >"$WORK/same-uid-headroom/tasks"
+    printf '%s\n' "$same_uid_processes" >"$WORK/same-uid-headroom/processes"
+    ulimit -u "$same_uid_limit"
+    printf 'PARALLEL_EFFECTIVE_ULIMIT_U='; ulimit -u
+    exec "$WORK/forkfail"
+  ) >"$WORK/same-uid-headroom/attempt.out" 2>"$WORK/same-uid-headroom/attempt.err"
+  same_uid_rc=$?
+  same_uid_failed_try="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/same-uid-headroom/attempt.out" || true)"
+  same_uid_succeeded_try="$(grep -Ec '^SLOT[0-9]+=[0-9]+$' "$WORK/same-uid-headroom/attempt.out" || true)"
+  if (( same_uid_failed_try > 0 && same_uid_succeeded_try > 0 )); then
+    mv "$WORK/same-uid-headroom/attempt.out" "$WORK/same-uid-headroom/forkfail.out"
+    mv "$WORK/same-uid-headroom/attempt.err" "$WORK/same-uid-headroom/forkfail.err"
+    same_uid_selected=1
+    break
+  fi
+done
+set -e
+test "$same_uid_selected" -eq 1
+same_uid_limit="$(cat "$WORK/same-uid-headroom/limit")"
+same_uid_tasks="$(cat "$WORK/same-uid-headroom/tasks")"
+same_uid_processes="$(cat "$WORK/same-uid-headroom/processes")"
+same_uid_signal=0; test "$same_uid_rc" -gt 128 && same_uid_signal=$((same_uid_rc - 128)) || true
+same_uid_failed="$(grep -c '"code":"E_RUN_PARALLEL_FORK"' "$WORK/same-uid-headroom/forkfail.out" || true)"
+same_uid_succeeded="$(grep -Ec '^SLOT[0-9]+=[0-9]+$' "$WORK/same-uid-headroom/forkfail.out" || true)"
+printf 'SAME_UID_HEADROOM_PROCESS_COUNT=%s\n' "$same_uid_processes"
+printf 'SAME_UID_HEADROOM_TASK_COUNT=%s\n' "$same_uid_tasks"
+printf 'SAME_UID_HEADROOM_ULIMIT_U=%s\n' "$same_uid_limit"
+printf 'CASE=process-limit-run-parallel-same-uid-headroom-retry RC=%s SIGNAL=%s FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK\n' "$same_uid_rc" "$same_uid_signal" "$same_uid_failed" "$same_uid_succeeded"
+grep '^SLOT[0-9]*=' "$WORK/same-uid-headroom/forkfail.out"
+test "$same_uid_rc" -eq 0 && test "$same_uid_signal" -eq 0
+test "$same_uid_failed" -gt 0 && test "$same_uid_succeeded" -gt 0
+test $((same_uid_failed + same_uid_succeeded)) -eq 20
+grep -Fxq 'PARALLEL_DONE' "$WORK/same-uid-headroom/forkfail.out"
+printf 'SAME_UID_HEADROOM_SUMMARY=PASS\n'
 
 "$COMPILER" "$ROOT/tests/task931/disk.fl" "$WORK/oom-disk.c" >"$WORK/oom-disk.compile" 2>&1
 gcc -w -I "$RUNTIME" -o "$WORK/oom-disk" "$WORK/oom-disk.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
@@ -155,7 +226,7 @@ gcc -w -I "$RUNTIME" -o "$WORK/oom-server" "$WORK/oom-server.c" "${LINK[@]}" -ls
 start_server() {
   local work="$1" limit="$2" max="$3" fd_limit="$4"
   mkdir -p "$work"
-  (if test -n "$limit"; then ulimit -u "$limit"; printf 'HTTP_EFFECTIVE_ULIMIT_U='; ulimit -u; fi; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max"; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
+  (if test -n "$limit"; then ulimit -u "$limit"; printf 'HTTP_EFFECTIVE_ULIMIT_U='; ulimit -u; fi; ulimit -n "$fd_limit"; export FL_HTTP_MAX_REQUESTS="$max" FL_HTTP_WORKERS=0; exec "$WORK/oom-server") >"$work/server.log" 2>&1 &
   SERVER_PID=$!
   for _ in $(seq 1 100); do
     if grep -q '^HTTP_LISTENING=' "$work/server.log"; then break; fi
@@ -177,7 +248,7 @@ for i in $(seq 1 30); do
   CURL_PIDS+=("$!")
 done
 for pid in "${CURL_PIDS[@]}"; do wait "$pid" || true; done
-set +e; wait "$SERVER_PID"; server_rc=$?; set -e
+set +e; wait_server_bounded "$SERVER_PID" 10; server_rc=$?; set -e
 server_signal=0; test "$server_rc" -gt 128 && server_signal=$((server_rc - 128)) || true
 nproc_codes="$(cat "$WORK"/oom-nproc/codes/*)"
 nproc_total="$(printf '%s\n' "$nproc_codes" | grep -Ec '^(200|503)$' || true)"
@@ -199,7 +270,7 @@ for i in $(seq 1 30); do
   CURL_PIDS+=("$!")
 done
 for pid in "${CURL_PIDS[@]}"; do wait "$pid" || true; done
-set +e; wait "$SERVER_PID"; server_rc=$?; set -e
+set +e; wait_server_bounded "$SERVER_PID" 10; server_rc=$?; set -e
 server_signal=0; test "$server_rc" -gt 128 && server_signal=$((server_rc - 128)) || true
 nofile_codes="$(cat "$WORK"/oom-nofile/codes/*)"
 nofile_total="$(printf '%s\n' "$nofile_codes" | grep -Ec '^200$' || true)"
@@ -212,7 +283,7 @@ test "$nofile_responses" -eq 30 && test "$nofile_503" -gt 0
 
 start_server "$WORK/oom-recovery" "" 1 32
 recovery_code="$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' "http://127.0.0.1:$SERVER_PORT/")"
-set +e; wait "$SERVER_PID"; server_rc=$?; set -e
+set +e; wait_server_bounded "$SERVER_PID" 10; server_rc=$?; set -e
 server_signal=0; test "$server_rc" -gt 128 && server_signal=$((server_rc - 128)) || true
 server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-recovery/server.log" || true)"
 test -n "$server_error" || server_error=none
@@ -237,6 +308,10 @@ test "$segv_count" -eq 0 && test "$zombie_delta" -eq 0 && test "$test_zombies" -
 printf 'OOM_SUMMARY=%s/12\n' "$passed"
 
 # Global zombies may predate this test; compare the baseline and count only zombies parented by this test.
+if test -n "${isolated_skip_reason:-}"; then
+  printf 'FORKFAIL_SUMMARY=SKIP/9 reason=%s\n' "$isolated_skip_reason"
+  exit 2
+fi
 forkfail_passed=0
 test "$parallel_user_processes" -gt 0 && forkfail_passed=$((forkfail_passed + 1))
 test "$parallel_nproc_limit" -gt "$parallel_user_tasks" && forkfail_passed=$((forkfail_passed + 1))

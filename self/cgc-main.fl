@@ -125,13 +125,27 @@
           [true
            (recur (advance $cur) (str $res_acc $c))])))))
 
+(defn read-triple-string-iter [$_cur $_res_acc $line $col]
+  (loop [$cur $_cur $res_acc $_res_acc]
+    (if (at-end? $cur) (emit $cur "UnclosedString" $res_acc $line $col)
+      (if (and (= (peek $cur) "\"") (= (peek-at $cur 1) "\"") (= (peek-at $cur 2) "\""))
+        (emit (advance (advance (advance $cur))) "String" $res_acc $line $col)
+        (recur (advance $cur) (str $res_acc (peek $cur)))))))
+
+(defn read-triple-string [$st]
+  (let [[$line (get $st :line)] [$col (get $st :col)]
+        [$start (advance (advance (advance $st)))]]
+    (read-triple-string-iter $start "" $line $col)))
+
 (defn read-string-body [$st $acc $line $col]
   (read-string-iter $st $acc $line $col))
 
 (defn read-string [$st]
   (let [[$line (get $st :line)] [$col (get $st :col)]
-      [$st1 (advance $st)]]
-  (read-string-body $st1 "" $line $col)))
+        [$triple (and (= (peek $st) "\"") (= (peek-at $st 1) "\"") (= (peek-at $st 2) "\""))]]
+    (if $triple
+      (read-triple-string $st)
+      (read-string-body (advance $st) "" $line $col))))
 
 ;; ── 심볼 / 변수 / 키워드 (모두 symbol-char 연속)
 
@@ -202,7 +216,7 @@
   {:kind "literal" :type type :value value :line line})
 
 (defn make-variable [name line]
-  {:kind "variable" :name name :line line})
+  {:kind "variable" :name name :line line :dollar true})
 
 (defn make-keyword [name line]
   {:kind "keyword" :name name :line line})
@@ -638,8 +652,11 @@
 (define known-defns-atom   (atom []))
 (define wrapper-defs-atom  (atom []))
 (define function-c-symbols-atom (atom []))
+(define function-c-symbol-overrides-atom (atom []))
+(define global-c-symbols-atom (atom []))
 ;; S24: define 전역 선언 목록 ("static FLValue name;")
 (define global-decls-atom  (atom []))
+(define global-names-atom  (atom []))
 
 ;; bug4: nested defn hoisting
 (define cgc-defn-depth-atom   (atom 0))
@@ -673,38 +690,68 @@
                   "continue" "default" "goto" "sizeof" "auto" "inline"
                   "bool" "true" "false"] $s))
 
-(defn c-name [$n]
-  ;; Preserve native C underscores; the registration pass rejects mangling collisions.
-  (let [[$a (str-replace $n "->" "_to_")]
-        [$b (str-replace $a "-" "_")]
-        [$c (str-replace $b "/" "__")]
-        [$d (str-replace $c "?" "_p")]
-        [$e (str-replace $d "!" "_b")]
-        [$f (str-replace $e "=" "_eq")]
-        [$g (str-replace $f "." "_dot")]
-        [$h (str-replace $g "<" "_lt")]
-        [$i (str-replace $h ">" "_gt")]
-        [$j (str-replace $i "+" "_plus")]
-        [$k (str-replace $j "*" "_star")]
-        [$l (str-replace $k "%" "_pct")]
-        [$m (str-replace $l "&" "_and")]
-        [$o (str-replace $m "|" "_or")]
-        [$p (str-replace $o "^" "_xor")]
-        [$raw (str-replace $p "~" "_not")]]
+(defn c-name-base [$n]
+  ;; Preserve native C underscores; the registration pass handles collisions.
+  (let [[$a (str-replace $n "$" "_dollar_")]
+        [$b (str-replace $a "->" "_to_")]
+        [$c (str-replace $b "-" "_")]
+        [$d (str-replace $c "/" "__")]
+        [$e (str-replace $d "?" "_p")]
+        [$f (str-replace $e "!" "_b")]
+        [$g (str-replace $f "=" "_eq")]
+        [$h (str-replace $g "." "_dot")]
+        [$i (str-replace $h "<" "_lt")]
+        [$j (str-replace $i ">" "_gt")]
+        [$k (str-replace $j "+" "_plus")]
+        [$l (str-replace $k "*" "_star")]
+        [$m (str-replace $l "%" "_pct")]
+        [$o (str-replace $m "&" "_and")]
+        [$p (str-replace $o "|" "_or")]
+        [$q (str-replace $p "^" "_xor")]
+        [$raw (str-replace $q "~" "_not")]]
     (if (includes-item ["now-iso" "str-split" "str-join" "str-trim" "str-replace" "str-index-of"] $n) (str "fl_library_" $raw)
     (if (= $n "dir-list") "fl_library_dir_list"
     (if (= $n "http-get") "fl_library_http_get"
       (if (c-reserved? $raw) (str "fl_" $raw) $raw))))))
 
+(defn c-name-override [$n]
+  (loop [$i 0 $items @function-c-symbol-overrides-atom]
+    (if (>= $i (length $items)) null
+      (let [[$item (get $items $i)]]
+        (if (= (get $item 0) $n) (get $item 1)
+          (recur (+ $i 1) $items))))))
+
+(defn c-name [$n]
+  (let [[$registered (cgc-symbol-for-raw @function-c-symbols-atom $n)]
+        [$override (c-name-override $n)]]
+    (if (and (not (null? $registered)) (not (= $registered (c-name-base $n)))) $registered
+      (if (null? $override) (c-name-base $n) $override))))
+
+(defn c-global-name [$raw]
+  (loop [$i 0 $items @global-c-symbols-atom]
+    (if (>= $i (length $items)) null
+      (let [[$item (get $items $i)]]
+        (if (= (get $item 0) $raw) (get $item 1)
+          (recur (+ $i 1) $items))))))
+
 (defn c-runtime-name [$op]
   (cond
+    [(= $op "json_parse") "fl_json_parse"]
+    [(= $op "time-now") "fl_now_ms"]
+    [(= $op "time_now") "fl_now_ms"]
+    [(= $op "date-now") "fl_now_iso"]
+    [(= $op "date_now") "fl_now_iso"]
+    [(= $op "req-query-default") "fl_or"]
+    [(= $op "req_query_default") "fl_or"]
     [(= $op "vec-push") "fl_vec_push"]
+    [(= $op "random") "fl_random"]
     [(= $op "tcp-bind") "fl_tcp_bind"]
     [(= $op "tcp-listen") "fl_tcp_listen"]
     [(= $op "tcp-accept") "fl_tcp_accept"]
     [(= $op "tcp-close") "fl_tcp_close"]
     [(= $op "tcp-local-port") "fl_tcp_local_port"]
     [(= $op "auth-random-token") "fl_auth_random_token"]
+    [(= $op "random_int") "fl_auth_random_int"]
     [(= $op "auth-pbkdf2") "fl_auth_pbkdf2"]
     [(= $op "auth-constant-time-equal") "fl_auth_constant_time_equal"]
     [(= $op "auth-hash-password") "fl_auth_hash_password"]
@@ -716,9 +763,21 @@
     [(= $op "http-get-headers") "fl_http_get_headers"]
     [(= $op "http-post") "fl_http_post"]
     [(= $op "http-post-headers") "fl_http_post_headers"]
+    [(= $op "http_body") "fl_http_body"]
+    [(= $op "http_status") "fl_http_status"]
+    [(= $op "http_ok_p") "fl_http_ok_p"]
     [(= $op "http-post-stream") "fl_http_post_stream"]
     [(= $op "http-stream-collect") "fl_http_stream_collect"]
     [(= $op "server-static") "fl_http_static"]
+    [(= $op "server_html") "fl_resp_html"]
+    [(= $op "server_status") "fl_resp_status"]
+    [(= $op "server_header") "fl_resp_header"]
+    [(= $op "server_redirect_cookie") "fl_resp_redirect_cookie"]
+    [(= $op "server_req_path") "server_req_path"]
+    [(= $op "server_req_query") "server_req_query"]
+    [(= $op "server_req_param") "server_req_param"]
+    [(= $op "server_req_cookie") "server_req_cookie"]
+    [(= $op "server_req_files") "server_req_files"]
     [(= $op "run-parallel") "fl_run_parallel"]
     [(= $op "uuid") "fl_uuid"]
     [(= $op "any?") "fl_any_p"]
@@ -733,6 +792,7 @@
     [(= $op "group-by") "fl_group_by"]
     [(= $op "frequencies") "fl_frequencies"]
     [(= $op "into") "fl_into"]
+    [(= $op "assoc") "fl_map_set"]
     [(= $op "conj") "fl_conj"]
     [(= $op "obj-pick") "fl_obj_pick"]
     [(= $op "obj-omit") "fl_obj_omit"]
@@ -750,6 +810,11 @@
     [(= $op "repeat") "fl_repeat"]
     [(= $op "sleep") "fl_sleep_ms"]
     [(= $op "dissoc") "fl_map_del"]
+    [(= $op "min") "fl_min"]
+    [(= $op "mod") "fl_mod"]
+    [(= $op "quot") "fl_quot"]
+    [(= $op "js_keys") "fl_map_keys"]
+    [(= $op "json_str") "fl_json_stringify"]
     [(= $op "entries") "fl_map_entries"]
     [(or (= $op "obj-values") (= $op "vals")) "fl_map_vals"]
     [(= $op "str-to-lower") "str_lower"]
@@ -761,6 +826,8 @@
 (defn cgc-runtime-call [$op $args]
   (let [[$name (c-runtime-name $op)]]
     (cond
+      [(or (= $op "req-query-default") (= $op "req_query_default"))
+        (str "fl_or(server_req_query(" (cgc (get $args 0)) ", " (cgc (get $args 1)) "), " (cgc (get $args 2)) ")")]
       [(or (= $op "comp") (= $op "conj"))
         (if (= (length $args) 0)
           (str $name "(0, NULL)")
@@ -777,18 +844,57 @@
         (str $name "(" (cgc (get $args 0)) ", " (if (>= (length $args) 2) (cgc (get $args 1)) "fl_int(8)") ")")]
       [true (str $name "(" (cgc-args $args) ")")])))
 
+(defn cgc-symbol-used? [$entries $name]
+  (loop [$i 0]
+    (if (>= $i (length $entries)) false
+      (if (= (get (get $entries $i) 0) $name) true
+        (recur (+ $i 1))))))
+
+(defn cgc-unique-symbol [$base $entries $i]
+  (let [[$candidate (str $base "_symbol_" $i)]]
+    (if (cgc-symbol-used? $entries $candidate)
+      (cgc-unique-symbol $base $entries (+ $i 1))
+      $candidate)))
+
+(defn cgc-symbol-for-raw [$entries $raw]
+  (loop [$i 0]
+    (if (>= $i (length $entries)) null
+      (let [[$entry (get $entries $i)]]
+        (if (= (get $entry 1) $raw) (get $entry 0)
+          (recur (+ $i 1)))))))
+
+(defn cgc-route-handler [$node]
+  (if (and (= (get $node :kind) "literal")
+           (= (get $node :type) "string"))
+    (let [[$raw (get $node :value)]
+          [$name (cgc-symbol-for-raw @function-c-symbols-atom $raw)]]
+      (if (and (not (null? $name)) (includes-item @known-defns-atom $name))
+        (str "fl_fn_new(__fl_wrap_" $name ", 0, NULL)")
+        (cgc $node)))
+    (cgc $node)))
+
 (defn cgc-register-function [$raw]
-  (let [[$name (c-name $raw)]
-        [$entries @function-c-symbols-atom]]
-    (loop [$i 0]
-      (if (>= $i (length $entries))
-        (do (swap! function-c-symbols-atom push [$name $raw]) $name)
-        (let [[$entry (get $entries $i)]]
-          (if (= (get $entry 0) $name)
-            (do
-              (println (str "[CGC-ERR] C symbol collision: " (get $entry 1) " and " $raw " -> " $name))
-              (_fl_exit 1))
-            (recur (+ $i 1))))))))
+  (let [[$name (c-name-base $raw)]
+        [$entries @function-c-symbols-atom]
+        [$existing (cgc-symbol-for-raw $entries $raw)]]
+    (if (not (null? $existing)) $existing
+      (loop [$i 0]
+        (if (>= $i (length $entries))
+          (do (swap! function-c-symbols-atom push [$name $raw]) $name)
+          (let [[$entry (get $entries $i)]]
+            (if (= (get $entry 0) $name)
+              (if (or (and (not (= $raw (get $entry 1)))
+                           (= (str-replace $raw "-" "_") (get $entry 1)))
+                      (and (not (= $raw (get $entry 1)))
+                           (= (str-replace (get $entry 1) "-" "_") $raw)))
+                (let [[$unique (cgc-unique-symbol $name $entries 0)]]
+                  (do (swap! function-c-symbols-atom push [$unique $raw]) $unique))
+                (do
+                  (println (str "[CGC-ERR] C symbol collision: " $raw " -> " $name
+                                " conflicts with " (get $entry 1)))
+                  (fl-cgc-halt)
+                  $name))
+              (recur (+ $i 1)))))))))
 
 ;; ── 메인 dispatch ──
 
@@ -799,17 +905,20 @@
     [(= (get $n :kind) "variable")
       (let [[$name (get $n :name)]
             [$cn   (c-name $name)]
+            [$raw (if (get $n :dollar) (str "$" $name) $name)]
+            [$global (c-global-name $raw)]
             [$line (get $n :line)]]
-        (if (or (includes-item @known-fncall-targets-atom $cn)
-                (includes-item @outer-params-atom $cn))
+        (if (includes-item @outer-params-atom $cn)
           $cn
-          (if (includes-item @known-defns-atom $cn)
-            (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
-            ;; 알려진 함수/변수가 아니면 경고 출력 (컴파일 시점)
-            (do
-              (println (str "[FL Warn] 정의되지 않은 이름: " $name
-                            (if (null? $line) "" (str " (line " $line ")"))))
-              $cn))))]
+          (if (not (null? $global)) $global
+            (if (includes-item @known-fncall-targets-atom $cn) $cn
+              (if (includes-item @known-defns-atom $cn)
+                (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+                ;; 알려진 함수/변수가 아니면 경고 출력 (컴파일 시점)
+                (do
+                  (println (str "[FL Warn] 정의되지 않은 이름: " $name
+                                (if (null? $line) "" (str " (line " $line ")"))))
+                  $cn))))))]
     [(= (get $n :kind) "keyword")   (str "fl_str_val(\"" (c-esc (get $n :name)) "\")")]
     [(= (get $n :kind) "sexpr")     (cgc-sexpr $n)]
     [(= (get $n :kind) "block")     (cgc-block $n)]
@@ -849,13 +958,18 @@
                         [(= $v "false") "fl_bool(false)"]
                         [(or (= $v "nil") (= $v "null")) "fl_nil()"]
                         [(= $v "json-parse") "fl_fn_new(json_parse_wrap, 0, NULL)"]
-                        [true (let [[$cn (c-name $v)]]
-                                (if (or (includes-item @known-fncall-targets-atom $cn)
-                                        (includes-item @outer-params-atom $cn))
-                                  $cn
-                                  (if (includes-item @known-defns-atom $cn)
-                                    (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
-                                    $cn)))])]
+                        [(= $v "min") "fl_builtin_min()"]
+                        [(= $v "max") "fl_builtin_max()"]
+                        [(= $v "+") "fl_builtin_add()"]
+                        [(= $v "str") "fl_builtin_str()"]
+                        [true (let [[$cn (c-name $v)] [$global (c-global-name $v)]]
+                                (if (not (null? $global)) $global
+                                  (if (or (includes-item @known-fncall-targets-atom $cn)
+                                          (includes-item @outer-params-atom $cn))
+                                    $cn
+                                    (if (includes-item @known-defns-atom $cn)
+                                      (str "fl_fn_new(__fl_wrap_" $cn ", 0, NULL)")
+                                      $cn))))])]
     [true
      (do (println (str "[CGC-ERR] unsupported literal type=" (get $n :type) " line=" (get $n :line)))
          "fl_nil()")])))
@@ -902,6 +1016,11 @@
     [(= (get $node :kind) "literal") (str (get $node :value))]
     [true "_anon"]))
 
+(defn cgc-extract-function-name [$node]
+  (if (and (= (get $node :kind) "variable") (get $node :dollar))
+    (str "$" (get $node :name))
+    (cgc-extract-raw-name $node)))
+
 ;; ── sexpr ──
 
 ;; S23: FLValue fn 동적 호출 — fl_fn_call 사용
@@ -929,7 +1048,17 @@
           (if (= (get $cols 0) $op) true
             (recur (+ $i 1))))))))
 
+(defn cgc-call-target-name [$op]
+  (if (str-starts-with $op "$")
+    (c-name (substring $op 1 (length $op)))
+    (c-name $op)))
+
 (defn cgc-dispatch [$op $args $line]
+  (if (or (includes-item @outer-params-atom (cgc-call-target-name $op))
+          (includes-item @known-fncall-targets-atom (cgc-call-target-name $op)))
+    (cgc-fncall (cgc-call-target-name $op) $args)
+  (if (= $op "doseq")
+    (cgc-doseq $args)
   (if (not (null? (c-runtime-name $op)))
     (cgc-runtime-call $op $args)
   (if (cgc-held-builtin? $op)
@@ -941,6 +1070,15 @@
            (includes-item @known-defns-atom (c-name $op)))
     (cgc-dispatch-fallback $op $args)
     (cond
+  [(and (= $op "h") (> (length $args) 3))
+   (str "h(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", "
+        (cgc-str (slice $args 2 (length $args))) ")")]
+  [(and (= $op "h") (< (length $args) 3))
+   (str "h(" (if (> (length $args) 0) (cgc (get $args 0)) "fl_nil()") ", "
+        (if (> (length $args) 1) (cgc (get $args 1)) "fl_nil()") ", fl_nil())")]
+  [(= $op "s")
+   (str "fl_style_join(" (length $args) ", "
+        (if (= (length $args) 0) "NULL" (str "(FLValue[]){" (cgc-args $args) "}")) ")")]
   [(= $op "if")     (cgc-if $args)]
   [(= $op "when")   (cgc-if $args)]
   [(= $op "??")      (cgc-null-coalesce $args)]
@@ -1026,7 +1164,9 @@
   [(= $op "vector?")      (str "fl_array_p(" (cgc (get $args 0)) ")")]
   [(= $op "map?")         (str "fl_map_p(" (cgc (get $args 0)) ")")]
   [(= $op "fn?")          (str "fl_fn_p(" (cgc (get $args 0)) ")")]
+  [(= $op "type")         (str "type_of(" (cgc (get $args 0)) ")")]
   [(= $op "type-of")      (str "type_of(" (cgc (get $args 0)) ")")]
+  [(= $op "str-count")    (str "str_count(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "empty?")       (cgc-empty? $args)]
   [(= $op "not-empty?")   (str "fl_not_empty_p(" (cgc (get $args 0)) ")")]
   [(= $op "nil-or-empty?") (str "fl_nil_or_empty_p(" (cgc (get $args 0)) ")")]
@@ -1112,6 +1252,7 @@
   ;; N-11: env / process — stub → 실제 구현
   [(= $op "_fl_env_get")           (str "_fl_env_get(" (cgc (get $args 0)) ")")]
   [(= $op "env-get")               (str "_fl_env_get(" (cgc (get $args 0)) ")")]
+  [(= $op "fl-env-get")            (str "_fl_env_get(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_env_set")           (str "_fl_env_set(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "_fl_env_all")           "_fl_env_all()"]
   [(= $op "_fl_process_run")       (str "_fl_process_run(" (cgc (get $args 0)) ")")]
@@ -1214,34 +1355,61 @@
   [(= $op "server-redirect")    (str "fl_resp_redirect(" (cgc (get $args 0)) ")")]
   [(= $op "server-html-cookie") (str "fl_resp_html_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "server-set-cookie")  (str "fl_resp_set_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "server-route")       (str "fl_http_route(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "server-get")         (str "fl_http_route(fl_str_val(\"GET\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
-  [(= $op "server-post")        (str "fl_http_route(fl_str_val(\"POST\"), " (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-route")       (str "fl_http_route(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc-route-handler (get $args 2)) ")")]
+  [(= $op "server-get")         (str "fl_http_route(fl_str_val(\"GET\"), " (cgc (get $args 0)) ", " (cgc-route-handler (get $args 1)) ")")]
+  [(= $op "server-post")        (str "fl_http_route(fl_str_val(\"POST\"), " (cgc (get $args 0)) ", " (cgc-route-handler (get $args 1)) ")")]
   ;; N-06: SQLite3 DB
   [(= $op "db-open")   (str "fl_db_open(" (cgc (get $args 0)) ")")]
   [(= $op "db-close")  (str "fl_db_close(" (cgc (get $args 0)) ")")]
-  [(= $op "db-query")  (str "fl_db_query(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
-  [(= $op "db-exec")   (str "fl_db_exec("  (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]
+  [(= $op "db-query")  (str "fl_db_query(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (if (>= (length $args) 3) (cgc (get $args 2)) "fl_vec_new()") ")")]
+  [(= $op "db-exec")   (str "fl_db_exec("  (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (if (>= (length $args) 3) (cgc (get $args 2)) "fl_vec_new()") ")")]
   ;; S19: fn lambda → static FLClosure 추출
   [(= $op "fn")      (cgc-fn $args)]
   [(= $op "cg-and")  (str "fl_and(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-or")   (str "fl_or(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "cg-match")"fl_nil()"]
   ;; N-09: 암호화 / 비밀번호
-  [true             (cgc-dispatch-fallback $op $args)])))))
+      [true             (cgc-dispatch-fallback $op $args)])))))))
+
+(defn cgc-doseq [$args]
+  (let [[$bindings (get-block-items (get $args 0))]
+        [$id @lambda-id-atom]]
+    (if (not (= (length $bindings) 2))
+      (do
+        (println "[CGC-ERR] doseq expects [item collection]")
+        (fl-cgc-halt)
+        "fl_nil()")
+      (let [[$item (c-name (cgc-extract-raw-name (get $bindings 0)))]
+            [$saved @outer-params-atom]]
+        (swap! outer-params-atom push $item)
+        (let [[$body (cgc (get $args 1))]]
+          (reset! outer-params-atom $saved)
+          (swap! lambda-id-atom + 1)
+          (str "(__extension__ ({ FLValue __fl_doseq_seq_" $id " = "
+               (cgc (get $bindings 1)) "; FLValue __fl_doseq_len_" $id
+               " = length(__fl_doseq_seq_" $id "); "
+               "for (int64_t __fl_doseq_i_" $id " = 0; __fl_doseq_i_" $id
+               " < __fl_doseq_len_" $id ".i; __fl_doseq_i_" $id "++) { "
+               "FLValue " $item " = get(__fl_doseq_seq_" $id ", fl_int(__fl_doseq_i_" $id ")); "
+               "(void)" $item "; (void)(" $body "); } fl_nil(); }))"))))))
 
 (defn cgc-swap! [$args]
   (let [[$atom-c  (cgc (get $args 0))]
         [$fn-node (get $args 1)]
         [$extra   (slice $args 2 (length $args))]]
     (let [[$deref (str "fl_atom_deref(" $atom-c ")")]
-          [$op    (get $fn-node :value)]
+          [$op    (if (= (get $fn-node :kind) "sexpr") (get $fn-node :op) (get $fn-node :value))]
           [$ec    (cgc-args $extra)]]
       (let [[$rhs (cond
                     [(= $op "+")    (str "fl_add(" $deref ", " $ec ")")]
                     [(= $op "-")    (str "fl_sub(" $deref ", " $ec ")")]
                     [(= $op "*")    (str "fl_mul(" $deref ", " $ec ")")]
                     [(= $op "push") (str "fl_vec_push(" $deref ", " $ec ")")]
+                    [(= $op "assoc") (str "fl_map_set(" $deref ", " $ec ")")]
+                    [(= $op "dissoc") (str "fl_map_del(" $deref ", " (cgc (get $extra 0)) ")")]
+                    [(= $op "conj") (str "fl_conj(" (+ (length $extra) 1) ", (FLValue[]){" $deref
+                                          (if (= (length $extra) 0) "" (str ", " $ec)) "})")]
+                    [(= $op "fn")    (str "fl_fn_call(" (cgc $fn-node) ", 1, (FLValue[]){" $deref "})")]
                     [true           (str (c-name $op) "(" $deref
                                       (if (= (length $extra) 0) "" (str ", " $ec)) ")")]
                   )]]
@@ -1262,9 +1430,18 @@
 ;; argv[i] 선언 구문
 (defn cgc-fn-argv-decls [$items $i $acc]
   (if (>= $i (length $items)) $acc
-  (let [[$name (c-name (cgc-extract-raw-name (get $items $i)))]]
+  (let [[$param (get $items $i)]
+        [$nested (and (= (get $param :kind) "block") (= (get $param :type) "Array"))]
+        [$name (c-name (cgc-extract-raw-name $param))]]
     (cgc-fn-argv-decls $items (+ $i 1)
-      (str $acc "    FLValue " $name " __attribute__((unused)) = argv[" $i "];\n")))))
+      (str $acc (if $nested (cgc-fn-destructure-argv (get-block-items $param) $i 0 "")
+        (str "    FLValue " $name " __attribute__((unused)) = argv[" $i "];\n")))))))
+
+(defn cgc-fn-destructure-argv [$parts $arg $i $acc]
+  (if (>= $i (length $parts)) $acc
+    (let [[$name (c-name (cgc-extract-raw-name (get $parts $i)))]]
+      (cgc-fn-destructure-argv $parts $arg (+ $i 1)
+        (str $acc "    FLValue " $name " __attribute__((unused)) = get(argv[" $arg "], fl_int(" $i "));\n")))))
 
 ;; 파라미터 이름 목록 수집
 (defn cgc-fn-param-names [$items $i $acc]
@@ -1287,7 +1464,9 @@
      (let [[$n (c-name (get $node :value))]]
        (if (or (= $n "") (includes-item $acc $n)) $acc (push $acc $n)))]
     [(= (get $node :kind) "sexpr")
-     (cgc-collect-vars-loop (get $node :args) 0 $acc)]
+     (let [[$op (get $node :op)]
+           [$with-op (if (includes-item $acc $op) $acc (push $acc $op))]]
+       (cgc-collect-vars-loop (get $node :args) 0 $with-op))]
     [(= (get $node :kind) "block")
      (if (= (get $node :type) "Map")
        (let [[$items (get (get $node :fields) :items)]]
@@ -1381,12 +1560,14 @@
 (defn cgc-tpl-env-loop [$names $i $acc]
   (if (>= $i (length $names)) $acc
     (let [[$n (get $names $i)]]
+      (let [[$global (c-global-name $n)]
+            [$cn (if (null? $global) (c-name $n) $global)]]
       (cgc-tpl-env-loop $names (+ $i 1)
-        (str $acc " __fl_te = fl_map_set(__fl_te, fl_str_val(\"" $n "\"), " $n ");")))))
+        (str $acc " __fl_te = fl_map_set(__fl_te, fl_str_val(\"" $n "\"), " $cn ");"))))))
 
 (defn cgc-template [$raw]
   (let [[$s (if (string? $raw) $raw "")]
-        [$names @outer-params-atom]
+        [$names (concat @outer-params-atom @global-names-atom)]
         [$env (cgc-tpl-env-loop $names 0 "FLValue __fl_te = fl_map_new();")]]
     (str "(__extension__ ({ " $env
          " fl_template_bound(fl_str_val(\"" (c-esc $s) "\"), __fl_te); }))")))
@@ -1610,7 +1791,7 @@
       (cgc-bind-names-loop $names (+ $i 1)))))
 
 (defn cgc-defn-impl [$args]
-  (let [[$name (c-name (cgc-extract-raw-name (get $args 0)))]
+  (let [[$name (c-name (cgc-extract-function-name (get $args 0)))]
         [$param-items (get-block-items (get $args 1))]
         [$ps (cgc-params $param-items)]
         [$pnames (cgc-fn-param-names $param-items 0 [])]]
@@ -1638,7 +1819,7 @@
       (reset! cgc-defn-depth-atom (- @cgc-defn-depth-atom 1))
       (reset! outer-params-atom $saved-params)
       (if (> $depth 0)
-        (let [[$name (cgc-register-function (cgc-extract-raw-name (get $args 0)))]
+        (let [[$name (cgc-register-function (cgc-extract-function-name (get $args 0)))]
               [$param-items (get-block-items (get $args 1))]
               [$ps (cgc-params $param-items)]]
           (swap! cgc-hoisted-fns-atom push $result)
@@ -1653,9 +1834,36 @@
 ;; ── define (전역 변수) ──
 
 (defn cgc-define [$args]
-  (let [[$name (c-name (cgc-extract-raw-name (get $args 0)))]
+  (let [[$raw (cgc-extract-function-name (get $args 0))]
+        [$existing (c-global-name $raw)]
+        [$base (c-name-base $raw)]
+        [$entries @function-c-symbols-atom]
+        [$conflict (cgc-symbol-used? $entries $base)]
+        [$function-raw (loop [$i 0]
+                         (if (>= $i (length $entries)) null
+                           (let [[$entry (get $entries $i)]]
+                             (if (= (get $entry 0) $base) (get $entry 1)
+                               (recur (+ $i 1))))))]
+        [$global-alias (loop [$i 0 $items @global-c-symbols-atom]
+                         (if (>= $i (length $items)) false
+                           (let [[$entry (get $items $i)]]
+                             (if (and (not (= $raw (get $entry 0)))
+                                      (= (str-replace $raw "-" "_")
+                                         (str-replace (get $entry 0) "-" "_")))
+                               true (recur (+ $i 1) $items)))))]
+        [$alias-conflict (and $conflict
+                          (or (and (= $raw $function-raw)
+                                   (or $global-alias (= (get (get $args 1) :type) "string")))
+                              (and (not (= $raw $function-raw))
+                                (or (= (str-replace $raw "-" "_") $function-raw)
+                                    (= (str-replace $function-raw "-" "_") $raw)))))]
+        [$name (if (not (null? $existing)) $existing
+                 (if $alias-conflict (cgc-unique-symbol $base $entries 0) $base))]
         [$val (cgc (get $args 1))]]
+    (if (and (null? $existing) (or $alias-conflict (not (= $raw $base))))
+      (swap! global-c-symbols-atom push [$raw $name]) nil)
     (swap! known-fncall-targets-atom push $name)
+    (swap! global-names-atom push (if $alias-conflict $raw $base))
     (swap! global-decls-atom push (str "static FLValue " $name ";"))
     (str $name " = " $val ";")))
 
@@ -1743,7 +1951,7 @@
     (recur (+ $i 1)
       (if (or $is-defn $is-block-func)
         (let [[$raw-name (if $is-defn
-                           (cgc-extract-raw-name (get (get $n :args) 0))
+                           (cgc-extract-function-name (get (get $n :args) 0))
                            (get $n :name))]
               [$name (cgc-register-function $raw-name)]
               [$params (if $is-defn
@@ -1765,15 +1973,29 @@
     (recur (+ $i 1)
       (str $acc (if (= (length $acc) 0) "" ", ") "argv[" $i "]")))))
 
+(defn cgc-function-later? [$nodes $i $raw]
+  (if (>= $i (length $nodes)) false
+    (let [[$n (get $nodes $i)]
+          [$kind (get $n :kind)]
+          [$defn (and (= $kind "sexpr") (= (get $n :op) "defn"))]
+          [$block-func (and (= $kind "block") (= (get $n :type) "FUNC"))]
+          [$candidate (if $defn (cgc-extract-function-name (get (get $n :args) 0)) (get $n :name))]]
+      (if (and (or $defn $block-func) (= $candidate $raw)) true
+        (cgc-function-later? $nodes (+ $i 1) $raw)))))
+
 (defn cgc-top-level [$_nodes $_i $_stmts $_fns]
   (loop [$i $_i $stmts $_stmts $fns $_fns]
     (if (>= $i (length $_nodes)) {:stmts $stmts :fns $fns}
     (let [[$n (get $_nodes $i)]
           [$k (get $n :kind)]
           [$is-defn (and (= $k "sexpr") (= (get $n :op) "defn"))]
-          [$is-block-func (and (= $k "block") (= (get $n :type) "FUNC"))]]
+          [$is-block-func (and (= $k "block") (= (get $n :type) "FUNC"))]
+          [$raw (if $is-defn (cgc-extract-function-name (get (get $n :args) 0)) (get $n :name))]
+          [$later (and (or $is-defn $is-block-func) (cgc-function-later? $_nodes (+ $i 1) $raw))]]
       (if (or $is-defn $is-block-func)
-        (recur (+ $i 1) $stmts (str $fns (cgc $n) "\n\n"))
+        (if $later
+          (recur (+ $i 1) $stmts $fns)
+          (recur (+ $i 1) $stmts (str $fns (cgc $n) "\n\n")))
         (recur (+ $i 1) (str $stmts "    " (cgc $n) ";\n") $fns))))))
 
 ;; S19: lambda forward decl 목록 생성

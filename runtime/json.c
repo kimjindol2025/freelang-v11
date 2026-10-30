@@ -330,4 +330,6 @@ FLValue fl_json_stringify(FLValue val) {
     return out;
 }
 
+FLValue json_str(FLValue val) { return fl_json_stringify(val); }
+
 /* ── 비트 연산 ── */

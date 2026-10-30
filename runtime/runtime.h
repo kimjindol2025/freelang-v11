@@ -83,6 +83,13 @@ FLValue fl_div(FLValue a, FLValue b);
 FLValue fl_mod(FLValue a, FLValue b);
 FLValue fl_quot(FLValue a, FLValue b);
 FLValue fl_rem(FLValue a, FLValue b);
+FLValue fl_min(FLValue a, FLValue b);
+FLValue fl_builtin_min(void);
+FLValue fl_builtin_max(void);
+FLValue fl_builtin_add(void);
+FLValue fl_builtin_str(void);
+FLValue validate_range(FLValue value, FLValue minimum, FLValue maximum, FLValue field);
+FLValue validate_length(FLValue value, FLValue minimum, FLValue maximum, FLValue field);
 
 /* ── 비교 ── */
 FLValue fl_eq(FLValue a, FLValue b);
@@ -131,6 +138,7 @@ FLValue fl_db_open(FLValue path);
 FLValue fl_db_close(FLValue db);
 FLValue fl_db_query(FLValue db, FLValue sql, FLValue params);
 FLValue fl_db_exec(FLValue db, FLValue sql, FLValue params);
+FLValue db_one(FLValue db, FLValue sql, FLValue params);
 
 /* ── HTTP server ── */
 FLValue fl_http_start(FLValue port);
@@ -143,9 +151,20 @@ FLValue fl_resp_redirect(FLValue location);
 FLValue fl_resp_html(FLValue body);
 FLValue fl_resp_html_cookie(FLValue cookie, FLValue body);
 FLValue fl_resp_set_cookie(FLValue response, FLValue name, FLValue value);
+FLValue fl_resp_header(FLValue response, FLValue name, FLValue value);
+FLValue fl_resp_redirect_cookie(FLValue location, FLValue cookie);
+FLValue server_redirect_cookie(FLValue location, FLValue cookie);
 FLValue fl_auth_random_token(FLValue bytes);
+FLValue fl_auth_random_int(FLValue min, FLValue max);
 FLValue fl_auth_pbkdf2(FLValue password, FLValue salt, FLValue iterations);
 FLValue fl_auth_constant_time_equal(FLValue left, FLValue right);
+FLValue hmac_sha256(FLValue key, FLValue message);
+FLValue scrypt_kdf(FLValue password, FLValue salt);
+FLValue random_bytes(FLValue count);
+FLValue aes_encrypt(FLValue plaintext, FLValue key);
+FLValue aes_decrypt(FLValue ciphertext, FLValue key);
+FLValue format_date(FLValue timestamp_ms, FLValue format);
+FLValue measure_time(FLValue function, FLValue label);
 FLValue fl_auth_hash_password(FLValue password);
 FLValue fl_auth_verify_password(FLValue password, FLValue encoded_hash);
 FLValue fl_jwt_sign(FLValue payload, FLValue secret, FLValue expiry_seconds);
@@ -160,6 +179,11 @@ FLValue server_body_limit(FLValue bytes);
 FLValue server_rate_limit(FLValue count, FLValue window_ms);
 FLValue server_req_header(FLValue request, FLValue name);
 FLValue server_req_json(FLValue request);
+FLValue server_req_path(FLValue request);
+FLValue server_req_query(FLValue request, FLValue name);
+FLValue server_req_param(FLValue request, FLValue name);
+FLValue server_req_cookie(FLValue request, FLValue name);
+FLValue server_req_files(FLValue request);
 
 /* ── S7: Closure ── */
 typedef struct FLClosure {
@@ -196,6 +220,7 @@ FLValue fl_zip_with(FLValue fn, FLValue left, FLValue right);
 
 /* ── S9: 맵 accessor ── */
 FLValue fl_map_keys(FLValue map);
+FLValue js_keys(FLValue map);
 FLValue fl_map_vals(FLValue map);
 FLValue fl_map_entries(FLValue map);
 
@@ -243,6 +268,10 @@ FLValue substring(FLValue s, FLValue start, FLValue end);
 FLValue trim(FLValue s);
 FLValue index_of(FLValue vec, FLValue val);
 FLValue str_index_of(FLValue s, FLValue sub);
+FLValue str_count(FLValue s, FLValue sub);
+FLValue str_replace_in(FLValue s, FLValue pattern, FLValue replacement);
+FLValue fl_style_join(int count, FLValue* parts);
+FLValue parse_date(FLValue value);
 
 /* ── S26: atom (mutable cell) ── */
 FLValue fl_atom_new(FLValue init);
@@ -305,6 +334,7 @@ FLValue fl_sleep_ms(FLValue ms);
 /* ── JSON ── */
 FLValue fl_json_parse(FLValue src);
 FLValue fl_json_stringify(FLValue val);
+FLValue json_str(FLValue val);
 
 /* ── 비트 연산 ── */
 FLValue fl_bit_xor(FLValue a, FLValue b);
@@ -334,6 +364,8 @@ FLValue _fl_process_exec(FLValue cmd);
 FLValue _fl_process_exec_args(FLValue cmd, FLValue args);
 FLValue _fl_process_spawn(FLValue cmd, FLValue args);
 FLValue process_spawn(FLValue cmd, FLValue args);
+FLValue shell(FLValue command);
+FLValue shell_exec_stdout(FLValue command);
 FLValue _fl_test_isolate(FLValue callback);
 FLValue fl_run_parallel(FLValue jobs, FLValue workers);
 FLValue _fl_exit(FLValue code);
@@ -348,10 +380,24 @@ FLValue git_diff_name_only(FLValue root);
 FLValue http_get(FLValue url);
 FLValue fl_http_get(FLValue url);
 FLValue fl_http_get_headers(FLValue url, FLValue headers);
+FLValue http_head(FLValue url);
+FLValue http_delete(FLValue url);
+FLValue base64_encode(FLValue text);
+FLValue base64_decode(FLValue text);
+FLValue style();
+FLValue fl_random(void);
 FLValue fl_http_post(FLValue url, FLValue body);
 FLValue fl_http_post_headers(FLValue url, FLValue headers, FLValue body);
 FLValue fl_http_post_stream(FLValue url, FLValue headers, FLValue body, FLValue callback);
 FLValue fl_http_stream_collect(FLValue url, FLValue headers, FLValue body);
+FLValue fl_http_body(FLValue response);
+FLValue fl_http_status(FLValue response);
+FLValue fl_http_ok_p(FLValue response);
+FLValue http_ok_p(FLValue response);
+FLValue http_post_json(FLValue url, FLValue headers, FLValue body);
+FLValue http_get_json(FLValue url, FLValue headers);
+FLValue http_put(FLValue url, FLValue body);
+FLValue http_post_form(FLValue url, FLValue body);
 FLValue fl_uuid(void);
 FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit);
 FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback);
