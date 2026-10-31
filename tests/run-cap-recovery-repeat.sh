@@ -78,7 +78,10 @@ for iteration in $(seq 1 20); do
     printf 'CAP_FAILURE_FD_TOTAL=%s\n' "$fd_total"
     printf 'CAP_FAILURE_ESTABLISHED_CONNECTIONS=%s\n' \
       "$(ss -tan state established 2>/dev/null | awk -v p=":$PORT" 'NR>1 && ($4 ~ p"$" || $5 ~ p"$"){n++} END{print n+0}')"
-    sed -E 's#127\.0\.0\.1:[0-9]+#<가림>#g; s#/[^ ]+#<가림>#g' "$ITER/server.log"
+    grep -E '^(HTTP_MAX_CONN|FL_HTTP_WORKERS|FL_HTTP_WORKER_MAX_REQ|HTTP_WORKER_RESTART)' "$ITER/server.log" | tail -n 12
+    CAP_FAILURE_FOLLOWUP_HTTP="$(curl --silent --max-time 3 -o /dev/null -w '%{http_code}' \
+      "http://127.0.0.1:$PORT/about" 2>/dev/null || echo 000)"
+    printf 'CAP_FAILURE_FOLLOWUP_HTTP=%s\n' "$CAP_FAILURE_FOLLOWUP_HTTP"
   fi
   ZOMBIE_AFTER="$(ps -o stat= --ppid "$SERVER_PID" 2>/dev/null | awk '$1 ~ /^Z/{n++} END{print n+0}' || true)"
   ZOMBIE_DELTA=$((ZOMBIE_AFTER - ZOMBIE_BEFORE))
