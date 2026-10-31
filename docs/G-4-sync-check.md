@@ -3,10 +3,10 @@
 ## 판정
 
 ```text
-G4_SUMMARY=4/5
+G4_SUMMARY=5/5
 ```
 
-후보는 seed, 고정점, native 빌드 실행 계약, `/about`, 동시성 확인을 통과했다. 전체 빠른 시험은 후보와 GitHub master 모두 같은 suite 결과까지 진행됐으나, 두 실행 모두 10분 동안 추가 suite 결과가 없어 각각 SIGTERM으로 종료했다. 따라서 전체 실패 목록 비교가 완료되지 않았고, 후보에서만 새로 실패하는 시험이 0개라는 항목은 미확인이다. 이 확인 작업에서 master에는 푸시하지 않았다.
+후보는 seed, 고정점, native 빌드 실행 계약, `/about`, 동시성 확인을 통과했다. G-4a의 전체 Jest 실행은 끝나지 않았지만, G-4b에서 빠른 시험 60개 suite를 양쪽에서 파일별 제한 시간 아래 다시 실행했다. 실패·timeout 상태와 완료된 실패 assertion 이름이 양쪽에서 같아 후보에서만 실패한 시험은 0개다. 이 확인 작업에서 master에는 푸시하지 않았다.
 
 ## 0. 후보 HEAD
 
@@ -177,3 +177,54 @@ OTHER_HEAVY_TESTS_FOUND=2
 ```
 
 지시대로 이 재시도에서도 suite별 Jest 명령을 시작하지 않았다. ⑤와 `G4_SUMMARY=4/5`는 미확인 상태 그대로다.
+
+## G-4b 대기 기록 및 5번 재검증
+
+무거운 작업 확인은 `ps -eo pid,ppid,stat,etime,comm,args`로 저장했다. 아래는 각 약 5분 간격 스냅샷에서 관련 행만 추린 원문이며, 경로는 `<가림>` 처리했다.
+
+```text
+2026-10-31 09:54:10 ps-000: 3245234 128192 Ss 18:29 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 18:29 unshare <가림>; 3245257 3245256 S 18:29 bash <가림>/verify-l08-platform-all.sh; 3262365 3245257 S 00:17 strace <가림>/verify-l08-atom-update.sh; 3262368 3262365 S 00:17 bash <가림>/verify-l08-atom-update.sh
+2026-10-31 09:59:32 ps-001: 3245234 128192 Ss 23:52 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 23:52 unshare <가림>; 3245257 3245256 S 23:52 bash <가림>/verify-l08-platform-all.sh; 3269333 3245257 S 00:14 strace <가림>/verify-l08-arena-cache.sh; 3269336 3269333 S 00:14 bash <가림>/verify-l08-arena-cache.sh
+2026-10-31 10:04:52 ps-002: 3245234 128192 Ss 29:11 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 29:11 unshare <가림>; 3245257 3245256 S 29:11 bash <가림>/verify-l08-platform-all.sh; 3273296 3245257 S 02:12 strace <가림>/verify-l08-timer-sanitizers.sh; 3273299 3273296 S 02:12 bash <가림>/verify-l08-timer-sanitizers.sh
+2026-10-31 10:11:07 ps-003: 3245234 128192 Ss 35:27 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 35:27 unshare <가림>; 3245257 3245256 S 35:27 bash <가림>/verify-l08-platform-all.sh; 3280239 3245257 R 01:28 strace <가림>/verify-l08-fd-faults.sh; 3280242 3280239 S 01:28 bash <가림>/verify-l08-fd-faults.sh
+2026-10-31 10:16:24 ps-004: 3245234 128192 Ss 40:44 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 40:44 unshare <가림>; 3245257 3245256 S 40:44 bash <가림>/verify-l08-platform-all.sh; 3286627 3245257 R 00:37 strace <가림>/verify-l08-http-platform.sh; 3286630 3286627 S 00:37 bash <가림>/verify-l08-http-platform.sh
+2026-10-31 10:21:40 ps-005: 3245234 128192 Ss 46:00 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 45:59 unshare <가림>; 3245257 3245256 S 45:59 bash <가림>/verify-l08-platform-all.sh; 3291217 3245257 S 01:12 bash <가림>/verify-l08-phase3-all.sh; 3291221 3291217 R 01:12 strace <가림>/verify-l08-phase3-self.sh; 3291224 3291221 S 01:12 bash <가림>/verify-l08-phase3-self.sh
+2026-10-31 10:26:56 ps-006: 3245234 128192 Ss 51:16 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 51:16 unshare <가림>; 3245257 3245256 S 51:16 bash <가림>/verify-l08-platform-all.sh; 3291217 3245257 S 06:28 bash <가림>/verify-l08-phase3-all.sh; 3295000 3291217 S 03:09 bash <가림>/verify-l08-phase2-all.sh; 3295004 3295000 S 03:09 strace <가림>/verify-l08-phase2-self.sh; 3295007 3295004 S 03:09 bash <가림>/verify-l08-phase2-self.sh
+2026-10-31 10:32:15 ps-007: 3245234 128192 Ss 56:34 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 56:34 unshare <가림>; 3245257 3245256 S 56:34 bash <가림>/verify-l08-platform-all.sh; 3291217 3245257 S 11:47 bash <가림>/verify-l08-phase3-all.sh; 3295000 3291217 S 08:27 bash <가림>/verify-l08-phase2-all.sh; 3301137 3295000 S 04:39 bash <가림>/verify-l08-all.sh; 3301141 3301137 S 04:39 strace <가림>/verify-l08-c01-c03.sh; 3301144 3301141 S 04:39 bash <가림>/verify-l08-c01-c03.sh
+2026-10-31 10:37:32 ps-008: 3245234 128192 Ss 01:01:52 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 01:01:52 unshare <가림>; 3245257 3245256 S 01:01:52 bash <가림>/verify-l08-platform-all.sh; 3291217 3245257 S 17:04 bash <가림>/verify-l08-phase3-all.sh; 3295000 3291217 S 13:45 bash <가림>/verify-l08-phase2-all.sh; 3301137 3295000 S 09:57 bash <가림>/verify-l08-all.sh
+2026-10-31 10:42:49 ps-009: 3245234 128192 Ss 01:07:09 bash <가림>/verify-l08-platform-all.sh; 3245256 3245234 S 01:07:09 unshare <가림>; 3245257 3245256 S 01:07:09 bash <가림>/verify-l08-platform-all.sh; 3291217 3245257 S 22:21 bash <가림>/verify-l08-phase3-all.sh; 3295000 3291217 S 19:02 bash <가림>/verify-l08-phase2-all.sh; 3301137 3295000 S 15:14 bash <가림>/verify-l08-all.sh
+2026-10-31 10:48:07 ps-010: OTHER_HEAVY_FOUND=0
+```
+
+`ps-010`에서 0개를 확인한 뒤 `/tmp/fl-heavy.lock`을 획득해, strace 없이 후보 `f1f39da5a2ab00bc77df9dc49370705cb7f9d214`와 GitHub master `29c57e38b3bd014822cf33fe3df8c1815fee707e`의 빠른 Jest 시험을 suite별로 각각 1회 실행했다. 제한은 suite당 120초였다. 처음 한 차례는 suite 경로 접두부를 빠뜨려 `--passWithNoTests`가 빈 시험을 성공 처리했으므로 무효로 제외했다. 올바른 경로로 재실행한 결과만 아래 집계에 포함한다.
+
+```text
+CANDIDATE_HEAD=f1f39da5a2ab00bc77df9dc49370705cb7f9d214
+MASTER_HEAD=29c57e38b3bd014822cf33fe3df8c1815fee707e
+CANDIDATE_SUITES=60
+MASTER_SUITES=60
+CANDIDATE_FAIL_SUITES=11
+CANDIDATE_TIMEOUT_SUITES=2
+MASTER_FAIL_SUITES=11
+MASTER_TIMEOUT_SUITES=2
+CANDIDATE_COMPLETED_TESTS=1384
+CANDIDATE_PASSED=1287
+CANDIDATE_FAILED=97
+CANDIDATE_JSON_SUITES=58
+MASTER_COMPLETED_TESTS=1384
+MASTER_PASSED=1287
+MASTER_FAILED=97
+MASTER_JSON_SUITES=58
+FAILED_ASSERTION_DIFF_RC=0
+SUITE_STATUS_DIFF_RC=0
+```
+
+| 양쪽 모두 실패 | 후보에서만 실패 | master에서만 실패 |
+|---|---|---|
+| `advanced.test.ts`, `ai-library.test.ts`, `build-determinism.test.ts`, `l2-proof.test.ts`, `p1-1-parallel-tasks.test.ts`, `p1-4-observability.test.ts`, `semantic-preservation.test.ts`, `stdlib-f4.test.ts`, `stdlib-helpers.test.ts`, `stdlib-new.test.ts`, `stdlib-perf.test.ts`; timeout: `errors.test.ts`, `self-hosting.test.ts` | 없음 | 없음 |
+
+완료된 JSON 결과에서 실패 assertion은 양쪽 모두 `97`개이며, 실패명 비교는 차이 `0`이다. timeout된 suite는 `errors.test.ts`, `self-hosting.test.ts`로 양쪽이 같다. 후보에서만 실패한 항목이 없어 해당 항목의 오류 첫 줄은 없다.
+
+```text
+G4_SUMMARY=5/5
+```
