@@ -160,3 +160,20 @@ OTHER_HEAVY_FOUND=1
 ```
 
 확인된 명령은 `verify-l08-platform-all.sh`이며, 하위 `strace`는 `verify-l08-atom-snapshot.sh`를 실행 중이었다. 따라서 G-4a에서는 후보와 master의 suite별 시험을 하나도 시작하지 않았다. 기존 결과를 기준으로 `G4_SUMMARY=4/5`이며, ⑤는 계속 미확인이다. 잠금 점유가 없어지는 뒤에만 재시도할 수 있다.
+
+### G-4a 재검증 재시도 전 확인 (2026-10-31)
+
+다시 실행 직전에도 무거운 검증 두 가지가 진행 중이었다. 아래는 `ps -eo pid,ppid,stat,etime,pcpu,comm,args` 결과에서 관련 행이며, 로컬 경로만 가렸다.
+
+```text
+3245234  128192 Ss   16:59  0.0 bash <가림>/verify-l08-platform-all.sh
+3245256 3245234 S    16:59  0.0 unshare <가림>
+3245257 3245256 S    16:59  0.0 bash <가림>/verify-l08-platform-all.sh
+3260546 3245257 S    00:00 13.6 strace <가림>/verify-l08-extern-self.sh
+3259591  128192 Ss   01:25  0.0 bash <가림>/verify-l08-editor-ui.sh
+3259615 3259591 R    01:25 16.2 strace <가림>/verify-l08-editor-ui.sh
+3259618 3259615 S    01:25  0.0 bash <가림>/verify-l08-editor-ui.sh
+OTHER_HEAVY_TESTS_FOUND=2
+```
+
+지시대로 이 재시도에서도 suite별 Jest 명령을 시작하지 않았다. ⑤와 `G4_SUMMARY=4/5`는 미확인 상태 그대로다.
