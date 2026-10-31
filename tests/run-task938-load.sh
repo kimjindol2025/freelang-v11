@@ -213,11 +213,19 @@ done
 wait "$WARMUP_PID"
 cat "$WORK/warmup.log"
 TOTAL_WRITE_HTTP_200="$(sed -n 's/.*write_http_200=\([0-9]*\).*/\1/p' "$WORK/warmup.log")"
-sleep 0.1
-server_snapshot
-(( SERVER_RSS_NOW > WARM_RSS_MAX )) && WARM_RSS_MAX=$SERVER_RSS_NOW
+BASELINE_FD_READY=0
+for _ in $(seq 1 50); do
+  server_snapshot
+  (( SERVER_RSS_NOW > WARM_RSS_MAX )) && WARM_RSS_MAX=$SERVER_RSS_NOW
+  if (( SERVER_FD_NOW <= COLD_FD + 1 )); then
+    BASELINE_FD_READY=1
+    break
+  fi
+  sleep 0.1
+done
 INITIAL_RSS=$WARM_RSS_MAX
 INITIAL_FD=$SERVER_FD_NOW
+printf 'LOAD_RESOURCE_BASELINE_SETTLED=%s fd=%s\n' "$BASELINE_FD_READY" "$INITIAL_FD"
 printf 'LOAD_RESOURCE_WARM_BASELINE rss_kb=%s fd=%s\n' "$INITIAL_RSS" "$INITIAL_FD"
 
 STAGES=0
