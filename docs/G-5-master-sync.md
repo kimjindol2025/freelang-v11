@@ -49,3 +49,47 @@ GitHub ls-remote: 29c57e38b3bd014822cf33fe3df8c1815fee707e refs/tags/pre-sync-20
 ```text
 G5_SUMMARY=진행 중
 ```
+
+## G-5a 재검증 및 원격 승격
+
+백업 태그는 이미 있어 다시 만들지 않았다. 시작 확인 원문:
+
+```text
+c31ad994144b944df8a453655104e5bdedd2842b
+25484a252c15fd9593972d9d2a18536ab0f3a55f
+forgejo-sync-check
+```
+
+`HEAD`는 지시된 `c31ad994144b944df8a453655104e5bdedd2842b`였고 `HEAD^`는 `25484a252c15fd9593972d9d2a18536ab0f3a55f`였다. fetch 후 원격 시작점과 조상 검사 결과:
+
+```text
+FORGEJO_MASTER=ef20ebc5ab00f768b1a49abc032795c714e05574
+GITHUB_MASTER=29c57e38b3bd014822cf33fe3df8c1815fee707e
+FORGEJO_SYNC=25484a252c15fd9593972d9d2a18536ab0f3a55f
+GITHUB_SYNC=f1f39da5a2ab00bc77df9dc49370705cb7f9d214
+FORGEJO_MASTER_IS_ANCESTOR_RC=0
+GITHUB_MASTER_IS_ANCESTOR_RC=0
+FORGEJO_SYNC_IS_ANCESTOR_RC=0
+GITHUB_SYNC_IS_ANCESTOR_RC=0
+```
+
+각 push에서 `X=$(git rev-parse HEAD)`로 얻은 값을 사용했다. Forgejo를 먼저 반영한 뒤 GitHub를 반영했다:
+
+```text
+PUSH_X=c31ad994144b944df8a453655104e5bdedd2842b
+FORGEJO_MASTER_PUSH=PASS
+FORGEJO_SYNC_PUSH=PASS
+FORGEJO_MASTER=c31ad994144b944df8a453655104e5bdedd2842b refs/heads/master
+FORGEJO_SYNC=c31ad994144b944df8a453655104e5bdedd2842b refs/heads/forgejo-sync-check
+PUSH_X=c31ad994144b944df8a453655104e5bdedd2842b
+GITHUB_MASTER_PUSH=PASS
+GITHUB_SYNC_PUSH=PASS
+GITHUB_MASTER=c31ad994144b944df8a453655104e5bdedd2842b refs/heads/master
+GITHUB_SYNC=c31ad994144b944df8a453655104e5bdedd2842b refs/heads/forgejo-sync-check
+```
+
+```text
+G5_SUMMARY=4/4
+```
+
+최종 양쪽 master 해시는 `c31ad994144b944df8a453655104e5bdedd2842b`다. 이 후속 보고서 커밋은 `forgejo-sync-check`에만 push하며 master는 이동시키지 않는다.
