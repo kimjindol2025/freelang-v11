@@ -31,3 +31,6 @@ stage1.js
 docs/AI_SYSTEM_PROMPT.md
 docs/AI_SYSTEM_PROMPT_MINI.md
 .freelang/
+self/cgc-main.out.js.new
+self/*.out.js*
+self/*.js.new

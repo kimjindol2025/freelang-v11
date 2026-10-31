@@ -15,4 +15,24 @@ FreeLang 네이티브 컴파일러와 런타임의 기준 저장소입니다. �
 - 실행 경로에 Node 0 / JS 0 / AFJ 0, 옛 파일은 `legacy/`에 보관.
 - 전체 시험 41/41, 감사 44/44
 
+## Architecture (5-Layer)
+
+```
+Layer 5: Experiments  ← 불안정, 자주 변경 (wisdom, predict, evolve)
+Layer 4: Core         ← 언어 의미론만 (parser, interpreter, match, type-check)
+Layer 3: Extensions   ← 도메인 기능 (web, db, http, agent, workflow)
+Layer 2: StdLib       ← 범용 유틸 (string, list, map, file, json)
+Layer 1: Temporary    ← 임시/호환성 (compat, temp, scratch - 막힌 것 먼저)
+```
+
+**쌓는 순서**: 막힌 것 → Temporary → StdLib → Extensions → Core 안정화
+
+**Core 원칙**: 언어 의미론에 필수적인 것만
+- 문법 파싱 & 타입 체크
+- 함수 정의 & 호출
+- 이름 해석 & 스코프
+- 패턴 매칭 & 제어문
+
+---
+
 프로젝트별 도구와 시험은 FreeLang Tools CLI의 프로젝트 어댑터를 사용합니다. 옛 Node·npm·bootstrap 실행 안내는 현재 기본 실행법이 아니며, 과거 방식 기록은 `legacy/`를 참고하세요.

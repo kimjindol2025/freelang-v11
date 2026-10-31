@@ -1,6 +1,6 @@
 // Phase 151: v9 자기진화 — v9가 자신의 코드를 진화시킨다
 
-import { EvolutionEngine } from "../evolve";
+import { EvolutionEngine } from "../experiments/evolve";
 
 beforeAll(() => {
   jest.spyOn(console, "log").mockImplementation(() => {});

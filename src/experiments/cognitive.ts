@@ -1,7 +1,7 @@
 // FreeLang v9 Cognitive Architecture — AI 인지 아키텍처 통합
 // Phase 120: Phase 111~119 전체 통합
 
-import { HypothesisTester } from './hypothesis';
+import { HypothesisTester } from '../hypothesis';
 import { MetaReasoner } from './meta-reason';
 import { BeliefSystem } from './belief';
 import { AnalogyStore } from './analogy';
