@@ -139,6 +139,26 @@ static void http_pool_connection_leave(size_t slot) {
     http_shared_unlock();
 }
 
+static int http_pool_connection_enter_main(void) {
+    http_shared_lock();
+    if (http_rate_shared->active_connections >= http_max_conn) {
+        http_shared_unlock();
+        return 0;
+    }
+    int active = ++http_rate_shared->active_connections;
+    if (active > http_rate_shared->max_active_connections)
+        http_rate_shared->max_active_connections = active;
+    http_shared_unlock();
+    return 1;
+}
+
+static void http_pool_connection_leave_main(void) {
+    http_shared_lock();
+    if (http_rate_shared->active_connections > 0)
+        http_rate_shared->active_connections--;
+    http_shared_unlock();
+}
+
 static int http_pool_request_count(void) {
     return __sync_val_compare_and_swap(&http_rate_shared->total_requests, 0, 0);
 }
@@ -347,7 +367,12 @@ static void http_run_pool(int server, int max_requests) {
             if (ready > 0 && (listener.revents & POLLIN)) {
                 int client = accept(server, NULL, NULL);
                 if (client >= 0) {
-                    http_send_busy(client);
+                    if (http_pool_connection_enter_main()) {
+                        http_handle_client(client);
+                        http_pool_connection_leave_main();
+                    } else {
+                        http_send_busy(client);
+                    }
                     close(client);
                     http_pool_request_enter();
                 }
