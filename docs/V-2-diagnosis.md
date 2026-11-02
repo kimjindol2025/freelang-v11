@@ -374,8 +374,17 @@ D-12 작업본과 단독 clone의 전체 시험 결과 차이에 대한 대표 �
 | 2 LOAD2 종료 코드 원인 | 통과 | 18행 저장 및 343행 실패 검사 확인 |
 | 3 pool 실패 원인 | 부분 확인·미통과 | 직접 실패 조건 확인, FD 구성 원인 및 당시 FD/포트 점유표 미확보 |
 | 4 환경 비교표 | 통과 | 현재 관찰·과거 기록·미수집 값을 구분해 작성 |
-| 5 Forgejo→GitHub 및 원격 HEAD 일치 | 대기 | 첫 보고서 전달 후 실제 두 ref 확인 결과로 갱신 |
+| 5 Forgejo→GitHub 및 원격 HEAD 일치 | 통과 | Forgejo 먼저, GitHub 다음 push 후 두 ref 일치 확인 |
 
-이 보고서만 커밋한다. 커밋 전 민감정보 diff를 검사하고 Forgejo 먼저, GitHub 다음으로 recheck-v1만 push한다. 소스·다른 보고서와 db-stability 브랜치는 변경하지 않는다.
+최초 보고서 전달 후 확인한 원격 ref 원문:
 
-V2_SUMMARY=3/5
+```text
+Forgejo
+ebd4a4639c0b92b48ee22319e8f3855689f441ea	refs/heads/recheck-v1
+GitHub
+ebd4a4639c0b92b48ee22319e8f3855689f441ea	refs/heads/recheck-v1
+```
+
+위 실제 검증 후 전달 칸과 점수를 갱신했다. 이 갱신을 포함한 최종 보고서 커밋 및 최종 두 원격 HEAD는 완료 답변에 기록한다. 보고서만 커밋하며 소스·다른 보고서와 db-stability 브랜치는 변경하지 않는다. 커밋 전 민감정보 diff 검사 결과는 `SENSITIVE_DIFF_MATCHES=0`이었다. 최종 갱신도 같은 순서로 push하고 ref를 다시 확인한다.
+
+V2_SUMMARY=4/5
