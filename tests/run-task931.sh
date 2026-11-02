@@ -10,7 +10,30 @@ COMPILER="${1:?usage: run-task931.sh <compiler> <work-dir>}"
 WORK="${2:?usage: run-task931.sh <compiler> <work-dir>}"
 RUNTIME="$ROOT/runtime"
 mkdir -p "$WORK"
-baseline_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+test_tree_snapshot() {
+  ps -eo pid=,ppid=,stat=,comm= | awk -v root="$$" '
+    { pid[NR]=$1; parent[NR]=$2; state[NR]=$3; command[NR]=$4 }
+    END {
+      known[root]=1
+      do {
+        changed=0
+        for (i=1; i<=NR; i++) {
+          if (known[parent[i]] && !known[pid[i]]) {
+            known[pid[i]]=1
+            changed=1
+          }
+        }
+      } while (changed)
+      print "PID PPID STAT COMMAND"
+      for (i=1; i<=NR; i++) {
+        if (known[pid[i]]) printf "%s %s %s %s\n", pid[i], parent[i], state[i], command[i]
+      }
+    }'
+}
+test_tree_zombies() {
+  test_tree_snapshot | awk '$3 ~ /^Z/ {n++} END {print n+0}'
+}
+baseline_zombies="$(test_tree_zombies)"
 SOURCES=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c db.c http_server.c auth.c)
 LINK=(); for source in "${SOURCES[@]}"; do LINK+=("$RUNTIME/$source"); done
 segv_count=0
@@ -131,7 +154,7 @@ if test "$fork_mode" = main || test -z "${isolated_skip_reason:-}"; then
   test "$parallel_failed" -gt 0 && test "$parallel_succeeded" -gt 0
   test $((parallel_failed + parallel_succeeded)) -eq 20
   grep -Fxq 'PARALLEL_DONE' "$WORK/forkfail.out"
-  parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+  parallel_zombies="$(test_tree_zombies)"
   parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
   printf 'FORKFAIL_CASE=run-parallel FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$parallel_failed" "$parallel_succeeded" "$parallel_rc" "$parallel_signal" "$parallel_zombie_delta"
   test "$parallel_zombie_delta" -eq 0
@@ -257,7 +280,7 @@ server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-nproc/server.log" || true
 test -n "$server_error" || server_error=none
 printf 'CASE=http-process-limit-30-requests SERVER_RC=%s SIGNAL=%s ERROR=%s RESPONSES=%s/30 HTTP_503=%s\n' "$server_rc" "$server_signal" "$server_error" "$nproc_total" "$nproc_503"
 test "$nproc_total" -eq 30 && test "$nproc_503" -gt 0
-parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+parallel_zombies="$(test_tree_zombies)"
 parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
 printf 'FORKFAIL_CASE=http-process-limit FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=HTTP_503 RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$nproc_503" "$((nproc_total - nproc_503))" "$server_rc" "$server_signal" "$parallel_zombie_delta"
 test "$parallel_zombie_delta" -eq 0
@@ -289,19 +312,19 @@ server_error="$(grep -im1 -E 'error|failed' "$WORK/oom-recovery/server.log" || t
 test -n "$server_error" || server_error=none
 printf 'CASE=http-recovery SERVER_RC=%s SIGNAL=%s ERROR=%s HTTP_STATUS=%s\n' "$server_rc" "$server_signal" "$server_error" "$recovery_code"
 test "$recovery_code" = 200
-parallel_zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+parallel_zombies="$(test_tree_zombies)"
 parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
 printf 'FORKFAIL_CASE=http-recovery FAILED_SLOTS=0 SUCCESSFUL_SLOTS=1 ERROR=none RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$server_rc" "$server_signal" "$parallel_zombie_delta"
 test "$parallel_zombie_delta" -eq 0
 
-zombies="$(ps -eo stat= | awk '$1 ~ /^Z/ {n++} END {print n+0}')"
+zombies="$(test_tree_zombies)"
 zombie_delta=$((zombies - baseline_zombies))
-test_zombies="$(ps -eo ppid=,stat= | awk -v p="$$" '$1 == p && $2 ~ /^Z/ {n++} END {print n+0}')"
+test_zombies="$zombies"
 printf 'SEGV_COUNT=%s\n' "$segv_count"
 printf 'ZOMBIE_COUNT=%s\n' "$zombies"
 printf 'ZOMBIE_BASELINE=%s ZOMBIE_DELTA=%s\n' "$baseline_zombies" "$zombie_delta"
-printf 'TEST_PARENT_ZOMBIE_COUNT=%s\n' "$test_zombies"
-printf 'ZOMBIE_PS_RAW_BEGIN\n'; ps -eo pid,ppid,stat,comm | awk 'NR==1 || $3 ~ /^Z/'; printf 'ZOMBIE_PS_RAW_END\n'
+printf 'TEST_TREE_ZOMBIE_COUNT=%s\n' "$test_zombies"
+printf 'ZOMBIE_PS_RAW_BEGIN\n'; test_tree_snapshot | awk 'NR==1 || $3 ~ /^Z/'; printf 'ZOMBIE_PS_RAW_END\n'
 passed=11
 test "$zombie_delta" -eq 0 && test "$test_zombies" -eq 0 && passed=12 || true
 test "$segv_count" -eq 0 && test "$zombie_delta" -eq 0 && test "$test_zombies" -eq 0
