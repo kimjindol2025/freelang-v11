@@ -172,13 +172,15 @@ grep -E '^(DB_BUSY_TIMEOUT_MS|DB_JOURNAL_MODE|HTTP_LISTEN_BACKLOG|HTTP_MAX_CONN)
 DB_JOURNAL_MODE="$(sqlite3 -batch -noheader "$MIXSOAK_DB" 'PRAGMA journal_mode;')"
 printf 'LOAD_SQLITE3_JOURNAL_MODE=%s\n' "$DB_JOURNAL_MODE"
 test "$DB_JOURNAL_MODE" = wal
+MIXSOAK_DB_REAL="$(readlink -f -- "$MIXSOAK_DB")"
+MIXSOAK_WAL_REAL="${MIXSOAK_DB_REAL}-wal"
 ACK_SQL="$WORK/acknowledged.sql"
 : >"$ACK_SQL"
 
 PAGE_KB="$(( $(getconf PAGESIZE) / 1024 ))"
 server_snapshot() {
-  local pid child_stat statm rss_pages stat
-  local -a pids=()
+  local pid child_stat statm rss_pages stat fd
+  local -a pids=() fd_paths=()
   SERVER_RSS_NOW=0; SERVER_FD_NOW=0; SERVER_ZOMBIE_NOW=0
   pids=("$SERVER_PID")
   while read -r pid child_stat; do
@@ -191,12 +193,56 @@ server_snapshot() {
     if ! read -r _ rss_pages _ 2>/dev/null <"/proc/$pid/statm"; then continue; fi
     SERVER_RSS_NOW=$((SERVER_RSS_NOW + rss_pages * PAGE_KB))
     local -a fds=(/proc/"$pid"/fd/*)
-    SERVER_FD_NOW=$((SERVER_FD_NOW + ${#fds[@]}))
+    fd_paths+=("${fds[@]}")
   done
+  SERVER_FD_NOW="$(fd_count_excluding_sqlite "${fd_paths[@]}")"
   stat="$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}' || true)"
   [[ "$stat" == Z* ]] && SERVER_ZOMBIE_NOW=$((SERVER_ZOMBIE_NOW + 1))
   return 0
 }
+
+fd_count_excluding_sqlite() {
+  local -a paths=("$@")
+  local count=${#paths[@]}
+  local excluded
+  excluded="$(readlink -- "${paths[@]}" 2>/dev/null | awk -v db="$MIXSOAK_DB_REAL" -v wal="$MIXSOAK_WAL_REAL" \
+    '$0 == db || $0 == (db " (deleted)") || $0 == wal || $0 == (wal " (deleted)") { n++ } END { print n+0 }')"
+  printf '%s\n' "$((count - excluded))"
+}
+
+fd_is_stable() {
+  local start=$1 end=$2
+  (( end <= start + 1 && start <= end + 1 ))
+}
+
+# Self-check the normalized counter: DB/WAL descriptors are ignored, while two
+# unrelated leaked descriptors still exceed the unchanged +/-1 limit.
+if [[ -r "$MIXSOAK_DB_REAL" && -r "$MIXSOAK_WAL_REAL" ]]; then
+  local_fd_paths=(/proc/$$/fd/*)
+  FD_CONTROL_BASE="$(fd_count_excluding_sqlite "${local_fd_paths[@]}")"
+  exec {fd_db}< "$MIXSOAK_DB_REAL"
+  exec {fd_wal}< "$MIXSOAK_WAL_REAL"
+  local_fd_paths=(/proc/$$/fd/*)
+  FD_CONTROL_DB="$(fd_count_excluding_sqlite "${local_fd_paths[@]}")"
+  if fd_is_stable "$FD_CONTROL_BASE" "$FD_CONTROL_DB"; then FD_CONTROL_DB_RC=0; else FD_CONTROL_DB_RC=1; fi
+  exec {fd_db}<&-
+  exec {fd_wal}<&-
+  exec {fd_leak_a}>/dev/null
+  exec {fd_leak_b}>/dev/null
+  local_fd_paths=(/proc/$$/fd/*)
+  FD_CONTROL_LEAK="$(fd_count_excluding_sqlite "${local_fd_paths[@]}")"
+  if fd_is_stable "$FD_CONTROL_DB" "$FD_CONTROL_LEAK"; then FD_CONTROL_LEAK_RC=0; else FD_CONTROL_LEAK_RC=1; fi
+  exec {fd_leak_a}>&-
+  exec {fd_leak_b}>&-
+  printf 'LOAD_FD_DB_TURNOVER_DELTA=%s\n' "$((FD_CONTROL_DB - FD_CONTROL_BASE))"
+  printf 'LOAD_FD_DB_TURNOVER_STABLE=%s\n' "$FD_CONTROL_DB_RC"
+  printf 'LOAD_FD_LEAK_DELTA=%s\n' "$((FD_CONTROL_LEAK - FD_CONTROL_DB))"
+  printf 'LOAD_FD_LEAK_CONTROL_DETECTED=%s\n' "$FD_CONTROL_LEAK_RC"
+  test "$FD_CONTROL_DB_RC" -eq 0 && test "$FD_CONTROL_LEAK_RC" -eq 1
+else
+  echo 'LOAD_FD_CONTROL_DB_FILES_MISSING=1' >&2
+  exit 1
+fi
 
 server_snapshot
 COLD_RSS=$SERVER_RSS_NOW
@@ -318,7 +364,7 @@ printf 'LOAD_RESOURCE_COLD_START rss_kb=%s fd=%s\n' "$COLD_RSS" "$COLD_FD"
 printf 'LOAD_RESOURCE_START rss_kb=%s fd=%s\n' "$STEADY_RSS_BASELINE" "$STEADY_FD_BASELINE"
 printf 'LOAD_RESOURCE_END rss_kb=%s fd=%s\n' "$FINAL_RSS" "$FINAL_FD"
 RESOURCE_STABLE=0
-(( FINAL_RSS <= STEADY_RSS_BASELINE + 2048 && FINAL_FD <= STEADY_FD_BASELINE + 1 && STEADY_FD_BASELINE <= FINAL_FD + 1 )) && RESOURCE_STABLE=1
+(( FINAL_RSS <= STEADY_RSS_BASELINE + 2048 )) && fd_is_stable "$STEADY_FD_BASELINE" "$FINAL_FD" && RESOURCE_STABLE=1
 printf 'LOAD_RESOURCE_STABLE=%s\n' "$RESOURCE_STABLE"
 if kill -0 "$SERVER_PID" 2>/dev/null && [[ "$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{$1=$1;print}')" != Z* ]]; then SERVER_ALIVE=1; else SERVER_ALIVE=0; fi
 printf 'LOAD_SERVER_ALIVE=%s\n' "$SERVER_ALIVE"

@@ -3,6 +3,13 @@ set -Eeuo pipefail
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 TOOLS="${FL_TOOLS_ROOT:-$(cd -- "$ROOT/../freelang-tools" && pwd -P)}"
+TOOLS_EXPECTED_COMMIT=5bbfb771e5f9c83f0b9664e306ff143a0a2b556c
+TOOLS_ACTUAL_COMMIT="$(git -C "$TOOLS" rev-parse HEAD 2>/dev/null || true)"
+if [[ "$TOOLS_ACTUAL_COMMIT" != "$TOOLS_EXPECTED_COMMIT" ]]; then
+  printf 'FREELANG_TOOLS_COMMIT_MISMATCH expected=%s actual=%s\n' \
+    "$TOOLS_EXPECTED_COMMIT" "${TOOLS_ACTUAL_COMMIT:-missing}" >&2
+  exit 1
+fi
 COMPILER="${1:?usage: run-task920.sh <stage2-compiler> <work-dir>}"
 WORK="${2:?usage: run-task920.sh <stage2-compiler> <work-dir>}"
 RUNTIME="$ROOT/runtime"
