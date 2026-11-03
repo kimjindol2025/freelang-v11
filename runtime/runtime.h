@@ -400,6 +400,7 @@ FLValue http_put(FLValue url, FLValue body);
 FLValue http_post_form(FLValue url, FLValue body);
 FLValue fl_uuid(void);
 FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit);
+FLValue _fl_https_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit);
 FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback);
 FLValue _fl_fs_io(FLValue operation, FLValue path, FLValue content);
 FLValue shell_cwd(void);

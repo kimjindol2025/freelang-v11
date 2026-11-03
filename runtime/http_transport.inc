@@ -3,6 +3,9 @@
 #include <fcntl.h>
 #include <time.h>
 #include <netinet/in.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/x509v3.h>
 
 static int64_t transport_now(void) {
     struct timespec ts;
@@ -92,7 +95,36 @@ static void transport_stream_available(char *buffer, size_t used, FLHTTPStreamSt
         state->cursor = data + chunk_size + 2;
     }
 }
-FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback) {
+/* Custom socket BIO preserves MSG_NOSIGNAL without changing process signal policy. */
+static int transport_bio_create(BIO *b) { BIO_set_init(b, 1); return 1; }
+static int transport_bio_destroy(BIO *b) { (void)b; return 1; }
+static long transport_bio_ctrl(BIO *b, int cmd, long n, void *p) {
+    (void)b; (void)n; (void)p; return cmd == BIO_CTRL_FLUSH ? 1 : 0;
+}
+static int transport_bio_read(BIO *b, char *out, int size) {
+    BIO_clear_retry_flags(b);
+    int n = (int)recv((int)(intptr_t)BIO_get_data(b), out, (size_t)size, 0);
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) BIO_set_retry_read(b);
+    return n;
+}
+static int transport_bio_write(BIO *b, const char *in, int size) {
+    BIO_clear_retry_flags(b);
+    int n = (int)send((int)(intptr_t)BIO_get_data(b), in, (size_t)size, MSG_NOSIGNAL);
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) BIO_set_retry_write(b);
+    return n;
+}
+/* Return 1 to retry, 0 for deadline, -1 for a TLS failure. */
+static int transport_tls_wait(SSL *ssl, int result, int fd, int64_t deadline) {
+    int error = SSL_get_error(ssl, result);
+    if (error != SSL_ERROR_WANT_READ && error != SSL_ERROR_WANT_WRITE) return -1;
+    return transport_wait(fd, error == SSL_ERROR_WANT_READ ? POLLIN : POLLOUT, deadline);
+}
+static void transport_close(int fd, SSL *ssl, SSL_CTX *ctx, BIO_METHOD *method) {
+    /* No blocking shutdown: the complete response must end with peer close_notify. */
+    SSL_free(ssl); SSL_CTX_free(ctx); BIO_meth_free(method); close(fd);
+}
+
+static FLValue transport_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback, int tls) {
     if (host.tag != FL_STRING || wire.tag != FL_STRING || port.tag != FL_INT ||
         timeout.tag != FL_INT || limit.tag != FL_INT || port.i < 1 || port.i > 65535 ||
         timeout.i < 1 || timeout.i > 60000 || limit.i < 1 || limit.i > 16777216 ||
@@ -144,33 +176,99 @@ FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLVal
             close(fd); return transport_error(ready == 0 ? "TIMEOUT" : "CONNECT", "connection failed");
         }
     }
+    SSL_CTX *ctx = NULL;
+    SSL *ssl = NULL;
+    BIO_METHOD *method = NULL;
+#define TRANSPORT_FAIL(code, message) do { transport_close(fd, ssl, ctx, method); return transport_error(code, message); } while (0)
+    if (tls) {
+        ctx = SSL_CTX_new(TLS_client_method());
+        if (!ctx) TRANSPORT_FAIL("TLS", "TLS context failed");
+        SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+        if (!SSL_CTX_set_default_verify_paths(ctx)) TRANSPORT_FAIL("TLS", "trust store unavailable");
+        ssl = SSL_new(ctx);
+        if (!ssl) TRANSPORT_FAIL("TLS", "TLS allocation failed");
+        X509_VERIFY_PARAM *param = SSL_get0_param(ssl);
+        X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+        struct in_addr ip;
+        if (inet_pton(AF_INET, fl_cstr(host), &ip) == 1) {
+            if (!X509_VERIFY_PARAM_set1_ip_asc(param, fl_cstr(host))) TRANSPORT_FAIL("TLS", "IP verification setup failed");
+        } else {
+            if (!SSL_set1_host(ssl, fl_cstr(host)) || !SSL_set_tlsext_host_name(ssl, fl_cstr(host)))
+                TRANSPORT_FAIL("TLS", "hostname verification setup failed");
+        }
+        method = BIO_meth_new(BIO_TYPE_SOURCE_SINK, "FreeLang nonblocking socket");
+        if (!method || !BIO_meth_set_create(method, transport_bio_create) ||
+            !BIO_meth_set_destroy(method, transport_bio_destroy) ||
+            !BIO_meth_set_read(method, transport_bio_read) ||
+            !BIO_meth_set_write(method, transport_bio_write) ||
+            !BIO_meth_set_ctrl(method, transport_bio_ctrl)) TRANSPORT_FAIL("TLS", "TLS socket setup failed");
+        BIO *bio = BIO_new(method);
+        if (!bio) TRANSPORT_FAIL("TLS", "TLS socket allocation failed");
+        BIO_set_data(bio, (void *)(intptr_t)fd);
+        SSL_set_bio(ssl, bio, bio);
+        for (;;) {
+            if (transport_now() >= deadline) TRANSPORT_FAIL("TIMEOUT", "TLS handshake deadline exceeded");
+            ERR_clear_error();
+            int n = SSL_connect(ssl);
+            if (n == 1) break;
+            int retry = transport_tls_wait(ssl, n, fd, deadline);
+            if (retry <= 0) TRANSPORT_FAIL(retry == 0 ? "TIMEOUT" : "TLS", "TLS handshake or certificate verification failed");
+        }
+        if (SSL_get_verify_result(ssl) != X509_V_OK) TRANSPORT_FAIL("TLS", "certificate verification failed");
+    }
     FLString *request = (FLString *)wire.obj;
     size_t sent = 0;
     while (sent < request->len) {
-        ready = transport_wait(fd, POLLOUT, deadline);
-        if (ready <= 0) { close(fd); return transport_error(ready == 0 ? "TIMEOUT" : "IO", "send failed"); }
-        ssize_t n = send(fd, request->data + sent, request->len - sent, MSG_NOSIGNAL);
-        if (n < 0 && (errno == EAGAIN || errno == EINTR)) continue;
-        if (n <= 0) { close(fd); return transport_error("IO", "send failed"); }
+        if (transport_now() >= deadline) TRANSPORT_FAIL("TIMEOUT", "send deadline exceeded");
+        ssize_t n;
+        if (tls) {
+            ERR_clear_error();
+            n = SSL_write(ssl, request->data + sent, (int)(request->len - sent));
+            if (n <= 0) {
+                int retry = transport_tls_wait(ssl, (int)n, fd, deadline);
+                if (retry > 0) continue;
+                TRANSPORT_FAIL(retry == 0 ? "TIMEOUT" : "TLS", "TLS send failed");
+            }
+        } else {
+            ready = transport_wait(fd, POLLOUT, deadline);
+            if (ready <= 0) TRANSPORT_FAIL(ready == 0 ? "TIMEOUT" : "IO", "send failed");
+            n = send(fd, request->data + sent, request->len - sent, MSG_NOSIGNAL);
+            if (n < 0 && (errno == EAGAIN || errno == EINTR)) continue;
+            if (n <= 0) TRANSPORT_FAIL("IO", "send failed");
+        }
         sent += (size_t)n;
     }
     char *buffer = fl_malloc((size_t)limit.i + 2);
-    if (!buffer) { close(fd); return transport_error("IO", "allocation failed"); }
+    if (!buffer) TRANSPORT_FAIL("IO", "allocation failed");
     size_t used = 0;
     FLHTTPStreamState stream = {0};
     for (;;) {
-        ready = transport_wait(fd, POLLIN, deadline);
-        if (ready <= 0) { free(buffer); close(fd); return transport_error(ready == 0 ? "TIMEOUT" : "IO", "receive failed"); }
-        ssize_t n = recv(fd, buffer + used, (size_t)limit.i + 1 - used, 0);
-        if (n < 0 && (errno == EAGAIN || errno == EINTR)) continue;
-        if (n < 0) { free(buffer); close(fd); return transport_error("IO", "receive failed"); }
-        if (!n) break;
+        if (transport_now() >= deadline) { free(buffer); TRANSPORT_FAIL("TIMEOUT", "receive deadline exceeded"); }
+        ssize_t n;
+        if (tls) {
+            ERR_clear_error();
+            n = SSL_read(ssl, buffer + used, (int)((size_t)limit.i + 1 - used));
+            if (n <= 0) {
+                if (SSL_get_error(ssl, (int)n) == SSL_ERROR_ZERO_RETURN) break;
+                int retry = transport_tls_wait(ssl, (int)n, fd, deadline);
+                if (retry > 0) continue;
+                free(buffer); TRANSPORT_FAIL(retry == 0 ? "TIMEOUT" : "TLS", "TLS receive failed");
+            }
+        } else {
+            ready = transport_wait(fd, POLLIN, deadline);
+            if (ready <= 0) { free(buffer); TRANSPORT_FAIL(ready == 0 ? "TIMEOUT" : "IO", "receive failed"); }
+            n = recv(fd, buffer + used, (size_t)limit.i + 1 - used, 0);
+            if (n < 0 && (errno == EAGAIN || errno == EINTR)) continue;
+            if (n < 0) { free(buffer); TRANSPORT_FAIL("IO", "receive failed"); }
+            if (!n) break;
+        }
         used += (size_t)n;
-        if (used > (size_t)limit.i) { free(buffer); close(fd); return transport_error("RESPONSE_TOO_LARGE", "response byte limit exceeded"); }
+        if (used > (size_t)limit.i) { free(buffer); TRANSPORT_FAIL("RESPONSE_TOO_LARGE", "response byte limit exceeded"); }
         buffer[used] = '\0';
         transport_stream_available(buffer, used, &stream, callback);
     }
-    close(fd);
+    transport_close(fd, ssl, ctx, method);
+#undef TRANSPORT_FAIL
     if (memchr(buffer, 0, used)) { free(buffer); return transport_error("HTTP_BINARY", "binary response unsupported"); }
     buffer[used] = 0;
     if (callback.tag == FL_FN && !stream.headers) transport_stream_available(buffer, used, &stream, callback);
@@ -188,4 +286,10 @@ FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLVal
 }
 FLValue _fl_http_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit) {
     return _fl_http_exchange_stream(host, port, wire, timeout, limit, fl_nil());
+}
+FLValue _fl_http_exchange_stream(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit, FLValue callback) {
+    return transport_exchange(host, port, wire, timeout, limit, callback, 0);
+}
+FLValue _fl_https_exchange(FLValue host, FLValue port, FLValue wire, FLValue timeout, FLValue limit) {
+    return transport_exchange(host, port, wire, timeout, limit, fl_nil(), 1);
 }

@@ -1,0 +1,10 @@
+(load "../../lib/http/http.fl")
+(define args (cli-args))
+(define expected (get args 1))
+(define response (http-request "GET" (get args 0) {} ""
+  (if (= expected "TIMEOUT") {"timeout-ms" 200}
+    (if (= expected "RESPONSE_TOO_LARGE") {"max-response-bytes" 256} {}))))
+(define actual (if (get response "ok") "OK" (get (get response "error") "code")))
+(println (str (if (= actual expected) "PASS " "FAIL ") (get args 2)
+  " expected=" expected " actual=" actual))
+(if (= actual expected) (_fl_exit 0) (_fl_exit 1))

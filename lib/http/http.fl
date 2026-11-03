@@ -22,10 +22,10 @@
       (if (and (>= code 48) (<= code 57)) (http-digits? text (+ index 1)) false))))
 (defn http-url [url]
   (if (not (string? url)) (http-error "INVALID_URL" "URL must be a string")
-    (if (str-starts-with url "https://") (http-error "HTTPS_UNSUPPORTED" "HTTPS 미지원")
-      (if (or (not (str-starts-with url "http://")) (http-control? url 0))
+    (let [[tls (str-starts-with url "https://")]]
+      (if (or (not (or tls (str-starts-with url "http://"))) (http-control? url 0))
         (http-error "INVALID_URL" "expected HTTP URL without spaces or controls")
-        (let [[rest (substring url 7 (length url))]
+        (let [[rest (substring url (if tls 8 7) (length url))]
               [slash (_fl_str_index_of rest "/")]
               [query (_fl_str_index_of rest "?")]
               [slash-end (if (< slash 0) (length rest) slash)]
@@ -35,7 +35,7 @@
               [path (if (= tail "") "/" (if (str-starts-with tail "?") (str "/" tail) tail))]
               [parts (_fl_str_split authority ":")]
               [host (get parts 0)]
-              [port-text (if (= (length parts) 1) "80" (get parts 1))]]
+              [port-text (if (= (length parts) 1) (if tls "443" "80") (get parts 1))]]
           (if (or (= host "") (or (> (length parts) 2)
               (or (>= (_fl_str_index_of authority "@") 0)
               (or (>= (_fl_str_index_of url "#") 0) (not (http-digits? port-text 0))))))
@@ -43,7 +43,7 @@
             (let [[port (str-to-num port-text)]]
               (if (or (= port nil) (or (< port 1) (> port 65535)))
                 (http-error "INVALID_URL" "port out of range")
-                {"ok" true "host" host "port" port "authority" authority "path" path}))))))))
+                {"ok" true "tls" tls "host" host "port" port "authority" authority "path" path}))))))))
 (defn http-header-wire [headers names index wire]
   (if (>= index (length names)) {"ok" true "value" wire}
     (let [[name (get names index)] [value (get headers name)]]
@@ -111,7 +111,9 @@
                           (length body) "\r\n" (get extra "value") "\r\n" body)]]
                     (if (> (length wire) request-limit)
                       (http-error "REQUEST_TOO_LARGE" "request byte limit exceeded")
-                      (let [[raw (_fl_http_exchange (get target "host") (get target "port") wire timeout response-limit)]]
+                      (let [[raw (if (get target "tls")
+                        (_fl_https_exchange (get target "host") (get target "port") wire timeout response-limit)
+                        (_fl_http_exchange (get target "host") (get target "port") wire timeout response-limit))]]
                         (if (get raw "ok") (http-response method (get raw "value")) raw)))))))))))))
 (defn http-get [url] (http-request "GET" url {} "" {}))
 (defn http-post [url body] (http-request "POST" url {} body {}))

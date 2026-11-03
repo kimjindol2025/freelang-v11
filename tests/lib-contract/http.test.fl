@@ -19,7 +19,7 @@
 (check (get (http-get (str base "/fail")) "status") 500 "500 status")
 (check (get (http-get (str base "/fail")) "ok") false "500 not ok")
 (check (get (http-get (str base "/missing")) "ok") false "404 not ok")
-(check (get (get (http-get "https://127.0.0.1/") "error") "code") "HTTPS_UNSUPPORTED" "HTTPS rejected")
+(check (get (http-get (_fl_env_get "FL_HTTP_TEST_HTTPS_URL")) "ok") true "HTTPS trusted local certificate")
 (check (get (get (http-get "bad-url") "error") "code") "INVALID_URL" "invalid URL")
 (check (get (get (http-get "http://127.0.0.1:bad/") "error") "code") "INVALID_URL" "invalid port")
 (check (get (get (http-get refused) "error") "code") "CONNECT" "connection refused")
