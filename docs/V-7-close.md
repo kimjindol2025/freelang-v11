@@ -41,4 +41,6 @@ FIXPOINT_LOG에 기록: `D-12 닫기, 해시 변경 없음`.
 
 V-6 작업 폴더의 원격 이름은 Forgejo `forgejo`, GitHub `origin`이었다. 두 원격의 `recheck-v1` ref는 모두 `5774279c2f5355246f07c05bf657e17331efbf21`로 일치해 대응 원격으로 확정했다. 두 `db-stability` ref도 모두 `963632add97cb0534a04d4707956ffe45d9e7e0e`였다. 주소는 기록하지 않았다. 새 Forgejo 복제본에서 이 두 원격을 사용해 Forgejo 먼저, GitHub 다음 순서로 푸시한다.
 
+새 마감 문서 최초 커밋 HEAD: `2ded012ef7d949386fe1e624f7379c5bc933a196`.
+
 V7_SUMMARY 4/4
