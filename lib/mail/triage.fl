@@ -1,0 +1,39 @@
+(load "imap.fl")
+(load "../http/http.fl")
+(load "../fs/fs.fl")
+(defn triage-valid? [value]
+  (and (map? value) (= (length (keys value)) 5)
+    (string? (get value "요약")) (includes-item ["중요" "업무" "광고" "기타"] (get value "분류"))
+    (vector? (get value "할 일 목록")) (every? (fn [item] (string? item)) (get value "할 일 목록"))
+    (string? (get value "답장 초안")) (boolean? (get value "위험 표시"))))
+(defn triage-run [host port imap-opts ai-url output]
+  (let [[target (http-url ai-url)]]
+    (if (not (and (get target "ok") (get target "tls")
+                 (includes-item ["localhost" "127.0.0.1"] (get target "host"))))
+      (imap-error "LOCAL_ONLY" "local HTTPS endpoint required")
+      (let [[inbox (imap-read-inbox host port imap-opts)]]
+        (if (not (get inbox "ok")) inbox
+          (loop [i 0 records []]
+            (if (>= i (length (get inbox "messages"))) {"ok" true "records" records}
+              (let [[mail (get (get inbox "messages") i)] [id (get mail "sequence")]
+                    [body (imap-read-body host port id imap-opts)]]
+                (if (not (get body "ok")) body
+                  (let [[response (http-json "POST" ai-url
+                          {"mail" (assoc mail "body" (get body "body"))
+                           "response_fields" ["요약" "분류" "할 일 목록" "답장 초안" "위험 표시"]}
+                          {"timeout-ms" 1000 "max-response-bytes" 65536})]
+                        [value (get response "body")]
+                        [path (str output "/" id ".json")]]
+                    (if (not (get response "ok")) response
+                      (if (not (triage-valid? value))
+                        (do (file-write-atomic (str output "/error-" id ".json")
+                              "{\"error\":\"INVALID_AI_SCHEMA\"}")
+                            (imap-error "INVALID_AI_SCHEMA" "AI response rejected"))
+                        (let [[risk (get value "위험 표시")]
+                              [record (if risk {"status" "사장님 확인 필요"}
+                                {"status" "초안 저장" "result" value})]
+                              [encoded (json-stringify record)]
+                              [saved (file-write-atomic path (get encoded "value"))]]
+                          (if (not (get saved "ok")) saved
+                            (recur (+ i 1) (push records {"sequence" id "path" path "status" (get record "status")})))))))))))))))
+)

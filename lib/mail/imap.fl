@@ -123,3 +123,43 @@
               (let [[result (try (imap-session socket opts timeout limit trace) (catch error error))]]
                 (_fl_connection_close socket)
                 (assoc result "transcript" @trace)))))))))
+
+;; Separate body reader; existing inbox/header functions remain unchanged.
+(defn imap-read-body [host port sequence opts]
+  (let [[timeout (imap-option opts "timeout-ms" 3000)] [cap (imap-option opts "max-body-bytes" 65536)]
+        [trace (atom "")]]
+    (if (not (and (or (= host "localhost") (= host "127.0.0.1"))
+                 (number? sequence) (> sequence 0) (= sequence (floor sequence))
+                 (number? timeout) (>= timeout 1) (<= timeout 60000) (= timeout (floor timeout))
+                 (number? cap) (>= cap 1) (<= cap 1048576) (= cap (floor cap))
+                 (imap-clean? (get opts "username")) (imap-clean? (get opts "password"))))
+      (imap-error "INVALID_ARGUMENT" "invalid body read options")
+      (let [[socket (_fl_connection_open host port timeout)]]
+        (if (not (number? socket)) socket
+          (let [[result (try
+            (do
+              (imap-value (_fl_connection_starttls socket timeout))
+              (if (not (str-starts-with (imap-line socket (+ (now-ms) timeout) 8192 trace) "* OK "))
+                (throw (imap-error "PROTOCOL" "invalid greeting")) nil)
+              (let [[counter (atom 0)]]
+                (imap-command socket counter timeout 8192 trace
+                  (str "LOGIN " (imap-quote (get opts "username")) " " (imap-quote (get opts "password"))) "LOGIN <가림> <가림>" false)
+                (imap-command socket counter timeout 8192 trace "SELECT \"INBOX\"" "SELECT \"INBOX\"" false)
+                (let [[command (str "A3 FETCH " sequence " (BODY.PEEK[TEXT])\r\n")]
+                      [deadline (+ (now-ms) timeout)]]
+                  (imap-log trace "C: " command)
+                  (imap-value (_fl_connection_write socket command (imap-left deadline)))
+                  (let [[line (imap-line socket deadline 8192 trace)] [size (imap-literal-length line)]]
+                    (if (or (= size nil) (not (str-starts-with line (str "* " sequence " FETCH (BODY[TEXT] "))))
+                      (throw (imap-error "PROTOCOL" "invalid body literal")) nil)
+                    (if (> size cap) (throw (imap-error "BODY_TOO_LARGE" "body exceeds bound")) nil)
+                    (let [[body (imap-read-exact socket size deadline)]]
+                      (imap-response socket "A3" deadline 8192 trace [] [] true false)
+                      (reset! counter 3)
+                      (let [[flags (imap-command socket counter timeout 8192 trace
+                              (str "FETCH " sequence " (FLAGS)") (str "FETCH " sequence " (FLAGS)") false)]]
+                        (imap-command socket counter timeout 8192 trace "LOGOUT" "LOGOUT" true)
+                        {"ok" true "body" body "flags" (get flags "lines")}))))))
+            (catch error error))]]
+            (_fl_connection_close socket)
+            (assoc result "transcript" @trace)))))))

@@ -95,6 +95,46 @@ static void transport_stream_available(char *buffer, size_t used, FLHTTPStreamSt
         state->cursor = data + chunk_size + 2;
     }
 }
+/* Return true when an HTTP response with an explicit body length is complete. */
+static int transport_content_length_complete(const char *buffer, size_t used, const FLString *request) {
+    const char *end = transport_find(buffer, used, "\r\n\r\n", 4);
+    if (!end) return 0;
+    size_t body_start = (size_t)(end - buffer) + 4;
+    if (request->len >= 5 && !strncasecmp(request->data, "HEAD ", 5)) return 1;
+    const char *line_end = transport_find(buffer, body_start - 2, "\r\n", 2);
+    if (!line_end) return 0;
+    const char *line = line_end + 2;
+    if ((size_t)(line_end - buffer) >= 12 && !memcmp(buffer, "HTTP/", 5)) {
+        const char *space = memchr(buffer, ' ', (size_t)(line_end - buffer));
+        if (space && (size_t)(line_end - space) >= 4) {
+            int status = (space[1] - '0') * 100 + (space[2] - '0') * 10 + (space[3] - '0');
+            if ((status >= 100 && status < 200) || status == 204 || status == 304) return 1;
+        }
+    }
+    size_t content_length = 0;
+    int found = 0;
+    const char *header_stop = end + 2;
+    while (line < header_stop) {
+        line_end = transport_find(line, (size_t)(header_stop - line), "\r\n", 2);
+        if (!line_end) return 0;
+        const char *colon = memchr(line, ':', (size_t)(line_end - line));
+        if (colon && (size_t)(colon - line) == 14 && !strncasecmp(line, "content-length", 14)) {
+            const char *value = colon + 1;
+            while (value < line_end && (*value == ' ' || *value == '\t')) value++;
+            if (value == line_end) return 0;
+            size_t parsed = 0;
+            for (; value < line_end; value++) {
+                if (*value < '0' || *value > '9' || parsed > (SIZE_MAX - (size_t)(*value - '0')) / 10) return 0;
+                parsed = parsed * 10 + (size_t)(*value - '0');
+            }
+            if (found && parsed != content_length) return 0;
+            content_length = parsed;
+            found = 1;
+        }
+        line = line_end + 2;
+    }
+    return found && content_length <= SIZE_MAX - body_start && used >= body_start + content_length;
+}
 /* Custom socket BIO preserves MSG_NOSIGNAL without changing process signal policy. */
 static int transport_bio_create(BIO *b) { BIO_set_init(b, 1); return 1; }
 static int transport_bio_destroy(BIO *b) { (void)b; return 1; }
@@ -120,7 +160,7 @@ static int transport_tls_wait(SSL *ssl, int result, int fd, int64_t deadline) {
     return transport_wait(fd, error == SSL_ERROR_WANT_READ ? POLLIN : POLLOUT, deadline);
 }
 static void transport_close(int fd, SSL *ssl, SSL_CTX *ctx, BIO_METHOD *method) {
-    /* No blocking shutdown: the complete response must end with peer close_notify. */
+    /* Keep connection teardown nonblocking after HTTP framing is complete. */
     SSL_free(ssl); SSL_CTX_free(ctx); BIO_meth_free(method); close(fd);
 }
 
@@ -266,6 +306,7 @@ static FLValue transport_exchange(FLValue host, FLValue port, FLValue wire, FLVa
         if (used > (size_t)limit.i) { free(buffer); TRANSPORT_FAIL("RESPONSE_TOO_LARGE", "response byte limit exceeded"); }
         buffer[used] = '\0';
         transport_stream_available(buffer, used, &stream, callback);
+        if (transport_content_length_complete(buffer, used, request)) break;
     }
     transport_close(fd, ssl, ctx, method);
 #undef TRANSPORT_FAIL

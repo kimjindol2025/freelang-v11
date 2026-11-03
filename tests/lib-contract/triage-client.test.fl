@@ -1,0 +1,40 @@
+(load "../../lib/mail/triage.fl")
+(define args (cli-args))
+(define mode (get args 0))
+(define opts {"username" "fixture" "password" (_fl_env_get "IMAP_TEST_PASSWORD") "max-body-bytes" 4096})
+(if (or (= mode "http-framed-open") (= mode "http-truncated"))
+  (let [[scheme (if (= mode "http-framed-open") "https://" "http://")]
+        [r (http-request "GET" (str scheme "localhost:" (get args 1) "/triage") {} ""
+        {"timeout-ms" 1500 "max-response-bytes" 4096})]
+        [passed (if (= mode "http-framed-open")
+          (and (get r "ok") (= (get r "status") 200) (= (get r "body") "framed response ok"))
+          (and (not (get r "ok")) (or (= (get (get r "error") "code") "HTTP_PROTOCOL")
+            (= (get (get r "error") "code") "TLS"))))]]
+    (if (= mode "http-truncated")
+      (println (str "HTTP_TRUNCATED_ERROR=" (get (get r "error") "code"))) nil)
+    (if (not passed) (println (str "RESULT_ERROR=" (get (get r "error") "code") " message=" (get (get r "error") "message"))) nil)
+    (println (str (if passed "PASS " "FAIL ") "HTTP " mode))
+    (if passed (_fl_exit 0) (_fl_exit 1)))
+  (if (or (= mode "body") (= mode "large-body"))
+  (let [[r (imap-read-body "localhost" (str-to-num (get args 1)) 1 opts)]]
+    (if (get r "transcript") (print (get r "transcript")) nil)
+    (define passed (if (= mode "body") (and (get r "ok") (= (get r "body") "plain body\r\n")
+      (= (get r "flags") ["* 1 FETCH (FLAGS ())\r\n"])) (= (get (get r "error") "code") "BODY_TOO_LARGE")))
+    (println (str (if passed "PASS " "FAIL ") "BODY " mode))
+    (if passed (_fl_exit 0) (_fl_exit 1)))
+  (let [[out (get args 3)]
+        [r (triage-run "localhost" (str-to-num (get args 1)) opts (str "https://localhost:" (get args 2) "/triage") out)]]
+    (if (not (get r "ok")) (println (str "RESULT_ERROR=" (get (get r "error") "code") " message=" (get (get r "error") "message"))) nil)
+    (define passed (if (= mode "invalid") (= (get (get r "error") "code") "INVALID_AI_SCHEMA")
+      (if (= mode "silent") (= (get (get r "error") "code") "TIMEOUT")
+        (and (get r "ok") (= (length (get r "records")) 3)))))
+    (if (get r "ok")
+      (doseq [id [1 2 3]]
+        (let [[text (get (file-read (str out "/" id ".json")) "value")]
+              [value (get (json-parse text) "value")]]
+          (if (= mode "risk")
+            (if (!= value {"status" "사장님 확인 필요"}) (_fl_exit 1) nil)
+            (if (not (and (= (get value "status") "초안 저장") (triage-valid? (get value "result")))) (_fl_exit 1) nil))
+          (println (str "SAVED " id ".json=" text)))) nil)
+    (println (str (if passed "PASS " "FAIL ") "AIM " mode))
+    (if passed (_fl_exit 0) (_fl_exit 1)))))

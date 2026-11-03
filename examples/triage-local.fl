@@ -1,0 +1,6 @@
+(load "../lib/mail/triage.fl")
+(define result (triage-run "localhost" (str-to-num (_fl_env_get "IMAP_TEST_PORT"))
+  {"username" "fixture" "password" (_fl_env_get "IMAP_TEST_PASSWORD") "max-body-bytes" 65536}
+  (_fl_env_get "TRIAGE_AI_URL") (_fl_env_get "TRIAGE_OUTPUT")))
+(println (if (get result "ok") "TRIAGE=PASS" "TRIAGE=FAIL"))
+(if (get result "ok") (_fl_exit 0) (_fl_exit 1))
