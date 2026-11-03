@@ -711,3 +711,5 @@ CMP_2_3=0
 CMP_3_4=0
 NATIVE_FIXED_POINT=PASS
 ```
+
+D-12 닫기, 해시 변경 없음
