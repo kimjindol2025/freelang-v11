@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+if [[ "${FL_TASK931_SESSION:-0}" != 1 ]]; then
+  exec setsid --wait env FL_TASK931_SESSION=1 bash "$0" "$@"
+fi
+
 if test -n "${DB_FORK_SNAPSHOT:-}"; then
   trap 'rc=$?; if test "$rc" -ne 0; then printf "D5_SCRIPT_FAILURE_TASKS=%s D5_SCRIPT_FAILURE_LIMIT=%s\n" "$(ps -u "$(id -u)" -L -o lwp= | wc -l | tr -d " ")" "${parallel_nproc_limit:-unknown}" >"$DB_FORK_SNAPSHOT.final.meta"; ps -u "$(id -u)" -L -o comm= | sed "s/^[[:space:]]*//" >"$DB_FORK_SNAPSHOT.final.names"; fi' EXIT
 fi
@@ -10,30 +14,83 @@ COMPILER="${1:?usage: run-task931.sh <compiler> <work-dir>}"
 WORK="${2:?usage: run-task931.sh <compiler> <work-dir>}"
 RUNTIME="$ROOT/runtime"
 mkdir -p "$WORK"
+TEST_SESSION_ID="$(ps -o sid= -p "$$" | awk '{$1=$1;print}')"
+TEST_PROCESS_GROUP="$(ps -o pgid= -p "$$" | awk '{$1=$1;print}')"
+test "$TEST_SESSION_ID" = "$TEST_PROCESS_GROUP"
 test_tree_snapshot() {
+  ps -eo pid=,ppid=,sid=,pgid=,stat=,comm= | awk -v sid="$TEST_SESSION_ID" -v pgid="$TEST_PROCESS_GROUP" '
+    BEGIN { print "PID PPID SID PGID STAT COMMAND" }
+    $3 == sid && $4 == pgid { print }
+  '
+}
+test_tree_zombies() {
+  test_tree_snapshot | awk '$5 ~ /^Z/ {n++} END {print n+0}'
+}
+test_process_tree_zombies() {
   ps -eo pid=,ppid=,stat=,comm= | awk -v root="$$" '
-    { pid[NR]=$1; parent[NR]=$2; state[NR]=$3; command[NR]=$4 }
+    { pid[NR]=$1; parent[NR]=$2; state[NR]=$3 }
     END {
       known[root]=1
       do {
         changed=0
         for (i=1; i<=NR; i++) {
-          if (known[parent[i]] && !known[pid[i]]) {
-            known[pid[i]]=1
-            changed=1
-          }
+          if (known[parent[i]] && !known[pid[i]]) { known[pid[i]]=1; changed=1 }
         }
       } while (changed)
-      print "PID PPID STAT COMMAND"
-      for (i=1; i<=NR; i++) {
-        if (known[pid[i]]) printf "%s %s %s %s\n", pid[i], parent[i], state[i], command[i]
-      }
+      for (i=1; i<=NR; i++) if (known[pid[i]] && state[i] ~ /^Z/) n++
+      print n+0
     }'
 }
-test_tree_zombies() {
-  test_tree_snapshot | awk '$3 ~ /^Z/ {n++} END {print n+0}'
-}
+gcc -std=c11 -O2 -Wall -Wextra -Werror -o "$WORK/orphan-zombie" "$ROOT/tests/task931/orphan-zombie.c"
 baseline_zombies="$(test_tree_zombies)"
+run_orphan_zombie_control() (
+  set -Eeuo pipefail
+  holder_pid=""
+  cleanup_orphan_holder() {
+    if [[ -n "$holder_pid" ]] && kill -0 "$holder_pid" 2>/dev/null; then
+      kill -USR1 "$holder_pid" 2>/dev/null || true
+    fi
+  }
+  trap cleanup_orphan_holder EXIT
+  "$WORK/orphan-zombie" >"$WORK/orphan-zombie.log" 2>&1 &
+  local launcher_pid=$!
+  for _ in $(seq 1 500); do
+    grep -q '^ORPHAN_ZOMBIE_READY=1 ' "$WORK/orphan-zombie.log" 2>/dev/null && break
+    sleep 0.01
+  done
+  set +e
+  wait "$launcher_pid"
+  local launcher_rc=$?
+  set -e
+  holder_pid="$(sed -n 's/^ORPHAN_HOLDER_PID=//p' "$WORK/orphan-zombie.log" | head -n 1)"
+  test "$launcher_rc" -eq 0
+  test -n "$holder_pid"
+  grep -Fxq 'ORPHAN_PARENT_EXITED=1' "$WORK/orphan-zombie.log"
+  grep -q '^ORPHAN_ZOMBIE_READY=1 ' "$WORK/orphan-zombie.log"
+  local tree_now session_now tree_delta session_delta
+  tree_now="$(test_process_tree_zombies)"
+  session_now="$(test_tree_zombies)"
+  tree_delta=$((tree_now - baseline_zombies))
+  session_delta=$((session_now - baseline_zombies))
+  printf 'ORPHAN_ZOMBIE_PROCESS_TREE_DELTA=%s\n' "$tree_delta"
+  printf 'ORPHAN_ZOMBIE_SESSION_DELTA=%s\n' "$session_delta"
+  printf 'ORPHAN_ZOMBIE_CONTROL_EXPECTED_FAIL=1\n'
+  printf 'ORPHAN_ZOMBIE_CONTROL_DETECTED=%s\n' "$([[ "$session_delta" -gt 0 ]] && echo 1 || echo 0)"
+  test "$tree_delta" -eq 0
+  test "$session_delta" -eq 1
+  kill -USR1 "$holder_pid"
+  for _ in $(seq 1 200); do
+    grep -q '^ORPHAN_ZOMBIE_REAPED=1$' "$WORK/orphan-zombie.log" && break
+    sleep 0.01
+  done
+  grep -Fxq 'ORPHAN_ZOMBIE_REAPED=1' "$WORK/orphan-zombie.log"
+  holder_pid=""
+  local clean_zombies
+  clean_zombies="$(test_tree_zombies)"
+  printf 'ORPHAN_ZOMBIE_NORMAL_COUNT=%s\n' "$clean_zombies"
+  test "$clean_zombies" -eq "$baseline_zombies"
+)
+run_orphan_zombie_control
 SOURCES=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c db.c http_server.c auth.c)
 LINK=(); for source in "${SOURCES[@]}"; do LINK+=("$RUNTIME/$source"); done
 segv_count=0
@@ -330,7 +387,7 @@ test "$zombie_delta" -eq 0 && test "$test_zombies" -eq 0 && passed=12 || true
 test "$segv_count" -eq 0 && test "$zombie_delta" -eq 0 && test "$test_zombies" -eq 0
 printf 'OOM_SUMMARY=%s/12\n' "$passed"
 
-# Global zombies may predate this test; compare the baseline and count only zombies parented by this test.
+# Zombies from unrelated sessions are outside this check; count this isolated test session and process group.
 if test -n "${isolated_skip_reason:-}"; then
   printf 'FORKFAIL_SUMMARY=SKIP/9 reason=%s\n' "$isolated_skip_reason"
   exit 2
