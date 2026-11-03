@@ -19,7 +19,7 @@ gcc -w -I "$ROOT/runtime" -o "$WORK/server" "$WORK/server.c" \
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
   "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
   "$ROOT/runtime/json.c" "$ROOT/runtime/db.c" "$ROOT/runtime/http_server.c" \
-  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm
+  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread \
   -o "$WORK/load-client" "$ROOT/tests/task938/load-client.c"
 FL_HTTP_WORKERS=16 FL_HTTP_PORT=0 MIXSOAK_DB="$WORK/bench.sqlite" \

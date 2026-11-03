@@ -16,7 +16,7 @@ for name in assoc conj dissoc json_str js_keys min mod quot swap-assoc swap-conj
   runtime_args=()
   for file in "${RUNTIME[@]}"; do runtime_args+=("$ROOT/runtime/$file"); done
   gcc -w -I "$ROOT/runtime" -o "$WORK/$name" "$WORK/$name.c" "${runtime_args[@]}" \
-    -lsqlite3 -lcrypto -lm >"$WORK/$name.gcc" 2>&1
+    -lsqlite3 -lcrypto -lm -lssl -lcrypto >"$WORK/$name.gcc" 2>&1
   "$WORK/$name" >"$WORK/$name.out"
   diff -u "$ROOT/tests/task945/$name.expected" "$WORK/$name.out"
   printf 'TASK945_CASE=%s PASS\n' "$name"

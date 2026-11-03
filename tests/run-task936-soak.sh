@@ -19,7 +19,7 @@ export MIXSOAK_DB="$WORK/mixsoak.sqlite"
 gcc -w -I "$RUNTIME" -o "$WORK/soak-server" "$WORK/soak-server.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/db.c" \
-  "$RUNTIME/http_server.c" "$RUNTIME/auth.c" "$RUNTIME/cgc-bridge.c" -lsqlite3 -lcrypto -lm
+  "$RUNTIME/http_server.c" "$RUNTIME/auth.c" "$RUNTIME/cgc-bridge.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 FL_HTTP_PORT=0 "$WORK/soak-server" "$WORK/public" >"$WORK/server.log" 2>&1 &
 SERVER_PID=$!
 cleanup() {

@@ -16,7 +16,7 @@ for name in time str-regex fs test-evidence; do
   gcc -Wno-unused -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" \
     "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
     "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/db.c" \
-    "$RUNTIME/http_server.c" "$RUNTIME/cgc-bridge.c" -lm -lsqlite3 >"$WORK/$name.build" 2>&1
+    "$RUNTIME/http_server.c" "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto -lsqlite3 >"$WORK/$name.build" 2>&1
   "$WORK/$name" --root "$ROOT" --compiler "$TOOLS/scripts/cgc-native" >"$WORK/$name.log" 2>&1
 done
 
@@ -33,36 +33,36 @@ done
 gcc -Wno-unused -I "$RUNTIME" -o "$WORK/http-runner" "$WORK/http-runner.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/db.c" \
-  "$RUNTIME/http_server.c" "$RUNTIME/cgc-bridge.c" -lm -lsqlite3
+  "$RUNTIME/http_server.c" "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto -lsqlite3
 "$WORK/http-runner" --root "$ROOT" --compiler "$TOOLS/scripts/cgc-native" >"$WORK/http.log" 2>&1
 "$TOOLS/scripts/cgc-native" "$ROOT/tests/lib-contract/tcp.test.fl" "$WORK/tcp.c" >"$WORK/tcp.compile" 2>&1
 gcc -Wno-unused -I "$RUNTIME" -o "$WORK/tcp" "$WORK/tcp.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
-  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm
+  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto
 "$WORK/tcp" >"$WORK/tcp.log" 2>&1
 (cd "$TOOLS" && "$TOOLS/scripts/fl-test" "$TOOLS") >"$WORK/existing41.log" 2>&1
 
 "$TOOLS/scripts/cgc-native" "$TOOLS/native/tester-registry.fl" "$WORK/tr.c" >"$WORK/tester-registry.compile" 2>&1
 gcc -Wno-unused -I "$RUNTIME" -o "$FREELANG_TESTER_REGISTRY" "$WORK/tr.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
-  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm
+  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto
 "$TOOLS/scripts/fl-native-tester-audit" --run --output "$WORK/audit-results.json" >"$WORK/audit.log"
 bash "$ROOT/tests/run-cgc-symbol-contract.sh" >"$WORK/symbol.log" 2>&1
 
 sources=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c db.c http_server.c auth.c)
 link_sources=(); for name in "${sources[@]}"; do link_sources+=("$RUNTIME/$name"); done
 "$COMPILER" "$ROOT/examples/erp-vendors/app.fl" "$WORK/app.c" >"$WORK/app.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$COMPILER" "$ROOT/examples/erp-vendors/create-user.fl" "$WORK/create-user.c" >"$WORK/create-user.compile" 2>&1
 gcc -w -I "$RUNTIME" -o "$WORK/create-user" "$WORK/create-user.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" \
-  "$RUNTIME/db.c" "$RUNTIME/auth.c" -lsqlite3 -lcrypto -lm
+  "$RUNTIME/db.c" "$RUNTIME/auth.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 
 for spec in 'erp test.fl' 'erp2 test2.fl' 'erp3 test3.fl' 'conc test-concurrency.fl' 'auth test-auth.fl'; do
   read -r label source <<<"$spec"
   "$COMPILER" "$ROOT/examples/erp-vendors/$source" "$WORK/$label.c" >"$WORK/$label.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$WORK/$label" "$WORK/$label.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  gcc -w -I "$RUNTIME" -o "$WORK/$label" "$WORK/$label.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
   mkdir -p "$WORK/$label-run"
   "$WORK/$label" "$WORK/$label-run" "$WORK/app" "$WORK/create-user" >"$WORK/$label.log" 2>&1
 done
@@ -72,7 +72,7 @@ bash "$ROOT/examples/erp-vendors/test-pages.sh" "$WORK/app" "$WORK/create-user" 
 NAME_COUNT=0
 for source in auth-random-token auth-pbkdf2 auth-constant-time-equal tcp-bind tcp-listen tcp-accept tcp-close tcp-local-port vec-push; do
   "$COMPILER" "$ROOT/tests/task922/$source.fl" "$WORK/$source.c" >"$WORK/$source.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$WORK/$source" "$WORK/$source.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  gcc -w -I "$RUNTIME" -o "$WORK/$source" "$WORK/$source.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
   "$WORK/$source" >"$WORK/$source.log" 2>&1
   grep -q "^PASS $source$" "$WORK/$source.log"
   NAME_COUNT=$((NAME_COUNT + 1))
@@ -104,25 +104,25 @@ printf 'WARN_SUMMARY=%s/4\n' "$WARN_COUNT"
 grep -E '^(BUILTINS_TOTAL|MATCHED|MISSING_IN_RUNTIME|UNUSED_RUNTIME|ABI_MAPPED|COMPILER_LOWERED|ABI_HOLD|MISSING_IN_RUNTIME_ITEMS|ABI_SUMMARY)=' "$WORK/abi.log"
 
 "$COMPILER" "$ROOT/tests/task924/builtins.fl" "$WORK/builtins2.c" >"$WORK/builtins2.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/builtins2" "$WORK/builtins2.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/builtins2" "$WORK/builtins2.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/builtins2" >"$WORK/builtins2.log" 2>&1
 BUILTIN2_COUNT="$(grep -c '^PASS ' "$WORK/builtins2.log")"
 test "$BUILTIN2_COUNT" -eq 14
 grep -Fx '&lt;script&gt;&quot;&#x27;&amp;' "$WORK/builtins2.log"
 "$COMPILER" "$ROOT/tests/task924/held-auth.fl" "$WORK/held-auth.c" >"$WORK/held-auth.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/held-auth" "$WORK/held-auth.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/held-auth" "$WORK/held-auth.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/held-auth" >"$WORK/held-auth.log" 2>&1
 grep -Fx 'PASS run-parallel-empty' "$WORK/held-auth.log"
 BUILTIN2_COUNT=$((BUILTIN2_COUNT + 2))
 printf 'BUILTIN2_SUMMARY=%s/16\n' "$BUILTIN2_COUNT"
 
 "$COMPILER" "$ROOT/tests/task925/hof.fl" "$WORK/hof.c" >"$WORK/hof.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/hof" "$WORK/hof.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/hof" "$WORK/hof.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/hof" >"$WORK/hof.log" 2>&1
 HOF_COUNT="$(grep -c '^PASS ' "$WORK/hof.log")"
 for spec in 'str-repeat-0' 'str-repeat-negative' 'str-repeat-million' 'repeat-million'; do
   "$COMPILER" "$ROOT/tests/task925/$spec.fl" "$WORK/$spec.c" >"$WORK/$spec.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$WORK/$spec" "$WORK/$spec.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+  gcc -w -I "$RUNTIME" -o "$WORK/$spec" "$WORK/$spec.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
   if test "$spec" = repeat-million; then
     /usr/bin/time -f 'REPEAT_VECTOR_MAX_RSS_KB=%M' -o "$WORK/$spec.time" "$WORK/$spec" >"$WORK/$spec.log" 2>&1
     cat "$WORK/$spec.time"
@@ -152,22 +152,22 @@ sed -n '/^RAW_POST_BEGIN$/,/^RAW_POST_END$/p' "$WORK/net2.log"
 sed -n '/^RAW_HEADER_BEGIN$/,/^RAW_HEADER_END$/p' "$WORK/net2.log"
 
 "$COMPILER" "$ROOT/tests/task927/password.fl" "$WORK/password.c" >"$WORK/password.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/password" "$WORK/password.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/password" "$WORK/password.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/password" >"$WORK/password.log" 2>&1
 grep -E '^(PW_FORMAT_EXAMPLE|PW_SUMMARY)=' "$WORK/password.log"
 test "$(grep -c '^PASS ' "$WORK/password.log")" -eq 11
 grep '^PASS ' "$WORK/password.log"
 "$COMPILER" "$ROOT/tests/task927/hash-once.fl" "$WORK/hash-once.c" >"$WORK/hash-once.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/hash-once" "$WORK/hash-once.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/hash-once" "$WORK/hash-once.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 /usr/bin/time -f '%e' -o "$WORK/hash-once.seconds" "$WORK/hash-once" >"$WORK/hash-once.log" 2>&1
 awk '{printf "PW_HASH_ONCE_MS=%.0f\n", $1 * 1000}' "$WORK/hash-once.seconds"
 grep '^PASS password hash timing$' "$WORK/hash-once.log"
 
 "$COMPILER" "$ROOT/tests/task928/jwt.fl" "$WORK/jwt.c" >"$WORK/jwt.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/jwt" "$WORK/jwt.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/jwt" "$WORK/jwt.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/jwt" >"$WORK/jwt.log" 2>&1
 grep -E '^(PASS |JWT_SUMMARY=)' "$WORK/jwt.log"
-gcc -w -I "$RUNTIME" -o "$WORK/rfc7515-vector" "$ROOT/tests/task928/rfc7515-vector.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/rfc7515-vector" "$ROOT/tests/task928/rfc7515-vector.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/rfc7515-vector"
 
 gcc -Wall -Wextra -Werror -o "$WORK/chunk-server" "$ROOT/tests/task929/chunk-server.c"
@@ -178,7 +178,7 @@ for attempt in $(seq 1 100); do test -s "$WORK/stream.port" && break; sleep 0.02
 test -s "$WORK/stream.port"
 export FL_STREAM_PORT="$(cat "$WORK/stream.port")"
 "$COMPILER" "$ROOT/tests/task929/stream.fl" "$WORK/stream.c" >"$WORK/stream.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/stream" "$WORK/stream.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/stream" "$WORK/stream.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/stream" >"$WORK/stream.log" 2>&1
 wait "$STREAM_SERVER_PID"
 trap - EXIT
@@ -197,12 +197,12 @@ grep -Fq 'request-body' "$WORK/stream-server.log"
 sed -n '/^RAW_STREAM_REQUEST_BEGIN$/,/^RAW_STREAM_REQUEST_END$/p' "$WORK/stream-server.log"
 
 "$COMPILER" "$ROOT/tests/task929/jsonnum.fl" "$WORK/jsonnum.c" >"$WORK/jsonnum.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/jsonnum" "$WORK/jsonnum.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/jsonnum" "$WORK/jsonnum.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/jsonnum" >"$WORK/jsonnum.log" 2>&1
 grep -E '^(JSONNUM_OUTPUTS=|JSONNUM_SUMMARY=)' "$WORK/jsonnum.log"
 
 "$COMPILER" "$ROOT/tests/task930/parallel.fl" "$WORK/parallel.c" >"$WORK/parallel.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/parallel" "$WORK/parallel.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/parallel" "$WORK/parallel.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/parallel" >"$WORK/parallel.log" 2>&1
 test "$(grep -c '^PASS ' "$WORK/parallel.log")" -eq 16
 grep -E '^(PASS |PAR_FOUR_JOBS_MS=|PAR_MAX_CONCURRENCY=|PAR_ZOMBIES=|PAR_FD_START=|PAR_FD_END=|PAR_SUMMARY=)' "$WORK/parallel.log"

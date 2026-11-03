@@ -58,7 +58,7 @@ gcc -w -DFL_HTTP_PERF_DIAGNOSTICS -I "$ROOT/runtime" -o "$WORK/server" "$WORK/se
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" "$ROOT/runtime/math.c" \
   "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" "$ROOT/runtime/json.c" "$ROOT/runtime/db.c" \
   "$ROOT/runtime/http_server.c" "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" \
-  -lsqlite3 -lcrypto -lm
+  -lsqlite3 -lcrypto -lm -lssl -lcrypto
 gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread -o "$WORK/load-client" "$ROOT/tests/task938/load-client.c"
 
 stage=94200

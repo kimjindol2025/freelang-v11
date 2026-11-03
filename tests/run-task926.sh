@@ -10,9 +10,9 @@ link_sources=(); for name in "${sources[@]}"; do link_sources+=("$RUNTIME/$name"
 for name in net-server net-client; do
   "$COMPILER" "$ROOT/tests/task926/$name.fl" "$WORK/$name.c" >"$WORK/$name.compile" 2>&1
   if test "$name" = net-server; then
-    gcc -w -DFL_HTTP_CAPTURE_RAW_TEST -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+    gcc -w -DFL_HTTP_CAPTURE_RAW_TEST -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
   else
-    gcc -w -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+    gcc -w -I "$RUNTIME" -o "$WORK/$name" "$WORK/$name.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
   fi
 done
 "$WORK/net-server" >"$WORK/server.log" 2>"$WORK/server.err" &
@@ -28,7 +28,7 @@ port="${line##*:}"
 base="http://127.0.0.1:$port"
 guard_app="$WORK/guard"
 "$COMPILER" "$ROOT/tests/task926/guard.fl" "$WORK/guard.c" >"$WORK/guard.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$guard_app" "$WORK/guard.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$guard_app" "$WORK/guard.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 refused_port="$($guard_app)"
 "$WORK/net-client" "$base" "http://127.0.0.1:$refused_port/" >"$WORK/client.log" 2>&1
 awk '/^UUID=/{print substr($0,6)}' "$WORK/client.log" >"$WORK/uuids.txt"

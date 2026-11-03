@@ -56,7 +56,7 @@ gcc -Wall -Wextra \
   -o "$OUTPUT_BIN" \
   "$INPUT_C" \
   $RUNTIME_SOURCES \
-  -lm
+  -lm -lssl -lcrypto
 
 if [[ $? -eq 0 ]]; then
   echo "✅ 성공: $OUTPUT_BIN ($(stat --format=%s "$OUTPUT_BIN") bytes)"

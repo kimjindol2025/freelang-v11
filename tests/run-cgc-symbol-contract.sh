@@ -11,7 +11,7 @@ bash "$ROOT/scripts/build-cgc-native.sh" "$WORK/compiler.c" "$WORK/cgc" >/dev/nu
 gcc -Wall -Wextra -I "$ROOT/runtime" -o "$WORK/symbols" "$WORK/symbols.c" \
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
   "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
-  "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm
+  "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm -lssl -lcrypto
 RESULT="$("$WORK/symbols")"
 test "$RESULT" = 'SYMBOL_RESULTS=slash-1,slash-2,slash-3,underscore,question,bang'
 printf 'PASS slash names and punctuation separation\n'
@@ -35,7 +35,7 @@ printf 'PASS invalid generated C rejected\n'
 gcc -Wall -Wextra -I "$ROOT/runtime" -o "$WORK/native-forms" "$WORK/native-forms.c" \
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
   "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
-  "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm
+  "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm -lssl -lcrypto
 test "$("$WORK/native-forms")" = 'NATIVE_FORMS=PASS'
 printf 'PASS when, ??, and empty? native lowering\n'
 printf 'NATIVE_FORMS_SUMMARY=18/18\n'

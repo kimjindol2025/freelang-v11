@@ -119,7 +119,7 @@ done <"$WORK/abi-holds.tsv"
 for source in dissoc entries obj-values vals str-to-lower float-p take drop; do
   "$COMPILER" "$ROOT/tests/task923/$source.fl" "$WORK/$source.c" >"$WORK/$source.compile" 2>&1
   gcc -w -I "$RUNTIME" -o "$WORK/$source" "$WORK/$source.c" \
-    "${objects[@]}" -lsqlite3 -lcrypto -lm
+    "${objects[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
   "$WORK/$source" >"$WORK/$source.log" 2>&1
   grep -q "^PASS " "$WORK/$source.log"
   cat "$WORK/$source.log"

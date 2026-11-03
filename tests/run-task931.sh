@@ -29,7 +29,7 @@ wait_server_bounded() {
 
 for mode in vector string json; do
   "$COMPILER" "$ROOT/tests/task931/memory.fl" "$WORK/oom-memory.c" >"$WORK/oom-memory.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$WORK/oom-memory" "$WORK/oom-memory.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
+  gcc -w -I "$RUNTIME" -o "$WORK/oom-memory" "$WORK/oom-memory.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
   set +e
   limit=32768
   test "$mode" = string && limit=24576 || true
@@ -45,7 +45,7 @@ for mode in vector string json; do
 done
 
 "$COMPILER" "$ROOT/tests/task932/forkfail.fl" "$WORK/forkfail.c" >"$WORK/forkfail.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/forkfail" "$WORK/forkfail.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 set +e
 parallel_rc=1
 parallel_selected=0
@@ -96,7 +96,7 @@ parallel_zombie_delta=$((parallel_zombies - baseline_zombies))
 printf 'FORKFAIL_CASE=run-parallel FAILED_SLOTS=%s SUCCESSFUL_SLOTS=%s ERROR=E_RUN_PARALLEL_FORK RC=%s SIGNAL=%s ZOMBIE_DELTA=%s\n' "$parallel_failed" "$parallel_succeeded" "$parallel_rc" "$parallel_signal" "$parallel_zombie_delta"
 
 "$COMPILER" "$ROOT/tests/task931/disk.fl" "$WORK/oom-disk.c" >"$WORK/oom-disk.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/oom-disk" "$WORK/oom-disk.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/oom-disk" "$WORK/oom-disk.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 set +e
 (ulimit -f 8; exec "$WORK/oom-disk" file "$WORK/limited-file") >"$WORK/oom-file.out" 2>"$WORK/oom-file.err"
 file_rc=$?
@@ -133,7 +133,7 @@ printf 'SQLITE_ROWS_AFTER_FAILED_WRITE=%s\n' "$sqlite_rows"
 test "$sqlite_integrity" = ok && test "$sqlite_rows" = 0
 
 "$COMPILER" "$ROOT/tests/task931/server.fl" "$WORK/oom-server.c" >"$WORK/oom-server.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/oom-server" "$WORK/oom-server.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm
+gcc -w -I "$RUNTIME" -o "$WORK/oom-server" "$WORK/oom-server.c" "${LINK[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 
 start_server() {
   local work="$1" limit="$2" max="$3" fd_limit="$4"

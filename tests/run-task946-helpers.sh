@@ -9,7 +9,7 @@ gcc -w -I "$ROOT/runtime" -o "$WORK/request-helpers" "$WORK/request-helpers.c" \
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
   "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
   "$ROOT/runtime/json.c" "$ROOT/runtime/db.c" "$ROOT/runtime/http_server.c" \
-  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm
+  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "$WORK/request-helpers" >"$WORK/request-helpers.out"
 diff -u "$ROOT/tests/task946/request-helpers.expected" "$WORK/request-helpers.out"
 printf 'REQUEST_HELPERS_SUMMARY=6/6\n'

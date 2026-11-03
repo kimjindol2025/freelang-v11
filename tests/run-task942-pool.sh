@@ -17,7 +17,7 @@ gcc -w -I "$RUNTIME" -o "$WORK/server" "$WORK/server.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/db.c" \
   "$RUNTIME/http_server.c" "$RUNTIME/auth.c" "$RUNTIME/cgc-bridge.c" \
-  -lsqlite3 -lcrypto -lm
+  -lsqlite3 -lcrypto -lm -lssl -lcrypto
 gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread \
   -o "$WORK/load-client" "$ROOT/tests/task938/load-client.c"
 

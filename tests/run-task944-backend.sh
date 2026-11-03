@@ -32,7 +32,7 @@ for name in try template symbol float triple-string symbol-collision duplicate-d
   for file in "${RUNTIME[@]}"; do runtime_args+=("$ROOT/runtime/$file"); done
   set +e
   gcc -w -I "$ROOT/runtime" -o "$WORK/$name" "$cfile" "${runtime_args[@]}" \
-    -lsqlite3 -lcrypto -lm >"$WORK/$name.gcc.log" 2>&1
+    -lsqlite3 -lcrypto -lm -lssl -lcrypto >"$WORK/$name.gcc.log" 2>&1
   gcc_rc=$?
   set -e
   printf 'BACKEND_CASE=%s GCC_RC=%s\n' "$name" "$gcc_rc"

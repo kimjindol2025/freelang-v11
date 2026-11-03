@@ -66,7 +66,7 @@ gcc_log="${WORK_DIR}/${test_name}-gcc.log"
   if ! gcc -Wno-unused -I "$RUNTIME" -o "$executable" "$first_c" \
       "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" \
       "$RUNTIME/math.c" "$RUNTIME/error.c" "$RUNTIME/process.c" \
-      "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm >"$gcc_log" 2>&1; then
+      "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto >"$gcc_log" 2>&1; then
     if grep -Fq "too few arguments to function ‘range’" "$gcc_log"; then
       echo "  ! $test_name (native runtime does not support legacy range/1 form)"
       TOTAL_BLOCKED=$((TOTAL_BLOCKED + 1))

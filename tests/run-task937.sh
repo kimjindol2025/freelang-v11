@@ -22,13 +22,13 @@ if printf 'int main(void){return 0;}\n' | gcc -x c -fsanitize=address,undefined 
   SAN_RUN=(env ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1)
 fi
 gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" \
-  -o "$WORK/runtime-fuzz" "$ROOT/tests/task937/runtime-fuzz.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm
+  -o "$WORK/runtime-fuzz" "$ROOT/tests/task937/runtime-fuzz.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 "${SAN_RUN[@]}" "$WORK/runtime-fuzz" json "$FUZZ_COUNT" >"$WORK/fuzz-json.log" 2>&1
 "${SAN_RUN[@]}" "$WORK/runtime-fuzz" jwt "$FUZZ_COUNT" >"$WORK/fuzz-jwt.log" 2>&1
 
 "$COMPILER" "$ROOT/tests/task937/http-server.fl" "$WORK/fuzz-http-server.c" >"$WORK/fuzz-http-server.compile" 2>&1
 gcc -g -O1 -w "${SAN_FLAGS[@]}" -I "$RUNTIME" -o "$WORK/fuzz-http-server" \
-  "$WORK/fuzz-http-server.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm
+  "$WORK/fuzz-http-server.c" "${RUNTIME_LINK[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto
 gcc -std=c11 -Wall -Wextra -Werror -o "$WORK/fuzz-http-client" "$ROOT/tests/task937/http-fuzz-client.c"
 if ((${#SAN_FLAGS[@]})); then
   env FL_HTTP_PORT=0 ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 \

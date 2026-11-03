@@ -14,7 +14,7 @@ gcc -w -I "$ROOT/runtime" -o "$WORK/disk" "$WORK/disk.c" \
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
   "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
   "$ROOT/runtime/json.c" "$ROOT/runtime/db.c" "$ROOT/runtime/http_server.c" \
-  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm \
+  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto \
   >"$WORK/build.log" 2>&1
 
 for attempt in 1 2 3 4 5; do

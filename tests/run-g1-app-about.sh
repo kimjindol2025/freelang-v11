@@ -14,7 +14,7 @@ sources=(core.c collection.c io.c math.c error.c process.c json.c cgc-bridge.c d
 link_sources=()
 for source in "${sources[@]}"; do link_sources+=("$RUNTIME/$source"); done
 "$COMPILER" "$ROOT/examples/erp-vendors/app.fl" "$WORK/app.c" >"$WORK/app.compile" 2>&1
-gcc -w -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm >"$WORK/app.build" 2>&1
+gcc -w -I "$RUNTIME" -o "$WORK/app" "$WORK/app.c" "${link_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto >"$WORK/app.build" 2>&1
 FL_HTTP_PORT=0 ERP_DB_PATH="$WORK/about.sqlite" "$WORK/app" >"$WORK/server.out" 2>"$WORK/server.err" &
 SERVER_PID=$!
 PORT=""

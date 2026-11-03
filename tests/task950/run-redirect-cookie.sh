@@ -7,7 +7,7 @@ gcc -Wall -Wextra -I "$ROOT/runtime" -o "$WORK/redirect-cookie" "$ROOT/tests/tas
   "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
   "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
   "$ROOT/runtime/json.c" "$ROOT/runtime/db.c" "$ROOT/runtime/http_server.c" \
-  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm \
+  "$ROOT/runtime/auth.c" "$ROOT/runtime/cgc-bridge.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto \
   >"$WORK/build.log" 2>&1
 "$WORK/redirect-cookie" >"$WORK/actual.out"
 diff -u "$ROOT/tests/task950/redirect-cookie.expected" "$WORK/actual.out"

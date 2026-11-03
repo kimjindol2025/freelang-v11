@@ -11,7 +11,7 @@ mkdir -p "$WORK"
 gcc -w -I "$RUNTIME" -o "$WORK/pool-server" "$WORK/pool-server.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/db.c" \
-  "$RUNTIME/http_server.c" "$RUNTIME/auth.c" "$RUNTIME/cgc-bridge.c" -lsqlite3 -lcrypto -lm \
+  "$RUNTIME/http_server.c" "$RUNTIME/auth.c" "$RUNTIME/cgc-bridge.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto \
   >"$WORK/pool-server.build" 2>&1 || exit 2
 gcc -std=c11 -O2 -Wall -Wextra -Werror -pthread -o "$WORK/load-client" "$ROOT/tests/task938/load-client.c" \
   >"$WORK/load-client.build" 2>&1 || exit 2

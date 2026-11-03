@@ -31,7 +31,7 @@
     (let [[linked (runner-command "gcc" (concat (if (= name "fs") ["-Wall" "-Wextra"] [])
             (concat ["-Wno-unused" "-I" (str root "/runtime") (str work "/" name ".c")]
               (concat (map (fn [unit] (str root "/runtime/" unit ".c")) runner-units)
-                ["-lm" "-lsqlite3" "-o" (str work "/" name)]))))]]
+                ["-lm" "-lssl" "-lcrypto" "-lsqlite3" "-o" (str work "/" name)]))))]]
       (print (get linked "stdout"))
       (runner-check (get (file-write (str work "/link.stderr") (get linked "stderr")) "ok") "cannot preserve link stderr")
       ;; process-run captures stdout and inherits stderr. This path comes only

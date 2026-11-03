@@ -34,7 +34,7 @@ if (( symbols_rc == 0 )); then
   gcc -Wall -Wextra -I "$ROOT/runtime" -o "$WORK/symbols" "$WORK/symbols.c" \
     "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
     "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
-    "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm >"$WORK/symbols.build" 2>&1 || symbols_rc=$?
+    "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm -lssl -lcrypto >"$WORK/symbols.build" 2>&1 || symbols_rc=$?
 fi
 if (( symbols_rc == 0 )); then
   "$WORK/symbols" >"$WORK/symbols.out" 2>&1 || symbols_rc=$?
@@ -61,7 +61,7 @@ if (( symbols_rc == 0 )); then
   gcc -Wall -Wextra -I "$ROOT/runtime" -o "$WORK/native-forms" "$WORK/native-forms.c" \
     "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
     "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
-    "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm >"$WORK/native-forms.build" 2>&1 || symbols_rc=$?
+    "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm -lssl -lcrypto >"$WORK/native-forms.build" 2>&1 || symbols_rc=$?
 fi
 if (( symbols_rc == 0 )); then
   "$WORK/native-forms" >"$WORK/native-forms.out" 2>&1 || symbols_rc=$?

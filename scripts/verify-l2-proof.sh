@@ -47,7 +47,7 @@ run_tests() {
       gcc -I "$ROOT/runtime" -o "$binary" "$source_c" \
         "$ROOT/runtime/core.c" "$ROOT/runtime/collection.c" "$ROOT/runtime/io.c" \
         "$ROOT/runtime/math.c" "$ROOT/runtime/error.c" "$ROOT/runtime/process.c" \
-        "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm
+        "$ROOT/runtime/json.c" "$ROOT/runtime/cgc-bridge.c" -lm -lssl -lcrypto
       "$binary" > "$output"
     done
     if cmp -s "$WORK_DIR/${name}-stage2.out" "$WORK_DIR/${name}-stage3.out"; then

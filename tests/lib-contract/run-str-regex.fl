@@ -32,7 +32,7 @@
           (not (str-includes diagnostics "[CGC-ERR]"))
           (not (str-includes diagnostics "[load] 파일 없음"))) diagnostics)
         (runner-success "gcc" (concat ["-I" (str root "/runtime") "-o" (str work "/test") (str work "/out.c")]
-          (concat (map (fn [unit] (str root "/runtime/" unit ".c")) runner-units) ["-lm" "-lsqlite3"])))
+          (concat (map (fn [unit] (str root "/runtime/" unit ".c")) runner-units) ["-lm" "-lssl" "-lcrypto" "-lsqlite3"])))
         (let [[result (runner-in work (str work "/test") [])]]
           (print (get result "stdout"))
           (runner-check (and (= (get result "code") expected)

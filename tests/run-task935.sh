@@ -11,7 +11,7 @@ link_runtime() {
   gcc -w -I "$RUNTIME" -o "$2" "$1" \
     "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
     "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/http_server.c" \
-    "$RUNTIME/cgc-bridge.c" -lm
+    "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto
 }
 
 "$COMPILER" "$ROOT/examples/static-files.fl" "$WORK/static-server.c" >"$WORK/static-server.compile" 2>&1

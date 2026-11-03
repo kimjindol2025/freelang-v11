@@ -11,12 +11,12 @@ mkdir -p "$WORK"
 gcc -w -I "$RUNTIME" -o "$WORK/server" "$WORK/server.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
   "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/http_server.c" \
-  "$RUNTIME/cgc-bridge.c" -lm
+  "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto
 gcc -std=c11 -Wall -Wextra -Werror -o "$WORK/http-attack-client" "$ROOT/tests/task934/http-attack-client.c"
 "$COMPILER" "$ROOT/tests/task934/http-attack.fl" "$WORK/attack.c" >"$WORK/attack.compile" 2>&1
 gcc -w -I "$RUNTIME" -o "$WORK/attack" "$WORK/attack.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
-  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm
+  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto
 
 FL_HTTP_PORT=0 "$WORK/server" >"$WORK/server.log" 2>&1 &
 server_pid=$!

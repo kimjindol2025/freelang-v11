@@ -25,14 +25,14 @@ build_variant() {
     else variant_sources+=("$RUNTIME/$name"); fi
   done
   "$compiler" "$ROOT/examples/erp-vendors/app.fl" "$dir/app.c" >"$dir/app.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$dir/app" "$dir/app.c" "${variant_sources[@]}" -lsqlite3 -lcrypto -lm >"$dir/app.build" 2>&1
+  gcc -w -I "$RUNTIME" -o "$dir/app" "$dir/app.c" "${variant_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto >"$dir/app.build" 2>&1
   "$compiler" "$ROOT/examples/erp-vendors/create-user.fl" "$dir/create-user.c" >"$dir/create-user.compile" 2>&1
   gcc -w -I "$RUNTIME" -o "$dir/create-user" "$dir/create-user.c" \
     "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
     "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" \
-    "$RUNTIME/db.c" "$RUNTIME/auth.c" -lsqlite3 -lcrypto -lm >"$dir/create-user.build" 2>&1
+    "$RUNTIME/db.c" "$RUNTIME/auth.c" -lsqlite3 -lcrypto -lm -lssl -lcrypto >"$dir/create-user.build" 2>&1
   "$compiler" "$ROOT/examples/erp-vendors/test-concurrency.fl" "$dir/concurrency.c" >"$dir/concurrency.compile" 2>&1
-  gcc -w -I "$RUNTIME" -o "$dir/concurrency" "$dir/concurrency.c" "${variant_sources[@]}" -lsqlite3 -lcrypto -lm >"$dir/concurrency.build" 2>&1
+  gcc -w -I "$RUNTIME" -o "$dir/concurrency" "$dir/concurrency.c" "${variant_sources[@]}" -lsqlite3 -lcrypto -lm -lssl -lcrypto >"$dir/concurrency.build" 2>&1
 }
 
 run_case() {
@@ -58,7 +58,7 @@ run_case() {
 "$TOOLS/scripts/cgc-native" "$TOOLS/native/tester-registry.fl" "$RECORD_DIR/tester-registry.c" >"$RECORD_DIR/tester-registry.compile" 2>&1
 gcc -Wno-unused -I "$RUNTIME" -o "$RECORD_DIR/tester-registry-native" "$RECORD_DIR/tester-registry.c" \
   "$RUNTIME/core.c" "$RUNTIME/collection.c" "$RUNTIME/io.c" "$RUNTIME/math.c" \
-  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm \
+  "$RUNTIME/error.c" "$RUNTIME/process.c" "$RUNTIME/json.c" "$RUNTIME/cgc-bridge.c" -lm -lssl -lcrypto \
   >"$RECORD_DIR/tester-registry.build" 2>&1
 
 mkdir -p "$RECORD_DIR/baseline"
