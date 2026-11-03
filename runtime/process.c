@@ -1325,3 +1325,5 @@ FLValue fl_tcp_accept(FLValue handle, FLValue timeout) {
 /* ── try/catch 런타임 ── */
 extern FLTryFrame fl_try_stack[FL_TRY_MAX];
 extern int fl_try_top;
+
+#include "connection_transport.inc"

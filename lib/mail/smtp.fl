@@ -1,0 +1,88 @@
+;; Local-only submission client. All dialogue and message policy lives here.
+(defn smtp-error [code message] {"ok" false "error" {"code" code "message" message}})
+(defn smtp-option [opts key fallback]
+  (if (= (get opts key) nil) fallback (get opts key)))
+(defn smtp-clean-bytes? [value index]
+  (if (>= index (length value)) true
+    (let [[code (char-code-at value index)]]
+      (and (> code 31) (!= code 127) (smtp-clean-bytes? value (+ index 1))))))
+(defn smtp-clean? [value]
+  (and (string? value) (smtp-clean-bytes? value 0)))
+(defn smtp-address? [text]
+  (and (smtp-clean? text) (> (length text) 0) (str-includes text "@")
+    (every? (fn [c] (str-includes "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@._+-" c))
+      (_fl_str_split text ""))))
+(defn smtp-dot-lines [lines i result]
+  (if (>= i (length lines)) result
+    (let [[line (get lines i)]]
+      (smtp-dot-lines lines (+ i 1) (str result (if (str-starts-with line ".") "." "") line "\r\n")))))
+(defn smtp-message [mail]
+  (str "From: " (get mail "from") "\r\nTo: " (get mail "to") "\r\nSubject: " (get mail "subject")
+    "\r\n\r\n" (smtp-dot-lines (_fl_str_split (str-replace (str-replace (get mail "body") "\r\n" "\n") "\r" "\n") "\n") 0 "") ".\r\n"))
+(defn smtp-value [result]
+  (if (get result "ok") (get result "value") (throw result)))
+(defn smtp-log [trace prefix text] (reset! trace (str @trace prefix text)))
+(defn smtp-reply-lines [socket deadline trace expected count total]
+  (let [[left (- deadline (now-ms))]]
+    (if (<= left 0) (throw (smtp-error "TIMEOUT" "reply deadline exceeded"))
+      (let [[line (smtp-value (_fl_connection_read socket 0 left 2048))]
+            [code (substring line 0 3)] [separator (substring line 3 4)]]
+        (smtp-log trace "S: " line)
+        (if (or (> count 32) (> (+ total (length line)) 16384)
+                (< (length line) 5) (not (str-ends-with line "\r\n"))
+                (not (and (>= (char-code-at code 0) 48) (<= (char-code-at code 0) 57)
+                          (>= (char-code-at code 1) 48) (<= (char-code-at code 1) 57)
+                          (>= (char-code-at code 2) 48) (<= (char-code-at code 2) 57)))
+                (and (!= expected "") (!= code expected)))
+          (throw (smtp-error "PROTOCOL" "invalid reply"))
+          (if (= separator "-") (smtp-reply-lines socket deadline trace code (+ count 1) (+ total (length line)))
+            (if (= separator " ") (str-to-num code) (throw (smtp-error "PROTOCOL" "invalid reply separator")))))))))
+(defn smtp-expect [socket timeout trace expected]
+  (let [[code (smtp-reply-lines socket (+ (now-ms) timeout) trace "" 1 0)]]
+    (if (= code expected) true (throw (smtp-error "SMTP_REPLY" (str "expected " expected ", received " code))))))
+(defn smtp-command [socket timeout trace text secret expected]
+  (smtp-log trace "C: " (if secret "<가림>\r\n" (str text "\r\n")))
+  (smtp-value (_fl_connection_write socket (str text "\r\n") timeout))
+  (smtp-expect socket timeout trace expected))
+(defn smtp-dialogue [socket timeout trace mail opts wire]
+  (smtp-expect socket timeout trace 220)
+  (smtp-command socket timeout trace "EHLO local.test" false 250)
+  (smtp-command socket timeout trace "STARTTLS" false 220)
+  (smtp-value (_fl_connection_starttls socket timeout))
+  (smtp-command socket timeout trace "EHLO local.test" false 250)
+  (smtp-command socket timeout trace "AUTH LOGIN" false 334)
+  (smtp-command socket timeout trace (base64_encode (get opts "username")) true 334)
+  (smtp-command socket timeout trace (base64_encode (get opts "password")) true 235)
+  (smtp-command socket timeout trace (str "MAIL FROM:<" (get mail "from") ">") false 250)
+  (smtp-command socket timeout trace (str "RCPT TO:<" (get mail "to") ">") false 250)
+  (smtp-command socket timeout trace "DATA" false 354)
+  (smtp-log trace "C: " wire)
+  (smtp-value (_fl_connection_write socket wire timeout))
+  (smtp-expect socket timeout trace 250)
+  (smtp-command socket timeout trace "QUIT" false 221)
+  {"ok" true})
+(defn smtp-send [host port mail opts]
+  (let [[trace (atom "")]
+        [timeout (smtp-option opts "timeout-ms" 3000)]
+        [limit (smtp-option opts "max-message-bytes" 65536)]]
+    (if (not (and (map? mail) (map? opts) (number? timeout) (number? limit)))
+      (smtp-error "INVALID_ARGUMENT" "maps and numeric limits required")
+      (if (not (or (= host "localhost") (= host "127.0.0.1")))
+        (smtp-error "LOCAL_ONLY" "only loopback test endpoints allowed")
+        (if (or (< timeout 1) (> timeout 60000) (!= timeout (floor timeout))
+                (< limit 1) (> limit 1048576) (!= limit (floor limit)))
+          (smtp-error "INVALID_ARGUMENT" "limits out of range")
+          (if (not (and (smtp-address? (get mail "from")) (smtp-address? (get mail "to"))
+                   (smtp-clean? (get mail "subject")) (string? (get mail "body"))
+                   (smtp-clean? (get opts "username")) (smtp-clean? (get opts "password"))))
+            (smtp-error "HEADER_INJECTION" "invalid header, envelope or credentials")
+            (if (> (+ (length (get mail "body")) (length (get mail "subject"))) limit)
+              (smtp-error "MESSAGE_TOO_LARGE" "message bound exceeded")
+              (let [[wire (smtp-message mail)]]
+                (if (> (length wire) limit) (smtp-error "MESSAGE_TOO_LARGE" "encoded message bound exceeded")
+                  (let [[socket (_fl_connection_open host port timeout)]]
+                    (if (not (number? socket)) socket
+                      (let [[result (try (smtp-dialogue socket timeout trace mail opts wire)
+                                      (catch error error))]]
+                        (_fl_connection_close socket)
+                        (assoc result "transcript" @trace)))))))))))))

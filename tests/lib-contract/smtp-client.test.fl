@@ -1,0 +1,14 @@
+(load "../../lib/mail/smtp.fl")
+(define args (cli-args))
+(define mode (get args 0))
+(define expected (get args 2))
+(define mail {"from" "sender@example.invalid" "to" "receiver@example.invalid"
+  "subject" (if (= mode "injection") "test\r\nBcc: injected@example.invalid" "Local fixture")
+  "body" "Hello from FreeLang\n.dot line"})
+(define result (smtp-send "localhost" (str-to-num (get args 1)) mail
+  {"username" "fixture" "password" (_fl_env_get "SMTP_TEST_PASSWORD")
+   "timeout-ms" (if (= mode "silent") 150 3000)}))
+(define actual (if (get result "ok") "OK" (get (get result "error") "code")))
+(if (get result "transcript") (print (get result "transcript")) nil)
+(println (str (if (= actual expected) "PASS " "FAIL ") "SMTP " mode " expected=" expected " actual=" actual))
+(if (= actual expected) (_fl_exit 0) (_fl_exit 1))

@@ -1,0 +1,49 @@
+;; Plaintext fixture and opaque TLS byte relay. TLS stays in openssl s_server.
+(define args (cli-args))
+(define mode (get args 0))
+(define record (get args 1))
+(defn fixture-write [socket text]
+  (let [[r (_fl_connection_write socket text 3000)]]
+    (if (get r "ok") true (throw "fixture write failed"))))
+(defn fixture-line [socket]
+  (let [[r (_fl_connection_read socket 0 3000 2048)]]
+    (if (get r "ok") (get r "value") (throw "fixture read failed"))))
+(defn fixture-expect [socket expected]
+  (let [[line (fixture-line socket)]]
+    (_fl_file_append (str record ".dialogue") (str "C: " line))
+    (if (= line expected) true (throw "fixture command mismatch"))))
+(defn fixture-reply [socket text]
+  (_fl_file_append (str record ".dialogue") (str "S: " text))
+  (fixture-write socket text))
+(defn fixture-forward [source target]
+  (let [[r (_fl_connection_read source 16384 10 16384)]]
+    (if (get r "ok") (get (_fl_connection_write target (get r "value") 3000) "ok")
+      (= (get (get r "error") "code") "TIMEOUT"))))
+(if (= mode "replies")
+  (_fl_file_write record
+    "250-local.test\r\n250 AUTH LOGIN\r\n334 VXNlcm5hbWU6\r\n334 UGFzc3dvcmQ6\r\n235 authenticated\r\n250 sender accepted\r\n250 recipient accepted\r\n354 send data\r\n250 queued locally\r\n221 bye\r\n")
+  (let [[listener (tcp-listen "127.0.0.1" 0)]]
+    (_fl_file_write (str record ".port") (str (tcp-local-port listener)))
+    (let [[socket (tcp-accept listener 10000)]]
+      (tcp-close listener)
+      (try
+        (if (= mode "silent") (_fl_process_run_args "/bin/sleep" ["1"])
+          (if (= mode "api")
+            (do (fixture-write socket "hello\r\n")
+                (fixture-expect socket "PING\r\n") (_fl_process_run_args "/bin/sleep" ["0.1"]))
+            (do
+              (fixture-reply socket "220 local.test ready\r\n")
+              (fixture-expect socket "EHLO local.test\r\n")
+              (if (= mode "reject") (fixture-reply socket "550 rejected\r\n")
+                (do
+                  (fixture-reply socket "250-local.test\r\n250 STARTTLS\r\n")
+                  (fixture-expect socket "STARTTLS\r\n")
+                  (fixture-reply socket "220 begin TLS\r\n")
+                  (let [[backend (_fl_connection_open "127.0.0.1" (str-to-num (get args 2)) 3000)]
+                        [deadline (+ (now-ms) 10000)]]
+                    (loop []
+                      (if (and (< (now-ms) deadline) (fixture-forward socket backend)
+                               (fixture-forward backend socket)) (recur) nil))
+                    (_fl_connection_close backend)))))))
+        (catch error (_fl_file_append (str record ".errors") (str error))))
+      (_fl_connection_close socket))))

@@ -1,0 +1,8 @@
+(load "../lib/mail/smtp.fl")
+;; Run only against a locally prepared fixture with SSL_CERT_FILE set.
+(define result (smtp-send "localhost" (str-to-num (_fl_env_get "SMTP_TEST_PORT"))
+  {"from" "sender@example.invalid" "to" "receiver@example.invalid"
+   "subject" "Local fixture" "body" "Hello from FreeLang"}
+  {"username" "fixture" "password" (_fl_env_get "SMTP_TEST_PASSWORD")}))
+(println (if (get result "ok") "LOCAL_SEND=PASS" "LOCAL_SEND=FAIL"))
+(if (get result "ok") (_fl_exit 0) (_fl_exit 1))
