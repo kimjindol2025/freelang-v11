@@ -1,0 +1,8 @@
+(load "../lib/mail/imap.fl")
+;; Local TLS fixture only; configure SSL_CERT_FILE and these environment values.
+(define result (imap-read-inbox "localhost" (str-to-num (_fl_env_get "IMAP_TEST_PORT"))
+  {"username" "fixture" "password" (_fl_env_get "IMAP_TEST_PASSWORD")}))
+(if (get result "ok")
+  (doseq [message (get result "messages")]
+    (println (str "Subject: " (get message "subject") " | From: " (get message "from"))))
+  (do (println (str "IMAP_ERROR=" (get (get result "error") "code"))) (_fl_exit 1)))

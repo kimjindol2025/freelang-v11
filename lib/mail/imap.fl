@@ -1,0 +1,125 @@
+;; Local-only, read-only IMAP client using the existing five connection APIs.
+(defn imap-error [code message] {"ok" false "error" {"code" code "message" message}})
+(defn imap-option [opts key fallback] (if (= (get opts key) nil) fallback (get opts key)))
+(defn imap-clean-bytes? [text i]
+  (if (>= i (length text)) true
+    (and (> (char-code-at text i) 31) (!= (char-code-at text i) 127) (imap-clean-bytes? text (+ i 1)))))
+(defn imap-clean? [text] (and (string? text) (<= (length text) 1024) (imap-clean-bytes? text 0)))
+(defn imap-quote [text]
+  (str "\"" (str-replace (str-replace text "\\" "\\\\") "\"" "\\\"") "\""))
+(defn imap-value [r]
+  (if (get r "ok") (get r "value")
+    (throw (if (= (get (get r "error") "code") "SIZE")
+      (imap-error "RESPONSE_TOO_LARGE" "response bound exceeded") r))))
+(defn imap-left [deadline]
+  (let [[left (- deadline (now-ms))]]
+    (if (<= left 0) (throw (imap-error "TIMEOUT" "response deadline exceeded")) left)))
+(defn imap-log [trace prefix text] (reset! trace (str @trace prefix text)))
+(defn imap-digits? [text i]
+  (if (>= i (length text)) (> i 0)
+    (and (>= (char-code-at text i) 48) (<= (char-code-at text i) 57) (imap-digits? text (+ i 1)))))
+(defn imap-line [socket deadline remaining trace]
+  (if (< remaining 1) (throw (imap-error "RESPONSE_TOO_LARGE" "response bound exceeded"))
+    (let [[line (imap-value (_fl_connection_read socket 0 (imap-left deadline) (min remaining 8192)))]]
+      (imap-log trace "S: " line)
+      (if (str-ends-with line "\r\n") line (throw (imap-error "PROTOCOL" "expected CRLF"))))))
+(defn imap-literal-length [line]
+  (if (not (str-ends-with line "}\r\n")) nil
+    (let [[start (_fl_str_index_of line "{")]]
+      (if (< start 0) (throw (imap-error "PROTOCOL" "invalid literal marker"))
+        (let [[digits (substring line (+ start 1) (- (length line) 3))]]
+          (if (and (<= (length digits) 9) (imap-digits? digits 0)) (str-to-num digits)
+            (throw (imap-error "PROTOCOL" "invalid literal length"))))))))
+(defn imap-read-exact [socket count deadline]
+  (loop [remaining count text ""]
+    (if (= remaining 0) text
+      (let [[part (imap-value (_fl_connection_read socket remaining (imap-left deadline) remaining))]]
+        (if (= (length part) 0) (throw (imap-error "PROTOCOL" "empty literal read"))
+          (recur (- remaining (length part)) (str text part)))))))
+(defn imap-response [socket tag deadline remaining trace lines literals closing logout]
+  (if (>= (length lines) 256) (throw (imap-error "RESPONSE_TOO_LARGE" "too many response lines")) nil)
+  (let [[line (imap-line socket deadline remaining trace)]
+        [left (- remaining (length line))]]
+    (if closing
+      (if (= line ")\r\n") (imap-response socket tag deadline left trace (push lines line) literals false logout)
+        (throw (imap-error "PROTOCOL" "missing FETCH closing parenthesis")))
+      (if (str-starts-with line (str tag " "))
+        (let [[status (get (_fl_str_split (str-trim line) " ") 1)]]
+          (if (= status "OK") {"lines" lines "literals" literals}
+            (throw (imap-error (if (= status "NO") "IMAP_NO" (if (= status "BAD") "IMAP_BAD" "PROTOCOL")) "command rejected"))))
+        (if (not (str-starts-with line "* ")) (throw (imap-error "PROTOCOL" "unexpected command tag or continuation"))
+          (if (and (str-starts-with line "* BYE") (not logout)) (throw (imap-error "IMAP_BYE" "server closed session"))
+            (let [[size (imap-literal-length line)]]
+              (if (= size nil) (imap-response socket tag deadline left trace (push lines line) literals false logout)
+                (if (> size left) (throw (imap-error "RESPONSE_TOO_LARGE" "literal exceeds response bound"))
+                  (let [[text (imap-read-exact socket size deadline)]]
+                    (imap-log trace "S literal: " text)
+                    (imap-response socket tag deadline (- left size) trace (push lines line)
+                      (push literals {"line" line "value" text}) true logout)))))))))))
+(defn imap-command [socket counter timeout limit trace command displayed logout]
+  (reset! counter (+ @counter 1))
+  (let [[tag (str "A" @counter)] [deadline (+ (now-ms) timeout)]]
+    (imap-log trace "C: " (str tag " " displayed "\r\n"))
+    (imap-value (_fl_connection_write socket (str tag " " command "\r\n") (imap-left deadline)))
+    (imap-response socket tag deadline limit trace [] [] false logout)))
+(defn imap-search-ids [lines]
+  (let [[matches (filter (fn [line] (or (= line "* SEARCH\r\n") (str-starts-with line "* SEARCH "))) lines)]]
+    (if (!= (length matches) 1) (throw (imap-error "PROTOCOL" "expected one SEARCH result"))
+      (let [[line (str-trim (get matches 0))]
+            [items (if (= line "* SEARCH") [] (_fl_str_split (substring line 9 (length line)) " "))]]
+        (loop [i 0 ids []]
+          (if (>= i (length items)) (sort ids)
+            (let [[text (get items i)]]
+              (if (not (and (<= (length text) 9) (imap-digits? text 0)))
+                (throw (imap-error "PROTOCOL" "invalid sequence number"))
+                (let [[number (str-to-num text)]]
+                  (if (or (< number 1) (includes-item ids number)) (throw (imap-error "PROTOCOL" "invalid or repeated sequence number"))
+                    (recur (+ i 1) (push ids number))))))))))))
+(defn imap-headers [text]
+  (loop [lines (_fl_str_split text "\r\n") i 0 key "" headers {}]
+    (if (>= i (length lines)) headers
+      (let [[line (get lines i)] [colon (_fl_str_index_of line ":")]]
+        (if (= line "") (recur lines (+ i 1) "" headers)
+          (if (or (str-starts-with line " ") (str-starts-with line "\t"))
+            (if (= key "") (throw (imap-error "PROTOCOL" "orphan folded header"))
+              (recur lines (+ i 1) key (assoc headers key (str (get headers key) " " (str-trim line)))))
+            (if (<= colon 0) (throw (imap-error "PROTOCOL" "invalid header"))
+              (let [[name (str-lower (substring line 0 colon))]]
+                (recur lines (+ i 1) name (assoc headers name (str-trim (substring line (+ colon 1) (length line)))))))))))))
+(defn imap-fetch-three [socket counter timeout limit trace ids]
+  (loop [i (max 0 (- (length ids) 3)) messages []]
+    (if (>= i (length ids)) messages
+      (let [[id (get ids i)] [command (str "FETCH " id " (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])")]
+            [response (imap-command socket counter timeout limit trace command command false)]
+            [literals (get response "literals")]]
+        (if (or (!= (length literals) 1)
+                (not (str-starts-with (get (get literals 0) "line") (str "* " id " FETCH (BODY[HEADER.FIELDS (SUBJECT FROM)] "))))
+          (throw (imap-error "PROTOCOL" "unexpected FETCH literal"))
+          (let [[headers (imap-headers (get (get literals 0) "value"))]]
+            (recur (+ i 1) (push messages {"sequence" id "subject" (get headers "subject") "from" (get headers "from")}))))))))
+(defn imap-session [socket opts timeout limit trace]
+  (imap-value (_fl_connection_starttls socket timeout))
+  (let [[greeting (imap-line socket (+ (now-ms) timeout) limit trace)] [counter (atom 0)]]
+    (if (not (str-starts-with greeting "* OK ")) (throw (imap-error "PROTOCOL" "invalid greeting")) nil)
+    (imap-command socket counter timeout limit trace
+      (str "LOGIN " (imap-quote (get opts "username")) " " (imap-quote (get opts "password")))
+      "LOGIN <가림> <가림>" false)
+    (imap-command socket counter timeout limit trace "SELECT \"INBOX\"" "SELECT \"INBOX\"" false)
+    (let [[search (imap-command socket counter timeout limit trace "SEARCH ALL" "SEARCH ALL" false)]
+          [messages (imap-fetch-three socket counter timeout limit trace (imap-search-ids (get search "lines")))]]
+      (imap-command socket counter timeout limit trace "LOGOUT" "LOGOUT" true)
+      {"ok" true "messages" messages})))
+(defn imap-read-inbox [host port opts]
+  (let [[timeout (imap-option opts "timeout-ms" 3000)] [limit (imap-option opts "max-response-bytes" 65536)]
+        [trace (atom "")]]
+    (if (not (or (= host "localhost") (= host "127.0.0.1"))) (imap-error "LOCAL_ONLY" "loopback endpoints only")
+      (if (not (and (map? opts) (number? timeout) (number? limit))) (imap-error "INVALID_ARGUMENT" "invalid options")
+        (if (or (< timeout 1) (> timeout 60000) (!= timeout (floor timeout))
+                (< limit 1) (> limit 1048576) (!= limit (floor limit))
+                (not (imap-clean? (get opts "username"))) (not (imap-clean? (get opts "password"))))
+          (imap-error "INVALID_ARGUMENT" "invalid limits or credentials")
+          (let [[socket (_fl_connection_open host port timeout)]]
+            (if (not (number? socket)) socket
+              (let [[result (try (imap-session socket opts timeout limit trace) (catch error error))]]
+                (_fl_connection_close socket)
+                (assoc result "transcript" @trace)))))))))
