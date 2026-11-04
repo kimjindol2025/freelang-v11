@@ -412,6 +412,9 @@ FLValue shell_cwd(void);
 
 /* ── _fl_file_* / _fl_env_* / str_join ── */
 FLValue _fl_file_append(FLValue path, FLValue content);
+/* Cross-process advisory lock. Acquire returns an opaque positive token or -1. */
+FLValue _fl_file_lock_acquire(FLValue path, FLValue timeout_ms);
+FLValue _fl_file_lock_release(FLValue handle);
 FLValue file_exists(FLValue path);
 FLValue _fl_file_delete(FLValue path);
 FLValue _fl_file_copy(FLValue src, FLValue dst);

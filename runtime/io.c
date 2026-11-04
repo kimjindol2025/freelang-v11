@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include "runtime.h"
 #include "internal.h"
 #include <stdio.h>
@@ -6,6 +7,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sched.h>
+#include <time.h>
 #include <unistd.h>
 
 FLValue fl_bit_xor(FLValue a, FLValue b) { return fl_int(a.i ^ b.i); }
@@ -24,6 +30,19 @@ const char* _strval(FLValue v) {
     return "";
 }
 
+#define FL_FILE_LOCK_HANDLES 4096
+static volatile int fl_file_lock_table_guard = 0;
+static struct { int fd; int64_t token; } fl_file_lock_handles[FL_FILE_LOCK_HANDLES];
+static int64_t fl_file_lock_next_token = 1;
+
+static void fl_file_lock_table_enter(void) {
+    while (__sync_lock_test_and_set(&fl_file_lock_table_guard, 1)) sched_yield();
+}
+
+static void fl_file_lock_table_leave(void) {
+    __sync_lock_release(&fl_file_lock_table_guard);
+}
+
 #include "fs_io.inc"
 
 FLValue _fl_file_append(FLValue path, FLValue content) {
@@ -32,6 +51,70 @@ FLValue _fl_file_append(FLValue path, FLValue content) {
     const char* s = _strval(content);
     fwrite(s, 1, strlen(s), f); fclose(f);
     return fl_bool(true);
+}
+FLValue _fl_file_lock_acquire(FLValue path, FLValue timeout_ms) {
+    if (path.tag != FL_STRING || !path.obj || timeout_ms.tag != FL_INT ||
+        timeout_ms.i < 0 || timeout_ms.i > 60000) return fl_int(-1);
+    const char* name = _strval(path);
+    if (!name[0]) return fl_int(-1);
+    int fd = open(name, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0) return fl_int(-1);
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        close(fd);
+        return fl_int(-1);
+    }
+    int64_t deadline_ms = (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000 + timeout_ms.i;
+    for (;;) {
+        if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+            fl_file_lock_table_enter();
+            for (int i = 0; i < FL_FILE_LOCK_HANDLES; i++) {
+                if (fl_file_lock_handles[i].token == 0) {
+                    if (fl_file_lock_next_token <= 0 || fl_file_lock_next_token == INT64_MAX) {
+                        fl_file_lock_table_leave();
+                        flock(fd, LOCK_UN);
+                        close(fd);
+                        return fl_int(-1);
+                    }
+                    int64_t token = fl_file_lock_next_token++;
+                    fl_file_lock_handles[i].fd = fd;
+                    fl_file_lock_handles[i].token = token;
+                    fl_file_lock_table_leave();
+                    return fl_int(token);
+                }
+            }
+            fl_file_lock_table_leave();
+            flock(fd, LOCK_UN);
+            close(fd);
+            return fl_int(-1);
+        }
+        if (errno != EWOULDBLOCK && errno != EAGAIN && errno != EINTR) break;
+        if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) break;
+        int64_t current_ms = (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+        if (current_ms >= deadline_ms) break;
+        struct timespec pause = {0, 1000000};
+        while (nanosleep(&pause, &pause) != 0 && errno == EINTR) {}
+    }
+    close(fd);
+    return fl_int(-1);
+}
+FLValue _fl_file_lock_release(FLValue handle) {
+    if (handle.tag != FL_INT || handle.i < 1) return fl_bool(false);
+    fl_file_lock_table_enter();
+    int fd = -1;
+    for (int i = 0; i < FL_FILE_LOCK_HANDLES; i++) {
+        if (fl_file_lock_handles[i].token == handle.i) {
+            fd = fl_file_lock_handles[i].fd;
+            fl_file_lock_handles[i].fd = -1;
+            fl_file_lock_handles[i].token = 0;
+            break;
+        }
+    }
+    fl_file_lock_table_leave();
+    if (fd < 0) return fl_bool(false);
+    int unlock_rc = flock(fd, LOCK_UN);
+    int close_rc = close(fd);
+    return fl_bool(unlock_rc == 0 && close_rc == 0);
 }
 FLValue file_exists(FLValue path) {
     struct stat st; return fl_bool(stat(_strval(path), &st) == 0);

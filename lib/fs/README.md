@@ -13,6 +13,7 @@ and may throw. JSON loads `lib/json/json.fl`, which reuses `self/stdlib/json.fl`
 | `file-write(path, content)`, `file-append(path, content)` | `true` |
 | `file-read-lines(path)` | split on LF; omit one final empty field; empty file → `[]`; CR is preserved |
 | `file-write-atomic(path, content)` | `true`; same-directory exclusive temporary file, checked writes, fsync, close, rename |
+| `file-lock-acquire(path, timeout-ms)`, `file-lock-release(handle)` | Cross-process exclusive advisory lock; acquire returns a handle or `LOCK_UNAVAILABLE`; timeout is an integer from 0 to 60000 ms. Release every acquired handle and keep the lock file in place. |
 | `dir-list(path)` | immediate entry names, excluding `.` and `..`; OS order |
 | `dir-walk(path)` | descendant paths including directories and symlinks; OS order; no descent into symlinks; depth limit 128 |
 | `dir-make(path)` | `true`; create intermediate directories, existing directory succeeds |

@@ -52,6 +52,16 @@
 (defn file-read [path] (fs-call "read" path nil))
 (defn file-write [path content] (fs-call "write" path content))
 (defn file-append [path content] (fs-call "append" path content))
+(defn file-lock-acquire [path timeout-ms]
+  (if (or (not (string? path)) (= path "") (not (integer? timeout-ms))
+          (< timeout-ms 0) (> timeout-ms 60000))
+    (fs-error "INVALID_ARGUMENT" "lock path or timeout is invalid" path)
+    (let [[handle (_fl_file_lock_acquire path timeout-ms)]]
+      (if (>= handle 0) (fs-ok handle)
+        (fs-error "LOCK_UNAVAILABLE" "file lock could not be opened or acquired before timeout" path)))))
+(defn file-lock-release [handle]
+  (if (and (number? handle) (_fl_file_lock_release handle)) (fs-ok true)
+    (fs-error "INVALID_LOCK_HANDLE" "file lock handle could not be released" nil)))
 (defn file-write-atomic [path content] (fs-call "atomic" path content))
 (defn file-exists? [path] (fs-call "exists" path nil))
 (defn file-size [path] (fs-call "size" path nil))

@@ -1234,6 +1234,8 @@
   ;; N-11: 파일 ops — stub → 실제 구현
   [(= $op "_fl_file_append")  (str "_fl_file_append(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "file-append")      (str "_fl_file_append(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_file_lock_acquire") (str "_fl_file_lock_acquire(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "_fl_file_lock_release") (str "_fl_file_lock_release(" (cgc (get $args 0)) ")")]
   [(= $op "_fl_file_copy")    (str "_fl_file_copy(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "_fl_file_delete")  (str "_fl_file_delete(" (cgc (get $args 0)) ")")]
   [(= $op "file-delete")      (str "_fl_file_delete(" (cgc (get $args 0)) ")")]
