@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)
-: "${TMPDIR:?Set the run-specific artifact directory}"
+: "${TMPDIR:?Set the task temporary directory}"
+: "${RUN_WORK_DIR:?Set the run artifact directory under /home/kim/tmp}"
 : "${FREELANG_HTTP_CGC:?Set the verified Stage2 compiler}"
-work=$(mktemp -d "$TMPDIR/mail-guard.XXXXXXXX")
+mkdir -p "$RUN_WORK_DIR"
+work=$(mktemp -d "$RUN_WORK_DIR/mail-guard.XXXXXXXX")
 pids=()
 fds=()
 client_pids=()

@@ -4,7 +4,9 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 SEED="$ROOT/bin/cgc-bin-x86_64-seed-v11"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/fl-v11-native-fixpoint.XXXXXX")"
+WORK_PARENT="${RUN_WORK_DIR:-${TMPDIR:-/tmp}}"
+mkdir -p "$WORK_PARENT"
+WORK="$(mktemp -d "$WORK_PARENT/fl-v11-native-fixpoint.XXXXXX")"
 trap 'rm -rf -- "$WORK"' EXIT INT TERM
 
 if [[ ! -x "$SEED" ]]; then

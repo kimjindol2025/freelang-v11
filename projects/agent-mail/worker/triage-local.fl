@@ -1,0 +1,64 @@
+(load "../../../lib/mail/triage.fl")
+(load "../../../lib/mail/store.fl")
+(load "../../../lib/mail/workflow.fl")
+(load "ingest.fl")
+
+(define AGENT_MAIL_DB_PATH (_fl_env_get "AGENT_MAIL_DB"))
+(define AGENT_MAIL_OWNER_ID (_fl_env_get "AGENT_MAIL_OWNER_ID"))
+(define AGENT_MAIL_MAILBOX_ID (_fl_env_get "AGENT_MAIL_MAILBOX_ID"))
+(define AGENT_MAIL_MAILBOX_ADDRESS (_fl_env_get "AGENT_MAIL_MAILBOX_ADDRESS"))
+(define AGENT_MAIL_SENDER_ADDRESS (_fl_env_get "AGENT_MAIL_SENDER_ADDRESS"))
+(define AGENT_MAIL_IMAP_USER (_fl_env_get "AGENT_MAIL_IMAP_USER"))
+(define AGENT_MAIL_IMAP_PASSWORD (_fl_env_get "AGENT_MAIL_IMAP_PASSWORD"))
+(define AGENT_MAIL_IMAP_PORT (str-to-num (_fl_env_get "AGENT_MAIL_IMAP_PORT")))
+(define AGENT_MAIL_AI_URL (_fl_env_get "AGENT_MAIL_AI_URL"))
+(define AGENT_MAIL_TRIAGE_DIR (_fl_env_get "AGENT_MAIL_TRIAGE_DIR"))
+(if (not (and (string? AGENT_MAIL_DB_PATH) (!= AGENT_MAIL_DB_PATH "")
+    (string? AGENT_MAIL_OWNER_ID) (!= AGENT_MAIL_OWNER_ID "")
+    (string? AGENT_MAIL_MAILBOX_ID) (!= AGENT_MAIL_MAILBOX_ID "")
+    (smtp-address? AGENT_MAIL_MAILBOX_ADDRESS) (smtp-address? AGENT_MAIL_SENDER_ADDRESS)
+    (string? AGENT_MAIL_IMAP_USER) (!= AGENT_MAIL_IMAP_USER "")
+    (string? AGENT_MAIL_IMAP_PASSWORD) (!= AGENT_MAIL_IMAP_PASSWORD "")
+    (number? AGENT_MAIL_IMAP_PORT) (> AGENT_MAIL_IMAP_PORT 0) (<= AGENT_MAIL_IMAP_PORT 65535)
+    (string? AGENT_MAIL_AI_URL) (string? AGENT_MAIL_TRIAGE_DIR) (!= AGENT_MAIL_TRIAGE_DIR "")))
+  (do (println "AGENT_MAIL_WORKER=CONFIG_ERROR") (_fl_exit 2)) nil)
+(define AGENT_MAIL_DB (db-open AGENT_MAIL_DB_PATH))
+(mail-store-init AGENT_MAIL_DB)
+(define AGENT_MAIL_MAILBOX (mail-store-get-mailbox AGENT_MAIL_DB
+  AGENT_MAIL_OWNER_ID AGENT_MAIL_MAILBOX_ID))
+(if (not AGENT_MAIL_MAILBOX)
+  (do (println "AGENT_MAIL_WORKER=MAILBOX_NOT_FOUND") (db-close AGENT_MAIL_DB) (_fl_exit 2)) nil)
+(define AGENT_MAIL_SYNC_STATE (mail-store-sync-state AGENT_MAIL_DB AGENT_MAIL_MAILBOX_ID))
+(define AGENT_MAIL_TRIAGE (triage-run-uids "localhost" AGENT_MAIL_IMAP_PORT
+  {"username" AGENT_MAIL_IMAP_USER "password" AGENT_MAIL_IMAP_PASSWORD}
+  AGENT_MAIL_AI_URL AGENT_MAIL_TRIAGE_DIR
+  (get (get AGENT_MAIL_SYNC_STATE "state") "uidvalidity")
+  (get (get AGENT_MAIL_SYNC_STATE "state") "last_uid")))
+(if (not (get AGENT_MAIL_TRIAGE "ok"))
+  (do (println (str "AGENT_MAIL_WORKER=ERROR code=" (get (get AGENT_MAIL_TRIAGE "error") "code")))
+      (db-close AGENT_MAIL_DB) (_fl_exit 1)) nil)
+(define AGENT_MAIL_EPOCH (mail-store-sync-set-epoch AGENT_MAIL_DB
+  AGENT_MAIL_MAILBOX_ID (get AGENT_MAIL_TRIAGE "uidvalidity")))
+(if (not (get AGENT_MAIL_EPOCH "ok"))
+  (do (println "AGENT_MAIL_WORKER=SYNC_EPOCH_FAILED") (db-close AGENT_MAIL_DB) (_fl_exit 1)) nil)
+(loop [i 0 results []]
+  (if (>= i (length (get AGENT_MAIL_TRIAGE "records")))
+    (do (println (str "AGENT_MAIL_WORKER_SUMMARY=" (length results) " records"))
+        (loop [j 0]
+          (if (>= j (length results)) nil
+            (do (println (str "AGENT_MAIL_WORKER_ITEM="
+              (get (get results j) "key") ":" (get (get results j) "status")))
+                (recur (+ j 1)))))
+        (db-close AGENT_MAIL_DB) (_fl_exit 0))
+    (let [[result (agent-mail-worker-ingest-one AGENT_MAIL_DB AGENT_MAIL_OWNER_ID AGENT_MAIL_MAILBOX_ID
+        AGENT_MAIL_MAILBOX_ADDRESS AGENT_MAIL_SENDER_ADDRESS AGENT_MAIL_TRIAGE_DIR
+        (get (get AGENT_MAIL_TRIAGE "records") i))]]
+      (if (not (get result "ok"))
+        (do (println (str "AGENT_MAIL_WORKER=ERROR code=" (get (get result "error") "code")))
+            (db-close AGENT_MAIL_DB) (_fl_exit 1))
+        (let [[record (get (get AGENT_MAIL_TRIAGE "records") i)]
+              [advanced (mail-store-sync-advance AGENT_MAIL_DB AGENT_MAIL_MAILBOX_ID
+                (get record "uidvalidity") (get record "uid"))]]
+          (if (not (get advanced "ok"))
+            (do (println "AGENT_MAIL_WORKER=SYNC_CURSOR_FAILED") (db-close AGENT_MAIL_DB) (_fl_exit 1))
+            (recur (+ i 1) (push results result)))))))

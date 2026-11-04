@@ -70,10 +70,10 @@
         (loop [i 0 ids []]
           (if (>= i (length items)) (sort ids)
             (let [[text (get items i)]]
-              (if (not (and (<= (length text) 9) (imap-digits? text 0)))
+              (if (not (and (<= (length text) 10) (imap-digits? text 0)))
                 (throw (imap-error "PROTOCOL" "invalid sequence number"))
                 (let [[number (str-to-num text)]]
-                  (if (or (< number 1) (includes-item ids number)) (throw (imap-error "PROTOCOL" "invalid or repeated sequence number"))
+                  (if (or (< number 1) (> number 4294967295) (includes-item ids number)) (throw (imap-error "PROTOCOL" "invalid or repeated message number"))
                     (recur (+ i 1) (push ids number))))))))))))
 (defn imap-headers [text]
   (loop [lines (_fl_str_split text "\r\n") i 0 key "" headers {}]
@@ -124,6 +124,82 @@
                 (_fl_connection_close socket)
                 (assoc result "transcript" @trace)))))))))
 
+;; UID-based read path for restartable synchronization. Sequence-number APIs
+;; above remain for the original read-three example and its compatibility tests.
+(defn imap-uidvalidity-from-lines [lines]
+  (loop [i 0 found 0 validity 0]
+    (if (>= i (length lines))
+      (if (and (= found 1) (> validity 0)) validity
+        (throw (imap-error "UIDVALIDITY_MISSING" "SELECT did not return one valid UIDVALIDITY")))
+      (let [[line (get lines i)] [marker "[UIDVALIDITY "]]
+        (if (str-includes line marker)
+          (let [[start (+ (_fl_str_index_of line marker) (length marker))]
+                [end (_fl_str_index_of (substring line start (length line)) "]")]
+                [digits (if (< end 0) "" (substring line start (+ start end)))]
+                [value (str-to-num digits)]]
+            (if (or (> found 0) (not (and (<= (length digits) 10) (imap-digits? digits 0)
+                (number? value) (> value 0) (<= value 4294967295))))
+              (throw (imap-error "UIDVALIDITY_INVALID" "SELECT returned an invalid UIDVALIDITY"))
+              (recur (+ i 1) 1 value)))
+          (recur (+ i 1) found validity)))))
+(defn imap-uids-after [ids cursor cap]
+  (loop [i 0 result []]
+    (if (or (>= i (length ids)) (>= (length result) cap)) result
+      (let [[uid (get ids i)]]
+        (if (> uid cursor) (recur (+ i 1) (push result uid))
+          (recur (+ i 1) result)))))
+(defn imap-fetch-uid-headers [socket counter timeout limit trace ids]
+  (loop [i 0 messages []]
+    (if (>= i (length ids)) messages
+      (let [[uid (get ids i)]
+            [command (str "UID FETCH " uid " (UID BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])")]
+            [response (imap-command socket counter timeout limit trace command command false)]
+            [literals (get response "literals")]]
+        (if (or (!= (length literals) 1)
+            (not (str-includes (get (get literals 0) "line")
+              (str " FETCH (UID " uid " BODY[HEADER.FIELDS (SUBJECT FROM)] "))))
+          (throw (imap-error "PROTOCOL" "UID FETCH returned an unexpected header literal"))
+          (let [[headers (imap-headers (get (get literals 0) "value"))]]
+            (recur (+ i 1) (push messages {"uid" uid "subject" (get headers "subject")
+              "from" (get headers "from")})))))))
+(defn imap-session-uids [socket opts timeout limit trace after-uidvalidity after-uid]
+  (imap-value (_fl_connection_starttls socket timeout))
+  (let [[greeting (imap-line socket (+ (now-ms) timeout) limit trace)] [counter (atom 0)]]
+    (if (not (str-starts-with greeting "* OK ")) (throw (imap-error "PROTOCOL" "invalid greeting")) nil)
+    (imap-command socket counter timeout limit trace
+      (str "LOGIN " (imap-quote (get opts "username")) " " (imap-quote (get opts "password")))
+      "LOGIN <가림> <가림>" false)
+    (let [[selected (imap-command socket counter timeout limit trace "SELECT \"INBOX\"" "SELECT \"INBOX\"" false)]
+          [uidvalidity (imap-uidvalidity-from-lines (get selected "lines"))]
+          [cursor (if (= uidvalidity after-uidvalidity) after-uid 0)]
+          [search (imap-command socket counter timeout limit trace "UID SEARCH ALL" "UID SEARCH ALL" false)]
+          [ids (imap-uids-after (imap-search-ids (get search "lines")) cursor 50)]
+          [messages (imap-fetch-uid-headers socket counter timeout limit trace ids)]]
+      (imap-command socket counter timeout limit trace "LOGOUT" "LOGOUT" true)
+      {"ok" true "uidvalidity" uidvalidity "messages" messages})))
+(defn imap-read-inbox-uids [host port opts after-uidvalidity after-uid]
+  (let [[timeout (imap-option opts "timeout-ms" 3000)]
+        [limit (imap-option opts "max-response-bytes" 65536)]
+        [trace (atom "")]]
+    (if (not (or (= host "localhost") (= host "127.0.0.1")))
+      (imap-error "LOCAL_ONLY" "loopback endpoints only")
+      (if (not (and (map? opts) (number? timeout) (number? limit)
+          (number? after-uidvalidity) (>= after-uidvalidity 0)
+          (number? after-uid) (>= after-uid 0)))
+        (imap-error "INVALID_ARGUMENT" "invalid UID sync options")
+        (if (or (< timeout 1) (> timeout 60000) (!= timeout (floor timeout))
+            (< limit 1) (> limit 1048576) (!= limit (floor limit))
+            (> after-uidvalidity 4294967295) (!= after-uidvalidity (floor after-uidvalidity))
+            (> after-uid 4294967295) (!= after-uid (floor after-uid))
+            (not (imap-clean? (get opts "username"))) (not (imap-clean? (get opts "password"))))
+          (imap-error "INVALID_ARGUMENT" "invalid UID sync limits or credentials")
+          (let [[socket (_fl_connection_open host port timeout)]]
+            (if (not (number? socket)) socket
+              (let [[result (try (imap-session-uids socket opts timeout limit trace
+                  after-uidvalidity after-uid) (catch error error))]]
+                (_fl_connection_close socket)
+                (assoc result "transcript" @trace)))))))))
+
 ;; Separate body reader; existing inbox/header functions remain unchanged.
 (defn imap-read-body [host port sequence opts]
   (let [[timeout (imap-option opts "timeout-ms" 3000)] [cap (imap-option opts "max-body-bytes" 65536)]
@@ -160,6 +236,53 @@
                               (str "FETCH " sequence " (FLAGS)") (str "FETCH " sequence " (FLAGS)") false)]]
                         (imap-command socket counter timeout 8192 trace "LOGOUT" "LOGOUT" true)
                         {"ok" true "body" body "flags" (get flags "lines")}))))))
+            (catch error error))]]
+            (_fl_connection_close socket)
+            (assoc result "transcript" @trace)))))))
+(defn imap-read-body-uid [host port uid expected-uidvalidity opts]
+  (let [[timeout (imap-option opts "timeout-ms" 3000)]
+        [cap (imap-option opts "max-body-bytes" 65536)]
+        [trace (atom "")]]
+    (if (not (and (or (= host "localhost") (= host "127.0.0.1"))
+        (number? uid) (> uid 0) (<= uid 4294967295) (= uid (floor uid))
+        (number? expected-uidvalidity) (> expected-uidvalidity 0)
+        (<= expected-uidvalidity 4294967295) (= expected-uidvalidity (floor expected-uidvalidity))
+        (number? timeout) (>= timeout 1) (<= timeout 60000) (= timeout (floor timeout))
+        (number? cap) (>= cap 1) (<= cap 1048576) (= cap (floor cap))
+        (imap-clean? (get opts "username")) (imap-clean? (get opts "password"))))
+      (imap-error "INVALID_ARGUMENT" "invalid UID body read options")
+      (let [[socket (_fl_connection_open host port timeout)]]
+        (if (not (number? socket)) socket
+          (let [[result (try
+            (do
+              (imap-value (_fl_connection_starttls socket timeout))
+              (if (not (str-starts-with (imap-line socket (+ (now-ms) timeout) 8192 trace) "* OK "))
+                (throw (imap-error "PROTOCOL" "invalid greeting")) nil)
+              (let [[counter (atom 0)]]
+                (imap-command socket counter timeout 8192 trace
+                  (str "LOGIN " (imap-quote (get opts "username")) " " (imap-quote (get opts "password")))
+                  "LOGIN <가림> <가림>" false)
+                (let [[selected (imap-command socket counter timeout 8192 trace "SELECT \"INBOX\"" "SELECT \"INBOX\"" false)]
+                      [current-uidvalidity (imap-uidvalidity-from-lines (get selected "lines"))]]
+                  (if (!= current-uidvalidity expected-uidvalidity)
+                    (throw (imap-error "UIDVALIDITY_CHANGED" "mailbox epoch changed during body fetch")) nil))
+                (let [[command (str "A3 UID FETCH " uid " (UID BODY.PEEK[TEXT])\r\n")]
+                      [deadline (+ (now-ms) timeout)]]
+                  (imap-log trace "C: " command)
+                  (imap-value (_fl_connection_write socket command (imap-left deadline)))
+                  (let [[line (imap-line socket deadline 8192 trace)] [size (imap-literal-length line)]]
+                    (if (or (= size nil) (not (str-includes line (str " FETCH (UID " uid " BODY[TEXT] "))))
+                      (throw (imap-error "PROTOCOL" "invalid UID body literal")) nil)
+                    (if (> size cap) (throw (imap-error "BODY_TOO_LARGE" "body exceeds bound")) nil)
+                    (let [[body (imap-read-exact socket size deadline)]]
+                      (imap-response socket "A3" deadline 8192 trace [] [] true false)
+                      (reset! counter 3)
+                      (let [[flags (imap-command socket counter timeout 8192 trace
+                          (str "UID FETCH " uid " (UID FLAGS)")
+                          (str "UID FETCH " uid " (UID FLAGS)") false)]]
+                        (imap-command socket counter timeout 8192 trace "LOGOUT" "LOGOUT" true)
+                        {"ok" true "uid" uid "uidvalidity" expected-uidvalidity
+                         "body" body "flags" (get flags "lines")}))))))
             (catch error error))]]
             (_fl_connection_close socket)
             (assoc result "transcript" @trace)))))))

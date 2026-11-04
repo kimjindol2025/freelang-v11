@@ -1354,6 +1354,8 @@
   [(= $op "server-html")        (str "fl_resp_html(" (cgc (get $args 0)) ")")]
   [(= $op "server-json")        (str "fl_resp_json(" (cgc (get $args 0)) ")")]
   [(= $op "server-status")      (str "fl_resp_status(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-req-header")  (str "server_req_header(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
+  [(= $op "server-req-json")    (str "server_req_json(" (cgc (get $args 0)) ")")]
   [(= $op "server-redirect")    (str "fl_resp_redirect(" (cgc (get $args 0)) ")")]
   [(= $op "server-html-cookie") (str "fl_resp_html_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ")")]
   [(= $op "server-set-cookie")  (str "fl_resp_set_cookie(" (cgc (get $args 0)) ", " (cgc (get $args 1)) ", " (cgc (get $args 2)) ")")]

@@ -1,0 +1,64 @@
+(load "../../../lib/mail/store.fl")
+(load "../../../lib/mail/guard.fl")
+
+(defn agent-mail-outbox-policy [directory approval-id job-id]
+  {"lock-file" (str directory "/guard.lock")
+   "approval-file" (str directory "/approval-" approval-id ".json")
+   "rate-file" (str directory "/rate.txt")
+   "stop-file" (str directory "/STOP")
+   "audit-file" (str directory "/audit.jsonl")
+   "hash-temp" (str directory "/hash-worker-" job-id ".tmp")})
+(defn agent-mail-outbox-process-one [database directory port username password]
+  (let [[claimed (mail-store-claim-send database)]]
+    (if (not (get claimed "ok"))
+      {"ok" false "state" "claim-failed"}
+      (let [[job (get claimed "job")]]
+        (if (not job) {"ok" true "state" "idle"}
+          (let [[mail {"from" (get job "from_address") "to" (get job "to_address")
+                "subject" (get job "subject") "body" (get job "body")}]
+                [approval (mail-store-get-approval database (get job "draft_id"))]
+                [policy (agent-mail-outbox-policy directory (get approval "approval_id") (get job "job_id"))]
+                [result (mail-guard-send "localhost" port (get job "draft_id") mail false policy
+                  {"username" username "password" password
+                   "timeout-ms" 3000 "max-message-bytes" 65536})]
+                [state (if (get result "ok") "submitted"
+                  (if (= (get result "status") "send-failed") "unknown" "failed"))]
+                [saved (mail-store-finish-send database (get job "job_id") state)]]
+            (if (get saved "ok")
+              {"ok" true "state" state "job_id" (get job "job_id")}
+              {"ok" false "state" "finish-failed" "job_id" (get job "job_id")})))))))
+(define arguments (cli-args))
+(define database (db-open (get arguments 0)))
+(define policy-directory (get arguments 1))
+(define smtp-port (str-to-num (get arguments 2)))
+(define smtp-username (_fl_env_get "AGENT_MAIL_SMTP_USERNAME"))
+(define smtp-password (_fl_env_get "AGENT_MAIL_SMTP_PASSWORD"))
+(mail-store-init database)
+(if (not (and (string? policy-directory) (!= policy-directory "")
+    (number? smtp-port) (> smtp-port 0) (< smtp-port 65536)
+    (string? smtp-username) (string? smtp-password)))
+  (do (println "OUTBOX_WORKER=CONFIG_ERROR") (db-close database) (_fl_exit 2)) nil)
+(define processed (atom 0))
+(define submitted (atom 0))
+(define unknown (atom 0))
+(define failed (atom 0))
+(loop []
+  (let [[result (agent-mail-outbox-process-one database policy-directory smtp-port
+      smtp-username smtp-password)]]
+    (if (= (get result "state") "idle") nil
+      (if (not (get result "ok"))
+        (do (println (str "OUTBOX_WORKER_ERROR=" (get result "state")))
+          (db-close database) (_fl_exit 1))
+        (do
+          (reset! processed (+ @processed 1))
+          (if (= (get result "state") "submitted") (reset! submitted (+ @submitted 1)) nil)
+          (if (= (get result "state") "unknown") (reset! unknown (+ @unknown 1)) nil)
+          (if (= (get result "state") "failed") (reset! failed (+ @failed 1)) nil)
+          (println (str "OUTBOX_JOB state=" (get result "state")))
+          (recur))))))
+(db-close database)
+(println (str "OUTBOX_PROCESSED=" @processed))
+(println (str "OUTBOX_SUBMITTED=" @submitted))
+(println (str "OUTBOX_UNKNOWN=" @unknown))
+(println (str "OUTBOX_FAILED=" @failed))
+(_fl_exit 0)

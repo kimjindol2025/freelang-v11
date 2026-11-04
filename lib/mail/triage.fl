@@ -30,10 +30,60 @@
                               "{\"error\":\"INVALID_AI_SCHEMA\"}")
                             (imap-error "INVALID_AI_SCHEMA" "AI response rejected"))
                         (let [[risk (get value "위험 표시")]
+                              [source {"sequence" id "from" (get mail "from")
+                                "subject" (get mail "subject") "body" (get body "body")}]
                               [record (if risk {"status" "사장님 확인 필요"}
                                 {"status" "초안 저장" "result" value})]
+                              [source-encoded (json-stringify source)]
+                              [source-saved (if (get source-encoded "ok")
+                                (file-write-atomic (str output "/" id ".source.json")
+                                  (get source-encoded "value")) source-encoded)]
                               [encoded (json-stringify record)]
                               [saved (file-write-atomic path (get encoded "value"))]]
-                          (if (not (get saved "ok")) saved
+                          (if (not (get source-saved "ok")) source-saved
+                            (if (not (get saved "ok")) saved
                             (recur (+ i 1) (push records {"sequence" id "path" path "status" (get record "status")})))))))))))))))
 )
+(defn triage-run-uids [host port imap-opts ai-url output after-uidvalidity after-uid]
+  (let [[target (http-url ai-url)]]
+    (if (not (and (get target "ok") (get target "tls")
+        (includes-item ["localhost" "127.0.0.1"] (get target "host"))))
+      (imap-error "LOCAL_ONLY" "local HTTPS endpoint required")
+      (let [[inbox (imap-read-inbox-uids host port imap-opts after-uidvalidity after-uid)]]
+        (if (not (get inbox "ok")) inbox
+          (loop [i 0 records []]
+            (if (>= i (length (get inbox "messages")))
+              {"ok" true "uidvalidity" (get inbox "uidvalidity") "records" records}
+              (let [[mail (get (get inbox "messages") i)] [uid (get mail "uid")]
+                    [validity (get inbox "uidvalidity")]
+                    [key (str "v" validity "-u" uid)]
+                    [body (imap-read-body-uid host port uid validity imap-opts)]]
+                (if (not (get body "ok")) body
+                  (let [[response (http-json "POST" ai-url
+                      {"mail" {"from" (get mail "from") "subject" (get mail "subject")
+                        "body" (get body "body")}
+                       "response_fields" ["요약" "분류" "할 일 목록" "답장 초안" "위험 표시"]}
+                      {"timeout-ms" 1000 "max-response-bytes" 65536})]
+                        [value (get response "body")]
+                        [path (str output "/" key ".json")]]
+                    (if (not (get response "ok")) response
+                      (if (not (triage-valid? value))
+                        (do (file-write-atomic (str output "/error-" key ".json")
+                              "{\"error\":\"INVALID_AI_SCHEMA\"}")
+                            (imap-error "INVALID_AI_SCHEMA" "AI response rejected"))
+                        (let [[risk (get value "위험 표시")]
+                              [source {"key" key "uidvalidity" validity "uid" uid
+                                "from" (get mail "from") "subject" (get mail "subject")
+                                "body" (get body "body")}]
+                              [record (if risk {"status" "사장님 확인 필요"}
+                                {"status" "초안 저장" "result" value})]
+                              [source-encoded (json-stringify source)]
+                              [source-saved (if (get source-encoded "ok")
+                                (file-write-atomic (str output "/" key ".source.json")
+                                  (get source-encoded "value")) source-encoded)]
+                              [encoded (json-stringify record)]
+                              [saved (file-write-atomic path (get encoded "value"))]]
+                          (if (not (get source-saved "ok")) source-saved
+                            (if (not (get saved "ok")) saved
+                              (recur (+ i 1) (push records {"key" key "uidvalidity" validity
+                                "uid" uid "path" path "status" (get record "status")})))))))))))))))

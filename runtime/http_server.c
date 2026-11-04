@@ -628,8 +628,76 @@ FLValue server_req_path(FLValue request) {
 }
 
 FLValue server_req_query(FLValue request, FLValue name) {
-    FLValue value = fl_map_get(fl_map_get(request, fl_str_val("query")), name);
-    return value.tag == FL_VECTOR ? fl_vec_first(value) : value;
+    FLValue raw_value = fl_map_get(request, fl_str_val("query"));
+    if (raw_value.tag != FL_STRING || !raw_value.obj ||
+        name.tag != FL_STRING || !name.obj) return fl_nil();
+    FLString *raw = (FLString *)raw_value.obj;
+    FLString *wanted = (FLString *)name.obj;
+    if (raw->len > 16384 || wanted->len == 0 || wanted->len > 128) return fl_nil();
+
+    const char *query = raw->data;
+    size_t offset = 0;
+    while (offset < raw->len) {
+        size_t end = offset;
+        while (end < raw->len && query[end] != '&') end++;
+        size_t equals = offset;
+        while (equals < end && query[equals] != '=') equals++;
+        size_t key_len = equals - offset;
+        char *key = malloc(key_len + 1);
+        if (!key) return fl_nil();
+        size_t key_out = 0;
+        int valid = 1;
+        for (size_t i = offset; i < equals; i++) {
+            unsigned char c = (unsigned char)query[i];
+            if (c == '+') c = ' ';
+            else if (c == '%') {
+                if (i + 2 >= equals || !isxdigit((unsigned char)query[i + 1]) ||
+                    !isxdigit((unsigned char)query[i + 2])) { valid = 0; break; }
+                int hi = isdigit((unsigned char)query[i + 1]) ? query[i + 1] - '0' :
+                    tolower((unsigned char)query[i + 1]) - 'a' + 10;
+                int lo = isdigit((unsigned char)query[i + 2]) ? query[i + 2] - '0' :
+                    tolower((unsigned char)query[i + 2]) - 'a' + 10;
+                c = (unsigned char)((hi << 4) | lo);
+                i += 2;
+            }
+            if (c == 0) { valid = 0; break; }
+            key[key_out++] = (char)c;
+        }
+        key[key_out] = '\0';
+        int matches = valid && key_out == wanted->len &&
+            memcmp(key, wanted->data, key_out) == 0;
+        free(key);
+        if (matches) {
+            size_t value_start = equals < end ? equals + 1 : end;
+            size_t value_len = end - value_start;
+            char *value = malloc(value_len + 1);
+            if (!value) return fl_nil();
+            size_t value_out = 0;
+            valid = 1;
+            for (size_t i = value_start; i < end; i++) {
+                unsigned char c = (unsigned char)query[i];
+                if (c == '+') c = ' ';
+                else if (c == '%') {
+                    if (i + 2 >= end || !isxdigit((unsigned char)query[i + 1]) ||
+                        !isxdigit((unsigned char)query[i + 2])) { valid = 0; break; }
+                    int hi = isdigit((unsigned char)query[i + 1]) ? query[i + 1] - '0' :
+                        tolower((unsigned char)query[i + 1]) - 'a' + 10;
+                    int lo = isdigit((unsigned char)query[i + 2]) ? query[i + 2] - '0' :
+                        tolower((unsigned char)query[i + 2]) - 'a' + 10;
+                    c = (unsigned char)((hi << 4) | lo);
+                    i += 2;
+                }
+                if (c == 0) { valid = 0; break; }
+                value[value_out++] = (char)c;
+            }
+            value[value_out] = '\0';
+            FLValue decoded = valid ? fl_str_val(value) : fl_nil();
+            free(value);
+            return decoded;
+        }
+        offset = end + 1;
+    }
+    return fl_nil();
 }
 
 FLValue server_req_param(FLValue request, FLValue name) {

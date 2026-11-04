@@ -1,0 +1,62 @@
+(load "../../lib/mail/store.fl")
+(load "../../lib/mail/workflow.fl")
+(load "../../projects/agent-mail/worker/ingest.fl")
+(define args (cli-args))
+(define database (db-open (get args 0)))
+(define output (get args 1))
+(define mode (if (> (length args) 2) (get args 2) "normal"))
+(mail-store-init database)
+(define owners (db-query database "SELECT user_id FROM mail_users WHERE email=?" ["admin@example.invalid"]))
+(define owner-id (get (get owners 0) "user_id"))
+(define failures (atom 0))
+(defn check [name passed]
+  (println (str (if passed "PASS " "FAIL ") "MAIL_WORKER " name))
+  (if passed nil (reset! failures (+ @failures 1))))
+(define results
+  (map (fn [id] (agent-mail-worker-ingest-one database owner-id "box-1"
+    "admin@example.invalid" "admin@example.invalid" output
+    {"sequence" (str id) "path" (str output "/" id ".json")})) [1 2 3]))
+(define messages (db-query database "SELECT COUNT(*) AS count FROM messages
+  WHERE mailbox_id=? AND message_id LIKE 'local-box-1-%'" ["box-1"]))
+(define drafts (db-query database "SELECT COUNT(*) AS count FROM drafts
+  WHERE mailbox_id=? AND state='pending-human-approval' AND source_message_id LIKE 'local-box-1-%'" ["box-1"]))
+(if (= mode "risk")
+  (do
+    (check "risky-records-require-human-review"
+      (and (get (get results 0) "ok") (= (get (get results 0) "status") "human-review-required")
+        (get (get results 1) "ok") (= (get (get results 1) "status") "human-review-required")
+        (get (get results 2) "ok") (= (get (get results 2) "status") "human-review-required")))
+    (check "risky-source-messages-persisted" (= (get (get messages 0) "count") 3))
+    (check "risky-mail-creates-no-drafts" (= (get (get drafts 0) "count") 0))
+    (db-close database)
+    (println (str "MAIL_WORKER_RISK_SUMMARY=" (- 3 @failures) "/3"))
+    (_fl_exit (if (= @failures 0) 0 1)))
+  nil)
+(check "all-triage-records-ingested"
+  (and (get (get results 0) "ok") (= (get (get results 0) "status") "draft-created")
+    (get (get results 1) "ok") (= (get (get results 1) "status") "draft-created")
+    (get (get results 2) "ok") (= (get (get results 2) "status") "draft-created")))
+(check "source-messages-persisted" (= (get (get messages 0) "count") 3))
+(define first-message (db-query database "SELECT body FROM messages WHERE message_id=?" ["local-box-1-1"]))
+(check "original-body-preserved" (= (get (get first-message 0) "body") "ordinary local message"))
+(check "safe-drafts-pending-human-review" (= (get (get drafts 0) "count") 3))
+(define repeated (agent-mail-worker-ingest-one database owner-id "box-1"
+  "admin@example.invalid" "admin@example.invalid" output
+  {"sequence" "1" "path" (str output "/1.json")}))
+(check "duplicate-is-skipped" (and (get repeated "ok") (= (get repeated "status") "duplicate-skipped")))
+(define final-count (db-query database "SELECT COUNT(*) AS count FROM drafts
+  WHERE mailbox_id=? AND state='pending-human-approval' AND source_message_id LIKE 'local-box-1-%'" ["box-1"]))
+(check "duplicate-does-not-create-draft" (= (get (get final-count 0) "count") 3))
+(check "draft-failure-fixture-removes-prior-draft" (= (db-exec database
+  "DELETE FROM drafts WHERE source_message_id='local-box-1-1'" []) 1))
+(define recovered (agent-mail-worker-ingest-one database owner-id "box-1"
+  "admin@example.invalid" "admin@example.invalid" output
+  {"sequence" "1" "path" (str output "/1.json")}))
+(check "duplicate-source-recovers-missing-draft"
+  (and (get recovered "ok") (= (get recovered "status") "draft-created")))
+(define recovered-count (db-query database "SELECT COUNT(*) AS count FROM drafts
+  WHERE mailbox_id=? AND state='pending-human-approval' AND source_message_id LIKE 'local-box-1-%'" ["box-1"]))
+(check "recovered-draft-count-restored" (= (get (get recovered-count 0) "count") 3))
+(db-close database)
+(println (str "MAIL_WORKER_INGEST_SUMMARY=" (- 9 @failures) "/9"))
+(_fl_exit (if (= @failures 0) 0 1))

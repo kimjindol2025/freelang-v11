@@ -5,19 +5,42 @@
 (defn fixture-fetch [id tag headers]
   (str "* " id " FETCH (BODY[HEADER.FIELDS (SUBJECT FROM)] {" (length headers) "}\r\n"
        headers ")\r\n" tag " OK fetched\r\n"))
+(defn fixture-uid-fetch [sequence uid tag headers]
+  (str "* " sequence " FETCH (UID " uid " BODY[HEADER.FIELDS (SUBJECT FROM)] {"
+    (length headers) "}\r\n" headers ")\r\n" tag " OK fetched\r\n"))
 (define greeting "* OK local.test ready\r\n")
 (define selected "A1 OK logged in\r\n* FLAGS (\\Seen)\r\n* 5 EXISTS\r\nA2 OK [READ-ONLY] selected\r\n* SEARCH 5 1 3 2 4\r\nA3 OK search complete\r\n")
-(define payload (if (= mode "silent") ""
+(define uid-payload (str greeting "A1 OK logged in\r\n* FLAGS (\\Seen)\r\n* 5 EXISTS\r\n"
+  "* OK [UIDVALIDITY 77] UIDs valid\r\nA2 OK [READ-ONLY] selected\r\n"
+  "* SEARCH 101 104 110\r\nA3 OK search complete\r\n"
+  (fixture-uid-fetch 2 101 "A4" "Subject: UID One\r\nFrom: one@example.invalid\r\n\r\n")
+  (fixture-uid-fetch 4 104 "A5" "Subject: UID Four\r\nFrom: four@example.invalid\r\n\r\n")
+  (fixture-uid-fetch 5 110 "A6" "Subject: UID Ten\r\nFrom: ten@example.invalid\r\n\r\n")
+  "* BYE logging out\r\nA7 OK logout completed\r\n"))
+(define uid-body-payload (str greeting "A1 OK logged in\r\n* OK [UIDVALIDITY 77] UIDs valid\r\n"
+  "A2 OK [READ-ONLY] selected\r\n* 5 FETCH (UID 110 BODY[TEXT] {10}\r\nbody text\r\n)\r\n"
+  "A3 OK fetched\r\n* 5 FETCH (UID 110 FLAGS ())\r\nA4 OK flags\r\n"
+  "* BYE logging out\r\nA5 OK logout completed\r\n"))
+(define payload (if (or (= mode "uid-all") (= mode "uid-cursor")) uid-payload
+  (if (= mode "uid-body") uid-body-payload
+  (if (= mode "silent") ""
   (if (= mode "login-no") (str greeting "A1 NO login rejected\r\n")
     (if (= mode "large") (str greeting selected "* 3 FETCH (BODY[HEADER.FIELDS (SUBJECT FROM)] {999999}\r\n")
       (str greeting selected
         (fixture-fetch 3 "A4" "Subject: Third\r\n folded\r\nFrom: three@example.invalid\r\n\r\n")
         (fixture-fetch 4 "A5" "Subject: 넷째 메일\r\nFrom: four@example.invalid\r\n\r\n")
         (fixture-fetch 5 "A6" "Subject: Fifth\r\nFrom: five@example.invalid\r\nX-Test: A99 NO literal text\r\n\r\n")
-        "* BYE logging out\r\nA7 OK logout completed\r\n")))))
+        "* BYE logging out\r\nA7 OK logout completed\r\n"))))))
 (_fl_file_write output payload)
 (_fl_file_write (str output ".commands")
-  (str "A1 LOGIN <가림> <가림>\nA2 SELECT \"INBOX\"\nA3 SEARCH ALL\n"
+  (if (= mode "uid-body")
+    "A1 LOGIN <가림> <가림>\nA2 SELECT \"INBOX\"\nA3 UID FETCH 110 (UID BODY.PEEK[TEXT])\nA4 UID FETCH 110 (UID FLAGS)\nA5 LOGOUT\n"
+    (if (or (= mode "uid-all") (= mode "uid-cursor"))
+      (str "A1 LOGIN <가림> <가림>\nA2 SELECT \"INBOX\"\nA3 UID SEARCH ALL\n"
+        "A4 UID FETCH 101 (UID BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])\n"
+        "A5 UID FETCH 104 (UID BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])\n"
+        "A6 UID FETCH 110 (UID BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])\nA7 LOGOUT\n")
+      (str "A1 LOGIN <가림> <가림>\nA2 SELECT \"INBOX\"\nA3 SEARCH ALL\n"
        "A4 FETCH 3 (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])\n"
        "A5 FETCH 4 (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])\n"
-       "A6 FETCH 5 (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])\nA7 LOGOUT\n"))
+       "A6 FETCH 5 (BODY.PEEK[HEADER.FIELDS (SUBJECT FROM)])\nA7 LOGOUT\n"))))

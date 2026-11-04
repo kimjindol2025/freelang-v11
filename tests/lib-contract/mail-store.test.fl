@@ -1,0 +1,99 @@
+(load "../../lib/mail/store.fl")
+(define args (cli-args))
+(define database (db-open (get args 0)))
+(define failures (atom 0))
+(defn check [name passed]
+  (println (str (if passed "PASS " "FAIL ") "MAIL_STORE " name))
+  (if passed nil (reset! failures (+ @failures 1))))
+(check "schema" (get (mail-store-init database) "ok"))
+(define mailbox (mail-store-mailbox-create database "box-1" "owner-1" "agent@example.invalid"))
+(check "mailbox-create" (get mailbox "ok"))
+(check "duplicate-mailbox-rejected" (not (get (mail-store-mailbox-create database
+  "box-2" "owner-2" "agent@example.invalid") "ok")))
+(check "sync-state-defaults-to-zero" (= (get (get (mail-store-sync-state database "box-1") "state") "last_uid") 0))
+(check "sync-epoch-initializes" (and (get (mail-store-sync-set-epoch database "box-1" 71) "ok")
+  (= (get (get (mail-store-sync-state database "box-1") "state") "uidvalidity") 71)))
+(check "sync-cursor-advances" (and (get (mail-store-sync-advance database "box-1" 71 12) "ok")
+  (= (get (get (mail-store-sync-state database "box-1") "state") "last_uid") 12)))
+(check "sync-cursor-does-not-regress" (and (get (mail-store-sync-advance database "box-1" 71 9) "ok")
+  (= (get (get (mail-store-sync-state database "box-1") "state") "last_uid") 12)))
+(check "changed-uidvalidity-resets-cursor" (and (get (mail-store-sync-set-epoch database "box-1" 72) "ok")
+  (= (get (get (mail-store-sync-state database "box-1") "state") "last_uid") 0)))
+(check "old-uidvalidity-cannot-advance" (not (get (mail-store-sync-advance database "box-1" 71 15) "ok")))
+(define message {"message_id" "msg-1" "mailbox_id" "box-1" "remote_uid" "uid-7"
+  "from" "sender@example.invalid" "to" "agent@example.invalid" "subject" "Question"
+  "body" "hello" "received_at" 1700000000})
+(check "message-ingest" (= (get (mail-store-ingest database message) "inserted") 1))
+(check "remote-uid-idempotent" (= (get (mail-store-ingest database
+  (assoc message "message_id" "msg-duplicate")) "inserted") 0))
+(define owned (mail-store-list-messages database "owner-1" "box-1" 10))
+(check "owner-can-list" (and (get owned "ok") (= (length (get owned "messages")) 1)))
+(check "other-owner-sees-none" (= (length (get (mail-store-list-messages
+  database "owner-2" "box-1" 10) "messages")) 0))
+(define draft {"draft_id" "draft-1" "mailbox_id" "box-1" "source_message_id" "msg-1"
+  "mail" {"from" "agent@example.invalid" "to" "sender@example.invalid"
+    "subject" "Re: Question" "body" "Thanks"}})
+(check "draft-owner-create" (get (mail-store-draft-create database "owner-1" draft) "ok"))
+(check "draft-cross-owner-blocked" (not (get (mail-store-draft-create database "owner-2"
+  (assoc draft "draft_id" "draft-other")) "ok")))
+(check "approval-transition" (get (mail-store-draft-transition database
+  "owner-1" "draft-1" "pending-human-approval" "approved") "ok"))
+(check "approval-replay-blocked" (not (get (mail-store-draft-transition database
+  "owner-1" "draft-1" "pending-human-approval" "approved") "ok")))
+(check "invalid-state-jump-blocked" (not (get (mail-store-draft-transition database
+  "owner-1" "draft-1" "approved" "sent") "ok")))
+(define draft2 (assoc draft "draft_id" "draft-crash"))
+(check "uncertain-draft-create" (get (mail-store-draft-create database "owner-1" draft2) "ok"))
+(check "uncertain-draft-approve" (get (mail-store-approve-draft database "draft-crash"
+  "reviewer-1" "approval-crash" "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  (+ (now-s) 3600)) "ok"))
+(check "send-job-started-once" (get (mail-store-begin-send database
+  "draft-crash" "approval-crash" "job-crash") "ok"))
+(check "approval-consumed-atomically" (not (get (mail-store-begin-send database
+  "draft-crash" "approval-crash" "job-replay") "ok")))
+(check "crash-reconciles-to-unknown" (= (mail-store-reconcile-send-jobs database) 1))
+(check "uncertain-job-stays-visible" (= (get (mail-store-get-send-job database "job-crash") "state") "unknown"))
+(check "reconciliation-idempotent" (= (mail-store-reconcile-send-jobs database) 0))
+(check "uncertain-draft-is-not-resendable" (= (get (mail-store-get-draft database "draft-crash") "state") "sending"))
+(define draft3 (assoc draft "draft_id" "draft-outbox"))
+(check "outbox-draft-create" (get (mail-store-draft-create database "owner-1" draft3) "ok"))
+(check "outbox-draft-approve" (get (mail-store-approve-draft database "draft-outbox"
+  "reviewer-1" "approval-outbox" "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  (+ (now-s) 3600)) "ok"))
+(check "approved-send-enqueued" (get (mail-store-enqueue-send database
+  "draft-outbox" "approval-outbox" "job-outbox") "ok"))
+(check "queued-state-visible" (= (get (mail-store-get-send-job database "job-outbox") "state") "queued"))
+(check "queued-job-survives-startup-reconciliation" (and
+  (= (mail-store-reconcile-send-jobs database) 0)
+  (= (get (mail-store-get-send-job database "job-outbox") "state") "queued")))
+(check "enqueue-consumes-approval" (> (get (mail-store-get-approval database "draft-outbox") "used_at") 0))
+(define claimed (mail-store-claim-send database))
+(check "outbox-worker-claims-once" (and (get claimed "ok")
+  (= (get (get claimed "job") "job_id") "job-outbox")
+  (= (get (mail-store-get-draft database "draft-outbox") "state") "sending")))
+(define claim-replay (mail-store-claim-send database))
+(check "claimed-job-is-not-claimed-again" (and (get claim-replay "ok")
+  (= (get claim-replay "job") nil)))
+(check "outbox-worker-finish-submitted" (get (mail-store-finish-send database "job-outbox" "submitted") "ok"))
+(check "finished-job-is-visible" (and
+  (= (get (mail-store-get-send-job database "job-outbox") "state") "submitted")
+  (= (get (mail-store-get-draft database "draft-outbox") "state") "sent")))
+(define draft4 (assoc draft "draft_id" "draft-outbox-crash"))
+(check "outbox-crash-draft-create" (get (mail-store-draft-create database "owner-1" draft4) "ok"))
+(check "outbox-crash-draft-approve" (get (mail-store-approve-draft database "draft-outbox-crash"
+  "reviewer-1" "approval-outbox-crash" "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  (+ (now-s) 3600)) "ok"))
+(define crash-enqueued (mail-store-enqueue-send database
+  "draft-outbox-crash" "approval-outbox-crash" "job-outbox-crash"))
+(define crash-claim (mail-store-claim-send database))
+(check "outbox-crash-enqueued-and-claimed" (and
+  (get crash-enqueued "ok") (get crash-claim "ok")
+  (= (get (get crash-claim "job") "job_id") "job-outbox-crash")))
+(define reconciled-crash (mail-store-reconcile-send-jobs database))
+(check "crashed-outbox-worker-reconciles-unknown" (and
+  (= reconciled-crash 1)
+  (= (get (mail-store-get-send-job database "job-outbox-crash") "state") "unknown")))
+(check "crashed-outbox-job-is-not-resent" (= (get (mail-store-claim-send database) "job") nil))
+(db-close database)
+(println (str "MAIL_STORE_SUMMARY=" (- 41 @failures) "/41"))
+(_fl_exit (if (= @failures 0) 0 1))

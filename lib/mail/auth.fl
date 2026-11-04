@@ -1,0 +1,139 @@
+(load "smtp.fl")
+(load "../time/time.fl")
+
+;; Passwords use the native PBKDF2 implementation. Bearer values are signed
+;; JWTs, while their random session ids remain revocable in the SQLite store.
+(define mail-auth-dummy-password-hash (auth-hash-password "invalid-login-dummy-password"))
+(defn mail-auth-error [code message]
+  {"ok" false "error" {"code" code "message" message}})
+(defn mail-auth-init [db]
+  (db-exec db "CREATE TABLE IF NOT EXISTS mail_workspaces (
+    workspace_id TEXT PRIMARY KEY, name TEXT NOT NULL, state TEXT NOT NULL,
+    created_at INTEGER NOT NULL)" [])
+  (db-exec db "CREATE TABLE IF NOT EXISTS mail_users (
+    user_id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('active','disabled')), created_at INTEGER NOT NULL)" [])
+  (db-exec db "CREATE TABLE IF NOT EXISTS mail_memberships (
+    workspace_id TEXT NOT NULL REFERENCES mail_workspaces(workspace_id),
+    user_id TEXT NOT NULL REFERENCES mail_users(user_id),
+    role TEXT NOT NULL CHECK (role IN ('admin','reviewer','agent')),
+    state TEXT NOT NULL CHECK (state IN ('active','disabled')),
+    PRIMARY KEY(workspace_id,user_id))" [])
+  (db-exec db "CREATE TABLE IF NOT EXISTS mail_sessions (
+    session_id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES mail_users(user_id),
+    expires_at INTEGER NOT NULL, revoked_at INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)" [])
+  (db-exec db "CREATE INDEX IF NOT EXISTS mail_sessions_user
+    ON mail_sessions(user_id,revoked_at,expires_at)" [])
+  (db-exec db "CREATE TABLE IF NOT EXISTS mail_login_limits (
+    email TEXT PRIMARY KEY, failures INTEGER NOT NULL, lock_until INTEGER NOT NULL)" [])
+  {"ok" true})
+(defn mail-auth-credential-valid? [email password secret]
+  (and (smtp-address? email) (string? password) (> (length password) 0)
+    (<= (length password) 4096) (string? secret) (>= (length secret) 32)))
+(defn mail-auth-bootstrap-admin [db email password]
+  (if (not (and (smtp-address? email) (string? password) (>= (length password) 12)
+      (<= (length password) 4096)))
+    (mail-auth-error "INVALID_BOOTSTRAP" "valid email and a 12-character password are required")
+    (let [[users (db-query db "SELECT COUNT(*) AS count FROM mail_users" [])]]
+      (if (!= (get (get users 0) "count") 0)
+        (mail-auth-error "BOOTSTRAP_CLOSED" "initial administrator already exists")
+        (let [[user-id (auth-random-token 16)] [hash (auth-hash-password password)]
+              [email-normal (str-lower email)]
+              [created (try
+                (do
+                  (db-exec db "BEGIN IMMEDIATE" [])
+                  (db-exec db "INSERT INTO mail_workspaces(workspace_id,name,state,created_at)
+                    VALUES('default','Default','active',?)" [(now-s)])
+                  (db-exec db "INSERT INTO mail_users(user_id,email,password_hash,state,created_at)
+                    VALUES(?,?,?,'active',?)" [user-id email-normal hash (now-s)])
+                  (db-exec db "INSERT INTO mail_memberships(workspace_id,user_id,role,state)
+                    VALUES('default',?,'admin','active')" [user-id])
+                  (db-exec db "COMMIT" [])
+                  true)
+                (catch error
+                  (do (db-exec db "ROLLBACK" []) false))]]
+          (if created {"ok" true "user_id" user-id "workspace_id" "default"}
+            (mail-auth-error "BOOTSTRAP_FAILED" "administrator could not be created")))))))
+(defn mail-auth-workspace-role [db user-id workspace-id]
+  (let [[rows (db-query db "SELECT role FROM mail_memberships
+    WHERE user_id=? AND workspace_id=? AND state='active'" [user-id workspace-id])]]
+    (if (= (length rows) 1) (get (get rows 0) "role") nil)))
+(defn mail-auth-user-create [db actor-id workspace-id email password role]
+  (if (not (and (string? actor-id) (string? workspace-id) (smtp-address? email)
+      (string? password) (>= (length password) 12) (<= (length password) 4096)
+      (includes-item ["reviewer" "agent"] role)))
+    (mail-auth-error "INVALID_USER" "user fields or role are invalid")
+    (if (!= (mail-auth-workspace-role db actor-id workspace-id) "admin")
+      (mail-auth-error "FORBIDDEN" "workspace administrator role required")
+      (let [[user-id (auth-random-token 16)] [hash (auth-hash-password password)]
+            [created (try
+              (do
+                (db-exec db "BEGIN IMMEDIATE" [])
+                (db-exec db "INSERT INTO mail_users(user_id,email,password_hash,state,created_at)
+                  VALUES(?,?,?,'active',?)" [user-id (str-lower email) hash (now-s)])
+                (db-exec db "INSERT INTO mail_memberships(workspace_id,user_id,role,state)
+                  VALUES(?,?,?,'active')" [workspace-id user-id role])
+                (db-exec db "COMMIT" []) true)
+              (catch error (do (db-exec db "ROLLBACK" []) false))]]
+        (if created {"ok" true "user_id" user-id "role" role}
+          (mail-auth-error "USER_CONFLICT" "user could not be created"))))))
+(defn mail-auth-failed-login [db email now]
+  (db-exec db "INSERT INTO mail_login_limits(email,failures,lock_until) VALUES(?,1,0)
+    ON CONFLICT(email) DO UPDATE SET
+      failures=CASE WHEN mail_login_limits.failures < 5 THEN mail_login_limits.failures+1 ELSE 5 END,
+      lock_until=CASE WHEN mail_login_limits.failures+1 >= 5 THEN ? ELSE mail_login_limits.lock_until END"
+    [email (+ now 900)])
+  (mail-auth-error "INVALID_CREDENTIAL" "email or password is invalid"))
+(defn mail-auth-login [db email password signing-secret]
+  (if (not (mail-auth-credential-valid? email password signing-secret))
+    (mail-auth-error "INVALID_REQUEST" "login fields are invalid")
+    (let [[normalized (str-lower email)] [now (now-s)]
+          [limits (db-query db "SELECT failures,lock_until FROM mail_login_limits WHERE email=?" [normalized])]
+          [locked (and (= (length limits) 1) (> (get (get limits 0) "lock_until") now))]
+          [users (db-query db "SELECT user_id,email,password_hash,state FROM mail_users WHERE email=?" [normalized])]
+          [user (if (= (length users) 1) (get users 0) nil)]
+          [password-ok (auth-verify-password password
+            (if user (get user "password_hash") mail-auth-dummy-password-hash))]]
+      (if locked (mail-auth-error "RATE_LIMITED" "login temporarily unavailable")
+        (if (or (not user) (!= (get user "state") "active") (not password-ok))
+          (mail-auth-failed-login db normalized now)
+          (let [[session-id (auth-random-token 32)]
+                [expires (+ now 43200)]
+                [memberships (db-query db "SELECT workspace_id,role FROM mail_memberships
+                  WHERE user_id=? AND state='active'" [(get user "user_id")])]
+                [token (auth-jwt-sign {"sub" (get user "user_id") "sid" session-id "exp" expires}
+                  signing-secret 43200)]
+                [saved (try
+                  (do
+                    (db-exec db "INSERT INTO mail_sessions(session_id,user_id,expires_at,created_at)
+                      VALUES(?,?,?,?)" [session-id (get user "user_id") expires now])
+                    (db-exec db "DELETE FROM mail_login_limits WHERE email=?" [normalized]) true)
+                  (catch error false))]]
+            (if (or (not saved) (= token nil) (= (length memberships) 0))
+              (mail-auth-error "SESSION_CREATE_FAILED" "session could not be created")
+              {"ok" true "token" token "expires_at" expires
+                "user" {"user_id" (get user "user_id") "email" (get user "email")}
+                "memberships" memberships})))))))
+(defn mail-authenticate [db token signing-secret]
+  (if (not (and (string? token) (string? signing-secret) (>= (length signing-secret) 32)))
+    (mail-auth-error "INVALID_CREDENTIAL" "bearer token is invalid")
+    (let [[payload (auth-jwt-verify token signing-secret)]]
+      (if (not payload) (mail-auth-error "INVALID_CREDENTIAL" "bearer token is invalid")
+        (let [[session-id (get payload "sid")] [user-id (get payload "sub")]
+              [sessions (db-query db "SELECT session_id FROM mail_sessions
+                WHERE session_id=? AND user_id=? AND revoked_at=0 AND expires_at>?"
+                [session-id user-id (now-s)])]
+              [users (db-query db "SELECT user_id,email FROM mail_users WHERE user_id=? AND state='active'"
+                [user-id])]
+              [memberships (db-query db "SELECT workspace_id,role FROM mail_memberships
+                WHERE user_id=? AND state='active'" [user-id])]]
+          (if (or (!= (length sessions) 1) (!= (length users) 1) (= (length memberships) 0))
+            (mail-auth-error "INVALID_CREDENTIAL" "bearer token is invalid")
+            {"ok" true "user" (get users 0) "memberships" memberships}))))))
+(defn mail-auth-logout [db token signing-secret]
+  (let [[identity (mail-authenticate db token signing-secret)]]
+    (if (not (get identity "ok")) identity
+      (let [[payload (auth-jwt-verify token signing-secret)]
+            [revoked (db-exec db "UPDATE mail_sessions SET revoked_at=?
+              WHERE session_id=? AND revoked_at=0" [(now-s) (get payload "sid")])]]
+        {"ok" true "revoked" (= revoked 1)}))))

@@ -1,0 +1,49 @@
+;; Persist validated records produced by triage-run. The IMAP and AI calls have
+;; already completed; this adapter never sends mail or executes message text.
+(defn agent-mail-worker-error [code message]
+  {"ok" false "error" {"code" code "message" message}})
+(defn agent-mail-worker-create-draft [db owner-id mailbox-id sender-address
+    source message-id triage-record sequence]
+  (let [[reply (mail-workflow-from-records
+      {"sequence" sequence "from" (get source "from_address") "subject" (get source "subject")}
+      triage-record {"from" sender-address})]]
+    (if (!= (get reply "status") "pending-human-approval")
+      (agent-mail-worker-error "DRAFT_REJECTED" "triage result did not produce a safe draft")
+      (let [[draft (assoc (get reply "draft") "draft_id" (str "draft-" (auth-random-token 16)))]
+            [stored (mail-store-draft-create db owner-id
+              (assoc (assoc draft "mailbox_id" mailbox-id) "source_message_id" message-id))]]
+        (if (get stored "ok")
+          {"ok" true "status" "draft-created" "sequence" sequence
+           "draft_id" (get draft "draft_id")}
+          (agent-mail-worker-error "DRAFT_STORE_FAILED" "safe draft could not be saved"))))))
+(defn agent-mail-worker-ingest-one [db owner-id mailbox-id mailbox-address sender-address output record]
+  (let [[sequence (or (get record "key") (get record "sequence"))]
+        [uid (get record "uid")]
+        [uidvalidity (get record "uidvalidity")]
+        [remote-uid (if (and (number? uid) (number? uidvalidity))
+          (str "v" uidvalidity "-u" uid) sequence)]
+        [source-file (file-read-json (str output "/" sequence ".source.json"))]
+        [triage-file (file-read-json (get record "path"))]]
+    (if (not (and (get source-file "ok") (map? (get source-file "value"))
+        (get triage-file "ok") (map? (get triage-file "value"))))
+      (agent-mail-worker-error "TRIAGE_RECORD_MISSING" "a validated local triage record is missing")
+      (let [[source (get source-file "value")]
+            [triage-record (get triage-file "value")]
+            [message-id (str "local-" mailbox-id "-" remote-uid)]
+            [message {"message_id" message-id "mailbox_id" mailbox-id
+              "remote_uid" remote-uid "from" (get source "from") "to" mailbox-address
+              "subject" (get source "subject") "body" (get source "body") "received_at" (now-s)}]
+            [saved (mail-store-ingest db message)]]
+        (if (not (get saved "ok")) saved
+          (let [[stored-source (mail-store-get-message db owner-id mailbox-id message-id)]]
+            (if (not stored-source)
+              (agent-mail-worker-error "SOURCE_MESSAGE_MISSING" "persisted source message could not be read")
+              (if (= (get triage-record "status") "사장님 확인 필요")
+                {"ok" true "status" "human-review-required" "sequence" sequence}
+                (let [[existing (db-query db "SELECT draft_id FROM drafts
+                  WHERE owner_id=? AND mailbox_id=? AND source_message_id=? LIMIT 1"
+                  [owner-id mailbox-id message-id])]]
+                  (if (> (length existing) 0)
+                    {"ok" true "status" "duplicate-skipped" "sequence" sequence}
+                    (agent-mail-worker-create-draft db owner-id mailbox-id sender-address
+                      stored-source message-id triage-record sequence)))))))))))

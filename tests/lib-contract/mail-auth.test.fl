@@ -1,0 +1,38 @@
+(load "../../lib/mail/auth.fl")
+(define args (cli-args))
+(define db (db-open (get args 0)))
+(define secret "unit-test-signing-key-32-bytes-minimum")
+(define failures (atom 0))
+(defn check [name passed]
+  (println (str (if passed "PASS " "FAIL ") "MAIL_AUTH " name))
+  (if passed nil (reset! failures (+ @failures 1))))
+(check "schema" (get (mail-auth-init db) "ok"))
+(define bootstrap (mail-auth-bootstrap-admin db "admin@example.invalid" "local-Admin-Password-42"))
+(check "bootstrap-admin" (get bootstrap "ok"))
+(check "bootstrap-one-time" (not (get (mail-auth-bootstrap-admin db
+  "other@example.invalid" "local-Other-Password-42") "ok")))
+(define login (mail-auth-login db "admin@example.invalid" "local-Admin-Password-42" secret))
+(check "password-login" (and (get login "ok") (string? (get login "token"))))
+(define identity (mail-authenticate db (get login "token") secret))
+(check "authenticated-identity" (and (get identity "ok")
+  (= (get (get identity "user") "email") "admin@example.invalid")
+  (= (get (get (get identity "memberships") 0) "role") "admin")))
+(define reviewer (mail-auth-user-create db (get bootstrap "user_id") "default"
+  "reviewer@example.invalid" "local-Reviewer-Password-42" "reviewer"))
+(check "admin-creates-reviewer" (and (get reviewer "ok") (= (get reviewer "role") "reviewer")))
+(define reviewer-login (mail-auth-login db "reviewer@example.invalid" "local-Reviewer-Password-42" secret))
+(check "reviewer-role" (= (get (get (get reviewer-login "memberships") 0) "role") "reviewer"))
+(check "reviewer-cannot-create-user" (not (get (mail-auth-user-create db (get reviewer "user_id")
+  "default" "other@example.invalid" "local-Other-Password-42" "agent") "ok")))
+(loop [i 0]
+  (if (>= i 5) nil
+    (do (mail-auth-login db "admin@example.invalid" "wrong-password-for-test" secret)
+      (recur (+ i 1)))))
+(check "login-lockout" (= (get (get (mail-auth-login db "admin@example.invalid"
+  "local-Admin-Password-42" secret) "error") "code") "RATE_LIMITED"))
+(define logout (mail-auth-logout db (get login "token") secret))
+(check "logout-revokes-session" (and (get logout "ok") (get logout "revoked")))
+(check "revoked-token-denied" (not (get (mail-authenticate db (get login "token") secret) "ok")))
+(db-close db)
+(println (str "MAIL_AUTH_SUMMARY=" (- 11 @failures) "/11"))
+(_fl_exit (if (= @failures 0) 0 1))
