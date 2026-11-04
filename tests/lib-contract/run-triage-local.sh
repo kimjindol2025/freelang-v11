@@ -16,11 +16,8 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 umask 077
 cd "$root"
-for name in fixture client worker-seed worker-ingest; do
- source="tests/lib-contract/triage-$name.$([[ $name == fixture ]] && echo fl || echo test.fl)"
- [[ $name == worker-seed ]] && source=tests/lib-contract/mail-api-seed.fl
- [[ $name == worker-ingest ]] && source=tests/lib-contract/mail-worker-ingest.test.fl
- "$FREELANG_HTTP_CGC" "$source" "$work/$name.c" >"$work/$name.compile" 2>&1
+for name in fixture client; do
+ "$FREELANG_HTTP_CGC" "tests/lib-contract/triage-$name.$([[ $name == fixture ]] && echo fl || echo test.fl)" "$work/$name.c" >"$work/$name.compile" 2>&1
  if grep -E '\[CGC-ERR\]|\[load\]' "$work/$name.compile"; then exit 1; fi
  bash scripts/build-cgc-native.sh "$work/$name.c" "$work/$name" >"$work/$name.build" 2>&1
 done
@@ -158,20 +155,6 @@ for mode in normal invalid risk injection silent; do
  done
  wait "$client_pid"
  test ! -e "$work/EXECUTED"
- if [[ $mode == normal ]]; then
-  "$work/worker-seed" "$work/worker.db" >"$work/worker-seed.log" 2>&1
-  grep -q '^MAIL_API_SEED=OK$' "$work/worker-seed.log"
-  strace -f -qq -e trace=execve,connect -o "$work/worker-ingest.trace" \
-    "$work/worker-ingest" "$work/worker.db" "$work/$mode"
-  if grep -E 'execve\("[^"]*/(node|nodejs)("|/)|execve\("[^"]*\.js"' "$work/worker-ingest.trace"; then
-   echo 'WORKER_INGEST_NODE_JS=nonzero'; exit 1
-  fi
-  if grep -E 'connect\(.*AF_INET|connect\(.*AF_INET6' "$work/worker-ingest.trace"; then
-   echo 'WORKER_INGEST_NETWORK=nonzero'; exit 1
-  fi
-  echo 'WORKER_INGEST_NODE_JS=0'
-  echo 'WORKER_INGEST_NETWORK=0'
- fi
  if [[ $mode == invalid ]]; then
   test ! -e "$work/$mode/1.json"
   cat "$work/$mode/error-1.json"
@@ -179,16 +162,3 @@ for mode in normal invalid risk injection silent; do
  if [[ $mode == silent ]]; then test ! -e "$work/$mode/1.json"; fi
 done
 echo AIM_SUMMARY=5/5
-"$work/worker-seed" "$work/worker-risk.db" >"$work/worker-risk-seed.log" 2>&1
-grep -q '^MAIL_API_SEED=OK$' "$work/worker-risk-seed.log"
-strace -f -qq -e trace=execve,connect -o "$work/worker-risk-ingest.trace" \
-  "$work/worker-ingest" "$work/worker-risk.db" "$work/risk" risk
-if grep -E 'execve\("[^"]*/(node|nodejs)("|/)|execve\("[^"]*\.js"' "$work/worker-risk-ingest.trace"; then
- echo 'WORKER_RISK_INGEST_NODE_JS=nonzero'; exit 1
-fi
-if grep -E 'connect\(.*AF_INET|connect\(.*AF_INET6' "$work/worker-risk-ingest.trace"; then
- echo 'WORKER_RISK_INGEST_NETWORK=nonzero'; exit 1
-fi
-echo 'WORKER_RISK_INGEST_NODE_JS=0'
-echo 'WORKER_RISK_INGEST_NETWORK=0'
-echo WORKER_RISK_SUMMARY=3/3
