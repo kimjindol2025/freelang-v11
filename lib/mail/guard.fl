@@ -1,0 +1,73 @@
+(load "smtp.fl")
+(load "../fs/fs.fl")
+(load "../evidence/evidence.fl")
+
+;; Human-approval gate for the local mail workflow. The only permitted
+;; recipient in this fixture is intentionally non-routable.
+(define mail-guard-allowed-recipients ["receiver@example.invalid"])
+(define mail-guard-hourly-limit 3)
+
+(defn mail-guard-record [policy mail result]
+  (let [[encoded (json-stringify {"title" (get mail "subject")
+                                  "recipient" (get mail "to")
+                                  "result" result})]]
+    (if (not (get encoded "ok")) false
+      (get (file-append (get policy "audit-file") (str (get encoded "value") "\n")) "ok"))))
+(defn mail-guard-block [policy mail status]
+  (mail-guard-record policy mail status)
+  {"ok" false "status" status})
+(defn mail-guard-hash [policy body]
+  (let [[path (get policy "hash-temp")]
+        [written (file-write-atomic path body)]]
+    (if (not (get written "ok")) {"ok" false}
+      (let [[hashed (evidence-hash path)]
+            [removed (_fl_file_delete path)]]
+        (if (and (get hashed "ok") removed)
+          {"ok" true "value" (get hashed "value")}
+          {"ok" false}))))
+(defn mail-guard-read-count [path now]
+  (let [[exists (file-exists? path)]]
+    (if (not (get exists "ok")) {"ok" false}
+      (if (not (get exists "value")) {"ok" true "value" 0}
+        (let [[read (file-read-lines path)]]
+          (if (not (get read "ok")) {"ok" false}
+            (loop [i 0 count 0]
+              (if (>= i (length (get read "value"))) {"ok" true "value" count}
+                (let [[entry (get (get read "value") i)]
+                      [stamp (str-to-num entry)]]
+                  (if (or (= entry "") (not (number? stamp)) (!= entry (str stamp)))
+                    {"ok" false}
+                    (recur (+ i 1) (if (and (<= stamp now) (>= stamp (- now 3600))) (+ count 1) count)))))))))))
+(defn mail-guard-recipient-allowed? [recipient]
+  (includes-item mail-guard-allowed-recipients recipient))
+(defn mail-guard-send [host port draft-id mail risk policy smtp-options]
+  (if (not (and (string? draft-id) (not (= draft-id "")) (map? mail)
+                (string? (get mail "subject")) (string? (get mail "to"))
+                (string? (get mail "body")) (map? policy) (map? smtp-options)))
+    {"ok" false "status" "invalid-request"}
+    (if risk (mail-guard-block policy mail "사람 확인 필요")
+      (let [[stopped (file-exists? (get policy "stop-file"))]]
+        (if (or (not (get stopped "ok")) (get stopped "value"))
+          (mail-guard-block policy mail "emergency-stop")
+          (if (not (mail-guard-recipient-allowed? (get mail "to")))
+            (mail-guard-block policy mail "recipient-denied")
+            (let [[approval (file-read-json (get policy "approval-file"))]
+                  [hash (mail-guard-hash policy (get mail "body"))]]
+              (if (or (not (get approval "ok")) (not (get hash "ok"))
+                      (!= (get (get approval "value") "draft_id") draft-id)
+                      (!= (get (get approval "value") "body_sha256") (get hash "value")))
+                (mail-guard-block policy mail "approval-missing-or-stale")
+                (let [[now (now-s)] [count (mail-guard-read-count (get policy "rate-file") now)]]
+                  (if (or (not (get count "ok")) (>= (get count "value") mail-guard-hourly-limit))
+                    (mail-guard-block policy mail "hourly-limit")
+                    (let [[reserved (file-append (get policy "rate-file") (str now "\n"))]]
+                      (if (not (get reserved "ok"))
+                        (mail-guard-block policy mail "rate-state-error")
+                        (if (not (mail-guard-record policy mail "send-started"))
+                          {"ok" false "status" "audit-error"}
+                          (let [[sent (smtp-send host port mail smtp-options)]]
+                            (if (get sent "ok")
+                              (do (mail-guard-record policy mail "sent")
+                                  {"ok" true "status" "sent"})
+                              (do (mail-guard-record policy mail "send-failed")
+                                  {"ok" false "status" "send-failed"})))))))))))))))
