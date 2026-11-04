@@ -10,7 +10,7 @@ cleanup() {
   for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || :; done
   for pid in "${pids[@]}"; do wait "$pid" 2>/dev/null || :; done
   for fd in "${fds[@]}"; do eval "exec ${fd}>&-"; done
-  rm -f -- "$work/key.pem" "$work/cert.pem"
+  rm -f -- "$work/key.pem" "$work/cert.pem" "$work/hourly/rate.txt"
   unset SMTP_TEST_PASSWORD
 }
 trap cleanup EXIT
@@ -39,7 +39,7 @@ start_tls() {
   exec {input_fd}<>"$work/$label.in"
   fds+=("$input_fd")
   while IFS= read -r line || [[ -n $line ]]; do
-    if [[ $line == '.' ]]; then printf 'MAIL_DATA_TERMINATOR_SEEN\n' >"$work/$label.delivered"; fi
+    if [[ ${line%$'\r'} == '.' ]]; then printf 'MAIL_DATA_TERMINATOR_SEEN\n' >"$work/$label.delivered"; fi
   done < <(openssl s_server -accept "127.0.0.1:$port" -cert "$work/cert.pem" -key "$work/key.pem" \
     -quiet -ign_eof -naccept 1 <"$work/$label.in" 2>"$work/$label.tls-errors") &
   pids+=("$!")
@@ -96,15 +96,16 @@ run_block risk
 
 hourly="$work/hourly"
 mkdir -p "$hourly"
+: >"$hourly/rate.txt"
 approve "$hourly" "approved local draft" draft-hourly
 for attempt in 1 2 3; do
   endpoint="ok$attempt"
   new_endpoint "$endpoint"
   "$work/client" success "$NEW_PORT" "$hourly" | tee "$work/hourly-$attempt.results"
   grep -Fq 'GUARD_RESULT=sent' "$work/hourly-$attempt.results"
-  for ((i=0;i<100;i++)); do [[ -s "$work/$endpoint.tls.delivered" ]] && break; sleep 0.02; done
-  test -s "$work/$endpoint.tls.delivered"
-  printf 'PASS GUARD approved-delivery-%s %s\n' "$attempt" "$(cat "$work/$endpoint.tls.delivered")"
+  for ((i=0;i<100;i++)); do [[ -s "$work/$endpoint.delivered" ]] && break; sleep 0.02; done
+  test -s "$work/$endpoint.delivered"
+  printf 'PASS GUARD approved-delivery-%s %s\n' "$attempt" "$(cat "$work/$endpoint.delivered")"
 done
 "$work/client" hourly 1 "$hourly" | tee "$work/hourly-4.results"
 grep -Fq 'GUARD_RESULT=hourly-limit' "$work/hourly-4.results"

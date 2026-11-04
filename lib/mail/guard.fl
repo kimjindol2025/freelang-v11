@@ -28,7 +28,7 @@
 (defn mail-guard-read-count [path now]
   (let [[exists (file-exists? path)]]
     (if (not (get exists "ok")) {"ok" false}
-      (if (not (get exists "value")) {"ok" true "value" 0}
+      (if (not (get exists "value")) {"ok" false}
         (let [[read (file-read-lines path)]]
           (if (not (get read "ok")) {"ok" false}
             (loop [i 0 count 0]
@@ -37,7 +37,7 @@
                       [stamp (str-to-num entry)]]
                   (if (or (= entry "") (not (number? stamp)) (!= entry (str stamp)))
                     {"ok" false}
-                    (recur (+ i 1) (if (and (<= stamp now) (>= stamp (- now 3600))) (+ count 1) count)))))))))))
+                    (recur (+ i 1) (if (and (<= stamp now) (>= stamp (- now 3600))) (+ count 1) count))))))))))))
 (defn mail-guard-recipient-allowed? [recipient]
   (includes-item mail-guard-allowed-recipients recipient))
 (defn mail-guard-send [host port draft-id mail risk policy smtp-options]
