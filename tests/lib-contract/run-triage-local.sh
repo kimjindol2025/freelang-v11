@@ -45,7 +45,14 @@ start_tls() {
   ai_command_logs+=("$work/$stem.commands")
   ai_response_files+=("$response")
  fi
- awk '/^[^ ]+ LOGIN / {print $1 " LOGIN <가림> <가림>"; fflush(); next} {print; fflush()}' <"$work/$stem.out" >"$work/$stem.commands" &
+ while IFS= read -r line || [[ -n $line ]]; do
+  login_name=${line%% *}
+  if [[ -n $login_name && $line == "$login_name LOGIN "* ]]; then
+   printf '%s LOGIN <가림> <가림>\n' "$login_name"
+  else
+   printf '%s\n' "$line"
+  fi
+ done <"$work/$stem.out" >"$work/$stem.commands" &
  pids+=("$!")
  openssl s_server -accept "127.0.0.1:$port" -cert "$work/cert.pem" -key "$work/key.pem" -quiet $eof_flag -naccept 1 \
   <"$work/$stem.in" >"$work/$stem.out" 2>"$work/$stem.errors" &

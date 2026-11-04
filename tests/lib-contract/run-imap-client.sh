@@ -39,8 +39,15 @@ start_server() {
   mkfifo "$work/$label.in" "$work/$label.out"
   exec {input_fd}<>"$work/$label.in"
   # LOGIN credentials are redacted before writing any transcript file.
-  awk '/^[^ ]+ LOGIN / {print $1 " LOGIN <가림> <가림>"; fflush(); next} {sub(/\r$/, ""); print; fflush()}' \
-    <"$work/$label.out" >"$work/$label.commands" &
+  while IFS= read -r line || [[ -n $line ]]; do
+    line=${line%$'\r'}
+    login_name=${line%% *}
+    if [[ -n $login_name && $line == "$login_name LOGIN "* ]]; then
+      printf '%s LOGIN <가림> <가림>\n' "$login_name"
+    else
+      printf '%s\n' "$line"
+    fi
+  done <"$work/$label.out" >"$work/$label.commands" &
   pids+=("$!")
   openssl s_server -accept "127.0.0.1:$port" -cert "$work/cert.pem" -key "$work/key.pem" \
     -quiet -ign_eof -naccept 1 <"$work/$label.in" >"$work/$label.out" 2>"$work/$label.tls-errors" &

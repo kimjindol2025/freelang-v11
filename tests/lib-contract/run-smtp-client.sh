@@ -42,8 +42,18 @@ start_tls() {
   exec {input_fd}<>"$work/$label.in"
   fds+=("$input_fd")
   # Redact authentication tokens before any transcript reaches a file.
-  awk 'redact>0 {print "<가림>"; redact--; fflush(); next} /^AUTH LOGIN\r?$/ {redact=2} {print; fflush()}' \
-    <"$work/$label.out" >"$work/$label.tls-dialogue" &
+  redact=0
+  while IFS= read -r line || [[ -n $line ]]; do
+    if (( redact > 0 )); then
+      printf '<가림>\n'
+      redact=$((redact - 1))
+    elif [[ $line == 'AUTH LOGIN' || $line == $'AUTH LOGIN\r' ]]; then
+      redact=2
+      printf '%s\n' "$line"
+    else
+      printf '%s\n' "$line"
+    fi
+  done <"$work/$label.out" >"$work/$label.tls-dialogue" &
   pids+=("$!")
   openssl s_server -accept "127.0.0.1:$port" -cert "$work/cert.pem" -key "$work/key.pem" \
     -quiet -ign_eof -naccept 1 <"$work/$label.in" >"$work/$label.out" 2>"$work/$label.tls-errors" &
