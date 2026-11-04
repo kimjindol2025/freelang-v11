@@ -24,7 +24,7 @@
             [removed (_fl_file_delete path)]]
         (if (and (get hashed "ok") removed)
           {"ok" true "value" (get hashed "value")}
-          {"ok" false}))))
+          {"ok" false})))))
 (defn mail-guard-read-count [path now]
   (let [[exists (file-exists? path)]]
     (if (not (get exists "ok")) {"ok" false}
