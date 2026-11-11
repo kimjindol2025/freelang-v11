@@ -257,5 +257,25 @@ export function createCollectionModule() {
       typeof text === "string" && text.startsWith(String(prefix)),
     "ends-with": (text: string, suffix: string): boolean =>
       typeof text === "string" && text.endsWith(String(suffix)),
+
+    // Public aliases keep the existing arr_* APIs unchanged.
+    "flatten-one": (items: any[]): any[] =>
+      Array.isArray(items) ? items.flat() : [],
+    "chunk": (items: any[], size: number): any[][] => {
+      if (!Array.isArray(items)) return [];
+      const width = Math.floor(Number(size));
+      if (!Number.isFinite(width) || width <= 0) return [];
+      const chunks: any[][] = [];
+      for (let offset = 0; offset < items.length; offset += width) {
+        chunks.push(items.slice(offset, offset + width));
+      }
+      return chunks;
+    },
+    "compact": (items: any[]): any[] =>
+      Array.isArray(items) ? items.filter((item) => item !== null && item !== undefined) : [],
+    "random-element": (items: any[]): any => {
+      if (!Array.isArray(items) || items.length === 0) return null;
+      return items[Math.floor(Math.random() * items.length)];
+    },
   };
 }
