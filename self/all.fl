@@ -883,7 +883,9 @@
 (defn extract-params-loop [$it $i $ps $pre $tc]
   (if (or (null? $it) (>= $i (length $it))) {:params $ps :preamble $pre}
   (let [[$c (get $it $i)] [$k (get $c :kind)]]
-    (if (or (= $k "variable") (= $k "literal")) (extract-params-loop $it (+ $i 1) (if (= (length $ps) 0) (extract-name $c) (str $ps "," (extract-name $c))) $pre $tc)
+    (if (or (= $k "variable") (= $k "literal"))
+      (let [[$name (if (= $k "variable") (js-name (get $c :name)) (js-name (get $c :value)))]]
+        (extract-params-loop $it (+ $i 1) (if (= (length $ps) 0) $name (str $ps "," $name)) $pre $tc))
       (if (and (= $k "block") (= (get $c :type) "Array"))
         (let [[$t (str "_arg" $tc)] [$sub (get (get $c :fields) "items")]]
           (extract-params-loop $it (+ $i 1) (if (= (length $ps) 0) $t (str $ps "," $t)) (str $pre (destructure-loop $sub $t 0)) (+ $tc 1)))
@@ -1387,4 +1389,3 @@
 
 ;; Entry point trigger
 (cli-main)
-
