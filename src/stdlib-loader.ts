@@ -11,6 +11,9 @@ import { createShellModule } from "./stdlib-shell";      // Phase 12: Shell exec
 import { createDataModule } from "./stdlib-data";        // Phase 13: Data Transform
 import { createCollectionModule } from "./stdlib-collection"; // Phase 14: Collection + Control
 import { createHelpersModule } from "./stdlib-helpers"; // Phase G: AI helper functions and aliases
+import { createOptionalModule } from "./stdlib-optional"; // Phase F-4: optional npm bridge
+import { createRestCrudModule } from "./stdlib-rest-crud"; // Phase F-4: REST CRUD helpers
+import { createCaptureErrorModule } from "./stdlib-capture-error"; // Phase F-4: structured error capture
 import { createAgentModule } from "./stdlib-agent";      // Phase 15: AI Agent State Machine
 import { createTimeModule } from "./stdlib-time";        // Phase 16: Time + Logging + Monitoring
 import { createPerfModule } from "./stdlib-perf";        // Phase F-2: Performance profiling
@@ -79,6 +82,11 @@ export function loadAllStdlib(interp: InterpreterLike): void {
   interp.registerModule(createDataModule());
   interp.registerModule(createCollectionModule());
   interp.registerModule(createHelpersModule(
+    (fnValue, args) => interp.callFunctionValue(fnValue, args)
+  ));
+  interp.registerModule(createOptionalModule());
+  interp.registerModule(createRestCrudModule());
+  interp.registerModule(createCaptureErrorModule(
     (fnValue, args) => interp.callFunctionValue(fnValue, args)
   ));
   interp.registerModule(createAgentModule());
