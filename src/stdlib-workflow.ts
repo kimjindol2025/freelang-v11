@@ -19,6 +19,10 @@ const T = createTimeModule();
 const A = createAgentModule();
 const X = createCryptoModule();
 
+// T.now() is deliberately an ISO string for user-facing timestamps.  Workflow
+// durations must use the numeric companion API instead of subtracting strings.
+const nowMs = (): number => T.now_ms();
+
 // P0-4: Error categorization helper
 function categorizeError(message: string): string {
   const msg = message.toLowerCase();
@@ -166,7 +170,7 @@ export function createWorkflowModule() {
         auto_resume?: boolean;
       }
     ): WorkflowResult => {
-      const startMs = T.now();
+      const startMs = nowMs();
       const runId = X.uuid_short();
       const checkpointPath = options?.checkpoint_path;
       const checkpointEvery = options?.checkpoint_every ?? 0;
@@ -206,7 +210,7 @@ export function createWorkflowModule() {
             steps_run: stepsOk + stepsFailed,
             steps_ok: stepsOk,
             steps_failed: stepsFailed,
-            total_ms: T.now() - startMs,
+            total_ms: nowMs() - startMs,
             log,
             errors: ["Parallel tasks detected. Use workflow_run_async() instead of workflow_run()"],
           };
@@ -237,7 +241,7 @@ export function createWorkflowModule() {
                 steps_run: stepsOk + stepsFailed,
                 steps_ok: stepsOk,
                 steps_failed: stepsFailed,
-                total_ms: T.now() - startMs,
+                total_ms: nowMs() - startMs,
                 log,
                 errors,
               };
@@ -246,7 +250,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepStart = T.now();
+        const stepStart = nowMs();
         let success = false;
         let lastErr = "";
         const maxAttempts = (step.retry ?? 0) + 1;
@@ -268,7 +272,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepMs = T.now() - stepStart;
+        const stepMs = nowMs() - stepStart;
 
         if (success) {
           stepsOk++;
@@ -359,7 +363,7 @@ export function createWorkflowModule() {
                 steps_run: stepsOk + stepsFailed,
                 steps_ok: stepsOk,
                 steps_failed: stepsFailed,
-                total_ms: T.now() - startMs,
+                total_ms: nowMs() - startMs,
                 log,
                 errors,
               };
@@ -368,7 +372,7 @@ export function createWorkflowModule() {
         }
       }
 
-      const totalMs = T.now() - startMs;
+      const totalMs = nowMs() - startMs;
       const status = stepsFailed === 0 ? "success" : "partial";
 
       if ((status === "success" || status === "partial") && checkpointPath) {
@@ -402,7 +406,7 @@ export function createWorkflowModule() {
         auto_resume?: boolean;
       }
     ): Promise<WorkflowResult> => {
-      const startMs = T.now();
+      const startMs = nowMs();
       const runId = X.uuid_short();
       const traceId = X.uuid_short();  // P1-4: Trace ID for distributed tracing
       const checkpointPath = options?.checkpoint_path;
@@ -434,7 +438,7 @@ export function createWorkflowModule() {
 
       // P1-1: Helper to execute a single step (with retry, error handling, etc)
       const executeStep = async (step: WorkflowStep, currentCtx: Record<string, any>): Promise<{ success: boolean; result: any; error: string; ms: number }> => {
-        const stepStart = T.now();
+        const stepStart = nowMs();
         let success = false;
         let lastErr = "";
         const maxAttempts = (step.retry ?? 0) + 1;
@@ -455,7 +459,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepMs = T.now() - stepStart;
+        const stepMs = nowMs() - stepStart;
         return { success, result: stepResult, error: lastErr, ms: stepMs };
       };
 
@@ -546,7 +550,7 @@ export function createWorkflowModule() {
                 steps_run: stepsOk + stepsFailed,
                 steps_ok: stepsOk,
                 steps_failed: stepsFailed,
-                total_ms: T.now() - startMs,
+                total_ms: nowMs() - startMs,
                 log,
                 errors,
                 compensations,
@@ -556,7 +560,7 @@ export function createWorkflowModule() {
           }
         }
 
-        const stepStart = T.now();
+        const stepStart = nowMs();
         let success = false;
         let lastErr = "";
         let stepResult: any = undefined;
@@ -566,7 +570,7 @@ export function createWorkflowModule() {
         if (step.parallel_tasks && step.parallel_tasks.length > 0) {
           const mergeStrategy = step.merge_strategy ?? "all-success";
           const parallelResult = await executeParallelTasks(step.parallel_tasks, mergeStrategy, ctx);
-          stepMs = T.now() - stepStart;
+          stepMs = nowMs() - stepStart;
 
           if (parallelResult.success) {
             success = true;
@@ -612,7 +616,7 @@ export function createWorkflowModule() {
                     steps_run: stepsOk + stepsFailed,
                     steps_ok: stepsOk,
                     steps_failed: stepsFailed,
-                    total_ms: T.now() - startMs,
+                    total_ms: nowMs() - startMs,
                     log,
                     errors,
                     compensations,
@@ -632,7 +636,7 @@ export function createWorkflowModule() {
                   steps_run: stepsOk + stepsFailed,
                   steps_ok: stepsOk,
                   steps_failed: stepsFailed,
-                  total_ms: T.now() - startMs,
+                  total_ms: nowMs() - startMs,
                   log,
                   errors,
                   compensations,
@@ -748,7 +752,7 @@ export function createWorkflowModule() {
                   steps_run: stepsOk + stepsFailed,
                   steps_ok: stepsOk,
                   steps_failed: stepsFailed,
-                  total_ms: T.now() - startMs,
+                  total_ms: nowMs() - startMs,
                   log,
                   errors,
                   compensations,
@@ -759,7 +763,7 @@ export function createWorkflowModule() {
         }
       }
 
-      const totalMs = T.now() - startMs;
+      const totalMs = nowMs() - startMs;
       const status = stepsFailed === 0 ? "success" : "partial";
 
       if ((status === "success" || status === "partial") && checkpointPath) {
@@ -889,7 +893,7 @@ export function createWorkflowModule() {
       status: "done",
       result,
       finished_at: T.now(),
-      duration_ms: T.now() - task.created_at,
+      duration_ms: nowMs() - new Date(task.created_at).getTime(),
     }),
 
     // task_progress task -> number (0.0-1.0)

@@ -207,8 +207,14 @@ export function createCollectionModule() {
       return result;
     },
 
-    // repeat n value -> [value]  (array of n copies of value)
-    "repeat": (n: number, value: any): any[] => Array(n).fill(value),
+    // repeat n value -> [value], repeat string n -> string.
+    // The collection overload must preserve the builtin string form.
+    "repeat": (countOrString: number | string, valueOrCount: any): any => {
+      if (typeof countOrString === "string") {
+        return countOrString.repeat(Math.max(0, Math.floor(Number(valueOrCount))));
+      }
+      return Array(Math.max(0, Math.floor(countOrString))).fill(valueOrCount);
+    },
 
     // arr_includes arr item -> boolean  (deep equality check)
     "arr_includes": (arr: any[], item: any): boolean => {
