@@ -147,7 +147,7 @@ jobs:
 
       - name: "🧪 Jest Regression Tests (Codegen + Let)"
         id: regression
-        run: bash scripts/ci-run-check.sh --name regression-tests --output-dir ci-results --timeout-seconds 270 --source-json ci-results/regression-tests-source.json -- npm test -- src/__tests__/codegen.let.test.ts --silent --json --outputFile=ci-results/regression-tests-source.json
+        run: bash scripts/ci-run-check.sh --name regression-tests --output-dir ci-results --timeout-seconds 270 --source-json ci-results/regression-tests-source.json -- npm run test:ci-jest -- src/__tests__/codegen.let.test.ts --silent --json --outputFile=ci-results/regression-tests-source.json
         timeout-minutes: 5
 
       - name: "🔐 Validate regression result"
@@ -197,7 +197,7 @@ jobs:
 
       - name: "📊 Jest Shard ${{ matrix.shard }}/3"
         id: jest
-        run: bash scripts/ci-run-check.sh --name jest-${{ matrix.shard }} --output-dir ci-results --timeout-seconds 1770 --source-json ci-results/jest-${{ matrix.shard }}-source.json -- npm test -- --shard=${{ matrix.shard }}/3 --bail=false --silent --maxWorkers=4 --json --outputFile=ci-results/jest-${{ matrix.shard }}-source.json
+        run: bash scripts/ci-run-check.sh --name jest-${{ matrix.shard }} --output-dir ci-results --timeout-seconds 1770 --source-json ci-results/jest-${{ matrix.shard }}-source.json -- npm run test:ci-jest -- --shard=${{ matrix.shard }}/3 --bail=false --silent --maxWorkers=4 --json --outputFile=ci-results/jest-${{ matrix.shard }}-source.json
         timeout-minutes: 30
 
       - name: "🔐 Validate Jest result"

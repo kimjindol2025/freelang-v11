@@ -764,7 +764,9 @@ AKL Suite의 공통 라이브러리 `akl-lib.fl`은 다음 고급 기능을 제�
 
 ### 테스트 실행
 ```bash
-npm run test:fast    ;; 1098/1098 PASS
+npm run test:fast    ;; 렉서·파서 코어 회귀 (현재 39개)
+npm run test:ci-jest ;; CI 샤드/표적 회귀: 전체 탐색, 커버리지 임계값 제외
+npm run test:full    ;; 통합·외부 서비스·성능을 포함한 전체 Jest + 커버리지
 npm run build        ;; 프로덕션 (테스트 코드 제외)
 ```
 
@@ -972,4 +974,3 @@ git push origin master
 | loop/recur | ✅ S6 |
 | closure (fn literal) | ✅ S7 |
 | map/filter (고차함수) | ⏳ S8 |
-

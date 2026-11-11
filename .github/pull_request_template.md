@@ -28,11 +28,12 @@
 - [ ] ✅ **Let-in-Expression Regression**: `node scripts/check-let-regressions.js`
   - 예상: `5 passed, 0 failed`
 
-- [ ] ✅ **Jest Regression (Codegen)**: `npm test -- src/__tests__/codegen.let.test.ts`
+- [ ] ✅ **Jest Regression (Codegen)**: `npm run test:ci-jest -- src/__tests__/codegen.let.test.ts`
   - 예상: `5 passed`
 
-- [ ] ✅ **Full Jest (643 tests)**: `npm test -- --silent`
-  - 로컬: `npm test`
+- [ ] ✅ **Full Jest**: `npm run test:full -- --silent`
+  - 로컬 코어 확인: `npm run test:fast`
+  - 전체 확인: `npm run test:full`
   - CI: 3 shards 병렬 실행
   - 예상: 모든 shard PASS
 
@@ -54,8 +55,9 @@ bash scripts/verify-fixed-point.sh
 # 4. 회귀 테스트
 node scripts/check-let-regressions.js
 
-# 5. Jest (단일 또는 sharded)
-npm test                          # 전체 (느림)
+# 5. Jest (코어 또는 전체)
+npm run test:fast                 # 개발 중 코어 회귀
+npm run test:full                 # 전체 + 커버리지 (느림)
 ./scripts/run-jest-shard.sh all   # 병렬 (빠름)
 ```
 

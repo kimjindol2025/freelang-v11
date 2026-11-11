@@ -107,7 +107,7 @@ FreeLang은 다음의 가치를 추구합니다:
 1. **Fork**: 리포지토리를 포크
 2. **브랜치**: `git checkout -b feature/amazing-feature`
 3. **개발**: 코드 작성
-4. **테스트**: `npm test` 실행 (637/637 PASS 필수)
+4. **테스트**: `npm run test:fast` 실행 (렉서·파서 코어 39개)
 5. **커밋**: 명확한 메시지로 커밋
 6. **푸시**: 브랜치에 푸시
 7. **PR**: Pull Request 생성
@@ -129,7 +129,7 @@ npm run build
 npm run test:watch
 
 # 5. 코드 확인
-npm test      # 전체 테스트
+npm run test:fast # 개발 중 코어 회귀
 npm run build # 빌드 확인
 ```
 
@@ -207,7 +207,8 @@ git commit -m "feat: AWS Lambda Layer 자동 생성 블록 추가
 - [ ] ♻️ 리팩토링
 
 ## 테스트
-- [x] npm test (637/637 PASS)
+- [x] npm run test:fast (코어 회귀 PASS)
+- [x] 관련 변경은 npm run test:ci-jest 또는 CI로 검증
 - [x] npm run build (성공)
 - [x] 수동 테스트 완료
 
@@ -308,11 +309,17 @@ describe("mariadb-query", () => {
 ### 테스트 실행
 
 ```bash
-# 전체 테스트
-npm test
+# 개발 중 빠른 코어 회귀
+npm run test:fast
+
+# CI와 같은 전체 테스트 탐색 (커버리지 임계값 제외)
+npm run test:ci-jest
+
+# 전체 테스트 + 커버리지
+npm run test:full
 
 # 특정 테스트 파일
-npm test -- stdlib.test.ts
+npm run test:ci-jest -- src/__tests__/stdlib.test.ts
 
 # Watch 모드 (개발 중)
 npm run test:watch
@@ -377,7 +384,8 @@ gh release create v11.1.0 --notes "..."
 
 ### 새 기능 제출 전
 
-- [ ] `npm test` (637/637 PASS)
+- [ ] `npm run test:fast` (코어 회귀 PASS)
+- [ ] 관련 변경은 `npm run test:ci-jest` 또는 CI로 검증
 - [ ] `npm run build` (성공)
 - [ ] 테스트 추가 (최소 3개 케이스)
 - [ ] 문서 업데이트

@@ -64,7 +64,9 @@ npm run build           # = node scripts/build.js
 ### Verify
 
 ```bash
-npm run test:fast       # jest 회귀 (≥ 1192 PASS 기준, 2026-05-21 시점)
+npm run test:fast       # 렉서·파서 코어 회귀 (현재 39개)
+npm run test:ci-jest    # CI 샤드/표적 회귀: 전체 탐색, 커버리지 임계값 제외
+npm run test:full       # 통합·외부 서비스·성능을 포함한 전체 Jest + 커버리지
 ```
 
 ---

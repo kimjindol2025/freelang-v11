@@ -34,7 +34,7 @@ jobs:
 
       - name: "📊 Jest 통합 L2 검증"
         id: jest
-        run: npm test -- src/__tests__/l2-proof.test.ts --runInBand
+        run: npm run test:ci-jest -- src/__tests__/l2-proof.test.ts --runInBand
         continue-on-error: true
 
       - name: "📦 L2 결과 저장"

@@ -156,5 +156,6 @@ node bootstrap.js serve --port 8000
 ## 💡 더 알아보기
 
 - **CLI 명령어**: `node bootstrap.js --help`
-- **테스트 실행**: `npm test`
+- **빠른 코어 테스트**: `npm run test:fast`
+- **전체 테스트**: `npm run test:full`
 - **성능 측정**: `npm run benchmark`

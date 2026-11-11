@@ -55,8 +55,8 @@ git checkout -b feature/your-feature-name
 # 의존성 설치
 npm install
 
-# 테스트 실행
-npm test
+# 개발 중 빠른 코어 테스트
+npm run test:fast
 
 # 개발 서버 시작
 npm run dev
@@ -104,7 +104,8 @@ git push origin feature/your-feature-name
 
 ### 제출 전
 - [ ] 테스트 추가/수정
-- [ ] 모든 테스트 통과: `npm test`
+- [ ] 빠른 코어 테스트 통과: `npm run test:fast`
+- [ ] 전체 변경은 CI 또는 `npm run test:full`로 검증
 - [ ] TypeScript 오류 없음: `npm run type-check`
 - [ ] 커밋 메시지가 명확함
 - [ ] CHANGELOG 업데이트
@@ -127,7 +128,8 @@ npm install
 
 ### 주요 명령어
 ```bash
-npm test          # 테스트 실행
+npm run test:fast # 개발 중 코어 테스트
+npm run test:full # 전체 테스트 + 커버리지
 npm run build     # 빌드
 npm run dev       # 개발 모드
 npm run format    # 코드 포매팅
@@ -180,9 +182,9 @@ describe('기능명', () => {
 
 ### 테스트 실행
 ```bash
-npm test                    # 모든 테스트
-npm test -- --watch        # 감시 모드
-npm test -- --coverage     # 커버리지 리포트
+npm run test:fast           # 렉서·파서 코어 테스트
+npm run test:watch          # 감시 모드
+npm run test:coverage       # 전체 커버리지 리포트
 ```
 
 ### 커버리지 목표

@@ -29,6 +29,7 @@
     "verify:self-host": "bash scripts/verify-native-fixed-point.sh",
     "test": "jest --config .config/jest.fast.config.js --passWithNoTests",
     "test:fast": "jest --config .config/jest.fast.config.js --passWithNoTests",
+    "test:ci-jest": "jest --config .config/jest.ci.config.js --passWithNoTests",
     "test:full": "jest --config .config/jest.config.js --passWithNoTests",
     "test:watch": "jest --config .config/jest.fast.config.js --watch",
     "test:coverage": "jest --config .config/jest.config.js --coverage",
