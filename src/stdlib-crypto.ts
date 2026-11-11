@@ -166,6 +166,31 @@ export function createCryptoModule() {
       return m ? m.length : 0;
     },
 
+    // re-* compatibility family uses pattern-first arguments, which is useful
+    // for validation rules such as email, phone, and product-code checks.
+    "re-groups": (pattern: string, text: string): string[] | null => {
+      const match = String(text).match(new RegExp(String(pattern)));
+      return match ? Array.from(match) : null;
+    },
+    "re_groups": (pattern: string, text: string): string[] | null => {
+      const match = String(text).match(new RegExp(String(pattern)));
+      return match ? Array.from(match) : null;
+    },
+    "re_match": (pattern: string, text: string): string | null => {
+      const match = String(text).match(new RegExp(String(pattern)));
+      return match ? match[0] : null;
+    },
+    "re_find": (pattern: string, text: string): string | null => {
+      const match = String(text).match(new RegExp(String(pattern)));
+      return match ? match[0] : null;
+    },
+    "re_find_all": (pattern: string, text: string): string[] =>
+      String(text).match(new RegExp(String(pattern), "g")) ?? [],
+    "re_split": (pattern: string, text: string): string[] =>
+      String(text).split(new RegExp(String(pattern))),
+    "re_test": (pattern: string, text: string): boolean =>
+      new RegExp(String(pattern)).test(String(text)),
+
     // ── AI Text Parsing Helpers ───────────────────────────────
 
     // extract_json str -> any|null  (extract first JSON object/array from text)
