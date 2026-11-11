@@ -468,6 +468,35 @@ export function createDataModule() {
       return decPart ? `${sign}${withComma}.${decPart}` : `${sign}${withComma}`;
     },
 
+    // Display-format aliases keep the existing underscore APIs unchanged.
+    "str-truncate": (value: unknown, maxLength: number, suffix: string = "..."): string => {
+      const text = value === null || value === undefined ? "" : String(value);
+      const limit = Math.max(0, Math.floor(Number(maxLength)) || 0);
+      if (text.length <= limit) return text;
+      const marker = String(suffix);
+      return text.slice(0, Math.max(0, limit - marker.length)) + marker.slice(0, limit);
+    },
+
+    "format-number": (value: number): string => {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "0";
+      return Math.trunc(number).toLocaleString("en-US");
+    },
+
+    "format-decimal": (value: number, digits: number = 2): string => {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "0";
+      const precision = Math.min(100, Math.max(0, Math.floor(Number(digits)) || 0));
+      return number.toFixed(precision);
+    },
+
+    "format-percent": (value: number, digits: number = 0): string => {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "0%";
+      const precision = Math.min(100, Math.max(0, Math.floor(Number(digits)) || 0));
+      return `${(number * 100).toFixed(precision)}%`;
+    },
+
     // ── str_ 확장 (Python str 47개 수준) ──────────────────────
     "str_upper": (s: string) => String(s).toUpperCase(),
     "str_lower": (s: string) => String(s).toLowerCase(),
