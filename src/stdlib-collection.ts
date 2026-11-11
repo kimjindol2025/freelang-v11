@@ -239,5 +239,23 @@ export function createCollectionModule() {
     "str-repeat": (s: string, n: number): string => n > 0 ? s.repeat(Math.floor(n)) : "",
 
     "str-repeat": (s: string, n: number): string => s.repeat(Math.max(0, Math.floor(n))),
+
+    // Compatibility helpers for common string and list operations.
+    "str-repeat-n": (s: string, n: number): string =>
+      String(s).repeat(Math.max(0, Math.floor(Number(n)))),
+    "nth-last": (items: any[], n: number): any => {
+      if (!Array.isArray(items)) return null;
+      const index = items.length - 1 - Math.floor(Number(n));
+      return index >= 0 && index < items.length ? items[index] : null;
+    },
+    "take-last": (items: any[], n: number): any[] => {
+      if (!Array.isArray(items)) return [];
+      const count = Math.max(0, Math.floor(Number(n)));
+      return count === 0 ? [] : items.slice(-count);
+    },
+    "starts-with": (text: string, prefix: string): boolean =>
+      typeof text === "string" && text.startsWith(String(prefix)),
+    "ends-with": (text: string, suffix: string): boolean =>
+      typeof text === "string" && text.endsWith(String(suffix)),
   };
 }
