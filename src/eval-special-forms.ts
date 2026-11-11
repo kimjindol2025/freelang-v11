@@ -83,6 +83,32 @@ function inferType(value: any): { kind: "type"; name: string } | undefined {
   return undefined;
 }
 
+function matchesRuntimeType(value: any, expected: string): boolean {
+  switch (expected.trim().toLowerCase()) {
+    case "any": return true;
+    case "number": case "float": return typeof value === "number" && Number.isFinite(value);
+    case "int": case "integer": return typeof value === "number" && Number.isInteger(value);
+    case "string": return typeof value === "string";
+    case "bool": case "boolean": return typeof value === "boolean";
+    case "nil": case "null": return value === null || value === undefined;
+    case "list": case "array": return Array.isArray(value);
+    case "map": case "object": return value !== null && typeof value === "object" && !Array.isArray(value);
+    case "fn": case "function": return typeof value === "function" || value?.kind === "function-value";
+    default: return false;
+  }
+}
+
+function runtimeTypeName(value: any): string {
+  if (value === null || value === undefined) return "nil";
+  if (Array.isArray(value)) return "list";
+  if (typeof value === "number") return "number";
+  if (typeof value === "boolean") return "boolean";
+  if (typeof value === "string") return "string";
+  if (typeof value === "function" || value?.kind === "function-value") return "function";
+  if (typeof value === "object") return "map";
+  return typeof value;
+}
+
 // ── AI-Native Phase 2: Effects 정적 분석 ─────────────────────────
 // 함수명 → 발생 effect 매핑 (well-known side effects)
 // SPEC.airc dec-011 LOCK — L0 compatibility-only taxonomy.
@@ -216,6 +242,69 @@ export function evalSpecialForm(interp: Interpreter, op: string, expr: SExpr): a
   const callAsyncFnVal = (fn: any, a: any[]) => (interp as any).callAsyncFunctionValue(fn, a);
   const callFn = (fn: any, a: any[]) => (interp as any).callFunction(fn, a);
   const ctx = interp.context;
+
+  // ── Function metadata and runtime type validation ────────────────
+  if (op === "fn-meta") {
+    if (expr.args.length !== 1) throwArgCount("fn-meta", "1", expr.args.length, expr.line);
+    const name = String(ev(expr.args[0]));
+    const definition: any = ctx.functions.get(name);
+    if (!definition) return null;
+    const meta = fnMetaRegistry.get(name) ?? {};
+    const params = (definition.params ?? []).map((param: string) => param.replace(/^\$/, ""));
+    const annotations = definition.paramAnnotations ?? definition.paramTypes ?? [];
+    return {
+      ...meta,
+      name,
+      params,
+      arity: params.length,
+      "param-types": params.map((_: string, index: number) => annotations[index]?.name ?? annotations[index] ?? "any"),
+      "return-type": definition.returnAnnotation ?? definition.returnType?.name ?? meta.returns ?? "any",
+    };
+  }
+
+  if (op === "check-arg-type") {
+    if (expr.args.length !== 2) throwArgCount("check-arg-type", "2", expr.args.length, expr.line);
+    const value = ev(expr.args[0]);
+    const expected = String(ev(expr.args[1]));
+    if (!matchesRuntimeType(value, expected)) {
+      throw new FLRuntimeError(
+        ErrorCodes.TYPE_MISMATCH,
+        `check-arg-type: expected ${expected}, got ${runtimeTypeName(value)}`,
+        { fn: "check-arg-type", expected, got: runtimeTypeName(value) },
+        undefined,
+        expr.line,
+      );
+    }
+    return value;
+  }
+
+  if (op === "validate-args") {
+    if (expr.args.length !== 2) throwArgCount("validate-args", "2", expr.args.length, expr.line);
+    const values = ev(expr.args[0]);
+    const expectedTypes = ev(expr.args[1]);
+    if (!Array.isArray(values) || !Array.isArray(expectedTypes) || values.length !== expectedTypes.length) {
+      throw new FLRuntimeError(
+        ErrorCodes.ARG_COUNT,
+        "validate-args: values and type specifications must be arrays of equal length",
+        { fn: "validate-args", expected: "matching arrays", got: `${Array.isArray(values) ? values.length : "non-array"}/${Array.isArray(expectedTypes) ? expectedTypes.length : "non-array"}` },
+        undefined,
+        expr.line,
+      );
+    }
+    for (let index = 0; index < values.length; index++) {
+      const expected = String(expectedTypes[index]);
+      if (!matchesRuntimeType(values[index], expected)) {
+        throw new FLRuntimeError(
+          ErrorCodes.TYPE_MISMATCH,
+          `validate-args: argument ${index + 1} expected ${expected}, got ${runtimeTypeName(values[index])}`,
+          { fn: "validate-args", arg: index, expected, got: runtimeTypeName(values[index]) },
+          undefined,
+          expr.line,
+        );
+      }
+    }
+    return values;
+  }
 
   // ── trace ─────────────────────────────────────────────────────────
   // (trace expr) → expr 평가 + [TRACE] expr/value/elapsed 출력 후 값 반환
