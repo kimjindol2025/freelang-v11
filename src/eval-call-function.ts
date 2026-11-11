@@ -7,7 +7,7 @@ import { TypeAnnotation } from "./ast";
 import { FreeLangPromise } from "./async-runtime";
 import { suggestSimilar, KNOWN_ALIASES } from "./error-formatter";
 import { FunctionNotFoundError } from "./errors";
-import { isTailCall } from "./tco";
+import { isTailCall, tailCall } from "./tco";
 import { globalProfiler } from "./profiler";
 import { vmFunctionRegistry } from "./vm-eligible"; // Phase 3-E
 import { VM } from "./vm"; // Phase 3-E
@@ -138,10 +138,16 @@ function bindParam(interp: InterpreterLike, param: any, value: any): void {
 }
 
 export function callUserFunction(interp: InterpreterLike, name: string, args: any[]): any {
-  // TCO 모드 활성화 시 trampoline으로 라우팅 (frame 관리는 TCO 측 — C4-2)
-  if (interp.tcoMode) {
-    return callUserFunctionTCO(interp, name, args);
+  // Direct self-recursion while the interpreter trampoline is evaluating the
+  // same function must return to that trampoline. Re-entering it here nests
+  // TCO loops and lets an unbounded direct call evade the iteration limit.
+  // Other nested calls retain the established callUserFunctionTCO behavior.
+  const activeCallStack = (interp.context as any).callStack as any[] | undefined;
+  if (interp.tcoMode && activeCallStack?.[activeCallStack.length - 1]?.name === name) {
+    return tailCall(name, args);
   }
+  // TCO 모드 활성화 시 trampoline으로 라우팅 (frame 관리는 TCO 측 — C4-2)
+  if (interp.tcoMode) return callUserFunctionTCO(interp, name, args);
 
   // === C4-1: effect gate (VM mode 분기 전에) ===
   // caller frame 이 이 호출을 허용하는가 검사 → 위반 시 즉시 throw.
@@ -465,8 +471,16 @@ function _callUserFunctionInterpPath(interp: InterpreterLike, name: string, args
       }
       return result;
     }
+    const tail = _callStack
+      .slice(-10)
+      .map((entry: any, index: number) => {
+        const fn = entry.name ?? entry.fn ?? "<anonymous>";
+        return `  #${Math.max(0, _callStack.length - 10) + index}: ${fn} (line ${entry.line})`;
+      })
+      .join("\n");
     throw new Error(
-      `[E_STACK_OVERFLOW] line ${interp.currentLine}: Maximum tail-call depth exceeded (${MAX_TCO_ITERATIONS}) — possible infinite recursion in '${baseName}'`
+      `[E_STACK_OVERFLOW] line ${interp.currentLine}: Maximum tail-call depth exceeded (${MAX_TCO_ITERATIONS}) — possible infinite recursion in '${baseName}'\n` +
+      (tail ? `최근 호출 체인:\n${tail}` : "")
     );
   } finally {
     (interp as any).tcoMode = _prevTcoMode;
