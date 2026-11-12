@@ -1,0 +1,86 @@
+name: T22 Self-Compile Measurement
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_jest:
+        description: Run the complete Jest inventory in three shards
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --prefer-offline
+      - name: Build measurement bootstrap
+        run: npm run build
+      - name: Measure three fresh compiler processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p perf-results
+          {
+            printf 'commit=%s\n' "$GITHUB_SHA"
+            printf 'node=%s\n' "$(node --version)"
+            printf 'arch=%s\n' "$(uname -m)"
+            printf 'cpus=%s\n' "$(nproc)"
+            lscpu | awk -F: '/Model name/ {sub(/^[[:space:]]+/, "", $2); print "cpu_model=" $2}'
+          } > perf-results/environment.txt
+          printf 'run\telapsed_seconds\tmax_rss_kib\tsha256\n' > perf-results/measurements.tsv
+          for iteration in 1 2 3; do
+            output_file="$RUNNER_TEMP/t22-stage1-$iteration.js"
+            /usr/bin/time -f '%e\t%M' -o "$RUNNER_TEMP/t22-time.txt" \
+              node --stack-size=65536 bootstrap.js run self/all.fl self/all.fl "$output_file" \
+              > "$RUNNER_TEMP/t22-compiler.log" 2>&1
+            test -s "$output_file"
+            read -r elapsed max_rss < "$RUNNER_TEMP/t22-time.txt"
+            output_sha=$(sha256sum "$output_file" | cut -d ' ' -f 1)
+            printf '%s\t%s\t%s\t%s\n' "$iteration" "$elapsed" "$max_rss" "$output_sha" \
+              | tee -a perf-results/measurements.tsv
+          done
+      - name: Upload measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t22-measurements
+          path: perf-results/
+          retention-days: 30
+
+  jest:
+    if: inputs.run_jest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --prefer-offline
+      - run: npm run build
+      - name: Run Jest shard
+        run: |
+          mkdir -p jest-results
+          npm test -- --shard=${{ matrix.shard }}/3 --bail=false --silent --maxWorkers=4 \
+            --json --outputFile=jest-results/shard-${{ matrix.shard }}.json
+      - name: Upload Jest results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t22-jest-${{ matrix.shard }}
+          path: jest-results/
+          retention-days: 30
