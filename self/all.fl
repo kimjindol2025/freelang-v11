@@ -479,25 +479,10 @@
                [$finally-clause (if (> (length $rest) 2) (get $rest 2) null)]]
            (r-pair (parse-consume-rparen $p2)
                    (make-try $body $catch-clause $finally-clause $line)))]
-        [(= $op "loop")
-         ;; loop: (loop [[$i 0] (< $i 10) (+ $i 1)] body...)
-         ;; 형식: (loop [init-binding condition update] body)
-         (let [[$loop-array (if (> (length $rest) 0) (get $rest 0) null)]]
-           (if (null? $loop-array)
-             (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" (list) $line))
-             (if (not (= (get $loop-array :kind) "array"))
-               (r-pair (parse-consume-rparen $p2) (make-sexpr "loop" $rest $line))
-               (let [[$items (get $loop-array :items)]
-                     [$init (if (> (length $items) 0) (get $items 0) null)]
-                     [$condition (if (> (length $items) 1) (get $items 1) null)]
-                     [$update (if (> (length $items) 2) (get $items 2) null)]
-                     [$body-exprs (slice $rest 1 (length $rest))]]
-                 (r-pair (parse-consume-rparen $p2)
-                         (make-loop $init $condition $update
-                                   (if (= (length $body-exprs) 1)
-                                     (get $body-exprs 0)
-                                     (make-sexpr "do" $body-exprs $line))
-                                   $line))))))]
+        ;; loop/recur use the same S-expression argument contract as cg-loop:
+        ;; the binding block is args[0], with no operator node in the arguments.
+        ;; The former dedicated branch expected obsolete kind="array" nodes;
+        ;; this parser constructs kind="block", type="Array" instead.
         [true
          (r-pair (parse-consume-rparen $p2)
                  (make-sexpr $op $rest $line))])))))
