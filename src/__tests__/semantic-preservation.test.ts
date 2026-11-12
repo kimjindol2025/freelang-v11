@@ -8,6 +8,7 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { execSync } from 'child_process';
 
@@ -60,15 +61,24 @@ function compileWithBootstrap(flFile: string): CompilationResult {
  */
 function compileWithStage1(flFile: string): CompilationResult {
   const jsFile = flFile.replace('.fl', '.stage1.js');
+  let stage1Dir: string | undefined;
   try {
+    stage1Dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fl-semantic-stage1-'));
+    const stage1File = path.join(stage1Dir, 'stage1.js');
     execSync(
-      `node --stack-size=65536 ${path.join(PROJECT_ROOT, 'stage1.js')} run self/all.fl ${flFile} ${jsFile}`,
+      `node --stack-size=65536 ${JSON.stringify(path.join(PROJECT_ROOT, 'bootstrap.js'))} run self/all.fl self/all.fl ${JSON.stringify(stage1File)}`,
+      { cwd: PROJECT_ROOT, stdio: 'pipe' }
+    );
+    execSync(
+      `node --stack-size=65536 ${JSON.stringify(stage1File)} run self/all.fl ${JSON.stringify(flFile)} ${JSON.stringify(jsFile)}`,
       { cwd: PROJECT_ROOT, stdio: 'pipe' }
     );
     const jsCode = fs.readFileSync(jsFile, 'utf-8');
     return { success: true, jsCode };
   } catch (e) {
     return { success: false, error: String(e) };
+  } finally {
+    if (stage1Dir) fs.rmSync(stage1Dir, { recursive: true, force: true });
   }
 }
 
