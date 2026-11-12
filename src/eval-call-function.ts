@@ -732,8 +732,9 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
             interp.context.variables.restoreStack(savedStack);
           }
         } else {
-          // 일반 함수
-          interp.context.variables.push();
+          // Global functions must not inherit the caller's local bindings.
+          // Match the non-TCO call path; only capturedEnv supplies a closure.
+          const savedStack = interp.context.variables.resetToGlobalFrame();
           try {
             for (let j = 0; j < func.params.length; j++) {
               bindParam(interp, func.params[j], currentArgs[j]);
@@ -743,7 +744,7 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
             if (isReturnSignal(e)) { result = e.value; }
             else throw e;
           } finally {
-            interp.context.variables.pop();
+            interp.context.variables.restoreStack(savedStack);
           }
         }
       } finally {
