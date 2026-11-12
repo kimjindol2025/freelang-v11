@@ -1702,15 +1702,125 @@ export class Interpreter {
     }
 
     // Phase 57: Dispatch to specialized modules
-    const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
-    const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
-    const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
-    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","comp","pipe","->","->>","as->","?.","?.","|>","??","let","set","if","if-let","when","when-not","when-let","unless","cond","case","for","do","begin","progn","loop","recur","while","doseq","dotimes","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return","group-by","group_by","safe-get","safe_get","partial","memoize","deftest","describe","it","is","is=","run-tests","test-summary","import","migrate","trace","with-trace","defcontract","with-budget"]);
-
-    if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
-    if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
-    if (STYLE_OPS.has(op)) return evalStyleBlock(this, op, expr);
-    if (SPECIAL_OPS.has(op)) return evalSpecialForm(this, op, expr);
+    // Compare literal names without allocating or sharing mutable dispatch sets.
+    switch (op) {
+      case "search":
+      case "fetch":
+      case "learn":
+      case "recall":
+      case "remember":
+      case "forget":
+      case "observe":
+      case "analyze":
+      case "decide":
+      case "act":
+      case "verify":
+      case "await":
+        return evalAiBlock(this, op, expr);
+      case "DOCKERFILE":
+      case "dockerfile":
+      case "DOCKER-COMPOSE":
+      case "docker-compose":
+      case "K8S-DEPLOYMENT":
+      case "deployment":
+      case "K8S-SERVICE":
+      case "service":
+      case "K8S-INGRESS":
+      case "ingress":
+      case "GITHUB-ACTIONS":
+      case "github-actions":
+      case "ci":
+      case "AWS-S3":
+      case "aws-s3":
+      case "AWS-LAMBDA":
+      case "aws-lambda":
+      case "AWS-RDS":
+      case "aws-rds":
+      case "GCP-RUN":
+      case "gcp-run":
+      case "AZURE-FUNCTION":
+      case "azure-function":
+        return evalInfraBlock(this, op, expr);
+      case "STYLE":
+      case "style":
+      case "THEME":
+      case "theme":
+        return evalStyleBlock(this, op, expr);
+      case "fn":
+      case "defn":
+      case "defun":
+      case "async":
+      case "set!":
+      case "define":
+      case "func-ref":
+      case "call":
+      case "compose":
+      case "comp":
+      case "pipe":
+      case "->":
+      case "->>":
+      case "as->":
+      case "?.":
+      case "|>":
+      case "??":
+      case "let":
+      case "set":
+      case "if":
+      case "if-let":
+      case "when":
+      case "when-not":
+      case "when-let":
+      case "unless":
+      case "cond":
+      case "case":
+      case "for":
+      case "do":
+      case "begin":
+      case "progn":
+      case "loop":
+      case "recur":
+      case "while":
+      case "doseq":
+      case "dotimes":
+      case "and":
+      case "or":
+      case "defmacro":
+      case "macroexpand":
+      case "defstruct":
+      case "defprotocol":
+      case "impl":
+      case "parallel":
+      case "race":
+      case "with-timeout":
+      case "fl-try":
+      case "use":
+      case "defprop":
+      case "map-keys":
+      case "map_keys":
+      case "map-vals":
+      case "map_vals":
+      case "return":
+      case "group-by":
+      case "group_by":
+      case "safe-get":
+      case "safe_get":
+      case "partial":
+      case "memoize":
+      case "deftest":
+      case "describe":
+      case "it":
+      case "is":
+      case "is=":
+      case "run-tests":
+      case "test-summary":
+      case "import":
+      case "migrate":
+      case "trace":
+      case "with-trace":
+      case "defcontract":
+      case "with-budget":
+        return evalSpecialForm(this, op, expr);
+    }
 
     // Phase 94: REFLECT — 자기 평가/반성 특수 폼
     if (op === "REFLECT") {
