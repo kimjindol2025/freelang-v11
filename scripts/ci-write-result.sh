@@ -26,7 +26,6 @@ captured_at="$(date -u +%Y-%m-%dT%H:%M:%S).000Z"
 source_error=null
 source_valid=true
 source_passed=true
-source_data='[]'
 if [[ -n "$source_json" ]]; then
   if [[ ! -f "$source_json" ]] || ! jq -e 'type == "object" and (.success | type == "boolean")' "$source_json" >/dev/null 2>&1; then
     source_valid=false
@@ -34,7 +33,6 @@ if [[ -n "$source_json" ]]; then
     source_error='"invalid-or-unreadable-source-json"'
   else
     source_passed="$(jq -r '(.success == true) and ((.numFailedTests // 0) == 0)' "$source_json")"
-    source_data="$(jq -c '[.]' "$source_json")"
   fi
 fi
 passed=false
@@ -68,8 +66,13 @@ else
       sourceError:$sourceError,sourceValid:$sourceValid,capturedAt:$capturedAt}' > "$result_path"
 fi
 
+junit_source_args=(--argjson source '[]')
+if [[ -n "$source_json" && "$source_valid" == true ]]; then
+  junit_source_args=(--slurpfile source "$source_json")
+fi
+
 jq -nr --arg name "$name" --argjson passed "$passed" --argjson sourceValid "$source_valid" \
-  --argjson sourceError "$source_error" --argjson source "$source_data" '
+  --argjson sourceError "$source_error" "${junit_source_args[@]}" '
   def esc: tostring | gsub("&";"&amp;") | gsub("<";"&lt;") | gsub(">";"&gt;") |
            gsub("\"";"&quot;") | gsub("\u0027";"&apos;");
   (if ($source|length) > 0 and $sourceValid then
