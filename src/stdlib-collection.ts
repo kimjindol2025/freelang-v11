@@ -236,9 +236,14 @@ export function createCollectionModule() {
       return [...arr.slice(0, idx), ...arr.slice(idx + 1)];
     },
 
-    "str-repeat": (s: string, n: number): string => n > 0 ? s.repeat(Math.floor(n)) : "",
-
-    "str-repeat": (s: string, n: number): string => s.repeat(Math.max(0, Math.floor(n))),
+    // Accept both existing string-first calls and count-first legacy calls.
+    // Do not rely on dispatch catching a TypeError and silently returning "".
+    "str-repeat": (first: string | number, second: number | string): string => {
+      const countFirst = typeof first === "number" && typeof second === "string";
+      const text = countFirst ? second : first;
+      const count = countFirst ? first : second;
+      return String(text).repeat(Math.max(0, Math.floor(Number(count))));
+    },
 
     // Compatibility helpers for common string and list operations.
     "str-repeat-n": (s: string, n: number): string =>
