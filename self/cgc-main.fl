@@ -493,7 +493,7 @@
                  (get $op-node :value)
                  (if (= (get $op-node :kind) "variable")
                    (str "$" (get $op-node :name))
-                   "unknown"))]
+                   $op-node))]
           [$rest (slice $args 1 (length $args))]]
       (cond
         [(= $op "try")
