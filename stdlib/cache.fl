@@ -5,8 +5,8 @@
 ;;
 ;; 핸들 구조: atom {"entries" {key → {"val" v "exp" ms|nil}} "hits" N "misses" N "max" N}
 ;;
-;; [주의] max-size 파라미터는 저장되지만 LRU 강제 없음.
-;;         TTL은 now_ms 비교로 지원 (get 시 만료 항목 자동 제거).
+;; max-size를 넘으면 가장 오래 읽거나 쓴 항목을 제거한다 (LRU).
+;; TTL은 now_ms 비교로 지원 (get 시 만료 항목 자동 제거).
 ;;
 ;; API:
 ;;   (cache-create N)                    → 핸들 (atom)
@@ -32,7 +32,7 @@
 ;; ── 생성 ─────────────────────────────────────────────────────────────────────
 
 (defn cache-create [max-size]
-  (atom {"entries" {} "hits" 0 "misses" 0 "max" max-size}))
+  (atom {"entries" {} "hits" 0 "misses" 0 "max" max-size "clock" 0}))
 
 ;; ── 내부 헬퍼 ────────────────────────────────────────────────────────────────
 
@@ -40,18 +40,31 @@
   (let [exp (get entry "exp")]
     (if (nil? exp) false (> (now_ms) exp))))
 
+(defn -cache-oldest-key [entries]
+  (let [ks (keys entries)]
+    (loop [i 1 oldest (get ks 0)]
+      (if (>= i (length ks)) oldest
+        (let [key (get ks i)]
+          (recur (+ i 1)
+            (if (< (get (get entries key) "used")
+                   (get (get entries oldest) "used")) key oldest)))))))
+
+(defn -cache-put [ch key val exp]
+  (let [st @ch
+        tick (+ (get st "clock") 1)
+        entries (assoc (get st "entries") key {"val" val "exp" exp "used" tick})
+        bounded (if (<= (get st "max") 0) {}
+                  (if (> (length entries) (get st "max"))
+                    (dissoc entries (-cache-oldest-key entries)) entries))]
+    (reset! ch (assoc (assoc st "clock" tick) "entries" bounded))))
+
 ;; ── 쓰기 ─────────────────────────────────────────────────────────────────────
 
 (defn cache-set [ch key val]
-  (let [st @ch]
-    (reset! ch (assoc st "entries"
-                      (assoc (get st "entries") key {"val" val "exp" nil})))))
+  (-cache-put ch key val nil))
 
 (defn cache-set-ttl [ch key val ttl-ms]
-  (let [st @ch
-        exp (+ (now_ms) ttl-ms)]
-    (reset! ch (assoc st "entries"
-                      (assoc (get st "entries") key {"val" val "exp" exp})))))
+  (-cache-put ch key val (+ (now_ms) ttl-ms)))
 
 ;; ── 읽기 ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +81,10 @@
         (do (reset! ch (assoc (assoc st "misses" (+ (get st "misses") 1))
                               "entries" (dissoc entries key)))
             nil)
-        (let [new-st (assoc st "hits" (+ (get st "hits") 1))]
+        (let [tick (+ (get st "clock") 1)
+              new-st (assoc (assoc (assoc st "hits" (+ (get st "hits") 1))
+                                   "clock" tick)
+                             "entries" (assoc entries key (assoc entry "used" tick)))]
           (reset! ch new-st)
           (get (get (get @ch "entries") key) "val"))))))
 
