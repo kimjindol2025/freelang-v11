@@ -103,3 +103,104 @@ Jest 실패가 확인되어 요청한 종료 조건을 적용했다. 되돌림 �
 | 수정 후 environment.txt | `8c71fa330bfb031bceca8d2064de31889f2187c3214062e7cb2fc280c91dcc03` |
 
 **판정: T22=닫기(되돌림).** 시간 10% 이상 감소와 생성 SHA 일치는 충족했지만 Jest 실패 0개 조건을 충족하지 못했다. 측정 결과와 워크플로는 남기고 Set 소스 변경은 복원했다.
+
+
+## T-23 · Set 공유 없는 재시도 (2026-11-12)
+
+### 수정 전 조사
+
+- 시작 커밋: `663be1a5da6df43dad0d7ac5141c3c4a16e22cf4`; 작업 가지: `perf/t23-set-retry`.
+- [T-22 수정 후 실행 43212338389](https://api.github.com/repositories/1215150205/actions/runs/43212338389)의 Jest JSON에서 실패 41개를 추출했다.
+- [Set 수정 전 실행 43211820729](https://api.github.com/repositories/1215150205/actions/runs/43211820729)에도 같은 41개 항목의 실패가 모두 존재한다. 이 실행의 커밋은 `58bf404a594f3bc96b788577ff4b691af2f5c826`이며, T-22 최적화를 포함하지 않는다. 실행기 차이가 있으므로 전체 실패 수를 동등한 조건의 대조 실험으로 취급하지 않는다.
+- **공통 판단: 41개는 Set 변경 이전부터 있던 기준 코드의 실패다. 하나의 공통 내부 버그나 Set 공유가 원인이라는 주장은 확인되지 않았다.**
+- 수정 전에 읽은 대표 메시지: stage1 동등성은 `Expected: true / Received: false`, 지표 수집은 `Expected: >= 0 / Received: NaN`, 문자열 repeat는 `Expected: "ababab" / Received: [3]`. 세 메시지는 수정 전 실행에도 동일하다.
+- 소스 확인: stage1 테스트는 추적되지 않는 stage1 산출물을 준비 없이 호출한다. 시간 모듈의 `now()`는 ISO 문자열인데 워크플로가 두 값을 빼므로 NaN이 된다. repeat는 등록된 컬렉션 함수 `Array(n).fill(value)`가 기존 문자열 반복 처리보다 먼저 선택되는 경로가 있고, 입력 `("ab", 3)`에서 관측된 `[3]`과 일치한다. 이들을 고치는 것은 이번 Set 변경 범위 밖이다.
+- 추가 메시지 확인: 함수 메타데이터, 정규식 그룹, 문자열 자르기 항목에는 각각 `Function not found`가 기록되어 있다.
+- T-22 샤드 2: 처음 한 테스트 파일의 PASS 이후 최종 Jest 집계 없이 30분 제한으로 취소됐다. 수정 전 실행에서도 1,770초 제한에 따른 exit 124 / timed_out이 기록됐다. **장시간 미종료는 재현되지만, 로그에 반복 스택이나 진행 추적이 없어 무한 반복 여부와 정확한 정지 위치는 확인 불가다.**
+
+### T-22 실패 41개 목록
+
+각 항목은 T-22 JSON에서 failed이며 수정 전 GitHub 로그에도 실패 제목이 존재한다.
+
+| 번호 | 항목 | 묶음 | 수정 전에도 실패 |
+|---:|---|---:|---|
+| 1 | stage1.js: bootstrap과 동등성 검증 (file-delete 버그 수정됨) | 1 | 예 |
+| 2 | 8. Parallel tasks execution time optimization | 1 | 예 |
+| 3 | should collect accurate timing metrics for each step | 1 | 예 |
+| 4 | should track parallel_tasks count in metrics | 1 | 예 |
+| 5 | should calculate overall metrics (parallel_ratio, error_ratio) | 1 | 예 |
+| 6 | repeat 문자열 | 3 | 예 |
+| 7 | defn :doc 메타데이터 파싱 | 3 | 예 |
+| 8 | fn-meta :doc 반환 | 3 | 예 |
+| 9 | check-arg-type 정상 검증 | 3 | 예 |
+| 10 | validate-args 다중 인자 검증 | 3 | 예 |
+| 11 | validate-args 배열 반환 | 3 | 예 |
+| 12 | fn-meta 없는 함수 null 반환 | 3 | 예 |
+| 13 | :context 메타 조회 | 3 | 예 |
+| 14 | re-groups 전체 + 그룹 반환 | 3 | 예 |
+| 15 | re-groups 매치 없음 | 3 | 예 |
+| 16 | re-groups 단일 그룹 | 3 | 예 |
+| 17 | re_match snake_case alias | 3 | 예 |
+| 18 | re_find snake_case alias | 3 | 예 |
+| 19 | re_find_all snake_case alias | 3 | 예 |
+| 20 | re_split snake_case alias | 3 | 예 |
+| 21 | re_groups snake_case alias | 3 | 예 |
+| 22 | re_test 성공 | 3 | 예 |
+| 23 | re_test 실패 | 3 | 예 |
+| 24 | re-groups 다중 호출 유효성 | 3 | 예 |
+| 25 | str-truncate 기본 suffix | 3 | 예 |
+| 26 | str-truncate 커스텀 suffix | 3 | 예 |
+| 27 | format-number 천 단위 쉼표 | 3 | 예 |
+| 28 | format-decimal + format-percent | 3 | 예 |
+| 29 | str-repeat-n 기본 | 3 | 예 |
+| 30 | nth-last 뒤에서 n번째 | 3 | 예 |
+| 31 | take-last 뒤에서 n개 | 3 | 예 |
+| 32 | starts-with 문자열 시작 | 3 | 예 |
+| 33 | ends-with 문자열 끝 | 3 | 예 |
+| 34 | flatten-one 1단계 펴기 | 3 | 예 |
+| 35 | flatten-one 섞인 배열 | 3 | 예 |
+| 36 | chunk 청크 분할 | 3 | 예 |
+| 37 | chunk 균등 분할 | 3 | 예 |
+| 38 | compact 콤팩트 | 3 | 예 |
+| 39 | compact 모두 유효 | 3 | 예 |
+| 40 | random-element 선택 | 3 | 예 |
+| 41 | random-element 단일원소 | 3 | 예 |
+
+### 재시도 방법과 검증 범위
+
+- 네 Set의 멤버십 검사를 문자열 리터럴 `switch`로 대체했다. 공유 Set, 다른 공유 가변 객체, 식마다 만드는 Set 모두 없다.
+- 원래 우선순위에 따른 112개 이름과 처리 함수 대응을 정적으로 비교했고 모두 같았다. 중복 `?.` 멤버는 한 case로 표현했다. 분기 앞뒤 소스가 그대로임도 확인했다.
+- 수정 커밋: `414a5a4b25b07081b024886b1df513da2e1d289d`.
+- [T-23 측정 및 Jest 실행 43220493014](https://api.github.com/repositories/1215150205/actions/runs/43220493014): 기존 수동 워크플로를 `run_jest=true`로 실행했다. 워크플로·테스트·제한·실행기 변경은 없다. 로컬 컴파일·벤치마크·Jest 실행은 하지 않았다.
+- 실패 확인 후 최적화 되돌림: `8273b1dd2dfec1cafc719c0e435289e0ac0c63fa`. 인터프리터는 시작 커밋과 동일하다. 실행 중인 GitHub 작업은 수정 커밋을 계속 검증한다.
+
+### 자기 컴파일 측정
+
+| 구분 | 1회 | 2회 | 3회 | 평균 | 최대 RSS |
+|---|---:|---:|---:|---:|---:|
+| T-22 기준 | 42.46초 | 42.46초 | 42.91초 | 42.61초 | 464,904 KiB |
+| T-23 수정 | 15.18초 | 15.05초 | 14.99초 | 15.0733초 | 459,040 KiB |
+
+- 산술 개선율: 64.6249%. 세 번의 최대-최소 차이 / 평균: 1.26%.
+- 두 실행 모두 Ubuntu 24.04, Node v24.22.2, x86_64, CPU 4개다. **기준은 AMD EPYC 7763, 이번은 Intel Xeon Platinum 8370C로 CPU 모델이 다르다. 따라서 이 비율을 코드 수정만의 효과로 확정하지 않는다.**
+- 세 번 모두 생성 SHA-256은 기준과 같은 `98e1bc80bd90dd04eddc33ed23de1bf4abd7a47acef38148eea4a8e44ff89d73`이다. 실행 의미 동등성까지 증명한 것은 아니다.
+- 측정 TSV SHA-256: `a9a751fcc622e9cb49e212c956795f7df60498dc179ffd2895466b0d8a376a4c`.
+- 환경 기록 SHA-256: `458b0d217d610872e92c5bc29b510dcd8b6f21419481a832cde9d009fd1b154b`.
+- 수정 전 CI 전체 로그 SHA-256: `2b8c7c43c38305852b1e798239830b17078efe68549cfbede51627f657d82a60`.
+
+### 최종 Jest 결과 및 판정
+
+| 묶음 | 통과 | 실패 | 건너뜀 | todo | 종료 상태 |
+|---|---:|---:|---:|---:|---|
+| 1 | 380 | 5 | 0 | 0 | 완료, 실패 |
+| 2 | 확인 불가 | 확인 불가 | 확인 불가 | 확인 불가 | 30분 제한으로 취소, 집계 없음 |
+| 3 | 553 | 36 | 0 | 0 | 완료, 실패 |
+| 집계 가능한 두 묶음만 | 933 | 41 | 0 | 0 | 전체 1,432개 집계가 아님 |
+
+- 샤드 1·3의 실패 항목 집합은 각각 T-22와 정확히 같다.
+- 샤드 2의 GitHub 주석: `The job has exceeded the maximum execution time of 30m0s`. 결과 JSON 파일을 찾지 못했다는 주석도 있으며, 해당 샤드의 결과 아티팩트는 없다.
+- 샤드 2는 12:43:46 UTC에 테스트 파일 하나의 PASS를 출력하고, 13:13:35 UTC에 취소됐다. 최종 Tests/Test Suites 집계는 없다. 무한 반복 여부는 이 로그만으로 확인할 수 없다.
+- 샤드 2 로그 SHA-256: `5c7e5bdebd8268decc9dbb608b47f92f9a068d3c47c6bfe98dddb94dd53f51d7`.
+- **T23=닫기(되돌림).** 실패 41개가 남았고 샤드 2도 시간 제한에 걸렸다. 전체 1,432개 통과나 언어 성과 달성을 주장하지 않는다.
+- 작업 중 변경한 소스는 모두 되돌렸다. 시작 커밋 대비 최종 변경은 이 문서의 맨 아래 추가 내용뿐이다. 기존 CI, 실행기, 테스트, 기대값, 시간 제한, 다른 병목은 수정하지 않았다.
+- GitHub 검증은 한 번 실행했다. 소유자·로컬 경로·비밀값을 기록하지 않았다.
