@@ -5,7 +5,13 @@
 import { spawnSync } from "child_process";
 let _DatabaseSync: any = null;
 function getDatabaseSync() {
-  if (!_DatabaseSync) _DatabaseSync = eval('require')("node:sqlite").DatabaseSync;
+  if (!_DatabaseSync) {
+    const loadBuiltin = (process as any).getBuiltinModule;
+    const sqlite = typeof loadBuiltin === "function"
+      ? loadBuiltin("node:sqlite")
+      : eval('require')("node:sqlite");
+    _DatabaseSync = sqlite.DatabaseSync;
+  }
   return _DatabaseSync;
 }
 
