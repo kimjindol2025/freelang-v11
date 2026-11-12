@@ -1,15 +1,16 @@
 /**
  * L2 Proof: Semantic Preservation Test Suite
  *
- * Stage 1 (bootstrap) vs Stage 2 (self-hosted) 의미 동등성 검증
+ * Bootstrap과 stage1 생성 결과 검증
  * - bootstrap.js로 FL 컴파일 → JS1
  * - stage1.js로 FL 컴파일 → JS2
- * - 런타임 결과 비교
+ * - 생성 JS의 바이트 비교 (실행 의미 동등성은 검증하지 않음)
  */
 
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { execSync } from 'child_process';
 
 const PROJECT_ROOT = path.resolve(__dirname, '../../');
@@ -36,6 +37,7 @@ interface CompilationResult {
   output?: string;
   error?: string;
   jsCode?: string;
+  jsBytes?: Buffer;
 }
 
 /**
@@ -48,8 +50,8 @@ function compileWithBootstrap(flFile: string): CompilationResult {
       `node ${path.join(PROJECT_ROOT, 'bootstrap.js')} run self/all.fl ${flFile} ${jsFile}`,
       { cwd: PROJECT_ROOT, stdio: 'pipe' }
     );
-    const jsCode = fs.readFileSync(jsFile, 'utf-8');
-    return { success: true, jsCode };
+    const jsBytes = fs.readFileSync(jsFile);
+    return { success: true, jsCode: jsBytes.toString('utf-8'), jsBytes };
   } catch (e) {
     return { success: false, error: String(e) };
   }
@@ -73,8 +75,8 @@ function compileWithStage1(flFile: string): CompilationResult {
       `node --stack-size=65536 ${JSON.stringify(stage1File)} run self/all.fl ${JSON.stringify(flFile)} ${JSON.stringify(jsFile)}`,
       { cwd: PROJECT_ROOT, stdio: 'pipe' }
     );
-    const jsCode = fs.readFileSync(jsFile, 'utf-8');
-    return { success: true, jsCode };
+    const jsBytes = fs.readFileSync(jsFile);
+    return { success: true, jsCode: jsBytes.toString('utf-8'), jsBytes };
   } catch (e) {
     return { success: false, error: String(e) };
   } finally {
@@ -159,18 +161,30 @@ describe('L2 Proof: Semantic Preservation (Stage1 vs Bootstrap)', () => {
   });
 
   describe('L2 증명 준비 (Phase 4 이후)', () => {
-    it('stage1.js: bootstrap과 동등성 검증 (file-delete 버그 수정됨)', () => {
-      // TODO: Phase 4에서 stage1.js 파라미터 누락 버그 수정 후
-      // compileWithStage1 함수 활성화 및 이 테스트 실행
+    it('stage1.js: bootstrap과 생성 JS 바이트 동등성 검증', () => {
       const flFile = path.join(TESTS_DIR, '01-arithmetic.fl');
       const bootstrap = compileWithBootstrap(flFile);
       const stage1 = compileWithStage1(flFile);
 
-      // 두 결과가 동일해야 함
       expect(bootstrap.success).toBe(true);
       expect(stage1.success).toBe(true);
-      // 실행 결과 비교
-      // expect(bootstrapOutput).toEqual(stage1Output);
+      expect(bootstrap.jsBytes).toBeDefined();
+      expect(stage1.jsBytes).toBeDefined();
+
+      const bootstrapBytes = bootstrap.jsBytes!;
+      const stage1Bytes = stage1.jsBytes!;
+      if (!bootstrapBytes.equals(stage1Bytes)) {
+        const commonLength = Math.min(bootstrapBytes.length, stage1Bytes.length);
+        let firstDifference = 0;
+        while (firstDifference < commonLength && bootstrapBytes[firstDifference] === stage1Bytes[firstDifference]) {
+          firstDifference++;
+        }
+        const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+        throw new Error(
+          `Generated JS differs: bootstrap SHA-256=${sha(bootstrapBytes)}, ` +
+          `stage1 SHA-256=${sha(stage1Bytes)}, first differing byte offset=${firstDifference}`
+        );
+      }
     });
 
     it('stage2 동작성 확인 (자동화 스크립트 verify-l2.sh 참고)', () => {
@@ -201,17 +215,12 @@ describe('L2 Proof: Semantic Preservation (Stage1 vs Bootstrap)', () => {
 /**
  * NOTE: Phase 4 예정 사항
  *
- * 1. stage1.js 파라미터 누락 버그 수정 후:
- *    - compileWithStage1 함수 활성화
- *    - stage1 vs bootstrap 결과 비교 테스트 활성화
- *    - jest 실행: npm test -- semantic-preservation
- *
- * 2. verify-l2.sh 스크립트로 자동화:
+ * 1. verify-l2.sh 스크립트로 자동화:
  *    - 모든 케이스 일괄 검증
  *    - CI/CD 파이프라인 통합
  *    - 성공 기준: 12/12 PASS
  *
- * 3. 성능 검증 (선택적):
+ * 2. 성능 검증 (선택적):
  *    - 동일 입력에 대한 실행 시간 비교
  *    - stage1 ≥ bootstrap × 0.8 목표
  */
