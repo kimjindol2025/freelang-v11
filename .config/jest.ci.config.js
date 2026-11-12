@@ -8,4 +8,5 @@ module.exports = {
   coverageThreshold: undefined,
   verbose: false,
   reporters: ['default'],
+  testResultsProcessor: '<rootDir>/.config/jest-ci-results-processor.js',
 };
