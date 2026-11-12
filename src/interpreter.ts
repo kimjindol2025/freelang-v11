@@ -71,6 +71,11 @@ import type {
   ModuleInfo,
 } from "./interpreter-context";
 
+const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
+const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
+const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
+const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","comp","pipe","->","->>","as->","?.","?.","|>","??","let","set","if","if-let","when","when-not","when-let","unless","cond","case","for","do","begin","progn","loop","recur","while","doseq","dotimes","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return","group-by","group_by","safe-get","safe_get","partial","memoize","deftest","describe","it","is","is=","run-tests","test-summary","import","migrate","trace","with-trace","defcontract","with-budget","fn-meta","check-arg-type","validate-args"]);
+
 // Interpreter class
 export class Interpreter {
   public context: ExecutionContext; // Public for testing
@@ -1702,10 +1707,6 @@ export class Interpreter {
     }
 
     // Phase 57: Dispatch to specialized modules
-    const AI_OPS = new Set(["search","fetch","learn","recall","remember","forget","observe","analyze","decide","act","verify","await"]);
-    const INFRA_OPS = new Set(["DOCKERFILE","dockerfile","DOCKER-COMPOSE","docker-compose","K8S-DEPLOYMENT","deployment","K8S-SERVICE","service","K8S-INGRESS","ingress","GITHUB-ACTIONS","github-actions","ci","AWS-S3","aws-s3","AWS-LAMBDA","aws-lambda","AWS-RDS","aws-rds","GCP-RUN","gcp-run","AZURE-FUNCTION","azure-function"]);
-    const STYLE_OPS = new Set(["STYLE","style","THEME","theme"]);
-    const SPECIAL_OPS = new Set(["fn","defn","defun","async","set!","define","func-ref","call","compose","comp","pipe","->","->>","as->","?.","?.","|>","??","let","set","if","if-let","when","when-not","when-let","unless","cond","case","for","do","begin","progn","loop","recur","while","doseq","dotimes","and","or","defmacro","macroexpand","defstruct","defprotocol","impl","parallel","race","with-timeout","fl-try","use","defprop","map-keys","map_keys","map-vals","map_vals","return","group-by","group_by","safe-get","safe_get","partial","memoize","deftest","describe","it","is","is=","run-tests","test-summary","import","migrate","trace","with-trace","defcontract","with-budget","fn-meta","check-arg-type","validate-args"]);
 
     if (AI_OPS.has(op)) return evalAiBlock(this, op, expr);
     if (INFRA_OPS.has(op)) return evalInfraBlock(this, op, expr);
@@ -1971,21 +1972,21 @@ export class Interpreter {
       // DU-1: Dispatch Unification Phase 1 — Adapter Layer
       // 먼저 unified resolveFunction으로 함수를 찾아보고, 찾으면 호출
       // 못 찾으면 기존 evalBuiltin으로 fallback (backward compat)
+      let duAdapter: any;
+      let resolved: any;
       try {
         // DU-1: 캐시된 어댑터 사용 (성능 최적화 — 매 호출마다 require() 불필요)
         if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: resolveFunction 시도...`);
-        const duAdapter = Interpreter.getDUAdapter();
-        const resolved = duAdapter.resolveFunction(this, op);
+        duAdapter = Interpreter.getDUAdapter();
+        resolved = duAdapter.resolveFunction(this, op);
         if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: resolved=${resolved ? "yes" : "no"}`);
-        if (resolved) {
-          // DU path: unified function call
-          if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: callFunction 호출...`);
-          return duAdapter.callFunction(this, op, args, expr);
-        }
       } catch (_duErr: any) {
         // DU error: fallback to evalBuiltin
         if (Interpreter._duDebugEnabled) console.log(`[DU-1] ${op}: DU 오류: ${_duErr?.message}`);
       }
+      // Once resolved, a runtime error must propagate; retrying through the
+      // legacy path duplicates side effects and repeats failed recursive work.
+      if (resolved) return duAdapter.callFunction(this, op, args, expr);
 
       // Fallback to evalBuiltin (legacy path)
       if (process.env.DU_DEBUG) console.log(`[DU-INTERP] ${op}: fallback to evalBuiltin`);

@@ -77,7 +77,9 @@ function propagateMutations(
 }
 
 const MAX_CALL_DEPTH = 5000; // Phase 61: 상향 (trampoline이 처리하므로 안전망 역할)
-const MAX_TCO_ITERATIONS = 10;
+// Tail calls do not grow the JS stack, but still need a finite work bound.
+// Use the existing call-depth budget; ten steps rejects ordinary traversals.
+const MAX_TCO_ITERATIONS = MAX_CALL_DEPTH;
 
 // ── 런타임 타입 시스템 ────────────────────────────────────────────────────────
 function _flCheckType(type: string, val: any): boolean {
@@ -761,7 +763,7 @@ export function callUserFunctionTCO(interp: InterpreterLike, name: string, args:
       }
       return result;
     }
-    throw new Error(`TCO: 최대 반복(2,000,000) 초과 — '${currentName}'에서 무한 재귀 가능성`);
+    throw new Error(`TCO: 최대 반복(${MAX_TCO_ITERATIONS}) 초과 — '${currentName}'에서 무한 재귀 가능성`);
   } finally {
     if (_haveFrame) _popEffectFrame();
     (interp as any).tcoMode = prevTcoMode;

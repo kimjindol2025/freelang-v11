@@ -195,11 +195,11 @@ export function callFunction(
 
   // Effect 검증 (fn.effects 기준만)
   if (fn.effects && fn.effects.length > 0) {
-    const { _enforceEffect } = require("./effect-enforcer");
+    const { enforceCall } = require("./effect-enforcer");
     const spanInfo = span
       ? { file: span.file ?? "", line: span.line ?? 0, col: span.col ?? 0 }
       : { file: "", line: 0, col: 0 };
-    _enforceEffect(fn.effects, spanInfo);
+    enforceCall({ name: fn.name, effects: new Set(fn.effects) }, spanInfo);
   }
 
   // 함수 실행
