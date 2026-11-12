@@ -1,0 +1,87 @@
+name: T26 T21 Baseline and Switch Verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out T21 baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 2b70d9104c4e85cbaf714a04e5e7e1aa5609cf2f
+          path: baseline
+          persist-credentials: false
+      - name: Check out switch candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: baseline/package-lock.json
+      - name: Prepare compilers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp baseline/package-lock.json candidate/package-lock.json
+          cmp baseline/self/all.fl candidate/self/all.fl
+          for revision in baseline candidate; do
+            (cd "$revision" && npm ci --prefer-offline && npm run build)
+          done
+      - name: Compile and compare on the same runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          {
+            printf 'baseline_commit=%s\n' "$(git -C baseline rev-parse HEAD)"
+            printf 'candidate_commit=%s\n' "$(git -C candidate rev-parse HEAD)"
+            printf 'node=%s\n' "$(node --version)"
+            printf 'architecture=%s\n' "$(uname -m)"
+            printf 'cpu_count=%s\n' "$(nproc)"
+            lscpu | awk -F: '/Model name/ {sub(/^[[:space:]]+/, "", $2); print "cpu_model=" $2}'
+            printf 'order=baseline,candidate,baseline,candidate,baseline,candidate\n'
+          } > evidence/environment.txt
+          printf 'revision\trun\tseconds\tmax_rss_kib\tsha256\n' > evidence/measurements.tsv
+          reference=''
+          identical=yes
+          for run in 1 2 3; do
+            for revision in baseline candidate; do
+              generated="$RUNNER_TEMP/t26-$revision-$run.js"
+              timing="$RUNNER_TEMP/t26-$revision-$run.time"
+              (
+                cd "$revision"
+                /usr/bin/time -f '%e\t%M' -o "$timing" \
+                  node --stack-size=65536 bootstrap.js run self/all.fl self/all.fl "$generated" \
+                  > "$RUNNER_TEMP/t26-$revision-$run.log" 2>&1
+              )
+              test -s "$generated"
+              read -r seconds rss < "$timing"
+              digest=$(sha256sum "$generated" | cut -d ' ' -f 1)
+              printf '%s\t%s\t%s\t%s\t%s\n' "$revision" "$run" "$seconds" "$rss" "$digest" \
+                | tee -a evidence/measurements.tsv
+              if [ -z "$reference" ]; then
+                reference="$generated"
+              elif ! cmp -s "$reference" "$generated"; then
+                identical=no
+              fi
+            done
+          done
+          printf 'output_equal=%s\n' "$identical" | tee evidence/equality.txt
+          test "$identical" = yes
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t26-paired-evidence
+          path: evidence/
+          retention-days: 30
